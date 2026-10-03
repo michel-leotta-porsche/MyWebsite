@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Richtung A2 · Systemplan hell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: randabfallende Wortmarke oben, darunter ein Plan aus Haarlinien.
+   Monochrom, Bernstein nur als einzelnes Signal. Keine Radien, keine Schatten. */
+:root {
+  --font-sans: "Schibsted Grotesk", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ease-out-expo: cubic-bezier(.19, 1, .22, 1);
+  --ease-in-out-cubic: cubic-bezier(.645, .045, .355, 1);
+  --ease-in-cubic: cubic-bezier(.55, .055, .675, .19);
+  --dur-1: 160ms;
+  --dur-2: 500ms;
+  --dur-3: 1000ms;
+  --gutter: clamp(16px, 4.4vw, 64px);
+}
+[data-theme="light"] {
+  --bg: #edece8;
+  --bg-2: #e4e3de;
+  --ink: #1f1f1d;
+  --muted: #64635e;
+  --faint: #a3a29c;
+  --line: #cfcdc6;
+  --signal: #ffb224;
+  --signal-ink: #1f1f1d;
+  --signal-text: #8a5300;
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --bg: #141412;
+  --bg-2: #1b1b19;
+  --ink: #e9e8e3;
+  --muted: #9a9993;
+  --faint: #5c5b56;
+  --line: #2f2e2a;
+  --signal: #ffb224;
+  --signal-ink: #141412;
+  --signal-text: #ffb224;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--font-sans); -webkit-font-smoothing: antialiased; transition: background var(--dur-2), color var(--dur-2); }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--signal-text); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cap { font: 500 11px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .16em; }
+.muted { color: var(--muted); }
+.frame::before { content: "▸ "; } .frame::after { content: " ◂"; }
+.frame::before, .frame::after { font-size: .8em; color: var(--faint); transition: color var(--dur-1); }
+.px { padding-inline: var(--gutter); }
+
+/* Passermarken am Rand */
+.reg { position: fixed; top: 50%; transform: translateY(-50%); font: 600 22px/1 var(--font-sans); color: var(--faint); letter-spacing: -.02em; z-index: 1; pointer-events: none; }
+.reg.l { left: 6px; } .reg.r { right: 6px; }
+@media (max-width: 760px) { .reg { display: none; } }
+
+/* ---------- Kopf ---------- */
+.top { padding-top: 22px; }
+.wordmark { display: block; font: 700 12vw/.8 var(--font-sans); letter-spacing: -.055em; white-space: nowrap; margin: 0 0 0 -.04em; }
+.runline { position: relative; height: 1px; background: var(--line); margin-top: 22px; }
+.runline i { position: absolute; inset: 0; background: var(--ink); transform-origin: left; transform: scaleX(var(--p, 1)); }
+.navrow { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 16px; align-items: center; padding-block: 16px; border-bottom: 1px solid var(--line); }
+.navrow .who { grid-column: 1 / 4; }
+.navrow nav { grid-column: 4 / 11; display: flex; justify-content: space-between; }
+.navrow nav a:hover .frame::before, .navrow nav a:hover .frame::after, .navrow nav a:hover::before, .navrow nav a:hover::after { color: var(--signal-text); }
+.navrow nav a.frame:hover::before, .navrow nav a.frame:hover::after { color: var(--signal-text); }
+.tools { grid-column: 11 / 13; display: flex; justify-content: flex-end; gap: 14px; }
+.tg { all: unset; cursor: pointer; font: 500 11px/1.5 var(--font-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.tg[aria-pressed="true"] { color: var(--ink); }
+.tg:focus-visible { outline: 2px solid var(--signal-text); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .navrow { grid-template-columns: 1fr auto; row-gap: 10px; }
+  .navrow .who { grid-column: 1; }
+  .navrow .tools { grid-column: 2; }
+  .navrow nav { grid-column: 1 / -1; flex-wrap: wrap; gap: 6px 18px; justify-content: flex-start; }
+}
+
+/* ---------- Hero ---------- */
+.hero { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 16px; padding-block: 56px 0; }
+.intro { grid-column: 1 / 5; align-self: start; }
+.intro .cap { color: var(--ink); max-width: 34ch; }
+.avail { display: flex; align-items: center; gap: 10px; margin-top: 22px; }
+.dot { width: 7px; height: 7px; background: var(--signal); border-radius: 50%; flex: none; }
+.statement { grid-column: 1 / 8; margin: 72px 0 0; font: 500 clamp(1.7rem, 3.3vw, 3rem)/1.08 var(--font-sans); letter-spacing: -.035em; text-wrap: balance; }
+.statement em { font-style: normal; color: var(--muted); }
+.ctas { grid-column: 1 / 8; display: flex; gap: 28px; align-items: center; margin-top: 32px; flex-wrap: wrap; }
+.cta-main { display: inline-flex; align-items: center; gap: 12px; height: 48px; padding: 0 22px; background: var(--ink); color: var(--bg); font: 500 12px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; transition: background var(--dur-1); }
+.cta-main .sq { width: 8px; height: 8px; background: var(--signal); transition: transform var(--dur-2) var(--ease-out-expo); }
+.cta-main:hover .sq { transform: rotate(45deg) scale(1.15); }
+.cta-sub { border-bottom: 1px solid var(--line); padding-bottom: 3px; transition: border-color var(--dur-1); }
+.cta-sub:hover { border-color: var(--ink); }
+
+/* Signatur: Ablauf */
+.plan { grid-column: 8 / 13; grid-row: 1 / 4; align-self: start; border-top: 1px solid var(--ink); }
+.plan-head { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.plan ol { list-style: none; margin: 0; padding: 0; position: relative; }
+.plan ol::before { content: ""; position: absolute; left: 7px; top: 22px; bottom: 22px; width: 1px; background: var(--line); }
+.plan ol .fill { position: absolute; left: 7px; top: 22px; bottom: 22px; width: 1px; background: var(--ink); transform-origin: top; transform: scaleY(var(--p, 1)); }
+.plan li { position: relative; display: grid; grid-template-columns: 15px 1fr auto; gap: 16px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.plan .node { width: 15px; height: 15px; border: 1px solid var(--ink); background: var(--bg); align-self: center; position: relative; z-index: 1; transition: background var(--dur-2) var(--ease-out-expo); }
+.plan li.done .node { background: var(--ink); }
+.plan li.active .node { background: var(--signal); border-color: var(--signal); }
+.plan .lbl { font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
+.plan .lbl small { display: block; font: 400 11px/1.5 var(--font-mono); letter-spacing: .06em; color: var(--muted); margin-top: 2px; }
+.plan .st { font: 500 11px var(--font-mono); letter-spacing: .14em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan li.done .st { color: var(--ink); }
+.plan li.active .st { color: var(--signal-text); }
+.plan-foot { display: flex; justify-content: space-between; padding: 10px 0; }
+.plan-foot b { font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 960px) {
+  .hero { grid-template-columns: 1fr; padding-top: 36px; }
+  .intro, .statement, .ctas, .plan { grid-column: 1; grid-row: auto; }
+  .statement { margin-top: 40px; }
+  .plan { margin-top: 48px; }
+}
+
+/* ---------- Sektionen ---------- */
+.sec { margin-top: 120px; }
+@media (max-width: 600px) { .sec { margin-top: 80px; } }
+.sec-bar { display: flex; justify-content: space-between; align-items: baseline; padding-block: 12px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--line); }
+.sec-title { font: 600 clamp(2rem, 5vw, 4.4rem)/.95 var(--font-sans); letter-spacing: -.045em; margin: 36px 0 40px; }
+
+/* Projekte: randlose Kacheln mit Caption-Leisten */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-block: 1px solid var(--line); }
+@media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
+.tile { position: relative; background: var(--bg); display: flex; flex-direction: column; cursor: pointer; }
+.tile.wide { grid-column: 1 / -1; }
+.tile-art { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--bg-2); }
+.tile.wide .tile-art { aspect-ratio: 21 / 8; }
+@media (max-width: 760px) { .tile.wide .tile-art { aspect-ratio: 16 / 10; } }
+@media (max-width: 760px) { .tile-art svg { opacity: .45; } }
+.tile-art svg { position: absolute; inset: 0; width: 100%; height: 100%; transition: transform var(--dur-3) var(--ease-out-expo); }
+.tile:hover .tile-art svg { transform: scale(1.03); }
+.tile-art .big { position: absolute; left: 24px; bottom: 18px; font: 600 clamp(1.4rem, 2.4vw, 2.2rem)/1.05 var(--font-sans); letter-spacing: -.035em; max-width: 18ch; }
+.cbar { display: flex; justify-content: space-between; gap: 16px; padding: 14px 24px; border-top: 1px solid var(--line); }
+.cursor-label { position: fixed; left: 0; top: 0; z-index: 20; pointer-events: none; padding: 7px 10px; background: var(--ink); color: var(--bg); opacity: 0; transform: translate(-50%, -150%); transition: opacity var(--dur-1); white-space: nowrap; }
+.cursor-label.on { opacity: 1; }
+@media (hover: none), (pointer: coarse) { .cursor-label { display: none; } }
+
+/* Notizen */
+.notes { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 16px; }
+.notes .lead { grid-column: 1 / 6; }
+.notes ul { grid-column: 7 / 13; list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+@media (max-width: 960px) { .notes .lead, .notes ul { grid-column: 1 / -1; } .notes ul { margin-top: 40px; } }
+.lead .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); font: 400 12px/1.7 var(--font-mono); }
+.lead .cmp div { background: var(--bg); padding: 14px 14px 16px; overflow-x: auto; }
+.lead .cmp b { display: block; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.lead .cmp .x { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+.lead h3 { font: 600 clamp(1.5rem, 2.4vw, 2.1rem)/1.08 var(--font-sans); letter-spacing: -.03em; margin: 26px 0 12px; text-wrap: balance; }
+.lead p { margin: 0 0 18px; color: var(--muted); max-width: 52ch; }
+.lead .meta { display: flex; gap: 22px; }
+.notes li a { display: grid; grid-template-columns: 1fr auto; gap: 8px 20px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.notes li .t { font-size: 1.15rem; font-weight: 500; letter-spacing: -.02em; line-height: 1.25; grid-column: 1; }
+.notes li .m { grid-column: 1; }
+.notes li .arr { grid-row: 1 / 3; grid-column: 2; align-self: center; font: 500 14px var(--font-mono); color: var(--faint); transition: transform var(--dur-2) var(--ease-out-expo), color var(--dur-1); }
+.notes li a:hover .arr { transform: translateX(6px); color: var(--signal-text); }
+.notes li a:hover .t { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+
+/* Spezifikation */
+.spec { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-block: 1px solid var(--line); }
+@media (max-width: 960px) { .spec { grid-template-columns: 1fr; } }
+.spec > div { background: var(--bg); padding: 24px 24px 28px 0; }
+.spec > div + div { padding-left: 24px; }
+@media (max-width: 960px) { .spec > div, .spec > div + div { padding: 24px 0; } }
+.chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: 16px; }
+.chips div { background: var(--bg); }
+.chips i { display: block; height: 56px; }
+.chips span { display: block; padding: 8px 10px 10px; font: 400 11px/1.5 var(--font-mono); color: var(--muted); }
+.chips b { display: block; color: var(--ink); font-weight: 500; }
+.spec .sp1 { font: 700 56px/1 var(--font-sans); letter-spacing: -.055em; margin-top: 16px; }
+.spec .sp2 { font: 500 13px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .16em; margin-top: 18px; }
+.spec small { display: block; margin-top: 6px; font: 400 11px/1.5 var(--font-mono); color: var(--muted); }
+.spec p { color: var(--muted); font-size: 14.5px; margin: 14px 0 0; }
+.spec p b { color: var(--ink); font-weight: 500; }
+.replay { all: unset; cursor: pointer; margin-top: 16px; border-bottom: 1px solid var(--line); }
+.replay:hover { border-color: var(--ink); }
+
+/* Footer-Monogramm */
+footer { margin-top: 120px; border-top: 1px solid var(--ink); display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 16px; padding-block: 28px 40px; }
+.mono-grid { grid-column: 1 / 4; display: grid; grid-template-columns: repeat(4, 1.6em); gap: 2px 0; font: 600 22px/1 var(--font-sans); }
+.mono-grid .s { color: var(--signal-text); }
+footer .f2 { grid-column: 5 / 9; display: flex; flex-direction: column; gap: 6px; }
+footer .f3 { grid-column: 9 / 13; display: flex; flex-direction: column; gap: 6px; text-align: right; }
+@media (max-width: 760px) { footer { grid-template-columns: 1fr; gap: 28px; } .mono-grid, footer .f2, footer .f3 { grid-column: 1; text-align: left; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<span class="reg l" aria-hidden="true">ML</span><span class="reg r" aria-hidden="true">ML</span>
+<div class="cursor-label cap" id="cursor" aria-hidden="true"><span class="frame" data-i18n="cur">Case ansehen</span></div>
+
+<header class="top px">
+  <h1 style="margin:0"><span class="wordmark">MICHEL LEOTTA</span><span class="sr-only" data-i18n="h1sr">, Software Engineer und System Architect für KI-Anwendungen</span></h1>
+  <div class="runline" aria-hidden="true"><i id="runline"></i></div>
+  <div class="navrow">
+    <span class="who cap muted">Software Engineer · System Architect</span>
+    <nav aria-label="Hauptnavigation" class="cap">
+      <a href="#" class="frame" data-i18n="n1">Leistungen</a>
+      <a href="#projekte" class="frame" data-i18n="n2">Projekte</a>
+      <a href="#" class="frame" data-i18n="n3">Über mich</a>
+      <a href="#notizen" class="frame">Blog</a>
+      <a href="#" class="frame" data-i18n="n4">Kontakt</a>
+    </nav>
+    <div class="tools">
+      <span role="group" aria-label="Sprache"><button class="tg" type="button" data-lang="de" aria-pressed="true">DE</button> <button class="tg" type="button" data-lang="en" aria-pressed="false">EN</button></span>
+      <span role="group" aria-label="Farbschema"><button class="tg" type="button" data-theme-set="light" aria-pressed="true" aria-label="Hell">○</button> <button class="tg" type="button" data-theme-set="dark" aria-pressed="false" aria-label="Dunkel">●</button></span>
+    </div>
+  </div>
+</header>
+
+<main class="px">
+  <section class="hero">
+    <div class="intro">
+      <p class="cap" style="margin:0" data-i18n="intro">Full-Stack-Entwicklung und Systemarchitektur für KI-Anwendungen. Von der Anforderung über Agenten und RAG bis zur Cloud-Infrastruktur. Stuttgart und remote.</p>
+      <div class="avail cap"><span class="dot" aria-hidden="true"></span><span data-i18n="avail">Offen für Projekte</span></div>
+    </div>
+
+    <p class="statement" data-i18n-html="st">Ich baue KI-Produkte, <em>die im Arbeitsalltag wirklich genutzt werden.</em></p>
+    <div class="ctas cap">
+      <a class="cta-main" href="#"><span class="sq" aria-hidden="true"></span><span data-i18n="c1">Projekt besprechen</span></a>
+      <a class="cta-sub" href="#projekte" data-i18n="c2">Projekte ansehen</a>
+    </div>
+
+    <!-- Signatur: Ein Ablauf läuft einmal durch. Ohne JS oder mit reduzierter Bewegung steht der Endzustand. -->
+    <div class="plan" aria-label="Beispielablauf: aus einer Anforderung werden Testfälle">
+      <div class="plan-head cap"><span data-i18n="ph">Ablauf · Anforderung → Test</span><span class="muted" id="state">fertig</span></div>
+      <ol>
+        <span class="fill" id="fill" aria-hidden="true"></span>
+        <li class="done"><span class="node" aria-hidden="true"></span><span class="lbl" data-i18n-html="s1">Anforderung eingelesen<small>REQ-0142 · PDF, 6 Seiten</small></span><span class="st">OK</span></li>
+        <li class="done"><span class="node" aria-hidden="true"></span><span class="lbl" data-i18n-html="s2">Kontext abgerufen<small>GraphRAG · Neo4j</small></span><span class="st">OK</span></li>
+        <li class="done"><span class="node" aria-hidden="true"></span><span class="lbl" data-i18n-html="s3">Agent plant Testfälle<small>LangGraph · 4 Schritte</small></span><span class="st">OK</span></li>
+        <li class="done"><span class="node" aria-hidden="true"></span><span class="lbl" data-i18n-html="s4">Spezifikation erzeugt<small>12 Testfälle · strukturiert</small></span><span class="st">OK</span></li>
+        <li class="done"><span class="node" aria-hidden="true"></span><span class="lbl" data-i18n-html="s5">Review &amp; Freigabe<small>Mensch entscheidet</small></span><span class="st">OK</span></li>
+      </ol>
+      <div class="plan-foot cap muted"><span data-i18n="pf">Beispiel</span><b id="pct">100 %</b></div>
+    </div>
+  </section>
+
+  <section class="sec" id="projekte" aria-labelledby="proj-h">
+    <div class="sec-bar cap"><span class="frame" data-i18n="pr">Ausgewählte Projekte</span><span class="muted">2022 — 2026</span></div>
+    <h2 class="sec-title" id="proj-h" data-i18n="prh">Gebaut, betrieben, genutzt.</h2>
+    <div class="tiles">
+      <a class="tile wide" href="#">
+        <div class="tile-art" aria-hidden="true">
+          <svg viewBox="0 0 1050 400" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--faint)">
+            <g opacity=".9"><line x1="0" y1="200" x2="1050" y2="200"/><line x1="0" y1="120" x2="1050" y2="120" stroke-dasharray="2 6"/><line x1="0" y1="280" x2="1050" y2="280" stroke-dasharray="2 6"/></g>
+            <g style="color:var(--ink)" stroke="currentColor"><rect x="560" y="176" width="48" height="48"/><rect x="700" y="96" width="48" height="48"/><rect x="700" y="256" width="48" height="48"/><rect x="860" y="176" width="48" height="48" fill="var(--signal)" stroke="var(--signal)"/>
+            <path d="M608 200 H650 V120 H700 M650 200 V280 H700 M748 120 H800 V200 H860 M748 280 H800 V200"/></g>
+          </svg>
+          <span class="big" data-i18n="t1">KI-Tool: aus Anforderungen werden Testspezifikationen</span>
+        </div>
+        <div class="cbar cap"><span data-i18n="t1c">Tech Lead · Full Stack · AWS · Terraform</span><span>Porsche</span></div>
+      </a>
+      <a class="tile" href="#">
+        <div class="tile-art" aria-hidden="true">
+          <svg viewBox="0 0 520 325" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" style="color:var(--faint)">
+            <g style="color:var(--ink)"><circle cx="300" cy="120" r="6" fill="currentColor"/><circle cx="380" cy="80" r="4"/><circle cx="420" cy="160" r="4"/><circle cx="340" cy="200" r="4"/><circle cx="240" cy="70" r="4"/><circle cx="460" cy="100" r="6" fill="var(--signal)" stroke="var(--signal)"/>
+            <path d="M300 120 L380 80 L460 100 M300 120 L420 160 L460 100 M300 120 L340 200 L420 160 M300 120 L240 70"/></g>
+          </svg>
+          <span class="big" data-i18n="t2">KI-Assistenz für das Fehlermanagement</span>
+        </div>
+        <div class="cbar cap"><span>LangGraph · GraphRAG · Neo4j</span><span>Porsche</span></div>
+      </a>
+      <a class="tile" href="#">
+        <div class="tile-art" aria-hidden="true">
+          <svg viewBox="0 0 520 325" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" style="color:var(--faint)">
+            <g><rect x="250" y="60" width="90" height="56"/><rect x="250" y="134" width="90" height="56"/><rect x="250" y="208" width="90" height="56"/></g>
+            <g style="color:var(--ink)"><rect x="390" y="134" width="90" height="56"/><path d="M340 88 H365 V162 H390 M340 162 H390 M340 236 H365 V162"/></g>
+          </svg>
+          <span class="big" data-i18n="t3">Cloud-Migration Jira &amp; Confluence</span>
+        </div>
+        <div class="cbar cap"><span data-i18n="t3c">Migrationsstrategie · Power BI</span><span>TRUMPF</span></div>
+      </a>
+    </div>
+  </section>
+
+  <section class="sec" id="notizen" aria-labelledby="notes-h">
+    <div class="sec-bar cap"><span class="frame" data-i18n="nb">Notizen</span><a class="muted" href="#" data-i18n="all">Alle Beiträge →</a></div>
+    <h2 class="sec-title" id="notes-h" data-i18n="nh">Aus der Praxis.</h2>
+    <div class="notes">
+      <a class="lead" href="#">
+        <div class="cmp" aria-hidden="true">
+          <div><b data-i18n="o1">Ohne Context7</b><span class="x">@tailwind base;</span><br><span class="x">tailwind.config.js</span><br><span class="x">bg-opacity-50</span></div>
+          <div><b data-i18n="o2">Mit Context7</b>@import "tailwindcss";<br>@theme { … }<br>bg-black/50</div>
+        </div>
+        <h3>Vibecoding ohne Halluzinationen: Best Practices mit Context7</h3>
+        <p>Dein Agent schreibt Code für eine Library-Version, die du gar nicht installiert hast. So gibst du ihm aktuelle Dokumentation statt Erinnerungen.</p>
+        <div class="meta cap muted"><span>03.10.2026</span><span>14 Min.</span><span>MCP</span></div>
+      </a>
+      <ul>
+        <li><a href="#"><span class="t">38 Tricks für Claude Code, die wirklich etwas ändern</span><span class="m cap muted">Workflow · 25 Min.</span><span class="arr" aria-hidden="true">→</span></a></li>
+        <li><a href="#"><span class="t">Schluss mit der Blackbox: LLM-Apps tracen mit Langfuse</span><span class="m cap muted">Observability · 15 Min.</span><span class="arr" aria-hidden="true">→</span></a></li>
+        <li><a href="#"><span class="t">GraphRAG mit Neo4j: wann ein Wissensgraph besser ist als Vektorsuche</span><span class="m cap muted" data-i18n="pl">KI · in Arbeit</span><span class="arr" aria-hidden="true">→</span></a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="spec-h">
+    <div class="sec-bar cap"><span class="frame">Spezifikation</span><span class="muted">Richtung A2</span></div>
+    <h2 class="sec-title" id="spec-h">Systemplan, hell.</h2>
+    <div class="spec">
+      <div>
+        <span class="cap muted">Farbpalette</span>
+        <div class="chips">
+          <div><i style="background:#edece8"></i><span><b>Papier</b>#EDECE8</span></div>
+          <div><i style="background:#1f1f1d"></i><span><b>Tinte</b>#1F1F1D</span></div>
+          <div><i style="background:#ffb224"></i><span><b>Signal</b>#FFB224</span></div>
+          <div><i style="background:#64635e"></i><span><b>Grafit</b>#64635E</span></div>
+          <div><i style="background:#cfcdc6"></i><span><b>Linie</b>#CFCDC6</span></div>
+          <div><i style="background:#141412"></i><span><b>Nacht</b>#141412</span></div>
+        </div>
+      </div>
+      <div>
+        <span class="cap muted">Schriftpaar</span>
+        <div class="sp1">MICHEL</div>
+        <small>Schibsted Grotesk · 400–700 · Wortmarke, Headlines, Text</small>
+        <div class="sp2">▸ Leistungen ◂ · 11 px · 0,16 em</div>
+        <small>IBM Plex Mono · 400/500 · Labels, Navigation, Daten</small>
+      </div>
+      <div>
+        <span class="cap muted">Signatur-Animation</span>
+        <p><b>Ablauf mit Fortschrittslinie.</b> Rechts läuft ein KI-Ablauf Schritt für Schritt durch. Die Haarlinie unter der Wortmarke wächst synchron mit, wie Magnetisms Ladelinie, aber ohne die Seite zu blockieren.</p>
+        <p>Dazu: Kacheln ohne Rahmen mit Caption-Leisten, ein Cursor-Label beim Hover, Passermarken am Rand und die Expo-Kurve aus magnetism.fr für alle Übergänge.</p>
+        <button class="replay cap" type="button" id="replay">Animation erneut abspielen</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="px">
+  <div class="mono-grid" aria-hidden="true">
+    <span>M</span><span>L</span><span class="s">↓</span><span>S</span>
+    <span>T</span><span>U</span><span>T</span><span>T</span>
+    <span>G</span><span>A</span><span>R</span><span>T</span>
+  </div>
+  <div class="f2 cap"><span class="muted" data-i18n="fk">Kontakt</span><span>michel.leotta@hotmail.com</span><a href="https://www.linkedin.com/in/michel-leotta-b9b00b106/">LinkedIn ↗</a></div>
+  <div class="f3 cap muted"><span>© 2026 Michel Leotta</span><span>Phase 1 · Entwurf A2</span></div>
+</footer>
+
+<script>
+(() => {
+  const root = document.documentElement;
+  const q = new URLSearchParams(location.search);
+  const setTheme = t => { root.dataset.theme = t; document.querySelectorAll('[data-theme-set]').forEach(b => b.setAttribute('aria-pressed', b.dataset.themeSet === t)); };
+  document.querySelectorAll('[data-theme-set]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+  if (q.get('theme')) setTheme(q.get('theme'));
+
+  const en = {
+    cur: 'View case', h1sr: ', software engineer and system architect for AI applications',
+    n1: 'Services', n2: 'Work', n3: 'About', n4: 'Contact',
+    intro: 'Full-stack development and system architecture for AI applications. From requirements to agents, RAG and cloud infrastructure. Stuttgart and remote.',
+    avail: 'Open for projects',
+    st: 'I build AI products <em>that people actually use at work.</em>',
+    c1: 'Discuss a project', c2: 'See projects',
+    ph: 'Flow · requirement → test', pf: 'Example',
+    s1: 'Requirement ingested<small>REQ-0142 · PDF, 6 pages</small>', s2: 'Context retrieved<small>GraphRAG · Neo4j</small>',
+    s3: 'Agent plans test cases<small>LangGraph · 4 steps</small>', s4: 'Specification generated<small>12 test cases · structured</small>',
+    s5: 'Review &amp; approval<small>A human decides</small>',
+    pr: 'Selected work', prh: 'Built, shipped, used.',
+    t1: 'AI tool: turning requirements into test specifications', t1c: 'Tech lead · full stack · AWS · Terraform',
+    t2: 'AI assistant for defect management', t3: 'Jira &amp; Confluence cloud migration', t3c: 'Migration strategy · Power BI',
+    nb: 'Notes', all: 'All posts →', nh: 'From practice.', o1: 'Without Context7', o2: 'With Context7', pl: 'AI · in progress', fk: 'Contact'
+  };
+  const de = {};
+  const els = () => document.querySelectorAll('[data-i18n],[data-i18n-html]');
+  els().forEach(el => { de[el.dataset.i18n || el.dataset.i18nHtml] = el.innerHTML; });
+  const setLang = l => {
+    root.lang = l; const d = l === 'en' ? en : de;
+    els().forEach(el => { const k = el.dataset.i18n || el.dataset.i18nHtml; if (d[k]) el.innerHTML = d[k]; });
+    document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === l));
+  };
+  document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+  if (q.get('lang')) setLang(q.get('lang'));
+
+  // Cursor-Label auf Projektkacheln (nur feiner Zeiger)
+  const cur = document.getElementById('cursor');
+  if (matchMedia('(pointer: fine)').matches) {
+    document.querySelectorAll('.tile').forEach(t => {
+      t.addEventListener('pointerenter', () => cur.classList.add('on'));
+      t.addEventListener('pointerleave', () => cur.classList.remove('on'));
+      t.addEventListener('pointermove', e => { cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px'; });
+    });
+  }
+
+  // Signatur: Ablauf + Fortschrittslinie. Startet aus dem sichtbaren Endzustand.
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const steps = [...document.querySelectorAll('.plan li')];
+  const fill = document.getElementById('fill'), line = document.getElementById('runline');
+  const state = document.getElementById('state'), pct = document.getElementById('pct');
+  let timers = [], raf;
+  const STEP = 820, T = 300 + STEP * steps.length;
+  const play = () => {
+    if (reduce) return;
+    timers.forEach(clearTimeout); timers = []; cancelAnimationFrame(raf);
+    steps.forEach(s => { s.classList.remove('done', 'active'); s.querySelector('.st').textContent = '—'; });
+    fill.style.setProperty('--p', 0); line.style.setProperty('--p', 0);
+    state.textContent = root.lang === 'en' ? 'running' : 'läuft';
+    const t0 = performance.now();
+    const tick = now => {
+      const p = Math.min(1, (now - t0) / T);
+      line.style.setProperty('--p', p); pct.textContent = String(Math.round(p * 100)).padStart(3, '0') + ' %';
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    steps.forEach((s, i) => {
+      timers.push(setTimeout(() => { s.classList.add('active'); s.querySelector('.st').textContent = '…'; }, 300 + i * STEP));
+      timers.push(setTimeout(() => {
+        s.classList.remove('active'); s.classList.add('done'); s.querySelector('.st').textContent = 'OK';
+        fill.style.setProperty('--p', i / (steps.length - 1));
+        if (i === steps.length - 1) { state.textContent = root.lang === 'en' ? 'done' : 'fertig'; pct.textContent = '100 %'; }
+      }, 300 + i * STEP + 560));
+    });
+  };
+  fill.style.transition = 'transform 700ms cubic-bezier(.19,1,.22,1)';
+  document.getElementById('replay').addEventListener('click', play);
+  if (!q.has('static')) setTimeout(play, 350);
+})();
+</script>
+</body>
+</html>
