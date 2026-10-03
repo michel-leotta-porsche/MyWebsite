@@ -13,7 +13,7 @@ type ProcessRunProps = {
   steps: ProcessStep[]
   /** Beim Mount einmal abspielen. Ohne JS oder mit reduzierter Bewegung steht der Endzustand. */
   autoplay?: boolean
-  /** Fortschritt als --run auf <html> schreiben, damit die Laufline im Kopf mitwächst. */
+  /** Fortschritt als --run auf [data-runline] schreiben, damit die Laufline im Kopf mitwächst. */
   driveRunline?: boolean
   className?: string
   /** Erlaubt einen externen Replay-Button: Zähler hochsetzen spielt erneut ab. */
@@ -41,10 +41,22 @@ export function ProcessRun({
   const reduce = useReducedMotion()
   const [states, setStates] = useState<CheckState[]>(() => steps.map(() => "done"))
   const [fill, setFill] = useState(1)
-  const [pct, setPct] = useState(100)
   const [running, setRunning] = useState(false)
   const timers = useRef<number[]>([])
   const raf = useRef(0)
+  // Fortschritt pro Frame direkt ins DOM, ohne React-Render und ohne Style-Neuberechnung der ganzen Seite.
+  const pctRef = useRef<HTMLElement>(null)
+  const setProgress = useCallback(
+    (p: number | null) => {
+      if (pctRef.current) pctRef.current.textContent = `${String(Math.round((p ?? 1) * 100)).padStart(3, "0")} %`
+      if (!driveRunline) return
+      document.querySelectorAll<HTMLElement>("[data-runline]").forEach((el) => {
+        if (p === null) el.style.removeProperty("--run")
+        else el.style.setProperty("--run", String(p))
+      })
+    },
+    [driveRunline]
+  )
 
   const stop = useCallback(() => {
     timers.current.forEach(clearTimeout)
@@ -56,18 +68,15 @@ export function ProcessRun({
     if (reduce) return
     stop()
     const total = START_MS + STEP_MS * steps.length
-    const root = document.documentElement
     setStates(steps.map(() => "open"))
     setFill(0)
-    setPct(0)
     setRunning(true)
-    if (driveRunline) root.style.setProperty("--run", "0")
+    setProgress(0)
 
     const t0 = performance.now()
     const tick = (now: number) => {
       const p = Math.min(1, (now - t0) / total)
-      setPct(Math.round(p * 100))
-      if (driveRunline) root.style.setProperty("--run", String(p))
+      setProgress(p)
       if (p < 1) raf.current = requestAnimationFrame(tick)
     }
     raf.current = requestAnimationFrame(tick)
@@ -81,13 +90,12 @@ export function ProcessRun({
           setFill(steps.length > 1 ? i / (steps.length - 1) : 1)
           if (i === steps.length - 1) {
             setRunning(false)
-            setPct(100)
-            if (driveRunline) root.style.removeProperty("--run")
+            setProgress(null)
           }
         }, at + SETTLE_MS)
       )
     })
-  }, [reduce, stop, steps, driveRunline])
+  }, [reduce, stop, steps, setProgress])
 
   useEffect(() => {
     if (!autoplay && replayKey === 0) return
@@ -95,9 +103,9 @@ export function ProcessRun({
     return () => {
       clearTimeout(t)
       stop()
-      if (driveRunline) document.documentElement.style.removeProperty("--run")
+      setProgress(null)
     }
-  }, [autoplay, replayKey, play, stop, driveRunline])
+  }, [autoplay, replayKey, play, stop, setProgress])
 
   return (
     <div className={cn("border-t border-ink", className)} aria-label={title} role="group">
@@ -143,7 +151,9 @@ export function ProcessRun({
       </ol>
       <div className="t-label flex justify-between py-3 text-ink-3">
         <span>{footer}</span>
-        <b className="font-medium text-ink tabular-nums">{String(pct).padStart(3, "0")} %</b>
+        <b ref={pctRef} className="font-medium text-ink tabular-nums">
+          100 %
+        </b>
       </div>
     </div>
   )

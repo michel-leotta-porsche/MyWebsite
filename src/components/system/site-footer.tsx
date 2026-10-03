@@ -25,7 +25,7 @@ export function SiteFooter({ note = "© 2026 Michel Leotta" }: { note?: string }
         </div>
         <div className="t-label col-span-full flex flex-col gap-1.5 text-ink-3 md:col-span-3 md:col-start-10 md:text-right">
           <span>{note}</span>
-          <Link href="/impressum" className="hover:text-ink">
+          <Link href="/impressum" prefetch={false} className="hover:text-ink">
             Impressum
           </Link>
         </div>

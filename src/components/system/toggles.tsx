@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react"
 import { cn } from "@/lib/utils"
 
 const toggleCls =
-  "t-label cursor-pointer text-ink-3 transition-colors duration-160 hover:text-ink aria-pressed:text-ink focus-visible:outline-offset-2"
+  "t-label inline-flex min-h-6 min-w-6 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-160 hover:text-ink aria-pressed:text-ink focus-visible:outline-offset-2"
 
 type Theme = "light" | "dark"
 
@@ -29,7 +29,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   return (
-    <span role="group" aria-label="Farbschema" className={cn("flex gap-2.5", className)}>
+    <span role="group" aria-label="Farbschema" className={cn("flex gap-1", className)}>
       <button type="button" className={toggleCls} aria-pressed={theme === "light"} onClick={() => set("light")}>
         <span aria-hidden="true">○</span>
         <span className="sr-only">Hell</span>
@@ -54,7 +54,7 @@ export function LangToggle({ className }: { className?: string }) {
   }, [lang])
 
   return (
-    <span role="group" aria-label="Sprache" className={cn("flex gap-2.5", className)}>
+    <span role="group" aria-label="Sprache" className={cn("flex gap-1", className)}>
       {(["de", "en"] as const).map((l) => (
         <button key={l} type="button" className={toggleCls} aria-pressed={lang === l} onClick={() => setLang(l)}>
           {l.toUpperCase()}

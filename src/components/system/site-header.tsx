@@ -15,7 +15,8 @@ export const defaultNav: NavItem[] = [
 /**
  * Kopf: Name klein links, Navigation, Sprach- und Farbschalter.
  * Darunter die Laufline: 1px in Linienfarbe, darauf eine Tinte-Linie, die mit --run (0–1) wächst.
- * Die Ablauf-Signatur (ProcessRun) setzt --run auf <html>. Ohne sie steht die Linie voll.
+ * prefetch ist aus, bis die Zielseiten in Phase 3 existieren.
+ * Die Ablauf-Signatur (ProcessRun) setzt --run auf [data-runline]. Ohne sie steht die Linie voll.
  */
 export function SiteHeader({ nav = defaultNav, tagline = "KI-Produkte" }: { nav?: NavItem[]; tagline?: string }) {
   return (
@@ -26,18 +27,18 @@ export function SiteHeader({ nav = defaultNav, tagline = "KI-Produkte" }: { nav?
         </Link>
         <nav aria-label="Hauptnavigation" className="ml-auto hidden gap-7 min-[901px]:flex">
           {nav.map((n) => (
-            <NavLink key={n.href} href={n.href}>
+            <NavLink key={n.href} href={n.href} prefetch={false}>
               {n.label}
             </NavLink>
           ))}
         </nav>
-        <div className="ml-auto flex gap-3.5 min-[901px]:ml-0">
+        <div className="ml-auto flex gap-3 min-[901px]:ml-0">
           <LangToggle />
           <ThemeToggle />
         </div>
       </div>
       <div aria-hidden="true" className="relative h-px bg-line">
-        <i className="absolute inset-0 origin-left scale-x-(--run,1) bg-ink" />
+        <i data-runline className="absolute inset-0 origin-left scale-x-(--run,1) bg-ink" />
       </div>
     </header>
   )

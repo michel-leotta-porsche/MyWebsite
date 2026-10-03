@@ -36,13 +36,13 @@ export function IndexRow({ href, year, title, description, meta, client }: Index
           </h3>
           <p className="t-small max-w-[56ch] text-ink-2">{description}</p>
         </div>
-        <div className="t-data col-span-8 flex flex-col gap-1 text-ink-2 md:col-span-3">
+        <div className="t-data col-span-8 flex flex-col gap-1 text-ink-2 md:col-span-2">
           {meta.map((m) => (
             <span key={m}>{m}</span>
           ))}
         </div>
         {client && (
-          <span className="col-span-4 self-end text-right font-semibold tracking-[-0.01em] md:col-span-1 md:self-start">
+          <span className="col-span-4 self-end text-right font-semibold tracking-[-0.01em] md:col-span-2 md:self-start">
             {client}
           </span>
         )}
@@ -51,14 +51,13 @@ export function IndexRow({ href, year, title, description, meta, client }: Index
   )
 }
 
-/** Bernstein-Balken links, wächst beim Hover von unten. */
-export function HoverBar({ group = "row" }: { group?: "row" | "card" }) {
+/** Bernstein-Balken links, wächst beim Hover von unten. Eltern-Element braucht group/row. */
+export function HoverBar() {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "absolute top-0 -bottom-px left-0 w-[3px] origin-bottom scale-y-0 bg-signal transition-transform duration-500 ease-out-expo",
-        group === "row" ? "group-hover/row:scale-y-100" : "group-hover/card:scale-y-100"
+        "absolute top-0 -bottom-px left-0 w-[3px] origin-bottom scale-y-0 bg-signal transition-transform duration-500 ease-out-expo group-hover/row:scale-y-100"
       )}
     />
   )
@@ -73,16 +72,15 @@ type CardProps = {
   className?: string
 }
 
-/** Karte: Linie oben in Tinte, Label, Titel, Text, Fuß in Mono. Als Link mit Hover-Muster. */
+/** Karte: Linie oben in Tinte, Label, Titel, Text, Fuß in Mono. Als Link: Titel unterstrichen, Pfeil rückt. */
 export function Card({ href, label, title, children, footer, className }: CardProps) {
   const body = (
     <>
-      {href && <HoverBar group="card" />}
       {label && <span className="t-label text-ink-3">{label}</span>}
       <h3
         className={cn(
-          "t-h4 mt-4 transition-transform duration-500 ease-out-expo",
-          href && "group-hover/card:translate-x-1.5"
+          "t-h4 mt-4 decoration-1 underline-offset-[5px]",
+          href && "group-hover/card:underline"
         )}
       >
         {title}
@@ -92,7 +90,7 @@ export function Card({ href, label, title, children, footer, className }: CardPr
       {footer && <div className="t-label mt-5 flex gap-5 text-ink-3">{footer}</div>}
     </>
   )
-  const cls = cn("group/card relative block border-t border-ink pt-4 pb-6", href && "pl-4", className)
+  const cls = cn("group/card relative block border-t border-ink pt-4 pb-6", className)
   return href ? (
     <Link href={href} className={cls}>
       {body}

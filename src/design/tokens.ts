@@ -7,7 +7,7 @@ export const colorTokens = [
   { token: "paper-2", name: "Papier 2", use: "Code, Flächen", light: "#E6E5E0", dark: "#1B1B18" },
   { token: "ink", name: "Tinte", use: "Text, Linie oben", light: "#1A1A18", dark: "#ECEBE6" },
   { token: "ink-2", name: "Text 2", use: "Fließtext sekundär", light: "#4B4A46", dark: "#BDBCB6" },
-  { token: "ink-3", name: "Text 3", use: "Labels, Metadaten", light: "#6A6964", dark: "#8F8E88" },
+  { token: "ink-3", name: "Text 3", use: "Labels, Metadaten", light: "#63625D", dark: "#8F8E88" },
   { token: "line", name: "Linie", use: "Trenner, Fugen", light: "#D2D0C9", dark: "#2E2D29" },
   { token: "signal", name: "Signal", use: "Marker, Balken, Punkt", light: "#FFB224", dark: "#FFB224" },
   { token: "signal-ink", name: "Signal-Text", use: "Text, Fokus", light: "#8A5300", dark: "#FFB224" },
