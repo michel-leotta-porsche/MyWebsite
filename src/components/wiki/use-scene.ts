@@ -28,15 +28,17 @@ export function useScene(
     const stage = stageRef.current
     const scene = scenes[name]
     if (!stage || !scene) return
-    stage.replaceChildren()
-    const ctx = scene.setup(stage, live.current.labels)
+    let ctx: unknown
+    let started = false
     const read = () => (reduced ? 1 : live.current.progress())
     const render = () => {
+      if (!started) return
       const p = read()
       scene.render(ctx, p, tw)
       live.current.onProgress?.(p)
     }
     const relayout = () => {
+      if (!started) return
       scene.layout(ctx, stage.clientWidth, stage.clientHeight)
       render()
     }
@@ -44,12 +46,24 @@ export function useScene(
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(() => ((frame = 0), render()))
     }
+    // Szene erst bauen, wenn die Bühne näher als eine Fensterhöhe ist: hält das Laden der Seite leicht
+    const start = () => {
+      if (started) return
+      started = true
+      stage.replaceChildren()
+      ctx = scene.setup(stage, live.current.labels)
+      relayout()
+      document.fonts?.ready.then(relayout)
+    }
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && start(), {
+      rootMargin: "100% 0px",
+    })
+    io.observe(stage)
     const ro = new ResizeObserver(relayout)
     ro.observe(stage)
     addEventListener("scroll", onScroll, { passive: true })
-    relayout()
-    document.fonts?.ready.then(relayout)
     return () => {
+      io.disconnect()
       ro.disconnect()
       removeEventListener("scroll", onScroll)
       cancelAnimationFrame(frame)

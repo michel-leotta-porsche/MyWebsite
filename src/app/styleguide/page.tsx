@@ -17,6 +17,11 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/system/table"
 import { ArrowLink, NavLink, TextLink } from "@/components/system/text-link"
 import { chartTokens, colorTokens, motionTokens, spaceTokens, typeScale } from "@/design/tokens"
 import { cn } from "@/lib/utils"
+import { Pitfalls, Takeaways } from "@/components/wiki/parts"
+import { Quiz } from "@/components/wiki/quiz"
+import { ScrollFig } from "@/components/wiki/scroll-fig"
+import { StepFigure } from "@/components/wiki/step-figure"
+import { TaskChecklist } from "@/components/wiki/task-checklist"
 import Beispiel from "./beispiel.mdx"
 import { MotionDemo, ProcessRunDemo } from "./demos"
 
@@ -44,6 +49,7 @@ const toc = [
   ["checkliste", "Checkliste & Ablauf"],
   ["navigation", "Navigation & Footer"],
   ["mdx", "MDX"],
+  ["wiki", "Wiki-Bausteine"],
 ] as const
 
 function Section({ id, label, title, children }: { id: string; label: string; title: string; children: ReactNode }) {
@@ -475,6 +481,40 @@ export default function StyleguidePage() {
                 <Beispiel />
               </div>
               <Spec>src/mdx-components.tsx ordnet Markdown-Elementen die Bausteine zu.</Spec>
+            </Section>
+
+            <Section id="wiki" label="18 · Wiki" title="Bausteine für Artikel im Wiki.">
+              <p className="max-w-[60ch] text-ink-2">
+                Spezifikation: blog-system/KOMPONENTEN.md. Die Scroll-Geschichte über die volle Breite (ScrollStory) zeigt der
+                Artikel <TextLink href="/de/wissen/git-commits">Git-Commits</TextLink>; Szenen liegen in src/content/scenes.
+              </p>
+              <Takeaways label="Takeaways" items={["Ein ganzer Satz pro Kachel.", "Genau drei Kacheln.", "Zitierbar ohne Kontext."]} />
+              <ScrollFig
+                title="ScrollFig: eine Verwandlung beim Vorbeiscrollen"
+                label="Beim Scrollen"
+                scene="git-commits/fixup"
+                labels={{
+                  fixup: "amend! fix(session): Timeout auf 60 Sekunden erhöhen",
+                  docs: "docs(readme): Tippfehler korrigieren",
+                  header: "feat(header): Hintergrund aufhellen",
+                  target: ["fix(session): Timeout auf 60 Sekunden erhöhen", "fix(session): Timeout auf 90 Sekunden erhöhen"],
+                }}
+              />
+              <StepFigure
+                title="StepFigure: Grafik mit Schritten"
+                label="Klick"
+                steps={[
+                  { state: "a", say: <><strong>Erster Teil.</strong> Klick hebt ihn hervor.</> },
+                  { state: "b", say: <><strong>Zweiter Teil.</strong> Der Rest tritt zurück.</> },
+                ]}
+              >
+                <div className="commit-msg">
+                  <div><i>1</i><span><span data-p="a">feat(wiki):</span> <span data-p="b">Bausteine zeigen</span></span></div>
+                </div>
+              </StepFigure>
+              <Pitfalls items={[{ title: "Fallstrick", text: "Ursache und Lösung in einem Absatz." }]} />
+              <Quiz questions={[{ q: "Was zeigt eine Scroll-Geschichte?", options: ["Eine Verwandlung", "Ein Video"], ok: 0, why: "Scrollen ist die Zeitachse, nichts läuft von selbst." }]} />
+              <TaskChecklist id="styleguide" items={[{ title: "Abhaken.", text: "Der Stand bleibt im Browser." }, { title: "Zurücksetzen.", text: "Mit dem Knopf darunter." }]} />
             </Section>
           </div>
         </div>

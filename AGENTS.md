@@ -21,6 +21,8 @@ Antworten an Michel auf Deutsch. Code-Kommentare auf Deutsch, Bezeichner auf Eng
 - Watermelon UI als shadcn-Registry `@watermelon` (siehe `components.json`).
 - Motion (`motion/react`) für Bewegung, die CSS nicht kann.
 - MDX über `@next/mdx`. Zuordnung Markdown → Bausteine in `src/mdx-components.tsx`.
+- Sprachen: Pfade `/de/…` und `/en/…` unter `src/app/[lang]`, Bereichs-Segmente pro Sprache in `src/i18n/config.ts` (`/de/wissen` ↔ `/en/knowledge`). `src/proxy.ts` leitet Pfade ohne Sprache um. Feste Texte in `src/i18n/dictionaries.ts`.
+- Lenis (`lenis/react`) für weiches Scrollen, React `<ViewTransition>` für Seitenwechsel (keine Pakete dafür).
 
 ## Arbeitsweise
 
@@ -101,7 +103,12 @@ Alles in `src/components`. Neue Seiten bauen nur aus diesen Bausteinen; neue Bau
 | `ProcessRun` | `system/process-run.tsx` | Signatur-Ablauf |
 | `SectionHead` | `system/section-head.tsx` | Sektionskopf |
 | `SiteHeader`, `SiteFooter` | `system/site-header.tsx`, `system/site-footer.tsx` | Kopf, Fuß |
-| `ThemeToggle`, `LangToggle` | `system/toggles.tsx` | Farbschema, Sprache |
+| `ThemeToggle`, `LangToggle` | `system/toggles.tsx` | Farbschema, Sprache (Links auf dieselbe Seite in der anderen Sprache) |
+| `SmoothScroll` | `system/smooth-scroll.tsx` | Lenis, aus bei reduced-motion |
+| `ScrollStory`, `ScrollFig` | `wiki/scroll-story.tsx`, `wiki/scroll-fig.tsx` | Scroll-Geschichte (Pflicht im Leitfaden), kleine Scroll-Grafik; Szenen in `src/content/scenes` |
+| `StepFigure` | `wiki/step-figure.tsx` | Grafik mit Schrittliste, mit `scroll` als Scrollytelling |
+| `Scenario`, `Takeaways`, `Sec`, `Code`, `Pitfalls`, `Sources` | `wiki/parts.tsx` | statische Artikel-Bausteine |
+| `Quiz`, `Checklist` (MDX) | `wiki/quiz.tsx`, `wiki/task-checklist.tsx` | Selbsttest, Checkliste mit gemerktem Stand |
 
 ## shadcn und Watermelon UI
 
@@ -112,4 +119,5 @@ Alles in `src/components`. Neue Seiten bauen nur aus diesen Bausteinen; neue Bau
 
 - Profilinhalte stammen aus `content/profil.md` im Projektordner. Porsche-Projekte ohne interne Namen oder Nummern beschreiben.
 - Texte in `/styleguide` und auf der Startseite sind Platzhalter. Zahlen dort sind Beispielwerte und dürfen nicht auf echte Seiten übernommen werden.
-- DE/EN: `LangToggle` setzt bisher nur `<html lang>`. Die Übersetzung kommt mit den Seiten (Phase 3).
+- Wiki-Artikel: `content/wiki/<slug>/de.mdx` und `en.mdx`, Slug in `src/content/wiki.ts` eintragen. Jede Datei exportiert `meta` und `toc`; beide Sprachen haben dieselben Bausteine in derselben Reihenfolge. Regeln für Inhalt: `blog-system/STIL.md` und `KOMPONENTEN.md` im Projektordner.
+- Jeder Artikel erscheint immer auf Deutsch und Englisch.

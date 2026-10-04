@@ -54,10 +54,10 @@ export function SiteFooter({
         </div>
         <div className="t-label col-span-full flex flex-col gap-1.5 text-ink-3 md:col-span-3 md:col-start-10 md:text-right">
           <span>{labels.note}</span>
-          <Link href={privacyHref} className="hover:text-ink">
+          <Link href={privacyHref} className="inline-flex min-h-6 items-center hover:text-ink md:justify-end">
             {labels.privacy}
           </Link>
-          <a href={rssHref} className="hover:text-ink">
+          <a href={rssHref} className="inline-flex min-h-6 items-center hover:text-ink md:justify-end">
             {labels.rss}
           </a>
         </div>
