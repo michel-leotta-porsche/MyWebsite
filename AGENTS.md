@@ -68,7 +68,7 @@ Quelle der Wahrheit für Werte ist `src/app/globals.css`. `src/design/tokens.ts`
 ### Bewegung
 
 - Easing `ease-out-expo` (Standard) oder `ease-in-out-cubic`. Dauern 160 (Farbe), 500 (Balken, Pfeile, Unterstriche), 900 ms (große Wege).
-- Nur `opacity`, `transform` (inkl. `translate`/`scale`) und `clip-path` animieren.
+- Nur `opacity`, `transform` (inkl. `translate`/`scale`) und `clip-path` animieren. Einzige Ausnahme: `stroke-dashoffset`, nur zum Linienzeichnen in SVG-Diagrammen.
 - `prefers-reduced-motion`: alles aus (global in `globals.css`; in Motion-Code `useReducedMotion`).
 - Keine Animation versteckt Inhalt beim Laden. Der Endzustand ist der Ausgangszustand (Server-HTML zeigt alles).
 - Hover-Muster: Bernstein-Balken 3px links + Titel rückt 6px (Index-Zeilen), Pfeil rückt 4–6px und wird `signal-ink`, Unterstrich wächst von links.

@@ -75,10 +75,10 @@
   --signal-ink: #ffb224;
   --destructive: #ff8a70;
 
-  /* Nr. 288 auf Dunkel: gleicher Farbton, aufgehellt auf ≥ 3:1. Black wird zu Tinte. */
+  /* Nr. 288 auf Dunkel: gleicher Farbton, aufgehellt auf ≥ 4.5:1 (auch als Textfarbe nutzbar). Black wird zu Tinte. */
   --chart-1: #f99d1b;
-  --chart-2: #a57c31;
-  --chart-3: #a45b73;
+  --chart-2: #b08a4f;
+  --chart-3: #c08396;
   --chart-4: #ecebe6;
 
   color-scheme: dark;
