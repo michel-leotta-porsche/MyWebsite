@@ -16,8 +16,8 @@ export const colorTokens = [
 /** Zweitpalette nur für Grafiken und Diagramme: Sanzo Wada, Kombination Nr. 288. */
 export const chartTokens = [
   { token: "chart-1", name: "Yellow Orange", light: "#F99D1B", dark: "#F99D1B" },
-  { token: "chart-2", name: "Sepia", light: "#644B1E", dark: "#A57C31" },
-  { token: "chart-3", name: "Taupe Brown", light: "#7A4456", dark: "#A45B73" },
+  { token: "chart-2", name: "Sepia", light: "#644B1E", dark: "#B08A4F" },
+  { token: "chart-3", name: "Taupe Brown", light: "#7A4456", dark: "#C08396" },
   { token: "chart-4", name: "Black", light: "#111314", dark: "#ECEBE6" },
 ] as const
 
