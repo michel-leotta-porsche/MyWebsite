@@ -479,7 +479,7 @@ export default function StyleguidePage() {
           </div>
         </div>
       </main>
-      <SiteFooter note="Styleguide · Systemplan" />
+      <SiteFooter />
     </>
   )
 }

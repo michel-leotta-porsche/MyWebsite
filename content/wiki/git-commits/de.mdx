@@ -1,0 +1,399 @@
+export const meta = {
+  title: "Git-Commits im Team: klein schneiden, klar benennen",
+  lede: "Für Teams, deren git log aus „Update“ und „Fixes“ besteht. Danach schneidest du Änderungen in Commits, die man wiederfindet, schreibst eine Nachricht, die ohne Code verständlich ist, und sicherst das Format im Repository ab.",
+  format: "leitfaden",
+  topic: "praxis",
+  tags: ["git", "team", "conventional-commits"],
+  date: "2026-10-04",
+  updated: "2026-10-04",
+  readingTime: 13,
+  sources: "tested",
+  testedWith: "git 2.43, POSIX-sh",
+  audience: "Entwicklerteams",
+}
+
+export const toc = [
+  { id: "split", label: "Aus eins werden vier" },
+  { id: "problem", label: "Git ist kein Backup" },
+  { id: "konzept", label: "Aufbau einer Nachricht" },
+  { id: "praxis", label: "So committest du" },
+  { id: "testen", label: "Was beim Testen passiert ist" },
+  { id: "entscheidung", label: "Wie groß ist ein Commit?" },
+  { id: "selbsttest", label: "Selbsttest" },
+  { id: "checkliste", label: "Checkliste" },
+]
+
+<Scenario label="Szenario">
+Seit dem letzten Release melden Monteure, dass ihre Eingaben im Prüfprotokoll verloren gehen. Du öffnest das `git log` und findest für die fragliche Woche drei Einträge: „Update“, „Fixes“ und „Templates aktualisiert“. Hinter dem letzten stecken 23 geänderte Dateien. Die nächste Stunde liest du Diffs, statt den Fehler zu beheben.
+</Scenario>
+
+<Takeaways
+  label="Das nimmst du mit"
+  items={[
+    "Ein Commit enthält genau eine zusammengehörige Änderung, und der Staging-Bereich ist das Werkzeug, mit dem du sie auswählst.",
+    "Lieber zu viele kleine Commits als ein großer, denn zusammenfassen geht später mit einem Befehl, aufteilen kostet Handarbeit.",
+    "Die erste Zeile sagt in höchstens 50 Zeichen, was der Commit bewirkt; wenn du dafür „und“ brauchst, sind es zwei Commits.",
+  ]}
+/>
+
+{/* Satz-Test: Danach hat der Leser gesehen, dass ein Feierabend-Commit vier Themen unter einer falschen Überschrift versteckt und dass dieselben Dateien, nach Inhalt sortiert, vier klare Log-Zeilen ergeben. */}
+
+<ScrollStory
+  id="split"
+  label="Scroll weiter"
+  title="Aus einem Commit werden vier"
+  intro={<>Sechs Dateien, ein Arbeitstag. Scroll langsam: Die Grafik folgt deinem Scrollen und zeigt, was <code>git add .</code> daraus macht und was gezieltes Auswählen daraus macht.</>}
+  scene="git-commits/split"
+  labels={{
+    box: "Templates aktualisiert",
+    boxNote: "6 Dateien, 4 Themen",
+    messages: [
+      "docs(readme): Tippfehler korrigieren",
+      "chore(site): Kontaktseite entfernen",
+      "feat(header): Hintergrund aufhellen",
+      "fix(session): Timeout auf 60 Sekunden erhöhen",
+    ],
+  }}
+  steps={[
+    { at: 0, lead: "Feierabend.", text: <><code>git status</code> zeigt sechs geänderte Dateien. Dahinter stecken vier verschiedene Gründe.</> },
+    { at: 0.3, lead: "git add . legt alles in einen Commit.", text: "Die Nachricht „Templates aktualisiert“ nennt eins von vier Themen. Den Timeout-Fix findet darüber niemand." },
+    { at: 0.42, lead: "Gezielt auswählen.", text: "Was zusammengehört, kommt zusammen: Fix und Test bleiben ein Paar, Kontaktseite und Footer-Link auch." },
+    { at: 0.76, lead: "Vier Commits.", text: "Jede Zeile im Log beantwortet „Was ist hier passiert?“ und lässt sich einzeln finden und zurücknehmen." },
+  ]}
+/>
+
+<Sec id="problem" label="01 · Problem">Git ist kein Backup</Sec>
+
+Viele lernen git als Sicherung: Am Ende des Tages `git add .`, eine Nachricht wie „Update“, `git push`, und der Code liegt sicher auf dem Server. Das funktioniert, solange niemand zurückschaut. Ein Backup schneidet nach der Uhrzeit. Ein Commit soll nach dem Inhalt schneiden: eine Änderung, ein Grund, eine Nachricht.
+
+Dafür gibt es den **Staging-Bereich**, die Zwischenablage zwischen Arbeitskopie und Commit. Was du mit `git add` dort hineinlegst, landet im nächsten Commit, alles andere bleibt liegen. Wer immer alles hineinlegt, verschenkt genau diese Auswahl.
+
+Das Ergebnis siehst du oben am Ende der Animation. Mit vier Commits findet `git log --grep=Timeout` den Fix sofort, und `git revert` nimmt den Header zurück, ohne die Kontaktseite wiederherzustellen. Mit dem einen Sammel-Commit geht beides nicht.
+
+Das gilt auch, wenn du allein an einem Projekt arbeitest. Dein zukünftiges Ich ist der Kollege, der den Code nicht mehr im Kopf hat. Im Team kommt dazu, dass du überwiegend Commits liest, die du nicht selbst geschrieben hast.
+
+Der häufigste Einwand: „Dann ist das Log voller winziger Commits.“ Ein Commit, der nur eine Hintergrundfarbe ändert, ist trotzdem ein guter Commit. Und wem die vielen kleinen Commits vor dem Merge zu viel sind, fasst sie mit einem Befehl zusammen (Schritt 4 unten). Der umgekehrte Weg, einen großen Commit nachträglich aufzuteilen, heißt: zurücksetzen und jede Zeile neu sortieren.
+
+<Sec id="konzept" label="02 · Konzept">Der Aufbau einer Commit-Nachricht</Sec>
+
+Eine Commit-Nachricht hat eine feste Form, und jedes Werkzeug rund um git verlässt sich darauf. `git log --oneline`, GitHub und GitLab zeigen nur die erste Zeile. Der Rest ist für den, der genauer wissen will, warum. Scroll durch die fünf Teile.
+
+{/* Satz-Test: Danach weiß der Leser, welcher Teil einer Commit-Nachricht welche Frage beantwortet und warum die Leerzeile nötig ist. */}
+
+<StepFigure
+  scroll
+  title="Eine Commit-Nachricht, fünf Teile"
+  label="Aufbau"
+  ariaLabel="Beispiel einer Commit-Nachricht"
+  steps={[
+    { state: "type", say: <><strong>Typ und Bereich.</strong> <code>fix(session):</code> sagt, welche Art Änderung das ist und wo sie liegt. Das Format kommt aus der Spezifikation Conventional Commits: <code>fix</code> behebt einen Fehler, <code>feat</code> bringt eine neue Funktion, dazu üblich <code>docs</code>, <code>refactor</code>, <code>test</code>, <code>chore</code>. Ein <code>!</code> nach dem Bereich markiert eine Änderung, die bestehende Nutzung bricht.</> },
+    { state: "subject", say: <><strong>Betreff.</strong> „Timeout auf 60 Sekunden erhöhen“ beschreibt, was der Commit bewirkt, nicht was du getan hast. Also „erhöhen“ statt „erhöht“ oder „habe erhöht“, ohne Punkt am Ende. Die ganze erste Zeile bleibt unter 50 Zeichen. Wird sie länger, steckt meist mehr als eine Änderung im Commit.</> },
+    { state: "blank", say: <><strong>Leerzeile.</strong> Die leere zweite Zeile trennt Betreff und Begründung. git behandelt alles bis zur ersten Leerzeile als Betreff. Fehlt sie, klebt der erste Satz der Begründung in <code>git log --oneline</code> an der Überschrift.</> },
+    { state: "body", say: <><strong>Begründung.</strong> Der Body erklärt, warum die Änderung nötig war und was vorher schieflief. Das Wie steht im Diff. Das Warum steht nirgends sonst, und genau das fehlt dir in zwei Jahren. Zeilen bricht man nach 72 Zeichen um, damit sie im Terminal lesbar bleiben.</> },
+    { state: "footer", say: <><strong>Verweis.</strong> Die letzte Zeile verknüpft den Commit mit Ticket, Fehlermeldung oder Review. Hier steht auch <code>BREAKING CHANGE:</code> mit einer Erklärung, wenn der Commit bestehende Nutzung bricht.</> },
+  ]}
+>
+  <div className="commit-msg">
+    <div><i>1</i><span><span data-p="type">fix(session):</span> <span data-p="subject">Timeout auf 60 Sekunden erhöhen</span></span></div>
+    <div><i>2</i><span data-p="blank" className="gap" /></div>
+    <div><i>3</i><span data-p="body">Monteure füllen das Prüfprotokoll am Tablet aus.</span></div>
+    <div><i>4</i><span data-p="body">Bei schwachem WLAN dauerte das Speichern länger als</span></div>
+    <div><i>5</i><span data-p="body">30 Sekunden, die Sitzung lief ab, Eingaben gingen</span></div>
+    <div><i>6</i><span data-p="body">verloren.</span></div>
+    <div><i>7</i><span data-p="blank" className="gap" /></div>
+    <div><i>8</i><span data-p="footer">Refs: WERK-212</span></div>
+  </div>
+  <div className="commit-ruler"><span>Zeile 1: <b>45</b> Zeichen</span><span>Body: höchstens <b>72</b> pro Zeile</span></div>
+</StepFigure>
+
+Nicht jeder Commit braucht alle fünf Teile. Ein korrigierter Tippfehler kommt mit der ersten Zeile aus. Sobald die Frage „Warum?“ nicht offensichtlich ist, gehört die Antwort in den Body.
+
+<Sec id="praxis" label="03 · Praxis">So committest du im Alltag</Sec>
+
+Alle Befehle habe ich in einem frischen Repository mit git 2.43 ausgeführt. Das Skript dazu spielt jeden Schritt automatisch durch.
+
+### 1. Erst schauen, dann auswählen
+
+Bevor du etwas stagest, verschaff dir einen Überblick. `git status` zeigt, welche Dateien sich geändert haben, `git diff` zeigt die Zeilen. Dann legst du gezielt in den Staging-Bereich, was zusammengehört:
+
+<Code file="Terminal">
+```sh
+git status
+# nur die zwei Dateien zur Kontaktseite
+git add pages/kontakt.html templates/footer.html
+# prüfen, was wirklich im Commit landet
+git diff --cached --stat
+```
+</Code>
+
+### 2. Zwei Änderungen in einer Datei trennen
+
+Oft stecken zwei Themen in derselben Datei. `git add -p` geht die Änderungen Abschnitt für Abschnitt durch und fragt jedes Mal: `y` nimmt den Abschnitt, `n` lässt ihn liegen, `s` teilt ihn in kleinere, `e` öffnet ihn zum Bearbeiten.
+
+<Code file="git add -p · Ausgabe gekürzt">
+```text
+$ git add -p app.py
+@@ -1,6 +1,6 @@
+ def timeout():
+-    return 30
++    return 60
+ ...
+-    return "Hallo"
++    return "Hallo, Welt"
+(1/1) Stage this hunk [y,n,q,a,d,s,e,?]? s
+Split into 2 hunks.
+# erster Teil (Timeout): y, zweiter Teil (Begrüßung): n
+
+$ git diff --cached
+-    return 30
++    return 60
+```
+</Code>
+
+Im Commit landet nur der Timeout. Die Begrüßung bleibt in der Arbeitskopie für den nächsten Commit.
+
+### 3. Die Nachricht schreiben
+
+Ohne `-m` öffnet `git commit` deinen Editor, und du schreibst Betreff, Leerzeile und Body wie oben. Für kurze Nachrichten aus dem Terminal geht es auch mit zweimal `-m`: Das erste wird der Betreff, das zweite der Body, die Leerzeile setzt git selbst.
+
+<Code file="Terminal">
+```sh
+git commit -m "chore(site): Kontaktseite entfernen" \
+  -m "Anfragen laufen seit dem Relaunch über das Formular im Footer."
+
+# Ergebnis prüfen
+git log -1 --format=%B
+```
+</Code>
+
+Damit niemand die Form vergisst, legt ihr eine Vorlage ins Repository. git zeigt sie jedes Mal im Editor an, Zeilen mit `#` landen nicht in der Nachricht:
+
+<Code file=".gitmessage">
+```text
+
+# typ(bereich): was der Commit bewirkt, max. 50 Zeichen
+# Typen: feat fix docs refactor test build ci chore perf revert
+#
+# Warum ist die Änderung nötig? Was war vorher das Problem?
+#
+# Refs: TICKET-123
+```
+</Code>
+
+<Code file="Terminal · einmal pro Klon">
+```sh
+git config commit.template .gitmessage
+# zeigt im Editor zusätzlich den Diff unter der Vorlage
+git config commit.verbose true
+```
+</Code>
+
+### 4. Nachbessern, ohne das Log zu verstopfen
+
+Beim Review fällt auf: 60 Sekunden reichen nicht, es müssen 90 sein. Statt eines neuen Commits „Timeout nochmal angepasst“ markierst du die Korrektur als Nachtrag zum ursprünglichen Commit. Vor dem Merge faltet git sie hinein.
+
+<Code file="Terminal">
+```sh
+git log --oneline        # Hash des Ziel-Commits suchen, z. B. 91fd3b7
+git add src/session/config.py
+git commit --fixup=amend:91fd3b7
+# Editor öffnet sich: Body und Betreff auf 90 Sekunden ändern,
+# die erste Zeile "amend! ..." aber stehen lassen
+
+git rebase -i --autosquash main
+# die Liste ist schon sortiert: speichern und schließen
+```
+</Code>
+
+{/* Satz-Test: Danach hat der Leser gesehen, dass autosquash den Nachtrag hinter seinen Ziel-Commit sortiert und beide zu einem Commit mit neuer Nachricht verschmilzt. */}
+
+<ScrollFig
+  title="Der Nachtrag rutscht in seinen Commit"
+  label="Beim Scrollen"
+  ariaLabel="Log vor und nach git rebase --autosquash"
+  scene="git-commits/fixup"
+  labels={{
+    fixup: "amend! fix(session): Timeout auf 60 Sekunden erhöhen",
+    docs: "docs(readme): Tippfehler korrigieren",
+    header: "feat(header): Hintergrund aufhellen",
+    target: ["fix(session): Timeout auf 60 Sekunden erhöhen", "fix(session): Timeout auf 90 Sekunden erhöhen"],
+  }}
+  caption={<><span><code>git rebase -i --autosquash main</code> sortiert den Nachtrag direkt hinter sein Ziel und faltet beide zusammen.</span><span>Danach bleibt ein Commit mit neuem Hash und der korrigierten Nachricht. Das Log hat eine Zeile weniger.</span></>}
+/>
+
+Danach gibt es einen einzigen Commit „fix(session): Timeout auf 90 Sekunden erhöhen“ mit dem richtigen Inhalt. Reicht die alte Nachricht, nimmst du `--fixup=91fd3b7` ohne `amend:`. Genauso fasst du mehrere kleine Commits zusammen: In der Liste von `git rebase -i` ersetzt du `pick` durch `fixup` oder `squash`.
+
+<Callout variant="warning" title="Nur auf deinem Branch">
+Rebase schreibt Commits neu. Mach das nur auf deinem eigenen Feature-Branch, bevor er in `main` landet. Wer Commits neu schreibt, die andere schon geholt haben, bringt deren Klone durcheinander.
+</Callout>
+
+### 5. Das Format im Team absichern
+
+Eine Vereinbarung im Wiki hält zwei Wochen. Ein Hook hält länger: ein Skript, das git vor jedem Commit ausführt. Der `commit-msg`-Hook bekommt die Nachricht als Datei und kann den Commit mit einem Fehlercode ablehnen. Diese Fassung prüft Typ, Bereich und Länge und lässt von git erzeugte Nachrichten wie `Merge`, `Revert` und `fixup!` durch:
+
+<Code file=".githooks/commit-msg">
+```sh
+#!/bin/sh
+# Prüft die erste Zeile der Commit-Nachricht gegen Conventional Commits.
+# Ablage: .githooks/commit-msg, aktivieren mit: git config core.hooksPath .githooks
+msg_file="$1"
+subject=$(grep -v '^#' "$msg_file" | head -n 1)
+
+# Von git erzeugte Nachrichten durchlassen
+case "$subject" in
+  Merge\ *|Revert\ *|fixup!\ *|squash!\ *|amend!\ *) exit 0 ;;
+esac
+
+pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9-]+\))?!?: .+'
+if ! printf '%s\n' "$subject" | grep -Eq "$pattern"; then
+  echo "Commit abgelehnt: \"$subject\"" >&2
+  echo "Format: typ(bereich): beschreibung, z. B. fix(login): Sitzung nach Timeout beenden" >&2
+  exit 1
+fi
+
+# Zeichen zählen, nicht Bytes: Umlaute sind in UTF-8 zwei Bytes lang
+len=$(printf '%s' "$subject" | LC_ALL=C.UTF-8 wc -m)
+if [ "$len" -gt 72 ]; then
+  echo "Commit abgelehnt: erste Zeile hat $len Zeichen, erlaubt sind 72." >&2
+  echo "Tipp: Passt es nicht in eine Zeile, steckt meist mehr als eine Änderung im Commit." >&2
+  exit 1
+fi
+if [ "$len" -gt 50 ]; then
+  echo "Hinweis: erste Zeile hat $len Zeichen, Ziel sind 50." >&2
+fi
+```
+</Code>
+
+Über 50 Zeichen gibt der Hook nur einen Hinweis, über 72 lehnt er ab. Der Typ und der Bereich kosten schon 10 bis 15 Zeichen, eine harte Grenze bei 50 würde zu oft greifen. Ins Repository kommt der Hook mit Ausführungsrecht, danach aktiviert ihn jeder einmal in seinem Klon:
+
+<Code file="Terminal">
+```sh
+chmod +x .githooks/commit-msg
+git update-index --chmod=+x .githooks/commit-msg   # falls schon ohne Recht eingecheckt
+git add .githooks && git commit -m "build(git): Hook für Commit-Nachrichten"
+
+# jeder im Team, einmal pro Klon
+git config core.hooksPath .githooks
+```
+</Code>
+
+<Code file="Ausgabe im Test">
+```text
+$ git commit -m "fixed stuff"
+Commit abgelehnt: "fixed stuff"
+Format: typ(bereich): beschreibung, z. B. fix(login): Sitzung nach Timeout beenden
+
+$ git commit -m "fix(session): Abmeldung nach Timeout erzwingen ohne Rückfrage"
+Hinweis: erste Zeile hat 61 Zeichen, Ziel sind 50.
+
+$ git commit -m "feat(api)!: Endpunkt v1 entfernen"
+[main 7230073] feat(api)!: Endpunkt v1 entfernen
+```
+</Code>
+
+Ein lokaler Hook ist eine Hilfe, keine Kontrolle: `git commit --no-verify` überspringt ihn. Wer das Format verbindlich machen will, prüft die Nachrichten zusätzlich in der CI-Pipeline des Pull Requests. Das habe ich hier nicht aufgesetzt.
+
+### 6. Die Vereinbarung aufschreiben
+
+Der Hook prüft die Form, nicht den Schnitt. Was ein Commit enthalten soll, gehört als kurze Regel ins Repository, zum Beispiel in die `CONTRIBUTING.md`:
+
+<Code file="CONTRIBUTING.md · Ausschnitt">
+```md
+## Commits
+- Ein Commit = eine Änderung mit einem Grund. Im Zweifel kleiner.
+- Erste Zeile: typ(bereich): was der Commit bewirkt, max. 50 Zeichen.
+- Body, wenn das Warum nicht offensichtlich ist. Ticket in die letzte Zeile.
+- Nachbesserungen vor dem Merge mit --fixup und rebase --autosquash.
+- Einmal pro Klon: git config core.hooksPath .githooks
+```
+</Code>
+
+<Sec id="testen" label="04 · Erfahrung">Was beim Testen passiert ist</Sec>
+
+Alle Beispiele habe ich mit einem Skript in frischen Repositorys durchgespielt. Diese sechs Dinge sind dabei schiefgegangen.
+
+<Pitfalls
+  items={[
+    { title: "Hook läuft still nicht", text: <>Der Commit „fixed stuff“ ging einfach durch. git meldete nur <code>hint: The '.githooks/commit-msg' hook was ignored because it's not set as executable.</code> Der Hook war ohne Ausführungsrecht kopiert, und <code>git add</code> hatte ihn als <code>100644</code> gespeichert. Lösung: <code>chmod +x</code> und, wenn er schon eingecheckt ist, <code>git update-index --chmod=+x</code>.</> },
+    { title: "Umlaute verfälschen die Länge", text: <>Der Hook zählte für „… ohne Rückfrage“ 62 Zeichen, es sind 61. <code>wc -m</code> zählt in der Standard-Locale Bytes, und „ü“ ist in UTF-8 zwei Bytes lang. Lösung: <code>LC_ALL=C.UTF-8 wc -m</code>.</> },
+    { title: "Fixup mit alter Nachricht", text: <>Nach <code>--fixup</code> und <code>autosquash</code> stand im Code 90, in der Nachricht weiter „60 Sekunden“. Ein einfaches Fixup übernimmt nur den Inhalt. Lösung: <code>--fixup=amend:&lt;hash&gt;</code> (seit git 2.32) und die Nachricht im Editor korrigieren.</> },
+    { title: "Amend wird nicht gefaltet", text: <>Nach <code>--fixup=amend:</code> blieb der Nachtrag als eigener Commit stehen. Ich hatte auch die erste Zeile „amend! fix(session): …“ geändert. Über genau diese Zeile findet <code>autosquash</code> sein Ziel. Lösung: nur die Zeilen darunter bearbeiten.</> },
+    { title: "Fixup im falschen Commit", text: <>Ich hatte das Ziel per <code>git log --grep="Timeout"</code> gesucht. Getroffen hat das den neueren Commit „Abmeldung nach Timeout …“, der Fix landete dort. Lösung: den Hash aus <code>git log --oneline</code> ablesen und direkt angeben.</> },
+    { title: "Suche nach Typ findet zu viel", text: <><code>git log -E --grep='^fix'</code> fand auch „fixed stuff“. Lösung: <code>--grep='^fix[(!:]'</code> verlangt nach dem Typ eine Klammer, ein Ausrufezeichen oder einen Doppelpunkt.</> },
+  ]}
+/>
+
+Zur Version: `git rebase --autosquash` funktioniert seit git 2.44 auch ohne `-i`. Mit 2.43 braucht es noch `-i`. Im Skript habe ich den Editor dafür mit `GIT_SEQUENCE_EDITOR=:` übersprungen.
+
+<Sec id="entscheidung" label="05 · Entscheidung">Wie groß ist ein Commit?</Sec>
+
+| Situation | So committest du | Warum |
+| --- | --- | --- |
+| Eine Farbe im Header geändert | Ein eigener Commit | Klein ist kein Problem. Man findet und revertiert ihn einzeln. |
+| Neue Funktion über fünf Dateien | Ein Commit, wenn alle fünf für die Funktion nötig sind | Ein halber Commit würde den Build brechen oder ins Leere verlinken. |
+| Fehler behoben und nebenbei umbenannt | Zwei Commits, zuerst das Umbenennen | Der Fix bleibt im Diff lesbar und lässt sich einzeln zurücknehmen. |
+| Ganze Datei neu formatiert | Eigener Commit vor der inhaltlichen Änderung | Sonst versteckt sich eine geänderte Zeile zwischen hundert verschobenen. |
+| Feierabend, halb fertig | Zwischenstand auf deinem Branch, vor dem Merge falten | Gesichert ist er trotzdem, nur `main` sieht ihn nie. |
+| Test zum Fix | Im selben Commit wie der Fix | Fix und Prüfung gehören zusammen, auch beim Revert. |
+
+<Callout variant="tip" title="Faustregel">
+Lies deine Betreffzeile laut. Wenn du dafür „und“ brauchst, sind es zwei Commits. Wenn du nicht weißt, was du schreiben sollst, weißt du noch nicht, was der Commit tut.
+</Callout>
+
+<Sec id="selbsttest" label="06 · Selbsttest">Hast du es verstanden?</Sec>
+
+Drei Fragen, jede mit Erklärung. Wer sich an eine Antwort erinnern muss, behält sie länger.
+
+<Quiz
+  questions={[
+    {
+      q: "Du hast heute den Header umgefärbt und einen Timeout-Fehler behoben. Wie committest du?",
+      options: ["Zwei Commits, einer pro Änderung", "Ein Commit „Header und Timeout angepasst“", "Ein Commit „Diverse Änderungen“, der Diff sagt den Rest"],
+      ok: 0,
+      why: "Zwei Änderungen mit zwei Gründen sind zwei Commits. So kann jemand den Header zurücknehmen, ohne den Fix zu verlieren, und findet den Fix über seine eigene Nachricht.",
+    },
+    {
+      q: "Warum lieber zu viele kleine Commits als zu wenige große?",
+      options: ["Kleine Commits lassen sich schneller pushen", "Zusammenfassen geht später mit einem Befehl, aufteilen nur von Hand", "git speichert kleine Commits platzsparender"],
+      ok: 1,
+      why: <>Mit <code>fixup</code> oder <code>squash</code> im interaktiven Rebase werden aus fünf Commits einer. Einen großen Commit aufzuteilen heißt dagegen: zurücksetzen und jede Zeile neu sortieren.</>,
+    },
+    {
+      q: "Der Hook liegt im Repository, aber bei einer Kollegin läuft er nicht. Was fehlt am wahrscheinlichsten?",
+      options: ["Sie muss git neu installieren", "Hooks laufen nur auf dem Server", <><code>git config core.hooksPath .githooks</code> in ihrem Klon oder das Ausführungsrecht der Datei</>],
+      ok: 2,
+      why: <><code>core.hooksPath</code> ist eine lokale Einstellung und wird nicht mitgeklont. Und eine Hook-Datei ohne Ausführungsrecht ignoriert git, mit nur einem Hinweis.</>,
+    },
+  ]}
+/>
+
+<Sec id="checkliste" label="07 · Umsetzen">Checkliste für euer Team</Sec>
+
+<Checklist
+  id="git-commits"
+  items={[
+    { title: <>Vor jedem Commit <code>git status</code> und <code>git diff</code> lesen.</>, text: "Erst wissen, was sich geändert hat, dann auswählen." },
+    { title: <>Gezielt stagen statt <code>git add .</code></>, text: <>Dateien einzeln, gemischte Dateien mit <code>git add -p</code>.</> },
+    { title: "Eine Änderung pro Commit.", text: "Wenn der Betreff ein „und“ braucht, aufteilen." },
+    { title: "Erste Zeile unter 50 Zeichen, mit Typ und Bereich.", text: "Was der Commit bewirkt, nicht was du getan hast." },
+    { title: "Das Warum in den Body.", text: "Nach einer Leerzeile, mit Verweis aufs Ticket." },
+    { title: <>Nachbesserungen mit <code>--fixup</code> falten.</>, text: "Nur auf dem eigenen Branch, vor dem Merge." },
+    { title: <><code>.githooks/commit-msg</code> und <code>.gitmessage</code> einchecken.</>, text: <>Mit Ausführungsrecht, Regel in die <code>CONTRIBUTING.md</code>.</> },
+    { title: "Jeder aktiviert den Hook in seinem Klon.", text: <code>git config core.hooksPath .githooks</code> },
+  ]}
+/>
+
+<SecLabel>Quellen</SecLabel>
+
+<Sources
+  items={[
+    { title: "Conventional Commits 1.0.0", href: "https://www.conventionalcommits.org/en/v1.0.0/", note: <>Format, Typen, <code>!</code> und <code>BREAKING CHANGE</code></> },
+    { title: "git: SubmittingPatches", href: "https://git-scm.com/docs/SubmittingPatches", note: "Befehlston, 50 Zeichen als weiche Grenze" },
+    { title: "Chris Beams: How to Write a Git Commit Message", href: "https://cbea.ms/git-commit/", note: "sieben Regeln, Umbruch nach 72 Zeichen" },
+    { title: "git-add", href: "https://git-scm.com/docs/git-add", note: <><code>-p</code>, getestet mit git 2.43</> },
+    { title: "git-commit", href: "https://git-scm.com/docs/git-commit", note: <><code>--fixup=amend:</code>, <code>--verbose</code>, <code>--no-verify</code>, getestet mit git 2.43</> },
+    { title: "git-rebase", href: "https://git-scm.com/docs/git-rebase", note: <><code>--autosquash</code>, getestet mit git 2.43</> },
+    { title: "githooks", href: "https://git-scm.com/docs/githooks", note: <><code>commit-msg</code>, <code>core.hooksPath</code>, Ausführungsrecht</> },
+    { title: "git 2.44 Release Notes", href: "https://github.com/git/git/blob/master/Documentation/RelNotes/2.44.0.adoc", note: <><code>--autosquash</code> ohne <code>-i</code></> },
+  ]}
+/>

@@ -3,12 +3,18 @@ import Link from "next/link"
 import { Callout } from "@/components/system/callout"
 import { CodeBlock, InlineCode } from "@/components/system/code-block"
 import { Table, TBody, TD, TH, THead, TR } from "@/components/system/table"
-import { Checklist } from "@/components/system/checklist"
 import { Stat, StatGrid } from "@/components/system/stat"
+import { Code, Pitfalls, Scenario, Sec, SecLabel, Sources, Takeaways } from "@/components/wiki/parts"
+import { Quiz } from "@/components/wiki/quiz"
+import { ScrollFig } from "@/components/wiki/scroll-fig"
+import { ScrollStory } from "@/components/wiki/scroll-story"
+import { StepFigure } from "@/components/wiki/step-figure"
+import { TaskChecklist } from "@/components/wiki/task-checklist"
 
 /*
  * MDX nutzt dieselben Bausteine wie die Seiten. Blogposts schreiben Markdown,
- * Sonderfälle (Callout, Checkliste, Statistik) als JSX.
+ * Sonderfälle (Callout, Statistik) und die Wiki-Bausteine als JSX
+ * (Spezifikation: blog-system/KOMPONENTEN.md im Projektordner).
  * Code-Blöcke (```lang) werden zu <CodeBlock> mit Kopier-Button.
  */
 const components: MDXComponents = {
@@ -40,7 +46,18 @@ const components: MDXComponents = {
   th: TH,
   td: TD,
   Callout,
-  Checklist,
+  Checklist: TaskChecklist,
+  Code,
+  Pitfalls,
+  Quiz,
+  Scenario,
+  ScrollFig,
+  ScrollStory,
+  Sec,
+  SecLabel,
+  Sources,
+  StepFigure,
+  Takeaways,
   Stat,
   StatGrid,
 }
