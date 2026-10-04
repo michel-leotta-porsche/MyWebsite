@@ -26,6 +26,12 @@
   --signal: #ffb224;
   --signal-ink: #8a5300;
 
+  /* Zweitpalette für Grafiken: Sanzo Wada, A Dictionary of Color Combinations, Nr. 288 */
+  --chart-1: #f99d1b; /* Yellow Orange */
+  --chart-2: #644b1e; /* Sepia */
+  --chart-3: #7a4456; /* Taupe Brown */
+  --chart-4: #111314; /* Black */
+
   --gutter: clamp(16px, 4.4vw, 64px);
   --col-gap: 20px;
   --section-gap: clamp(88px, 11vw, 160px);
@@ -69,6 +75,12 @@
   --signal-ink: #ffb224;
   --destructive: #ff8a70;
 
+  /* Nr. 288 auf Dunkel: gleicher Farbton, aufgehellt auf ≥ 3:1. Black wird zu Tinte. */
+  --chart-1: #f99d1b;
+  --chart-2: #a57c31;
+  --chart-3: #a45b73;
+  --chart-4: #ecebe6;
+
   color-scheme: dark;
 }
 
@@ -88,6 +100,10 @@
   --color-line: var(--line);
   --color-signal: var(--signal);
   --color-signal-ink: var(--signal-ink);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -43,6 +43,8 @@ Quelle der Wahrheit für Werte ist `src/app/globals.css`. `src/design/tokens.ts`
 - Bernstein (`signal`) nur als Signal: aktiver Zustand, Hover-Balken, Status-Punkt, Fokus. Nie als Fläche, nie als Hintergrund eines Abschnitts.
 - Text in Bernstein immer `text-signal-ink` (Kontrast auf Hell).
 - Text-Kontrast ≥ 4.5:1, auch auf `paper-2`. Neue Kombinationen nachrechnen.
+- Grafiken und Diagramme nutzen die Zweitpalette `chart-1` bis `chart-4` (Sanzo Wada, *A Dictionary of Color Combinations*, Nr. 288: Yellow Orange, Sepia, Taupe Brown, Black). Nie für Oberfläche, Text oder Zustände. Werte immer direkt beschriften, nicht nur über Farbe. `chart-1` hat auf Papier nur 1.8:1, deshalb Flächen in `chart-1` immer mit Kontur in `chart-4`.
+- Abgleich mit Wada: `signal` entspricht „Orange Yellow“ (ΔE 1.7), `ink` entspricht „Black“ (ΔE 3.1). Papier und Grautöne kommen im Buch nicht vor; das ist gewollt (Monochrom plus Signal).
 
 ### Form
 

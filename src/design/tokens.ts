@@ -13,6 +13,14 @@ export const colorTokens = [
   { token: "signal-ink", name: "Signal-Text", use: "Text, Fokus", light: "#8A5300", dark: "#FFB224" },
 ] as const
 
+/** Zweitpalette nur für Grafiken und Diagramme: Sanzo Wada, Kombination Nr. 288. */
+export const chartTokens = [
+  { token: "chart-1", name: "Yellow Orange", light: "#F99D1B", dark: "#F99D1B" },
+  { token: "chart-2", name: "Sepia", light: "#644B1E", dark: "#A57C31" },
+  { token: "chart-3", name: "Taupe Brown", light: "#7A4456", dark: "#A45B73" },
+  { token: "chart-4", name: "Black", light: "#111314", dark: "#ECEBE6" },
+] as const
+
 export const typeScale = [
   { cls: "t-display", spec: "600 · clamp(40–83px) / 1 · −0.045em", sample: "KI-Produkte im Alltag" },
   { cls: "t-h2", spec: "600 · clamp(32–58px) / 1 · −0.04em", sample: "Gebaut, betrieben, genutzt." },

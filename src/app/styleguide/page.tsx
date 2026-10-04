@@ -15,7 +15,7 @@ import { SiteHeader } from "@/components/system/site-header"
 import { Stat, StatGrid } from "@/components/system/stat"
 import { Table, TBody, TD, TH, THead, TR } from "@/components/system/table"
 import { ArrowLink, NavLink, TextLink } from "@/components/system/text-link"
-import { colorTokens, motionTokens, spaceTokens, typeScale } from "@/design/tokens"
+import { chartTokens, colorTokens, motionTokens, spaceTokens, typeScale } from "@/design/tokens"
 import { cn } from "@/lib/utils"
 import Beispiel from "./beispiel.mdx"
 import { MotionDemo, ProcessRunDemo } from "./demos"
@@ -84,6 +84,41 @@ function Swatches({ scheme }: { scheme: "light" | "dark" }) {
   )
 }
 
+function ChartSwatches({ scheme }: { scheme: "light" | "dark" }) {
+  const bars = [
+    { label: "Vektorsuche", value: 71, token: "chart-2" },
+    { label: "GraphRAG", value: 86, token: "chart-3" },
+    { label: "Hybrid", value: 89, token: "chart-1" },
+  ]
+  return (
+    <div className={cn(scheme === "dark" && "dark", "bg-paper p-4 text-ink sm:p-6")}>
+      <p className="t-label mb-4 text-ink-3">{scheme === "light" ? "Hell" : "Dunkel"}</p>
+      <ul className="grid grid-cols-4 gap-px border border-line bg-line">
+        {chartTokens.map((c) => (
+          <li key={c.token} className="bg-paper">
+            <span aria-hidden="true" className="block h-10" style={{ background: `var(--${c.token})` }} />
+            <span className="t-data block px-2 pt-1.5 pb-2 text-[11px] text-ink-3">
+              <b className="block font-medium text-ink">{c.token}</b>
+              {scheme === "light" ? c.light : c.dark}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <ul className="mt-6 flex flex-col gap-3" aria-label="Beispielwerte Trefferquote">
+        {bars.map((b) => (
+          <li key={b.label} className="grid grid-cols-[11ch_1fr_4ch] items-center gap-3">
+            <span className="t-small text-ink-2">{b.label}</span>
+            <span className="h-3 border border-chart-4">
+              <span className="block h-full" style={{ width: `${b.value}%`, background: `var(--${b.token})` }} />
+            </span>
+            <span className="t-data text-right">{b.value} %</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export default function StyleguidePage() {
   return (
     <>
@@ -132,6 +167,21 @@ export default function StyleguidePage() {
                 <Swatches scheme="dark" />
               </div>
               <Spec>Utilities: bg-paper · text-ink-2 · border-line · bg-signal · text-signal-ink</Spec>
+
+              <h3 className="t-h4 mt-16 mb-3">Zweitpalette für Grafiken</h3>
+              <p className="mb-8 max-w-[60ch] text-ink-2">
+                Kombination Nr. 288 aus Sanzo Wadas <i>A Dictionary of Color Combinations</i>: Yellow Orange, Sepia,
+                Taupe Brown, Black. Nur für Diagramme und Illustrationen, nie für Oberfläche oder Text. Auf Dunkel sind
+                Sepia und Taupe Brown im gleichen Farbton aufgehellt, Black wird zu Tinte.
+              </p>
+              <div className="grid gap-px border border-line bg-line md:grid-cols-2">
+                <ChartSwatches scheme="light" />
+                <ChartSwatches scheme="dark" />
+              </div>
+              <Spec>
+                Utilities: bg-chart-1 bis bg-chart-4 · Werte immer direkt beschriften · Yellow Orange auf Papier nur mit
+                Kontur (Kontrast 1.8:1)
+              </Spec>
             </Section>
 
             <Section id="typografie" label="02 · Typografie" title="Schibsted Grotesk und IBM Plex Mono.">
