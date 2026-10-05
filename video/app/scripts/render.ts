@@ -109,7 +109,7 @@ async function sheet(page: Page, times: number[], cols: number, out: string) {
 async function video(page: Page, from: number, to: number, fps: number, out: string) {
   mkdirSync(path.dirname(out), { recursive: true });
   const crf = opt('crf', '16')!;
-  const audio = path.join(ROOT, 'audio/voiceover.wav');
+  const audio = path.join(ROOT, 'audio/mix.wav');
   const args = ['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${OW}x${OH}`, '-r', String(fps), '-i', 'pipe:0'];
   if (!flag('noaudio')) args.push('-ss', String(from), '-t', String(to - from), '-i', audio);
   // Frames are sRGB (toSRGB in the final pass): convert with the BT.709 matrix and tag the stream,

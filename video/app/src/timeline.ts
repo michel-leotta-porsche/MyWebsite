@@ -16,7 +16,7 @@ export function makeTimeline(ly: Lyrics, au: AudioData): TimelineEntry[] {
   const cut = (i: number) => (i === 0 ? 0 : Math.max(0, heads[i]!.start - 0.3));
   return heads.map((l, i) => ({
     id: l.rule!,
-    load: scene('lab'),
+    load: scene('club'),
     start: cut(i),
     end: i + 1 < heads.length ? cut(i + 1) : au.duration,
     params: { rule: l.rule },

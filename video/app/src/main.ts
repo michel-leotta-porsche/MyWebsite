@@ -95,7 +95,7 @@ function setupExport() {
 
 // ------------------------------------------------------------------ preview player
 function setupPlayer() {
-  const audio = new Audio('audio/voiceover.wav');
+  const audio = new Audio('audio/mix.wav');
   audio.preload = 'auto';
   const ui = document.getElementById('ui')!;
   const scrub = document.getElementById('scrub') as HTMLInputElement;
