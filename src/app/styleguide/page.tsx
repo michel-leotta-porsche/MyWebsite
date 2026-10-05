@@ -17,6 +17,16 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/system/table"
 import { ArrowLink, NavLink, TextLink } from "@/components/system/text-link"
 import { chartTokens, colorTokens, motionTokens, spaceTokens, typeScale } from "@/design/tokens"
 import { cn } from "@/lib/utils"
+import { Pitfalls, Takeaways } from "@/components/wiki/parts"
+import { Quiz } from "@/components/wiki/quiz"
+import { ScrollFig } from "@/components/wiki/scroll-fig"
+import { StepFigure } from "@/components/wiki/step-figure"
+import { TaskChecklist } from "@/components/wiki/task-checklist"
+import { DragSnap } from "@/components/wiki/drag-snap"
+import { Rearrange } from "@/components/wiki/rearrange"
+import { SampleGrid } from "@/components/wiki/sample-grid"
+import { ScrambleSwap } from "@/components/wiki/scramble"
+import { ZoomFigure } from "@/components/wiki/zoom-figure"
 import Beispiel from "./beispiel.mdx"
 import { MotionDemo, ProcessRunDemo } from "./demos"
 
@@ -44,6 +54,7 @@ const toc = [
   ["checkliste", "Checkliste & Ablauf"],
   ["navigation", "Navigation & Footer"],
   ["mdx", "MDX"],
+  ["wiki", "Wiki-Bausteine"],
 ] as const
 
 function Section({ id, label, title, children }: { id: string; label: string; title: string; children: ReactNode }) {
@@ -476,10 +487,112 @@ export default function StyleguidePage() {
               </div>
               <Spec>src/mdx-components.tsx ordnet Markdown-Elementen die Bausteine zu.</Spec>
             </Section>
+
+            <Section id="wiki" label="18 · Wiki" title="Bausteine für Artikel im Wiki.">
+              <p className="max-w-[60ch] text-ink-2">
+                Spezifikation: blog-system/KOMPONENTEN.md. Die Scroll-Geschichte über die volle Breite (ScrollStory) zeigt der
+                Artikel <TextLink href="/de/wissen/git-commits">Git-Commits</TextLink>; Szenen liegen in src/content/scenes.
+              </p>
+              <p className="max-w-[60ch] text-ink-2">
+                Animationen, die der Leser selbst auslöst: Klick, Schalter oder Ziehen. Jeder Artikel nutzt höchstens eine
+                Scroll-Geschichte, dazu passende Bausteine von hier. Beim Laden zeigen alle ihren Ausgangszustand vollständig.
+              </p>
+              <ZoomFigure
+                title="ZoomFigure: Kamera per Klick"
+                label="Klick"
+                ariaLabel="Repository mit Branch, Commit und Nachricht"
+                levels={[
+                  { id: "msg", label: "Nachricht", text: "Die erste Zeile eines Commits." },
+                  { id: "commit", label: "Commit", text: "Hash, Autor, Nachricht, Änderungen." },
+                  { id: "branch", label: "Branch", text: "Eine Folge von Commits." },
+                  { id: "repo", label: "Repository", text: "Alle Branches zusammen." },
+                ]}
+              >
+                <div className="grid gap-3 border-t border-ink pt-2">
+                  <span className="t-label text-signal-ink">Repository</span>
+                  <div className="grid gap-px bg-line sm:grid-cols-[1fr_1.6fr]">
+                    <div data-zoom-show="repo" className="bg-paper p-3 font-mono text-[13px] text-ink-2">main · 214 Commits</div>
+                    <div data-zoom="branch" className="grid gap-2 bg-paper p-3">
+                      <span className="font-mono text-[13px] text-ink-2">feature/timeout</span>
+                      <div data-zoom-show="repo branch" className="font-mono text-[13px] text-ink-3">e3b6a58 docs(readme): Tippfehler korrigieren</div>
+                      <div data-zoom="commit" className="grid gap-1 border-t border-line pt-2 font-mono text-[13px]">
+                        <span data-zoom-show="repo branch commit" className="text-ink-3">91fd3b7 · Michel · 04.10.</span>
+                        <span data-zoom="msg" className="justify-self-start text-ink">fix(session): Timeout auf 60 Sekunden erhöhen</span>
+                        <span data-zoom-show="repo branch commit" className="text-ink-3">1 Datei, +1 −1</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ZoomFigure>
+              <ScrambleSwap
+                title="ScrambleSwap: Text verwürfelt sich"
+                label="Umschalten"
+                states={[
+                  { label: "vorher", lines: ["Update", "Fixes"], note: "Zeichen für Zeichen, ohne GSAP." },
+                  { label: "nachher", lines: ["fix(session): Timeout erhöhen", "docs(readme): Tippfehler korrigieren"] },
+                ]}
+              />
+              <Rearrange
+                title="Rearrange: Liste ordnet sich neu"
+                label="Umschalten"
+                markLabel="markiert"
+                items={[
+                  { id: "a", meta: "a1", text: "feat: Eins" },
+                  { id: "b", meta: "b2", text: "fix: Zwei" },
+                  { id: "c", meta: "c3", text: "docs: Drei" },
+                ]}
+                states={[
+                  { label: "alle", ids: ["a", "b", "c"] },
+                  { label: "umgekehrt", ids: ["c", "b", "a"] },
+                  { label: "gefiltert", ids: ["b"], mark: ["b"], note: "Motion layout, feste Höhe." },
+                ]}
+              />
+              <DragSnap
+                title="DragSnap: Etikett ziehen und einrasten"
+                label="Ziehen"
+                chip="production"
+                place="Hierhin"
+                keysHint="Mit den Pfeiltasten links und rechts verschieben."
+                initial={1}
+                slots={[
+                  { id: "v1", label: "v1", text: "Erste Fassung.", note: "production zeigt auf v1." },
+                  { id: "v2", label: "v2", text: "Mit Beispielen.", note: "production zeigt auf v2." },
+                  { id: "v3", label: "v3", text: "Kürzer.", note: "production zeigt auf v3." },
+                ]}
+              />
+              <SampleGrid title="SampleGrid: Raster neu auslosen" label="Klick" action="Neu auslosen" result="{n} von 200 Feldern getroffen ({p} %)." />
+              <Takeaways label="Takeaways" items={["Ein ganzer Satz pro Kachel.", "Genau drei Kacheln.", "Zitierbar ohne Kontext."]} />
+              <ScrollFig
+                title="ScrollFig: eine Verwandlung beim Vorbeiscrollen"
+                label="Beim Scrollen"
+                scene="git-commits/fixup"
+                labels={{
+                  fixup: "amend! fix(session): Timeout auf 60 Sekunden erhöhen",
+                  docs: "docs(readme): Tippfehler korrigieren",
+                  header: "feat(header): Hintergrund aufhellen",
+                  target: ["fix(session): Timeout auf 60 Sekunden erhöhen", "fix(session): Timeout auf 90 Sekunden erhöhen"],
+                }}
+              />
+              <StepFigure
+                title="StepFigure: Grafik mit Schritten"
+                label="Klick"
+                steps={[
+                  { state: "a", say: <><strong>Erster Teil.</strong> Klick hebt ihn hervor.</> },
+                  { state: "b", say: <><strong>Zweiter Teil.</strong> Der Rest tritt zurück.</> },
+                ]}
+              >
+                <div className="commit-msg">
+                  <div><i>1</i><span><span data-p="a">feat(wiki):</span> <span data-p="b">Bausteine zeigen</span></span></div>
+                </div>
+              </StepFigure>
+              <Pitfalls items={[{ title: "Fallstrick", text: "Ursache und Lösung in einem Absatz." }]} />
+              <Quiz questions={[{ q: "Was zeigt eine Scroll-Geschichte?", options: ["Eine Verwandlung", "Ein Video"], ok: 0, why: "Scrollen ist die Zeitachse, nichts läuft von selbst." }]} />
+              <TaskChecklist id="styleguide" items={[{ title: "Abhaken.", text: "Der Stand bleibt im Browser." }, { title: "Zurücksetzen.", text: "Mit dem Knopf darunter." }]} />
+            </Section>
           </div>
         </div>
       </main>
-      <SiteFooter note="Styleguide · Systemplan" />
+      <SiteFooter />
     </>
   )
 }

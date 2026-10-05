@@ -1,10 +1,13 @@
 "use client"
 
-import { useEffect, useState, useSyncExternalStore } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useSyncExternalStore } from "react"
+import { hasLocale, locales, translatePath, type Locale } from "@/i18n/config"
 import { cn } from "@/lib/utils"
 
 const toggleCls =
-  "t-label inline-flex min-h-6 min-w-6 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-160 hover:text-ink aria-pressed:text-ink focus-visible:outline-offset-2"
+  "t-label inline-flex min-h-6 min-w-6 cursor-pointer items-center justify-center text-ink-3 transition-colors duration-160 hover:text-ink aria-pressed:text-ink aria-[current=true]:text-ink focus-visible:outline-offset-2"
 
 type Theme = "light" | "dark"
 
@@ -18,7 +21,13 @@ const readTheme = (): Theme => (document.documentElement.classList.contains("dar
 const serverTheme = (): Theme => "light"
 
 /** Hell/Dunkel. Hell ist Standard; die Wahl liegt in localStorage("theme"). */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  labels = { scheme: "Farbschema", light: "Hell", dark: "Dunkel" },
+}: {
+  className?: string
+  labels?: { scheme: string; light: string; dark: string }
+}) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, serverTheme)
 
   function set(t: Theme) {
@@ -29,36 +38,41 @@ export function ThemeToggle({ className }: { className?: string }) {
   }
 
   return (
-    <span role="group" aria-label="Farbschema" className={cn("flex gap-1", className)}>
+    <span role="group" aria-label={labels.scheme} className={cn("flex gap-1", className)}>
       <button type="button" className={toggleCls} aria-pressed={theme === "light"} onClick={() => set("light")}>
         <span aria-hidden="true">○</span>
-        <span className="sr-only">Hell</span>
+        <span className="sr-only">{labels.light}</span>
       </button>
       <button type="button" className={toggleCls} aria-pressed={theme === "dark"} onClick={() => set("dark")}>
         <span aria-hidden="true">●</span>
-        <span className="sr-only">Dunkel</span>
+        <span className="sr-only">{labels.dark}</span>
       </button>
     </span>
   )
 }
 
 /**
- * DE/EN-Schalter. Phase 2: nur die Oberfläche (setzt <html lang>).
- * Die echte Übersetzung kommt mit den Seiten in Phase 3.
+ * DE/EN-Schalter: Links auf dieselbe Seite in der anderen Sprache (gleicher Slug).
+ * Außerhalb der Sprachpfade (z. B. /styleguide) führen sie auf die Startseiten.
  */
-export function LangToggle({ className }: { className?: string }) {
-  const [lang, setLang] = useState<"de" | "en">("de")
-
-  useEffect(() => {
-    document.documentElement.setAttribute("lang", lang)
-  }, [lang])
+export function LangToggle({ className, label = "Sprache" }: { className?: string; label?: string }) {
+  const pathname = usePathname() ?? "/"
+  const seg = pathname.split("/")[1] ?? ""
+  const current: Locale | undefined = hasLocale(seg) ? seg : undefined
 
   return (
-    <span role="group" aria-label="Sprache" className={cn("flex gap-1", className)}>
-      {(["de", "en"] as const).map((l) => (
-        <button key={l} type="button" className={toggleCls} aria-pressed={lang === l} onClick={() => setLang(l)}>
+    <span role="group" aria-label={label} className={cn("flex gap-1", className)}>
+      {locales.map((l) => (
+        <Link
+          key={l}
+          href={translatePath(pathname, l)}
+          hrefLang={l}
+          lang={l}
+          className={toggleCls}
+          aria-current={current === l ? "true" : undefined}
+        >
           {l.toUpperCase()}
-        </button>
+        </Link>
       ))}
     </span>
   )
