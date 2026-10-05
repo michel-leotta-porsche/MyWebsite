@@ -108,6 +108,12 @@ Alles in `src/components`. Neue Seiten bauen nur aus diesen Bausteinen; neue Bau
 | `ScrollStory`, `ScrollFig` | `wiki/scroll-story.tsx`, `wiki/scroll-fig.tsx` | Scroll-Geschichte (Pflicht im Leitfaden), kleine Scroll-Grafik; Szenen in `src/content/scenes` |
 | `StepFigure` | `wiki/step-figure.tsx` | Grafik mit Schrittliste, mit `scroll` als Scrollytelling |
 | `Scenario`, `Takeaways`, `Sec`, `Code`, `Pitfalls`, `Sources` | `wiki/parts.tsx` | statische Artikel-Bausteine |
+| `ZoomFigure` | `wiki/zoom-figure.tsx` | Kamera per Klick mit Feder; Ziele über `data-zoom`, Rest über `data-zoom-show` |
+| `Rearrange` | `wiki/rearrange.tsx` | Liste ordnet sich per Schalter neu (Motion `layout`): Filter, Sortierung, Vorher/Nachher |
+| `ScrambleSwap`, `Scramble` | `wiki/scramble.tsx` | Text verwürfelt sich Zeichen für Zeichen (eigener Effekt, kein GSAP) |
+| `DragSnap` | `wiki/drag-snap.tsx` | Etikett ziehen und einrasten, Knöpfe und Pfeiltasten als Ersatz |
+| `SampleGrid` | `wiki/sample-grid.tsx` | Raster vieler Felder, per Knopf neu ausgelost |
+| `FigFrame`, `Choice` | `wiki/fig-frame.tsx` | Rahmen und Schalter für die Grafiken oben |
 | `Quiz`, `Checklist` (MDX) | `wiki/quiz.tsx`, `wiki/task-checklist.tsx` | Selbsttest, Checkliste mit gemerktem Stand |
 
 ## shadcn und Watermelon UI
@@ -119,5 +125,6 @@ Alles in `src/components`. Neue Seiten bauen nur aus diesen Bausteinen; neue Bau
 
 - Profilinhalte stammen aus `content/profil.md` im Projektordner. Porsche-Projekte ohne interne Namen oder Nummern beschreiben.
 - Texte in `/styleguide` und auf der Startseite sind Platzhalter. Zahlen dort sind Beispielwerte und dürfen nicht auf echte Seiten übernommen werden.
+- Animation pro Artikel abwechseln: höchstens eine `ScrollStory`, sonst Bausteine, die der Leser per Klick, Schalter oder Ziehen auslöst. Nicht in jedem Artikel dieselben.
 - Wiki-Artikel: `content/wiki/<slug>/de.mdx` und `en.mdx`, Slug in `src/content/wiki.ts` eintragen. Jede Datei exportiert `meta` und `toc`; beide Sprachen haben dieselben Bausteine in derselben Reihenfolge. Regeln für Inhalt: `blog-system/STIL.md` und `KOMPONENTEN.md` im Projektordner.
 - Jeder Artikel erscheint immer auf Deutsch und Englisch.

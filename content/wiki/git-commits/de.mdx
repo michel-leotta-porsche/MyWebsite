@@ -76,7 +76,18 @@ Der häufigste Einwand: „Dann ist das Log voller winziger Commits.“ Ein Comm
 
 <Sec id="konzept" label="02 · Konzept">Der Aufbau einer Commit-Nachricht</Sec>
 
-Eine Commit-Nachricht hat eine feste Form, und jedes Werkzeug rund um git verlässt sich darauf. `git log --oneline`, GitHub und GitLab zeigen nur die erste Zeile. Der Rest ist für den, der genauer wissen will, warum. Scroll durch die fünf Teile.
+Eine Commit-Nachricht hat eine feste Form, und jedes Werkzeug rund um git verlässt sich darauf. `git log --oneline`, GitHub und GitLab zeigen nur die erste Zeile. Schalte um und vergleiche dieselbe Woche ohne und mit fester Form.
+
+<ScrambleSwap
+  title="Dieselbe Woche im Log"
+  label="Umschalten"
+  states={[
+    { label: "ohne Form", lines: ["Update", "Fixes", "Templates aktualisiert", "wip"], note: "Welcher Commit hat den Timeout geändert? Das verrät keine Zeile." },
+    { label: "mit Form", lines: ["fix(session): Timeout auf 60 Sekunden erhöhen", "feat(header): Hintergrund aufhellen", "chore(site): Kontaktseite entfernen", "docs(readme): Tippfehler korrigieren"], note: "Typ, Bereich und Wirkung stehen vorn. Den Timeout-Fix findest du beim Überfliegen." },
+  ]}
+/>
+
+Der Rest der Nachricht ist für den, der genauer wissen will, warum. Scroll durch die fünf Teile.
 
 {/* Satz-Test: Danach weiß der Leser, welcher Teil einer Commit-Nachricht welche Frage beantwortet und warum die Leerzeile nötig ist. */}
 
@@ -320,6 +331,27 @@ Alle Beispiele habe ich mit einem Skript in frischen Repositorys durchgespielt. 
     { title: "Amend wird nicht gefaltet", text: <>Nach <code>--fixup=amend:</code> blieb der Nachtrag als eigener Commit stehen. Ich hatte auch die erste Zeile „amend! fix(session): …“ geändert. Über genau diese Zeile findet <code>autosquash</code> sein Ziel. Lösung: nur die Zeilen darunter bearbeiten.</> },
     { title: "Fixup im falschen Commit", text: <>Ich hatte das Ziel per <code>git log --grep="Timeout"</code> gesucht. Getroffen hat das den neueren Commit „Abmeldung nach Timeout …“, der Fix landete dort. Lösung: den Hash aus <code>git log --oneline</code> ablesen und direkt angeben.</> },
     { title: "Suche nach Typ findet zu viel", text: <><code>git log -E --grep='^fix'</code> fand auch „fixed stuff“. Lösung: <code>--grep='^fix[(!:]'</code> verlangt nach dem Typ eine Klammer, ein Ausrufezeichen oder einen Doppelpunkt.</> },
+  ]}
+/>
+
+{/* Satz-Test: Danach hat der Leser gesehen, dass ^fix auch „fixed stuff“ trifft und erst ^fix[(!:] nur die echten Fixes findet. */}
+
+<Rearrange
+  title="Suche nach Typ im Log"
+  label="Umschalten"
+  markLabel="falscher Treffer"
+  items={[
+    { id: "a", meta: "e3b6a58", text: "fix: Leere Liste abfangen" },
+    { id: "b", meta: "70ad3f2", text: "docs(readme): Tippfehler korrigieren" },
+    { id: "c", meta: "2b7d9e4", text: "feat(auth): Abmeldung nach Timeout anzeigen" },
+    { id: "d", meta: "c88a103", text: "fixed stuff" },
+    { id: "e", meta: "51c0b7e", text: "feat(header): Hintergrund aufhellen" },
+    { id: "f", meta: "91fd3b7", text: "fix(session): Timeout auf 60 Sekunden erhöhen" },
+  ]}
+  states={[
+    { label: "git log --oneline", ids: ["a", "b", "c", "d", "e", "f"], note: "Sechs Commits einer Woche, neueste oben." },
+    { label: "--grep='^fix'", ids: ["a", "d", "f"], mark: ["d"], note: <>Drei Treffer, einer davon falsch: <code>^fix</code> passt auch auf „fixed stuff“.</> },
+    { label: "--grep='^fix[(!:]'", ids: ["a", "f"], note: <>Nur die echten Fixes. Nach dem Typ muss <code>(</code>, <code>!</code> oder <code>:</code> folgen.</> },
   ]}
 />
 

@@ -76,7 +76,18 @@ The most common objection: “Then the log is full of tiny commits.” A commit 
 
 <Sec id="konzept" label="02 · Concept">The anatomy of a commit message</Sec>
 
-A commit message has a fixed form, and every tool around git relies on it. `git log --oneline`, GitHub and GitLab show only the first line. The rest is for whoever wants to know why in more detail. Scroll through the five parts.
+A commit message has a fixed form, and every tool around git relies on it. `git log --oneline`, GitHub and GitLab show only the first line. Switch below and compare the same week without and with a fixed format.
+
+<ScrambleSwap
+  title="The same week in the log"
+  label="Switch"
+  states={[
+    { label: "no format", lines: ["Update", "Fixes", "Updated templates", "wip"], note: "Which commit changed the timeout? No line tells you." },
+    { label: "with format", lines: ["fix(session): Raise timeout to 60 seconds", "feat(header): Lighten background", "chore(site): Remove contact page", "docs(readme): Fix typo"], note: "Type, scope and effect come first. You spot the timeout fix at a glance." },
+  ]}
+/>
+
+The rest of the message is for whoever wants to know why in more detail. Scroll through the five parts.
 
 {/* Sentence test: After this, the reader knows which part of a commit message answers which question and why the blank line is needed. */}
 
@@ -320,6 +331,27 @@ I ran all examples with a script in fresh repositories. These six things went wr
     { title: "Amend is not folded in", text: <>After <code>--fixup=amend:</code>, the addendum stayed as its own commit. I had also changed the first line “amend! fix(session): …”. <code>autosquash</code> finds its target through exactly this line. Fix: edit only the lines below it.</> },
     { title: "Fixup in the wrong commit", text: <>I had looked for the target with <code>git log --grep="timeout"</code>. That hit the newer commit “Force logout after timeout …”, and the fix landed there. Fix: read the hash from <code>git log --oneline</code> and pass it directly.</> },
     { title: "Search by type finds too much", text: <><code>git log -E --grep='^fix'</code> also found “fixed stuff”. Fix: <code>--grep='^fix[(!:]'</code> requires a parenthesis, an exclamation mark or a colon after the type.</> },
+  ]}
+/>
+
+{/* Sentence test: After this, the reader has seen that ^fix also matches “fixed stuff” and only ^fix[(!:] finds the real fixes. */}
+
+<Rearrange
+  title="Searching the log by type"
+  label="Switch"
+  markLabel="false match"
+  items={[
+    { id: "a", meta: "e3b6a58", text: "fix: Handle empty list" },
+    { id: "b", meta: "70ad3f2", text: "docs(readme): Fix typo" },
+    { id: "c", meta: "2b7d9e4", text: "feat(auth): Show logout after timeout" },
+    { id: "d", meta: "c88a103", text: "fixed stuff" },
+    { id: "e", meta: "51c0b7e", text: "feat(header): Lighten background" },
+    { id: "f", meta: "91fd3b7", text: "fix(session): Raise timeout to 60 seconds" },
+  ]}
+  states={[
+    { label: "git log --oneline", ids: ["a", "b", "c", "d", "e", "f"], note: "Six commits from one week, newest first." },
+    { label: "--grep='^fix'", ids: ["a", "d", "f"], mark: ["d"], note: <>Three matches, one of them wrong: <code>^fix</code> also matches “fixed stuff”.</> },
+    { label: "--grep='^fix[(!:]'", ids: ["a", "f"], note: <>Only the real fixes. The type must be followed by <code>(</code>, <code>!</code> or <code>:</code>.</> },
   ]}
 />
 

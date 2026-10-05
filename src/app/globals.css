@@ -466,3 +466,11 @@
   font: 500 13px var(--font-plex-mono), ui-monospace, monospace;
   color: var(--ink);
 }
+
+/* ZoomFigure: Elemente außerhalb der gewählten Ebene treten zurück */
+.zoom-stage [data-zoom-show] {
+  transition: opacity var(--dur-2, 500ms) var(--ease-out-expo);
+}
+.zoom-stage [data-zdim] {
+  opacity: 0.15;
+}

@@ -10,6 +10,11 @@ import { ScrollFig } from "@/components/wiki/scroll-fig"
 import { ScrollStory } from "@/components/wiki/scroll-story"
 import { StepFigure } from "@/components/wiki/step-figure"
 import { TaskChecklist } from "@/components/wiki/task-checklist"
+import { DragSnap } from "@/components/wiki/drag-snap"
+import { Rearrange } from "@/components/wiki/rearrange"
+import { SampleGrid } from "@/components/wiki/sample-grid"
+import { Scramble, ScrambleSwap } from "@/components/wiki/scramble"
+import { ZoomFigure } from "@/components/wiki/zoom-figure"
 
 /*
  * MDX nutzt dieselben Bausteine wie die Seiten. Blogposts schreiben Markdown,
@@ -48,9 +53,14 @@ const components: MDXComponents = {
   Callout,
   Checklist: TaskChecklist,
   Code,
+  DragSnap,
   Pitfalls,
   Quiz,
+  Rearrange,
+  SampleGrid,
   Scenario,
+  Scramble,
+  ScrambleSwap,
   ScrollFig,
   ScrollStory,
   Sec,
@@ -58,6 +68,7 @@ const components: MDXComponents = {
   Sources,
   StepFigure,
   Takeaways,
+  ZoomFigure,
   Stat,
   StatGrid,
 }
