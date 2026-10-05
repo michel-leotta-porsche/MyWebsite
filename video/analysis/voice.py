@@ -159,7 +159,7 @@ def main():
         track.append(a)
         t += len(a) / SR
         prev = who
-    tail = 1.6
+    tail = 3.2
     track.append(np.zeros(int(tail * SR), np.float32))
     y = np.concatenate(track)
     y = y / max(1e-6, np.abs(y).max()) * 0.89

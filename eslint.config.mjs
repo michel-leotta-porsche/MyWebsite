@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Erklärvideo: eigenes Projekt mit eigener Toolchain
+    "video/**",
   ]),
 ]);
 
