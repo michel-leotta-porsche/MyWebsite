@@ -80,7 +80,8 @@ A commit message has a fixed form, and every tool around git relies on it. `git 
 
 <ScrambleSwap
   title="The same week in the log"
-  label="Switch"
+  label="Plays itself"
+  replay="Play again"
   states={[
     { label: "no format", lines: ["Update", "Fixes", "Updated templates", "wip"], note: "Which commit changed the timeout? No line tells you." },
     { label: "with format", lines: ["fix(session): Raise timeout to 60 seconds", "feat(header): Lighten background", "chore(site): Remove contact page", "docs(readme): Fix typo"], note: "Type, scope and effect come first. You spot the timeout fix at a glance." },
@@ -338,7 +339,8 @@ I ran all examples with a script in fresh repositories. These six things went wr
 
 <Rearrange
   title="Searching the log by type"
-  label="Switch"
+  label="Plays itself"
+  replay="Play again"
   markLabel="false match"
   items={[
     { id: "a", meta: "e3b6a58", text: "fix: Handle empty list" },

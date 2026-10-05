@@ -27,6 +27,18 @@ export function useAutoplay(ref: RefObject<HTMLElement | null>, steps: number, s
     clear()
   }, [])
 
+  const play = useCallback(() => {
+    clear()
+    for (let k = 1; k <= steps; k++) timers.current.push(window.setTimeout(() => stepRef.current(k), 600 + (k - 1) * every))
+  }, [steps, every])
+
+  /** Von vorn abspielen, auch nachdem der Leser eingegriffen hat */
+  const replay = useCallback(() => {
+    stopped.current = false
+    stepRef.current(0)
+    play()
+  }, [play])
+
   useEffect(() => {
     const el = ref.current
     if (!el || reduce) return
@@ -37,8 +49,7 @@ export function useAutoplay(ref: RefObject<HTMLElement | null>, steps: number, s
         if (e.isIntersecting) {
           if (played) stepRef.current(0)
           played = true
-          clear()
-          for (let k = 1; k <= steps; k++) timers.current.push(window.setTimeout(() => stepRef.current(k), 600 + (k - 1) * every))
+          play()
         } else clear()
       },
       { threshold: 0.4 }
@@ -48,7 +59,7 @@ export function useAutoplay(ref: RefObject<HTMLElement | null>, steps: number, s
       io.disconnect()
       clear()
     }
-  }, [ref, steps, every, reduce])
+  }, [ref, reduce, play])
 
-  return stop
+  return { stop, replay, reduce }
 }

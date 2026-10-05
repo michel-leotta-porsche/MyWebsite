@@ -10,6 +10,8 @@ import { useAutoplay } from "./use-autoplay"
 type Slot = { id: string; label: string; text: ReactNode; note?: ReactNode }
 
 type DragSnapProps = {
+  /** Beschriftung „Nochmal abspielen“ */
+  replay?: string
   title: string
   label: string
   /** Text auf dem Etikett, das gezogen wird */
@@ -29,7 +31,7 @@ const SPRING = { type: "spring" as const, stiffness: 420, damping: 22 }
  * schon im Server-HTML über dem richtigen Platz (per CSS-Variable). Beim Ziehen zählt nur der Versatz x;
  * nach dem Loslassen springt der Platz um und der Versatz federt auf 0. Knöpfe ersetzen das Ziehen für die Tastatur.
  */
-export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHint }: DragSnapProps) {
+export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHint, replay = "Nochmal abspielen" }: DragSnapProps) {
   const [i, setI] = useState(initial)
   const iRef = useRef(initial)
   iRef.current = i
@@ -41,7 +43,7 @@ export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHi
   const n = slots.length
   const fig = useRef<HTMLElement>(null)
   // Läuft beim Sichtbarwerden einmal über alle Plätze zurück zum Start
-  const stop = useAutoplay(fig, n, (k) => {
+  const { stop, replay: again, reduce: still } = useAutoplay(fig, n, (k) => {
     const next = (initial + k) % n
     if (next !== iRef.current) go(next, 0)
   })
@@ -59,7 +61,7 @@ export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHi
   }
 
   return (
-    <FigFrame ref={fig} title={title} label={label} caption={slots[i].note && <span aria-live="polite">{slots[i].note}</span>}>
+    <FigFrame ref={fig} replay={still ? undefined : { label: replay, onClick: again }} title={title} label={label} caption={slots[i].note && <span aria-live="polite">{slots[i].note}</span>}>
       <div ref={track} className="relative mt-3.5 pt-14" style={{ ["--n" as string]: n, ["--i" as string]: i }}>
         <motion.button
           type="button"

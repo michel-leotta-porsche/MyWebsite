@@ -9,6 +9,8 @@ type Item = { id: string; text: string; meta?: string }
 type RearrangeState = { label: string; ids: string[]; mark?: string[]; note?: ReactNode }
 
 type RearrangeProps = {
+  /** Beschriftung „Nochmal abspielen“ */
+  replay?: string
   title: string
   label: string
   items: Item[]
@@ -25,16 +27,16 @@ const ROW = 40
  * fehlende Zeilen blenden aus, neue ein. Taugt für Filter (git log --grep), Sortierung (rebase)
  * und Vorher/Nachher. Die Höhe bleibt fest, damit der Text darunter nicht springt.
  */
-export function Rearrange({ title, label, items, states, markLabel, initial = 0 }: RearrangeProps) {
+export function Rearrange({ title, label, items, states, markLabel, initial = 0, replay = "Nochmal abspielen" }: RearrangeProps) {
   const [i, setI] = useState(initial)
   const cur = states[i]
   const byId = new Map(items.map((it) => [it.id, it]))
   const rows = Math.max(...states.map((s) => s.ids.length))
   const fig = useRef<HTMLElement>(null)
-  const stop = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
+  const { stop, replay: again, reduce: still } = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
 
   return (
-    <FigFrame ref={fig} title={title} label={label}>
+    <FigFrame ref={fig} replay={still ? undefined : { label: replay, onClick: again }} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
         <Choice options={states.map((s) => s.label)} value={i} onChange={(k) => (stop(), setI(k))} ariaLabel={title} className="justify-self-start" />
         <MotionConfig reducedMotion="user" transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}>
