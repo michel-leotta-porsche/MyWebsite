@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { animate, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import { FigFrame } from "./fig-frame"
+import { useAutoplay } from "./use-autoplay"
 
 type Level = { id: string; label: string; text: ReactNode }
 
@@ -23,7 +24,7 @@ type ZoomFigureProps = {
 }
 
 /**
- * Kamera-Zoom per Klick: Die Grafik fährt mit einer Feder auf die gewählte Ebene, alles andere tritt zurück.
+ * Kamera-Zoom: läuft beim Sichtbarwerden einmal durch alle Ebenen, danach per Klick. Die Grafik fährt mit einer Feder auf die gewählte Ebene, alles andere tritt zurück.
  * Beim Laden zeigt sie das Gesamtbild. Ohne Bewegung springt die Kamera.
  */
 export function ZoomFigure({ title, label, levels, children, initial, height = [300, 380], ariaLabel }: ZoomFigureProps) {
@@ -32,6 +33,11 @@ export function ZoomFigure({ title, label, levels, children, initial, height = [
   const cam = useRef<HTMLDivElement>(null)
   const first = useRef(true)
   const reduce = useReducedMotion()
+  const fig = useRef<HTMLElement>(null)
+  // Von der Startebene Richtung Detail (Listenanfang) und zurück; steht die Startebene vorn, umgekehrt
+  const start = Math.max(0, levels.findIndex((l) => l.id === (initial ?? levels[levels.length - 1].id)))
+  const tour = start > 0 ? [...levels.keys()].slice(0, start).reverse() : [...levels.keys()].slice(1)
+  const stop = useAutoplay(fig, tour.length + 1, (k) => setCur(levels[k === 0 || k > tour.length ? start : tour[k - 1]].id), 2600)
 
   const move = useCallback((id: string, instant: boolean) => {
     const st = stage.current
@@ -77,7 +83,7 @@ export function ZoomFigure({ title, label, levels, children, initial, height = [
   }, [cur, move])
 
   return (
-    <FigFrame title={title} label={label}>
+    <FigFrame ref={fig} title={title} label={label}>
       <div
         ref={stage}
         role="img"
@@ -105,7 +111,10 @@ export function ZoomFigure({ title, label, levels, children, initial, height = [
             key={l.id}
             type="button"
             aria-pressed={cur === l.id}
-            onClick={() => setCur(l.id)}
+            onClick={() => {
+              stop()
+              setCur(l.id)
+            }}
             className={cn(
               "relative grid content-start gap-1 bg-paper px-3 py-3 text-left text-[15px] text-ink-2 transition-colors duration-160 hover:text-ink",
               "aria-pressed:bg-paper-2 aria-pressed:text-ink",

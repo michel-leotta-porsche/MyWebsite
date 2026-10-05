@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactNode, Ref } from "react"
 import { cn } from "@/lib/utils"
 
 type FigFrameProps = {
@@ -7,12 +7,13 @@ type FigFrameProps = {
   children: ReactNode
   caption?: ReactNode
   className?: string
+  ref?: Ref<HTMLElement>
 }
 
 /** Rahmen für Grafiken im Textfluss: Haarlinie oben in Tinte, Kopf mit Titel und Label, Linie unten. */
-export function FigFrame({ title, label, children, caption, className }: FigFrameProps) {
+export function FigFrame({ title, label, children, caption, className, ref }: FigFrameProps) {
   return (
-    <figure className={cn("my-[1.6em] border-t border-b border-t-ink border-b-line", className)}>
+    <figure ref={ref} className={cn("my-[1.6em] border-t border-b border-t-ink border-b-line", className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5 border-b border-line py-3">
         <h3 className="text-[1.05rem] font-semibold tracking-[-0.015em]">{title}</h3>
         <span className="t-label text-ink-3">{label}</span>

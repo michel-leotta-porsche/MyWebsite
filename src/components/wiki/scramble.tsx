@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import { Choice, FigFrame } from "./fig-frame"
+import { useAutoplay } from "./use-autoplay"
 
 const CHARS = "abcdefghijklmnopqrstuvwxyz0123456789():_-"
 
@@ -75,16 +76,18 @@ type ScrambleSwapProps = {
   initial?: number
 }
 
-/** Zeilen, die sich per Schalter verwürfeln, z. B. ein Log vorher und nachher. */
+/** Zeilen, die sich verwürfeln, z. B. ein Log vorher und nachher. Läuft beim Sichtbarwerden selbst, der Schalter übernimmt. */
 export function ScrambleSwap({ title, label, states, gutter, initial = 0 }: ScrambleSwapProps) {
   const [i, setI] = useState(initial)
   const rows = Math.max(...states.map((s) => s.lines.length))
   const cur = states[i]
+  const fig = useRef<HTMLElement>(null)
+  const stop = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
 
   return (
-    <FigFrame title={title} label={label}>
+    <FigFrame ref={fig} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
-        <Choice options={states.map((s) => s.label)} value={i} onChange={setI} ariaLabel={title} className="justify-self-start" />
+        <Choice options={states.map((s) => s.label)} value={i} onChange={(k) => (stop(), setI(k))} ariaLabel={title} className="justify-self-start" />
         <ol className="relative overflow-x-auto bg-paper-2 py-2 font-mono text-[13px] leading-[1.9] sm:text-[14px]" tabIndex={0} aria-label={cur.label}>
           {Array.from({ length: rows }, (_, r) => (
             <li

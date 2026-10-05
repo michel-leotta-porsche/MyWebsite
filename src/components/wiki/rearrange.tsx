@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 import { Choice, FigFrame } from "./fig-frame"
+import { useAutoplay } from "./use-autoplay"
 
 type Item = { id: string; text: string; meta?: string }
 type RearrangeState = { label: string; ids: string[]; mark?: string[]; note?: ReactNode }
@@ -20,7 +21,7 @@ type RearrangeProps = {
 const ROW = 40
 
 /**
- * Liste, die sich per Schalter neu ordnet: Zeilen rücken mit Motion `layout` an ihren Platz,
+ * Liste, die sich neu ordnet, beim Sichtbarwerden von selbst, danach per Schalter: Zeilen rücken mit Motion `layout` an ihren Platz,
  * fehlende Zeilen blenden aus, neue ein. Taugt für Filter (git log --grep), Sortierung (rebase)
  * und Vorher/Nachher. Die Höhe bleibt fest, damit der Text darunter nicht springt.
  */
@@ -29,11 +30,13 @@ export function Rearrange({ title, label, items, states, markLabel, initial = 0 
   const cur = states[i]
   const byId = new Map(items.map((it) => [it.id, it]))
   const rows = Math.max(...states.map((s) => s.ids.length))
+  const fig = useRef<HTMLElement>(null)
+  const stop = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
 
   return (
-    <FigFrame title={title} label={label}>
+    <FigFrame ref={fig} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
-        <Choice options={states.map((s) => s.label)} value={i} onChange={setI} ariaLabel={title} className="justify-self-start" />
+        <Choice options={states.map((s) => s.label)} value={i} onChange={(k) => (stop(), setI(k))} ariaLabel={title} className="justify-self-start" />
         <MotionConfig reducedMotion="user" transition={{ duration: 0.5, ease: [0.19, 1, 0.22, 1] }}>
           <ul
             aria-label={cur.label}

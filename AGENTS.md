@@ -125,6 +125,6 @@ Alles in `src/components`. Neue Seiten bauen nur aus diesen Bausteinen; neue Bau
 
 - Profilinhalte stammen aus `content/profil.md` im Projektordner. Porsche-Projekte ohne interne Namen oder Nummern beschreiben.
 - Texte in `/styleguide` und auf der Startseite sind Platzhalter. Zahlen dort sind Beispielwerte und dürfen nicht auf echte Seiten übernommen werden.
-- Animation pro Artikel abwechseln: höchstens eine `ScrollStory`, sonst Bausteine, die der Leser per Klick, Schalter oder Ziehen auslöst. Nicht in jedem Artikel dieselben.
+- Animation pro Artikel abwechseln: höchstens eine `ScrollStory`, dazu andere Bausteine. Nicht in jedem Artikel dieselben. Die Klick-Bausteine laufen beim Sichtbarwerden selbst durch (`useAutoplay`), Klick oder Ziehen übernimmt; bei reduzierter Bewegung läuft nichts von selbst.
 - Wiki-Artikel: `content/wiki/<slug>/de.mdx` und `en.mdx`, Slug in `src/content/wiki.ts` eintragen. Jede Datei exportiert `meta` und `toc`; beide Sprachen haben dieselben Bausteine in derselben Reihenfolge. Regeln für Inhalt: `blog-system/STIL.md` und `KOMPONENTEN.md` im Projektordner.
 - Jeder Artikel erscheint immer auf Deutsch und Englisch.

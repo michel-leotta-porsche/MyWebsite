@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react"
 import { animate, useReducedMotion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { FigFrame } from "./fig-frame"
+import { useAutoplay } from "./use-autoplay"
 
 type SampleGridProps = {
   title: string
@@ -47,13 +48,23 @@ export function SampleGrid({ title, label, total = 200, rate = 0.2, action, resu
     }
   }
 
+  const fig = useRef<HTMLElement>(null)
+  // Beim Sichtbarwerden dreimal von selbst auslosen
+  const stop = useAutoplay(fig, 3, (k) => k > 0 && draw(), 1800)
+
   const text = result.replace("{n}", String(n)).replace("{p}", String(Math.round((n / total) * 100)))
 
   return (
-    <FigFrame title={title} label={label}>
+    <FigFrame ref={fig} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="secondary" onClick={draw}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              stop()
+              draw()
+            }}
+          >
             {action}
           </Button>
           <span className="t-data text-ink" aria-hidden="true">

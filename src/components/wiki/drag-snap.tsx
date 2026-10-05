@@ -5,6 +5,7 @@ import { flushSync } from "react-dom"
 import { animate, motion, useMotionValue, useReducedMotion } from "motion/react"
 import { cn } from "@/lib/utils"
 import { FigFrame } from "./fig-frame"
+import { useAutoplay } from "./use-autoplay"
 
 type Slot = { id: string; label: string; text: ReactNode; note?: ReactNode }
 
@@ -30,19 +31,27 @@ const SPRING = { type: "spring" as const, stiffness: 420, damping: 22 }
  */
 export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHint }: DragSnapProps) {
   const [i, setI] = useState(initial)
+  const iRef = useRef(initial)
+  iRef.current = i
   const [near, setNear] = useState<number | null>(null)
   const track = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
   const reduce = useReducedMotion()
   const hint = useId()
   const n = slots.length
+  const fig = useRef<HTMLElement>(null)
+  // Läuft beim Sichtbarwerden einmal über alle Plätze zurück zum Start
+  const stop = useAutoplay(fig, n, (k) => {
+    const next = (initial + k) % n
+    if (next !== iRef.current) go(next, 0)
+  })
 
   const slotW = () => (track.current?.clientWidth ?? 0) / n
   const nearest = (offset: number) => Math.max(0, Math.min(n - 1, Math.round(i + offset / slotW())))
 
   // Neuer Platz, das Etikett startet optisch dort, wo es gerade ist, und federt hinüber
   function go(next: number, from: number) {
-    const shift = (i - next) * slotW() + from
+    const shift = (iRef.current - next) * slotW() + from
     flushSync(() => setI(next))
     x.set(shift)
     if (reduce) x.set(0)
@@ -50,7 +59,7 @@ export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHi
   }
 
   return (
-    <FigFrame title={title} label={label} caption={slots[i].note && <span aria-live="polite">{slots[i].note}</span>}>
+    <FigFrame ref={fig} title={title} label={label} caption={slots[i].note && <span aria-live="polite">{slots[i].note}</span>}>
       <div ref={track} className="relative mt-3.5 pt-14" style={{ ["--n" as string]: n, ["--i" as string]: i }}>
         <motion.button
           type="button"
@@ -59,12 +68,14 @@ export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHi
           dragConstraints={track}
           dragElastic={0.08}
           style={{ x, left: "calc((var(--i) + 0.5) * 100% / var(--n))" }}
+          onDragStart={stop}
           onDrag={(_, info) => setNear(nearest(info.offset.x))}
           onDragEnd={(_, info) => {
             setNear(null)
             go(nearest(info.offset.x), x.get())
           }}
           onKeyDown={(e) => {
+            stop()
             if (e.key === "ArrowLeft" && i > 0) go(i - 1, 0)
             if (e.key === "ArrowRight" && i < n - 1) go(i + 1, 0)
           }}
@@ -92,7 +103,10 @@ export function DragSnap({ title, label, chip, slots, initial = 0, place, keysHi
               <button
                 type="button"
                 aria-pressed={k === i}
-                onClick={() => k !== i && go(k, 0)}
+                onClick={() => {
+                  stop()
+                  if (k !== i) go(k, 0)
+                }}
                 className={cn("mt-1 min-h-6 justify-self-start font-mono text-[12px] text-ink-3 underline-offset-4 hover:text-ink hover:underline aria-pressed:text-signal-ink aria-pressed:no-underline")}
               >
                 {k === i ? chip : place}
