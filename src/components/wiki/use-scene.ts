@@ -8,15 +8,14 @@ import { tw } from "./tw"
 /**
  * Hängt eine Szene an eine Bühne. progress() liefert 0..1 aus der Scrollposition,
  * onProgress meldet den Wert z. B. für die Bildunterschriften.
- * Ohne Bewegung (prefers-reduced-motion) oder mit still steht der Endzustand p = 1.
+ * Ohne Bewegung (prefers-reduced-motion) steht der Endzustand p = 1.
  */
 export function useScene(
   stageRef: RefObject<HTMLElement | null>,
   name: string,
   labels: Record<string, unknown>,
   progress: () => number,
-  onProgress?: (p: number) => void,
-  still = false
+  onProgress?: (p: number) => void
 ) {
   const reduced = useReducedMotion()
   // Die neuesten Rückrufe ohne Neuaufbau der Szene
@@ -31,7 +30,7 @@ export function useScene(
     if (!stage || !scene) return
     let ctx: unknown
     let started = false
-    const read = () => (reduced || still ? 1 : live.current.progress())
+    const read = () => (reduced ? 1 : live.current.progress())
     const render = () => {
       if (!started) return
       const p = read()
@@ -70,5 +69,5 @@ export function useScene(
       cancelAnimationFrame(frame)
       stage.replaceChildren()
     }
-  }, [stageRef, name, reduced, still])
+  }, [stageRef, name, reduced])
 }
