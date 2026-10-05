@@ -9,6 +9,8 @@ import { useAutoplay } from "./use-autoplay"
 type Level = { id: string; label: string; text: ReactNode }
 
 type ZoomFigureProps = {
+  /** Beschriftung „Nochmal abspielen“ */
+  replay?: string
   title: string
   label: string
   levels: Level[]
@@ -27,7 +29,7 @@ type ZoomFigureProps = {
  * Kamera-Zoom: läuft beim Sichtbarwerden einmal durch alle Ebenen, danach per Klick. Die Grafik fährt mit einer Feder auf die gewählte Ebene, alles andere tritt zurück.
  * Beim Laden zeigt sie das Gesamtbild. Ohne Bewegung springt die Kamera.
  */
-export function ZoomFigure({ title, label, levels, children, initial, height = [300, 380], ariaLabel }: ZoomFigureProps) {
+export function ZoomFigure({ title, label, levels, children, initial, height = [300, 380], ariaLabel, replay = "Nochmal abspielen" }: ZoomFigureProps) {
   const [cur, setCur] = useState(initial ?? levels[levels.length - 1].id)
   const stage = useRef<HTMLDivElement>(null)
   const cam = useRef<HTMLDivElement>(null)
@@ -37,7 +39,7 @@ export function ZoomFigure({ title, label, levels, children, initial, height = [
   // Von der Startebene Richtung Detail (Listenanfang) und zurück; steht die Startebene vorn, umgekehrt
   const start = Math.max(0, levels.findIndex((l) => l.id === (initial ?? levels[levels.length - 1].id)))
   const tour = start > 0 ? [...levels.keys()].slice(0, start).reverse() : [...levels.keys()].slice(1)
-  const stop = useAutoplay(fig, tour.length + 1, (k) => setCur(levels[k === 0 || k > tour.length ? start : tour[k - 1]].id), 2600)
+  const { stop, replay: again, reduce: still } = useAutoplay(fig, tour.length + 1, (k) => setCur(levels[k === 0 || k > tour.length ? start : tour[k - 1]].id), 2600)
 
   const move = useCallback((id: string, instant: boolean) => {
     const st = stage.current
@@ -83,7 +85,7 @@ export function ZoomFigure({ title, label, levels, children, initial, height = [
   }, [cur, move])
 
   return (
-    <FigFrame ref={fig} title={title} label={label}>
+    <FigFrame ref={fig} replay={still ? undefined : { label: replay, onClick: again }} title={title} label={label}>
       <div
         ref={stage}
         role="img"

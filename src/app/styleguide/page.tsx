@@ -498,8 +498,8 @@ export default function StyleguidePage() {
                 Scroll-Geschichte, dazu passende Bausteine von hier. Beim Laden zeigen alle ihren Ausgangszustand vollständig.
               </p>
               <ZoomFigure
-                title="ZoomFigure: Kamera per Klick"
-                label="Klick"
+                title="ZoomFigure: Kamera fährt die Ebenen ab"
+                label="Läuft selbst"
                 ariaLabel="Repository mit Branch, Commit und Nachricht"
                 levels={[
                   { id: "msg", label: "Nachricht", text: "Die erste Zeile eines Commits." },
@@ -526,7 +526,7 @@ export default function StyleguidePage() {
               </ZoomFigure>
               <ScrambleSwap
                 title="ScrambleSwap: Text verwürfelt sich"
-                label="Umschalten"
+                label="Läuft selbst"
                 states={[
                   { label: "vorher", lines: ["Update", "Fixes"], note: "Zeichen für Zeichen, ohne GSAP." },
                   { label: "nachher", lines: ["fix(session): Timeout erhöhen", "docs(readme): Tippfehler korrigieren"] },
@@ -534,7 +534,7 @@ export default function StyleguidePage() {
               />
               <Rearrange
                 title="Rearrange: Liste ordnet sich neu"
-                label="Umschalten"
+                label="Läuft selbst"
                 markLabel="markiert"
                 items={[
                   { id: "a", meta: "a1", text: "feat: Eins" },
@@ -549,7 +549,7 @@ export default function StyleguidePage() {
               />
               <DragSnap
                 title="DragSnap: Etikett ziehen und einrasten"
-                label="Ziehen"
+                label="Läuft selbst"
                 chip="production"
                 place="Hierhin"
                 keysHint="Mit den Pfeiltasten links und rechts verschieben."
@@ -560,7 +560,7 @@ export default function StyleguidePage() {
                   { id: "v3", label: "v3", text: "Kürzer.", note: "production zeigt auf v3." },
                 ]}
               />
-              <SampleGrid title="SampleGrid: Raster neu auslosen" label="Klick" action="Neu auslosen" result="{n} von 200 Feldern getroffen ({p} %)." />
+              <SampleGrid title="SampleGrid: Raster neu auslosen" label="Läuft selbst" action="Neu auslosen" result="{n} von 200 Feldern getroffen ({p} %)." />
               <Takeaways label="Takeaways" items={["Ein ganzer Satz pro Kachel.", "Genau drei Kacheln.", "Zitierbar ohne Kontext."]} />
               <ScrollFig
                 title="ScrollFig: eine Verwandlung beim Vorbeiscrollen"
@@ -575,7 +575,7 @@ export default function StyleguidePage() {
               />
               <StepFigure
                 title="StepFigure: Grafik mit Schritten"
-                label="Klick"
+                label="Läuft selbst"
                 steps={[
                   { state: "a", say: <><strong>Erster Teil.</strong> Klick hebt ihn hervor.</> },
                   { state: "b", say: <><strong>Zweiter Teil.</strong> Der Rest tritt zurück.</> },

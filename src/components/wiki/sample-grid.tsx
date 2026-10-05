@@ -7,6 +7,8 @@ import { FigFrame } from "./fig-frame"
 import { useAutoplay } from "./use-autoplay"
 
 type SampleGridProps = {
+  /** Beschriftung „Nochmal abspielen“ */
+  replay?: string
   title: string
   label: string
   /** Anzahl Felder */
@@ -30,7 +32,7 @@ function seeded(total: number, rate: number) {
  * Raster vieler Felder, das per Knopf neu ausgelost wird. Jedes Feld wechselt mit eigener
  * Verzögerung (nur opacity, per CSS), die Zahl zählt mit Motion hoch oder runter.
  */
-export function SampleGrid({ title, label, total = 200, rate = 0.2, action, result }: SampleGridProps) {
+export function SampleGrid({ title, label, total = 200, rate = 0.2, action, result, replay = "Nochmal abspielen" }: SampleGridProps) {
   const [cells, setCells] = useState(() => seeded(total, rate))
   const count = useRef<HTMLSpanElement>(null)
   const reduce = useReducedMotion()
@@ -50,12 +52,12 @@ export function SampleGrid({ title, label, total = 200, rate = 0.2, action, resu
 
   const fig = useRef<HTMLElement>(null)
   // Beim Sichtbarwerden dreimal von selbst auslosen
-  const stop = useAutoplay(fig, 3, (k) => k > 0 && draw(), 1800)
+  const { stop, replay: again, reduce: still } = useAutoplay(fig, 3, (k) => k > 0 && draw(), 1800)
 
   const text = result.replace("{n}", String(n)).replace("{p}", String(Math.round((n / total) * 100)))
 
   return (
-    <FigFrame ref={fig} title={title} label={label}>
+    <FigFrame ref={fig} replay={still ? undefined : { label: replay, onClick: again }} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button

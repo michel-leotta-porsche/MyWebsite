@@ -68,6 +68,8 @@ export function Scramble({ text, ms = 600, className }: ScrambleProps) {
 type ScrambleSwapState = { label: string; lines: string[]; note?: string }
 
 type ScrambleSwapProps = {
+  /** Beschriftung „Nochmal abspielen“ */
+  replay?: string
   title: string
   label: string
   states: ScrambleSwapState[]
@@ -77,15 +79,15 @@ type ScrambleSwapProps = {
 }
 
 /** Zeilen, die sich verwürfeln, z. B. ein Log vorher und nachher. Läuft beim Sichtbarwerden selbst, der Schalter übernimmt. */
-export function ScrambleSwap({ title, label, states, gutter, initial = 0 }: ScrambleSwapProps) {
+export function ScrambleSwap({ title, label, states, gutter, initial = 0, replay = "Nochmal abspielen" }: ScrambleSwapProps) {
   const [i, setI] = useState(initial)
   const rows = Math.max(...states.map((s) => s.lines.length))
   const cur = states[i]
   const fig = useRef<HTMLElement>(null)
-  const stop = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
+  const { stop, replay: again, reduce: still } = useAutoplay(fig, states.length - 1, (k) => setI((initial + k) % states.length), 2600)
 
   return (
-    <FigFrame ref={fig} title={title} label={label}>
+    <FigFrame ref={fig} replay={still ? undefined : { label: replay, onClick: again }} title={title} label={label}>
       <div className="grid gap-4 py-3.5">
         <Choice options={states.map((s) => s.label)} value={i} onChange={(k) => (stop(), setI(k))} ariaLabel={title} className="justify-self-start" />
         <ol className="relative overflow-x-auto bg-paper-2 py-2 font-mono text-[13px] leading-[1.9] sm:text-[14px]" tabIndex={0} aria-label={cur.label}>
