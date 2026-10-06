@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "export": "STATIC_EXPORT=1 next build && node scripts/shrink-export.mjs"
   },
   "dependencies": {
     "motion": "^14.0.0",

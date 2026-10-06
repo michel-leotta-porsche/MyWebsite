@@ -52,6 +52,8 @@ html {
 }
 
 body {
+  /* explizit, damit eingebettete Ansichten keinen eigenen Grund zeigen */
+  background: var(--table);
   font-family: var(--font-bricolage), system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
