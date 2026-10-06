@@ -68,6 +68,7 @@ export function SunAndShade() {
 
   useEffect(() => {
     const c = canvas.current;
+    if (document.documentElement.classList.contains("ohne-schatten")) return;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
     const draw = () => {
@@ -86,14 +87,14 @@ export function SunAndShade() {
   return (
     <>
       {/* Schatten: Petrol mit wenig Deckkraft, damit Text auf dem Papier lesbar bleibt (≥ 4.5:1) */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-10 overflow-hidden opacity-[0.12]">
+      <div aria-hidden data-shade className="pointer-events-none absolute inset-0 z-10 overflow-hidden opacity-[0.12]">
         <div className="sway absolute -inset-[6%] origin-top-right">
           <canvas ref={canvas} className="h-full w-full" />
         </div>
       </div>
       {/* Sonne: weiches Licht, mischt sich mit Tisch und Papier darunter */}
       {/* nur ab Tablet: der Mischmodus über dem 3D-Buch kostet auf dem Telefon zu viel Speicher */}
-      <div aria-hidden className="sunlight pointer-events-none absolute inset-0 z-10 hidden md:block" />
+      <div aria-hidden data-shade className="sunlight pointer-events-none absolute inset-0 z-10 hidden md:block" />
     </>
   );
 }

@@ -73,7 +73,7 @@ body {
 }
 
 @layer components {
-/* Gewebe: zwei Fadenrichtungen aus Rauschen, ohne Bilddatei */
+/* Gewebe: zwei Fadenrichtungen, als kleine PNG-Kacheln vorgerendert (SVG-Filter zur Laufzeit sind in WebKit teuer) */
 .linen {
   isolation: isolate;
 }
@@ -86,8 +86,8 @@ body {
   opacity: 0.32;
   mix-blend-mode: soft-light;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.035' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.9' numOctaves='2' seed='8'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.6 -0.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+    url("/textures/linen-weft.png"),
+    url("/textures/linen-warp.png");
 }
 
 /* Papier: Fasern und ein Hauch Vergilbung am Rand, wie ein Buch nach ein paar Sommern */
@@ -101,7 +101,7 @@ body {
   pointer-events: none;
   background-image:
     radial-gradient(ellipse 120% 105% at 50% 50%, transparent 72%, rgb(196 160 92 / 0.16) 100%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.08' numOctaves='2' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 0.45  0 0 0 0 0.38  0 0 0 0 0.25  0 0 0 0.9 -0.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+    url("/textures/paper.png");
   opacity: 0.28;
 }
 
@@ -168,4 +168,13 @@ html.intro .intro-cover {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+/* Schalter zum Eingrenzen auf Geräten: ?ohne=intro,schatten,struktur,biegung (Skript im Layout) */
+html.ohne-struktur .linen::after,
+html.ohne-struktur .paper::before {
+  display: none;
+}
+html.ohne-schatten [data-shade] {
+  display: none;
 }

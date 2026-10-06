@@ -63,7 +63,6 @@ export function PageView({
                 sizes="(min-width: 768px) 28vw, 64vw"
                 className="object-cover object-[50%_40%]"
                 preload
-                placeholder="blur"
               />
             </div>
           </div>
@@ -152,7 +151,6 @@ export function PageView({
               sizes={pageSizes}
               className="object-cover"
               loading={loading}
-              placeholder="blur"
             />
             <PlateButton no={page.no} />
           </div>
@@ -178,7 +176,6 @@ export function PageView({
                 sizes="(min-width: 768px) 72vw, 100vw"
                 className="object-cover"
                 loading={loading}
-                placeholder="blur"
               />
             </div>
             <PlateButton no={page.no} />

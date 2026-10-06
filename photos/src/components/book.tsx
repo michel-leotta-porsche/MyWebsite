@@ -217,7 +217,9 @@ function LeafView({
     const on = turningNow(tv);
     if (on !== turning) setTurning(on);
   });
-  const bent = turning && near;
+  // ?ohne=biegung: flach umblättern wie früher
+  const noBend = typeof document !== "undefined" && document.documentElement.classList.contains("ohne-biegung");
+  const bent = turning && near && !noBend;
 
   return (
     <motion.div

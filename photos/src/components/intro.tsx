@@ -150,7 +150,6 @@ export function Intro() {
                 sizes="330px"
                 className="block h-auto w-full"
                 loading="eager"
-                placeholder="blur"
               />
             </div>
           );
