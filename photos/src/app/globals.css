@@ -44,6 +44,7 @@
 }
 
 html {
+  scrollbar-gutter: stable;
   background: var(--table);
   color: var(--on-table);
   scroll-snap-type: y proximity;
@@ -62,9 +63,12 @@ body {
   color: var(--cloth-ink);
 }
 
-:focus-visible {
-  outline: 2px solid var(--cloth);
-  outline-offset: 3px;
+@layer base {
+  /* Fokus in Einbandgelb auf dem Tisch; auf Papier setzen Elemente Tinte (outline-ink) */
+  :focus-visible {
+    outline: 2px solid var(--cloth);
+    outline-offset: 3px;
+  }
 }
 
 @layer components {
@@ -90,20 +94,19 @@ body {
   background-color: var(--paper);
 }
 
-/* Prägung im Einband */
-.deboss {
-  color: var(--cloth-ink);
-  text-shadow:
-    0 1px 0 color-mix(in oklab, var(--cloth) 60%, white),
-    0 -1px 0 color-mix(in oklab, var(--cloth-ink) 40%, transparent);
-}
-
 /* Fahrplan-Linie: Haltepunkte der Bildfolge */
 .stop {
   transition:
     scale 500ms var(--ease-out),
     background-color 160ms ease;
 }
+}
+
+/* Auf kleinen Schirmen wirkt das Gewebe sonst wie Rauschen */
+@media (max-width: 767px) {
+  .linen::after {
+    opacity: 0.18;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
