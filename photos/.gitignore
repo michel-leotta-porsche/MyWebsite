@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .impeccable/review/
+
+# Firebase-Cache
+.firebase/
