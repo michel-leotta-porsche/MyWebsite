@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
-import { plates } from "@/content/plates";
+import { countWord, plates } from "@/content/plates";
 
 const EXPO = "cubic-bezier(0.16, 1, 0.3, 1)";
 const IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
@@ -68,10 +68,10 @@ export function Intro() {
             { opacity: 0, transform: `translate(${s.dx}vw, -70vh) rotate(${s.rot - 24}deg) scale(1.18)` },
             { opacity: 1, transform: `translate(${s.dx}vw, ${s.dy}vh) rotate(${s.rot}deg) scale(1)` },
           ],
-          { duration: 760, delay: 180 + i * 80, easing: EXPO, fill: "both" },
+          { duration: 760, delay: 180 + i * 52, easing: EXPO, fill: "both" },
         ),
       );
-      timers.push(window.setTimeout(() => setCount(i + 1), 180 + i * 80 + 420));
+      timers.push(window.setTimeout(() => setCount(i + 1), 180 + i * 52 + 420));
       // danach schiebt sich der Stapel zu einem Buch zusammen
       anims.push(
         p.animate(
@@ -175,7 +175,7 @@ export function Intro() {
           ))}
         </p>
         <p data-sub className="text-on-table-2 mt-3 text-base opacity-0 md:mt-4 md:text-lg">
-          Fünfzehn Fotografien von Fuerteventura · Michel Leotta
+          {countWord} Fotografien von Fuerteventura · Michel Leotta
         </p>
       </div>
     </div>

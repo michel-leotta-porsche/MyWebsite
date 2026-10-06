@@ -11,7 +11,7 @@ const bricolage = Bricolage_Grotesque({
 export const metadata: Metadata = {
   title: "Fujiventura · Fotografien von Michel Leotta",
   description:
-    "Fünfzehn Fotografien von Fuerteventura, gebunden als Buch zum Durchblättern.",
+    "Sechsundzwanzig Fotografien von Fuerteventura, gebunden als Buch zum Durchblättern.",
 };
 
 export const viewport: Viewport = {

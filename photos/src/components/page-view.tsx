@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { plate, type Page } from "@/content/plates";
+import { countWord, plate, type Page } from "@/content/plates";
 import { PlateButton } from "@/components/plate-viewer";
 
 // Alle Maße in cqw/cqh: jede Seite ist ein Size-Container.
@@ -15,7 +15,7 @@ function Gutter({ side }: { side: "left" | "right" }) {
       className="pointer-events-none absolute inset-y-0 z-20 w-[14cqw]"
       style={{
         [side === "left" ? "right" : "left"]: 0,
-        background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.05) 30%, transparent)`,
+        background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(4 24 27 / 0.16), rgb(4 24 27 / 0.05) 30%, transparent)`,
       }}
     />
   );
@@ -109,7 +109,7 @@ export function PageView({
               Fuji&shy;ventura
             </h2>
             <p className="mt-[5cqw] max-w-[60cqw] leading-snug" style={{ fontSize: "4.2cqw" }}>
-              Fünfzehn Fotografien von Fuerteventura
+              {countWord} Fotografien von Fuerteventura
             </p>
           </div>
           <p className="text-ink-2 absolute bottom-[12cqw] left-[12cqw]" style={{ fontSize: "3.4cqw" }}>
@@ -130,7 +130,12 @@ export function PageView({
     case "plate": {
       const p = plate(page.no);
       const landscape = p.src.width > p.src.height;
-      const box = landscape
+      // randabfallend: das Bild läuft bis an die Papierkante; auf dem Telefon bleibt unten Platz für die Unterschrift
+      const box = page.bleed
+        ? compact
+          ? "inset-x-0 top-0 bottom-[17cqw]"
+          : "inset-0"
+        : landscape
         ? compact
           ? "top-[calc(50cqh-34cqw)] left-[4cqw] aspect-[3/2] w-[92cqw]"
           : "top-[calc(50cqh-30cqw)] left-[7cqw] aspect-[3/2] w-[86cqw]"
@@ -139,7 +144,9 @@ export function PageView({
           : page.withCaption
             ? "top-[9cqw] left-[16cqw] aspect-[2/3] w-[68cqw]"
             : "top-[8cqw] left-[12cqw] aspect-[2/3] w-[76cqw]";
-      const captionAt = landscape
+      const captionAt = page.bleed
+        ? "bottom-[5cqw] left-[8cqw]"
+        : landscape
         ? compact
           ? "top-[calc(50cqh+30cqw)] left-[4cqw]"
           : "top-[calc(50cqh+34cqw)] left-[7cqw]"
@@ -206,7 +213,7 @@ export function PageView({
             style={{ fontSize: "max(11px, 3.1cqw)" }}
           >
             <p className="text-ink font-semibold">Fujiventura</p>
-            <p>Fünfzehn Fotografien, aufgenommen auf Fuerteventura mit einer Fuji.</p>
+            <p>{countWord} Fotografien, aufgenommen auf Fuerteventura mit einer Fuji.</p>
             <p>Fotografie und Gestaltung: Michel Leotta</p>
             <p>Gesetzt in Bricolage Grotesque.</p>
             <p>© 2026 Michel Leotta</p>

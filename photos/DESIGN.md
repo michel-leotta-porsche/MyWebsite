@@ -1,6 +1,6 @@
 ---
 name: Fujiventura
-description: Fünfzehn Fotografien von Fuerteventura, gebunden als Buch auf einem Leinentisch.
+description: Sechsundzwanzig Fotografien von Fuerteventura, gebunden als Buch auf einem Leinentisch.
 colors:
   table: "#1d4f55"
   table-deep: "#12363b"
@@ -13,6 +13,9 @@ colors:
   paper-shade: "#e4e4dd"
   ink: "#1b1c1a"
   ink-2: "#5a5c56"
+  shadow-petrol: "#04181b"
+  sunlight: "#ffcd82"
+  yellowing: "#c4a05c"
 typography:
   cover-title:
     fontFamily: "Bricolage Grotesque, system-ui, sans-serif"
@@ -50,6 +53,13 @@ typography:
     fontFamily: "Bricolage Grotesque, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 400
+  intro-word:
+    fontFamily: "Bricolage Grotesque, system-ui, sans-serif"
+    fontSize: "clamp(56px, 15.5vw, 230px)"
+    fontWeight: 700
+    lineHeight: 0.82
+    letterSpacing: "-0.035em"
+    fontVariation: "\"wdth\" 75, \"opsz\" 96"
 rounded:
   none: "0px"
 spacing:
@@ -140,6 +150,7 @@ Im dunklen Farbschema des Systems wird nur der Tisch dunkler (`table` #143a3f, `
 - **Einbandtitel** (700, 15.5cqw, Zeilenhöhe 0.86, Laufweite -0.035em, Breite 78, Optik 96): „Fujiventura“ auf dem Einband, die eine `h1`.
 - **Titelseite** (700, 19cqw, 0.86, -0.04em, Breite 75, Optik 96): Titel auf der Titelei, darunter ein Satz in 4.2cqw.
 - **Wortmarke** (700, 18px, -0.02em, Breite 80): oben links auf dem Tisch.
+- **Einstieg** (700, `clamp(56px, 15.5vw, 230px)`, 0.82, -0.035em, Breite 75, Optik 96): „FUJIVENTURA“ in Versalien, Buchstabe für Buchstabe von unten, nur im Einstieg.
 - **Bildunterschrift** (400, max(11px, 3.1cqw), 1.375): Nummer in `ink` halbfett, Abstand 2.4cqw, Titel und Zusatz in `ink-2`. Gleiche Größe im Kolophon. Breite höchstens 64 bis 76cqw der Seite.
 - **Bedienung** (400, 14px): Tafelzähler, Hinweis „Scrollen zum Blättern“, Knöpfe im Vollbild, Fuß.
 - **Haltepunkt-Etikett** (400, 12px): Nummer und Titel über einem Haltepunkt beim Hover.
@@ -155,7 +166,7 @@ Die Bühne ist ein Viewport hoch und klebt (`sticky`), darunter liegt eine Scrol
 
 Ab 768px wird das Buch als Doppelseite gebunden: Seitenbreite `min((100vw - 64px) / 2, (100dvh - 150px) / 1.3, 700px)`, Seitenformat 1:1.3. Darunter als Einzelseiten: Breite `min(100vw - 24px, (100dvh - 130px) / 1.46)`, Format 1:1.46, jede Tafel mit Unterschrift auf ihrer eigenen Seite.
 
-Der Satzspiegel arbeitet mit großem, ungleichem Weißraum: Bildunterschriften sitzen unten links mit 12cqw Abstand, Hochformate stehen oben mit 8 bis 16cqw Einzug, Querformate mittig. Drei Doppelseitentypen wechseln sich ab: Unterschrift links und Tafel rechts (leere Gegenseite), zwei Tafeln mit Unterschrift, ein Panorama über den Bund.
+Der Satzspiegel arbeitet mit großem, ungleichem Weißraum: Bildunterschriften sitzen unten links mit 12cqw Abstand, Hochformate stehen oben mit 8 bis 16cqw Einzug, Querformate mittig. Vier Doppelseitentypen wechseln sich ab: Unterschrift links und Tafel rechts (leere Gegenseite), zwei Tafeln mit Unterschrift, ein Panorama über den Bund, und eine randabfallende Tafel, die bis an die Papierkante läuft (gegenüber nur die Unterschrift). Auf dem Telefon läuft die randabfallende Tafel oben und seitlich bis an die Kante, unten bleibt Platz für die Unterschrift.
 
 ### Named Rules
 **The Empty Facing Page Rule.** Eine Tafel darf eine leere Gegenseite haben, die nur ihre Unterschrift trägt. Der Leerraum ist Teil der Erzählung und wird nicht aufgefüllt.
@@ -167,8 +178,13 @@ Tiefe ist physisch, nicht ornamental. Es gibt genau ein Objekt über dem Tisch, 
 ### Shadow Vocabulary
 - **Buch auf dem Tisch** (`box-shadow: 0 28px 50px -18px rgb(4 24 27 / 0.75), 0 6px 14px -6px rgb(4 24 27 / 0.5)`): nur unter dem aufgeschlagenen Teil, Farbe aus dem Petrol abgeleitet, nie neutralschwarz.
 - **Eingeklebtes Bild** (`box-shadow: 1px 2px 3px rgb(58 39 6 / 0.35), 0 0 0 0.5px rgb(58 39 6 / 0.2)`): das Coverbild steht minimal vom Leinen ab.
-- **Bundwölbung** (Verlauf `rgb(0 0 0 / 0.16)` über 0.05 bei 30 % zu transparent, 14cqw breit): jede Innenseite dunkelt zum Bund hin.
-- **Blattlicht** (Verlauf `rgb(0 0 0 / 0.55)` zu `0.15`, Deckkraft 0 bis 0.42): die Vorderseite dunkelt beim Aufrichten, die Rückseite hellt beim Ablegen.
+- **Bundwölbung** (Verlauf `rgb(4 24 27 / 0.16)` über `rgb(4 24 27 / 0.05)` bei 30 % zu transparent, 14cqw breit): jede Innenseite dunkelt zum Bund hin.
+- **Blattlicht** (Verlauf `rgb(4 24 27 / 0.55)` zu `rgb(4 24 27 / 0.15)`, Deckkraft 0 bis 0.42): die Vorderseite dunkelt beim Aufrichten, die Rückseite hellt beim Ablegen.
+- **Biegung** (Petrol `rgb(4 24 27)`, je Streifen zwei Verläufe, deren Deckkraft dem Winkel folgt, höchstens 0.55): beim Umblättern wölbt sich das Blatt, steile Stellen werden dunkler.
+- **Eselsohr-Loch** (Verlauf `rgb(4 24 27 / 0.28)` an der Falte zu `paper-shade`): die Seite unter der umgeklappten Ecke.
+- **Palmenschatten** (Wedel in `rgb(4 24 27)`, Deckkraft 0.12, auf ein Neuntel der Auflösung gezeichnet und hochskaliert): Schatten einer Palme über Tisch und Buch, wiegt sich langsam (9s und 3.1s, `cubic-bezier(0.77, 0, 0.175, 1)`). Liegt unter Kopfzeile und Bildfolge, nie auf Bedienelementen.
+- **Sonne** (`soft-light`: oben rechts `rgb(255 205 130 / 0.55)` zu transparent, unten links `rgb(4 24 27 / 0.35)`): Licht von draußen, gleiche Stelle wie der Ansatz der Palme.
+- **Vergilbung** (Rand `rgb(196 160 92 / 0.16)` ab 72 % des Seitenradius, dazu feine Papierfaser bei 28 % Deckkraft): das Papier hat ein paar Sommer gesehen.
 - **Eselsohr** (`drop-shadow(-3px -3px 5px rgb(4 24 27 / 0.28))`): die Lasche der umgeklappten Ecke.
 
 ### Named Rules
@@ -194,9 +210,9 @@ Unsichtbare Knöpfe, die auf dem Papier liegen.
 - **Focus:** 2px Rahmen in `ink`, nach innen versetzt (-4px), weil `cloth` auf Papier zu schwach wäre.
 
 ### Bildfolge-Linie (Signatur)
-Die Bildfolge als Fahrplan-Linie mit 15 Haltepunkten.
+Die Bildfolge als Fahrplan-Linie mit einem Haltepunkt pro Tafel (26). Die ganze Linie ist eine Scrub-Leiste: Tippen oder Ziehen springt zur Tafel unter dem Finger; die Knöpfe bleiben für die Tastatur.
 - **Linie:** 1px `on-table-2` bei 40 %, darüber die gefüllte Strecke in `cloth`, die per `scaleX` mit dem Blättern mitläuft.
-- **Haltepunkt:** Balken 3px × 10px in `on-table-2`, Klickfläche 24px × 24px.
+- **Haltepunkt:** Balken 3px × 10px in `on-table-2`. Klickfläche: die ganze 24px hohe Linie; jeder Knopf höchstens 24px breit, auf schmalen Schirmen schmaler, weil die Leiste den Treffer übernimmt.
 - **Hover:** Balken wächst auf 150 % Höhe und wird `on-table`, darüber erscheint Nummer und Titel (12px, steigt 4px auf).
 - **Aktiv:** `cloth`, 190 % Höhe, `aria-current`.
 - **Übergang:** Größe 500ms `ease-out`, Farbe 160ms.
@@ -208,7 +224,7 @@ Wortmarke links, rechts „Tafel 3 / 15 Tafeln“ (Abschnitt in `on-table`, Rest
 Ringelblumen-Leinen mit Falz am Rücken, eingeklebte Tafel (64cqw breit, 4:5, mit 1.6cqw Papierrand), Titel als flacher Druck in `cloth-ink` unten links. Beim ersten Laden hebt sich der Einband einmal um 28° an (1.8s, nach 0.9s), als Hinweis zum Blättern.
 
 ### Blatt und Eselsohr
-Jedes Blatt dreht um den Bund (`rotateY` 0 bis -180°, Perspektive 2600px) mit kubischem ease-in-out pro Blatt und einer Feder auf dem Scrollwert (Steifigkeit 150, Dämpfung 26, Masse 0.7). Bei Maus über dem ruhig liegenden Buch klappt die Ecke der Seite unter dem Zeiger um (24 % der Seitenbreite, höchstens 150px, Feder 420/30); darunter liegt die Farbe der nächsten Seite.
+Jedes Blatt dreht um den Bund (`rotateY` 0 bis -180°, Perspektive 2600px) mit kubischem ease-in-out pro Blatt. Während es sich bewegt, besteht es aus einer Kette von Streifen (12 bei der Doppelseite, 7 auf dem Telefon), die sich als Bogen biegen: die freie Kante eilt bis zu 64° voraus und setzt zuerst auf. Liegende Blätter sind ein flaches Stück; nur zwei Blätter um die aufgeschlagene Seite tragen Bilder. und einer Feder auf dem Scrollwert (Steifigkeit 150, Dämpfung 26, Masse 0.7). Bei Maus über dem ruhig liegenden Buch klappt die Ecke der Seite unter dem Zeiger um (24 % der Seitenbreite, höchstens 150px, Feder 420/30); darunter liegt die Farbe der nächsten Seite.
 
 ### Vergrößerte Tafel
 Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`, nur `transform`) über einem Hintergrund aus `table-deep`-Leinen, darunter Nummer, Titel und Zurück/Weiter. Schließen fliegt sie zurück an ihre Stelle (480ms), die Bedienung blendet vorher in 120ms aus. Tafelwechsel im Vollbild: 260ms Einblenden aus 98.5 %.

@@ -19,6 +19,7 @@ import { plates, singlePages, spreads, type Page } from "@/content/plates";
 import { INTRO_DONE } from "@/components/intro";
 import { PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
+import { SunAndShade } from "@/components/sun-and-shade";
 
 type Mode = "spread" | "single";
 type Leaf = { front: Page; back: Page };
@@ -80,6 +81,101 @@ function Blank({ page }: { page: Page }) {
   return <div className={`absolute inset-0 ${bg}`} />;
 }
 
+// Gebogenes Blatt: so viele Streifen wie nötig, damit der Bogen rund wirkt
+const STRIPS = { spread: 12, single: 7 } as const;
+// wie stark sich das Papier mitten im Umblättern wölbt (Grad zwischen Bund und Kante)
+const BEND = 64;
+
+/** Winkel jedes Streifens: die freie Kante eilt voraus, der Bund folgt zuletzt */
+function stripAngles(tv: number, i: number, n: number, pv: number) {
+  const s = clamp01(tv - i);
+  let theta = 180 * turnEase(s);
+  if (i === 0 && tv < 0.02) theta -= pv;
+  const b = BEND * Math.sin(Math.PI * s);
+  const out: number[] = [];
+  for (let j = 0; j < n; j++) {
+    const u = (j + 0.5) / n;
+    out.push(Math.min(180, Math.max(0, theta + b * (2 * u - 1))));
+  }
+  return out;
+}
+
+function Strip({
+  j,
+  n,
+  leaf,
+  i,
+  t,
+  peek,
+  compact,
+  fadeBack,
+}: {
+  j: number;
+  n: number;
+  leaf: Leaf;
+  i: number;
+  t: MotionValue<number>;
+  peek: MotionValue<number>;
+  compact: boolean;
+  fadeBack: boolean;
+}) {
+  // Drehung relativ zum Streifen davor: zusammen ergibt die Kette den Bogen
+  const transform = useTransform<number, string>([t, peek], ([tv, pv]) => {
+    const a = stripAngles(tv, i, n, pv);
+    return `rotateY(${-(a[j] - (j > 0 ? a[j - 1] : 0))}deg)`;
+  });
+  const angle = useTransform<number, number>([t, peek], ([tv, pv]) => stripAngles(tv, i, n, pv)[j]);
+  // Licht: steht das Papier steil, wird es dunkler. Zwei Verläufe pro Streifen (links, rechts),
+  // nur ihre Deckkraft ändert sich; zusammen läuft das Licht fließend über den Bogen.
+  const shadeOf = (a: number, back: boolean) => {
+    const x = back ? (180 - a) / 90 : a / 90;
+    return 0.55 * Math.pow(Math.min(1, Math.max(0, x)), 1.5);
+  };
+  const edges = (tv: number, pv: number): [number, number] => {
+    const a = stripAngles(tv, i, n, pv);
+    const left = j > 0 ? (a[j - 1] + a[j]) / 2 : Math.max(0, a[0] - (a[1] - a[0]) / 2);
+    const right = j < n - 1 ? (a[j] + a[j + 1]) / 2 : Math.min(180, a[j] + (a[j] - a[j - 1]) / 2);
+    return [left, right];
+  };
+  const frontL = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[0], false));
+  const frontR = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[1], false));
+  // die Rückseite ist gespiegelt: ihre linke Bildkante ist die rechte Kante des Streifens
+  const backL = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[1], true));
+  const backR = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[0], true));
+  // auf dem Telefon erst ganz am Ende ausblenden, sonst wirkt das Blatt milchig
+  const backOpacity = useTransform(angle, [172, 180], [1, fadeBack ? 0 : 1]);
+
+  return (
+    <motion.div
+      className="absolute inset-y-0 origin-left [transform-style:preserve-3d]"
+      style={{ transform, left: j === 0 ? 0 : "100%", width: j === 0 ? `${100 / n}%` : "100%" }}
+    >
+      {/* Vorderseite: dieser Streifen zeigt seinen Ausschnitt der Seite (leicht überlappend gegen Haarfugen) */}
+      <div className="absolute inset-y-0 left-0 w-[calc(100%+0.6px)] overflow-hidden [backface-visibility:hidden]">
+        <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-j * 100}%` }}>
+          <PageView page={leaf.front} side="right" eager compact={compact} />
+        </div>
+        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: frontL }} />
+        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: frontR }} />
+      </div>
+      {/* Rückseite: gespiegelt, also von der anderen Kante her geschnitten */}
+      <motion.div
+        className="absolute inset-y-0 left-0 w-[calc(100%+0.6px)] overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
+        style={{ opacity: backOpacity }}
+      >
+        <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-(n - 1 - j) * 100}%` }}>
+          <PageView page={leaf.back} side="left" eager compact={compact} />
+        </div>
+        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: backL }} />
+        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: backR }} />
+      </motion.div>
+      {j < n - 1 && (
+        <Strip j={j + 1} n={n} leaf={leaf} i={i} t={t} peek={peek} compact={compact} fadeBack={fadeBack} />
+      )}
+    </motion.div>
+  );
+}
+
 function LeafView({
   leaf,
   i,
@@ -110,45 +206,58 @@ function LeafView({
   const frontShade = useTransform(rot, [0, -90], [0, 0.42]);
   const backShade = useTransform(rot, [-90, -180], [0.42, 0]);
   // Auf dem Telefon verschwindet die Rückseite nach links aus dem Bild
-  const backOpacity = useTransform(rot, [-120, -180], [1, mode === "single" ? 0 : 1]);
+  const backOpacity = useTransform(rot, [-172, -180], [1, mode === "single" ? 0 : 1]);
   const compact = mode === "single";
   const near = Math.abs(i - k) <= WINDOW;
+
+  // Nur das Blatt, das sich gerade bewegt, biegt sich; liegende Blätter bleiben ein flaches Stück
+  const turningNow = (tv: number) => tv - i > 0.004 && tv - i < 0.996;
+  const [turning, setTurning] = useState(() => turningNow(t.get()));
+  useMotionValueEvent(t, "change", (tv) => {
+    const on = turningNow(tv);
+    if (on !== turning) setTurning(on);
+  });
+  const bent = turning && near;
 
   return (
     <motion.div
       className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${near ? "will-change-transform" : ""}`}
       style={{
-        transform,
+        transform: bent ? "perspective(2600px)" : transform,
         zIndex,
         left: mode === "spread" ? "50%" : 0,
         width: mode === "spread" ? "50%" : "100%",
       }}
     >
-      {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
-      <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
-        {near ? (
-          <PageView page={leaf.front} side="right" eager compact={compact} />
-        ) : (
-          <Blank page={leaf.front} />
-        )}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(0_0_0/0.55),rgb(0_0_0/0.15))]"
-          style={{ opacity: frontShade }}
-        />
-      </div>
-      <motion.div
-        className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
-        style={{ opacity: backOpacity }}
-        inert={k !== i + 1 || mode === "single"}
-      >
-        {near ? <PageView page={leaf.back} side="left" eager compact={compact} /> : <Blank page={leaf.back} />}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(0_0_0/0.55),rgb(0_0_0/0.15))]"
-          style={{ opacity: backShade }}
-        />
-      </motion.div>
+      {bent ? (
+        <div className="absolute inset-0 [transform-style:preserve-3d]" inert>
+          <Strip j={0} n={STRIPS[mode]} leaf={leaf} i={i} t={t} peek={peek} compact={compact} fadeBack={mode === "single"} />
+        </div>
+      ) : (
+        <>
+          {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
+          <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
+            {near ? <PageView page={leaf.front} side="right" eager compact={compact} /> : <Blank page={leaf.front} />}
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"
+              style={{ opacity: frontShade }}
+            />
+          </div>
+          <motion.div
+            className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
+            style={{ opacity: backOpacity }}
+            inert={k !== i + 1 || mode === "single"}
+          >
+            {near ? <PageView page={leaf.back} side="left" eager compact={compact} /> : <Blank page={leaf.back} />}
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"
+              style={{ opacity: backShade }}
+            />
+          </motion.div>
+        </>
+      )}
     </motion.div>
   );
 }
@@ -174,7 +283,7 @@ function Curl({ side, amount, flap }: { side: "left" | "right"; amount: MotionVa
         className="absolute inset-0"
         style={{
           clipPath: right ? "polygon(100% 0, 100% 100%, 0 100%)" : "polygon(0 0, 100% 100%, 0 100%)",
-          background: `linear-gradient(${dir}, rgb(0 0 0 / 0.28) 50%, var(--paper-shade) 66%, var(--paper) 100%)`,
+          background: `linear-gradient(${dir}, rgb(4 24 27 / 0.28) 50%, var(--paper-shade) 66%, var(--paper) 100%)`,
         }}
       />
       {/* Lasche: Rückseite des Blatts, zur Falte hin aufgehellt */}
@@ -183,7 +292,7 @@ function Curl({ side, amount, flap }: { side: "left" | "right"; amount: MotionVa
           className="absolute inset-0"
           style={{
             clipPath: right ? "polygon(0 0, 100% 0, 0 100%)" : "polygon(0 0, 100% 0, 100% 100%)",
-            background: `linear-gradient(${dir}, color-mix(in oklab, var(--flap) 82%, black) 0%, var(--flap) 34%, color-mix(in oklab, var(--flap) 70%, white) 49%, var(--flap) 50%)`,
+            background: `linear-gradient(${dir}, color-mix(in oklab, var(--flap) 82%, rgb(4 24 27)) 0%, var(--flap) 34%, color-mix(in oklab, var(--flap) 70%, white) 49%, var(--flap) 50%)`,
           }}
         />
       </div>
@@ -487,6 +596,17 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     else goTo(k - 1);
   };
 
+  // Bildfolge: Position auf der Linie wird zur Tafel
+  const scrubbing = useRef(false);
+  const scrubbed = useRef(0);
+  const scrubTo = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const no = Math.min(plates.length, Math.max(1, Math.floor(((e.clientX - r.left) / r.width) * plates.length) + 1));
+    if (no === scrubbed.current && e.type !== "pointerdown") return;
+    scrubbed.current = no;
+    goTo(stepForPlate(no));
+  };
+
   const current = platesAt(mode, k);
   const label = labelAt(mode, k, count);
 
@@ -516,7 +636,8 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
         className={`linen sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
         inert={!!viewer}
       >
-        <header className="flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
+        <SunAndShade />
+        <header className="relative z-20 flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
           <p
             className="text-on-table text-lg font-bold tracking-[-0.02em]"
             style={{ fontVariationSettings: '"wdth" 80' }}
@@ -641,7 +762,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
         {/* Bildfolge als Linie mit Haltepunkten */}
         <nav
           aria-label="Bildfolge"
-          className="relative mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7"
+          className="relative z-20 mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7"
         >
           <motion.p
             aria-hidden
@@ -650,24 +771,39 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
           >
             {swipe ? "Wischen zum Blättern" : "Scrollen zum Blättern"}
           </motion.p>
-          <div className="relative h-6">
-            <div aria-hidden className="absolute top-1/2 right-[12px] left-[12px] h-px bg-on-table-2/40" />
+          {/* Scrub-Leiste: tippen oder ziehen springt zur nächsten Tafel; die Knöpfe bleiben für die Tastatur */}
+          <div
+            className="relative h-6 cursor-pointer touch-none"
+            onPointerDown={(e) => {
+              scrubbing.current = true;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              scrubTo(e);
+            }}
+            onPointerMove={(e) => scrubbing.current && scrubTo(e)}
+            onPointerUp={() => (scrubbing.current = false)}
+            onPointerCancel={() => (scrubbing.current = false)}
+          >
+            <div
+              aria-hidden
+              className="absolute top-1/2 h-px bg-on-table-2/40"
+              style={{ left: `${50 / plates.length}%`, right: `${50 / plates.length}%` }}
+            />
             <motion.div
               aria-hidden
-              className="absolute top-1/2 right-[12px] left-[12px] h-px origin-left bg-cloth"
-              style={{ transform: fillT }}
+              className="absolute top-1/2 h-px origin-left bg-cloth"
+              style={{ transform: fillT, left: `${50 / plates.length}%`, right: `${50 / plates.length}%` }}
             />
-            <ol className="absolute inset-0 flex justify-between">
+            <ol className="absolute inset-0 flex">
               {plates.map((p) => {
                 const active = current.includes(p.no);
                 return (
-                  <li key={p.no} className="group relative flex">
+                  <li key={p.no} className="group relative flex min-w-0 flex-1 justify-center">
                     <button
                       type="button"
                       onClick={() => goTo(stepForPlate(p.no))}
                       aria-label={`Tafel ${p.no}: ${p.title}`}
                       aria-current={active ? "true" : undefined}
-                      className="flex h-6 w-6 items-center justify-center"
+                      className="flex h-6 w-full max-w-6 items-center justify-center"
                     >
                       <span
                         aria-hidden

@@ -35,7 +35,7 @@ Eigene Bilder aus eigener Hand, fotografiert mit einer Fujifilm-Kamera. Der warm
 
 ## Evidence on Hand
 
-- 15 Fotos von Fuerteventura unter `public/photos/` (01 bis 15). Bekannte Orte: Playa El Bajo Negro (Bild 09, Schrift am Turm), Gemeinde La Oliva.
+- 26 Fotos von Fuerteventura unter `public/photos/`; die Reihenfolge im Buch steht in `src/content/plates.ts`. Beim Auto im Garten ist das Kennzeichen unkenntlich gemacht (personenbezogen). Bekannte Orte: Playa El Bajo Negro (Bild 09, Schrift am Turm), Gemeinde La Oliva.
 - Michel ist auf Bild 03 (Strand) und Bild 11 (Felsbogen) zu sehen; darf gezeigt werden. Bild 08 zeigt ihn als Spiegelung beim Fotografieren.
 - Keine Kameradaten (EXIF ist leer), keine Aufnahmedaten. Keine Brennweiten, Blenden oder Daten erfinden.
 
