@@ -92,7 +92,8 @@ export function SunAndShade() {
         </div>
       </div>
       {/* Sonne: weiches Licht, mischt sich mit Tisch und Papier darunter */}
-      <div aria-hidden className="sunlight pointer-events-none absolute inset-0 z-10" />
+      {/* nur ab Tablet: der Mischmodus über dem 3D-Buch kostet auf dem Telefon zu viel Speicher */}
+      <div aria-hidden className="sunlight pointer-events-none absolute inset-0 z-10 hidden md:block" />
     </>
   );
 }

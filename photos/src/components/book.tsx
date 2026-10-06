@@ -82,7 +82,7 @@ function Blank({ page }: { page: Page }) {
 }
 
 // Gebogenes Blatt: so viele Streifen wie nötig, damit der Bogen rund wirkt
-const STRIPS = { spread: 12, single: 7 } as const;
+const STRIPS = { spread: 12, single: 5 } as const;
 // wie stark sich das Papier mitten im Umblättern wölbt (Grad zwischen Bund und Kante)
 const BEND = 64;
 
@@ -153,7 +153,7 @@ function Strip({
       {/* Vorderseite: dieser Streifen zeigt seinen Ausschnitt der Seite (leicht überlappend gegen Haarfugen) */}
       <div className="absolute inset-y-0 left-0 w-[calc(100%+0.6px)] overflow-hidden [backface-visibility:hidden]">
         <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-j * 100}%` }}>
-          <PageView page={leaf.front} side="right" eager compact={compact} />
+          <PageView page={leaf.front} side="right" compact={compact} />
         </div>
         <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: frontL }} />
         <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: frontR }} />
@@ -164,7 +164,7 @@ function Strip({
         style={{ opacity: backOpacity }}
       >
         <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-(n - 1 - j) * 100}%` }}>
-          <PageView page={leaf.back} side="left" eager compact={compact} />
+          <PageView page={leaf.back} side="left" compact={compact} />
         </div>
         <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: backL }} />
         <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: backR }} />
@@ -221,7 +221,7 @@ function LeafView({
 
   return (
     <motion.div
-      className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${near ? "will-change-transform" : ""}`}
+      className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${bent ? "will-change-transform" : ""}`}
       style={{
         transform: bent ? "perspective(2600px)" : transform,
         zIndex,
@@ -237,7 +237,7 @@ function LeafView({
         <>
           {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
           <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
-            {near ? <PageView page={leaf.front} side="right" eager compact={compact} /> : <Blank page={leaf.front} />}
+            {near ? <PageView page={leaf.front} side="right" compact={compact} /> : <Blank page={leaf.front} />}
             <motion.div
               aria-hidden
               className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"
@@ -249,7 +249,7 @@ function LeafView({
             style={{ opacity: backOpacity }}
             inert={k !== i + 1 || mode === "single"}
           >
-            {near ? <PageView page={leaf.back} side="left" eager compact={compact} /> : <Blank page={leaf.back} />}
+            {near ? <PageView page={leaf.back} side="left" compact={compact} /> : <Blank page={leaf.back} />}
             <motion.div
               aria-hidden
               className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"

@@ -8,7 +8,11 @@ const nextConfig: NextConfig = {
   // Eigenes Projekt im Repo der Hauptseite: Wurzel festnageln, sonst greift Turbopack nach oben
   turbopack: { root: path.join(__dirname) },
   outputFileTracingRoot: path.join(__dirname),
-  ...(staticExport && { output: "export", images: { unoptimized: true } }),
+  ...(staticExport && {
+    output: "export",
+    // feste Breiten statt Bildserver, siehe src/image-loader.ts
+    images: { loader: "custom", loaderFile: "./src/image-loader.ts" },
+  }),
 };
 
 export default nextConfig;

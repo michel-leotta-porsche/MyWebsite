@@ -254,9 +254,10 @@ export type Page =
 
 export type Spread = { left: Page; right: Page; plates: number[] };
 
+// einzelne Tafel: randabfallend über die ganze rechte Seite, die Unterschrift steht gegenüber
 const single = (title: string): Spread => {
   const no = byTitle(title);
-  return { left: { kind: "caption", no }, right: { kind: "plate", no }, plates: [no] };
+  return { left: { kind: "caption", no }, right: { kind: "plate", no, bleed: true }, plates: [no] };
 };
 // randabfallend: das Bild läuft bis an die Papierkante, die Unterschrift steht gegenüber
 const bleed = (title: string): Spread => {

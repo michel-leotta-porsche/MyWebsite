@@ -130,29 +130,18 @@ export function PageView({
     case "plate": {
       const p = plate(page.no);
       const landscape = p.src.width > p.src.height;
-      // randabfallend: das Bild läuft bis an die Papierkante; auf dem Telefon bleibt unten Platz für die Unterschrift
-      const box = page.bleed
-        ? compact
-          ? "inset-x-0 top-0 bottom-[17cqw]"
-          : "inset-0"
-        : landscape
-        ? compact
-          ? "top-[calc(50cqh-34cqw)] left-[4cqw] aspect-[3/2] w-[92cqw]"
-          : "top-[calc(50cqh-30cqw)] left-[7cqw] aspect-[3/2] w-[86cqw]"
-        : compact
-          ? "top-[7cqw] left-[8cqw] aspect-[2/3] w-[84cqw]"
+      // Die Bilder laufen bis an die Papierkante. Einzelne Tafeln füllen die ganze Seite
+      // (Unterschrift auf der Gegenseite); Paare und das Telefon lassen unten einen Papierstreifen
+      // für die Unterschrift. Querformate auf dem Telefon laufen seitlich bis an die Kante.
+      const box =
+        compact && landscape
+          ? "top-[calc(50cqh-40cqw)] inset-x-0 aspect-[3/2]"
           : page.withCaption
-            ? "top-[9cqw] left-[16cqw] aspect-[2/3] w-[68cqw]"
-            : "top-[8cqw] left-[12cqw] aspect-[2/3] w-[76cqw]";
-      const captionAt = page.bleed
-        ? "bottom-[5cqw] left-[8cqw]"
-        : landscape
-        ? compact
-          ? "top-[calc(50cqh+30cqw)] left-[4cqw]"
-          : "top-[calc(50cqh+34cqw)] left-[7cqw]"
-        : compact
-          ? "top-[137cqw] left-[8cqw]"
-          : "top-[115cqw] left-[16cqw]";
+            ? compact
+              ? "inset-x-0 top-0 bottom-[17cqw]"
+              : "inset-x-0 top-0 bottom-[15cqw]"
+            : "inset-0";
+      const captionAt = compact && landscape ? "top-[calc(50cqh+30cqw)] left-[8cqw]" : "bottom-[5cqw] left-[8cqw]";
       return (
         <div className="paper absolute inset-0 [container-type:size]">
           <div data-plate-box={page.no} className={`absolute overflow-hidden ${box}`}>
@@ -178,12 +167,8 @@ export function PageView({
       const left = page.half === "left";
       return (
         <div className="paper absolute inset-0 [container-type:size]">
-          {/* ein Bild, über den Bund gesetzt: jede Seite zeigt ihre Hälfte */}
-          <div
-            data-plate-box={page.no}
-            className="absolute top-[9cqw] aspect-[0.75/1] w-[80cqw] overflow-hidden"
-            style={left ? { right: 0 } : { left: 0 }}
-          >
+          {/* ein Bild über den Bund, bis an die Außenkanten: jede Seite zeigt ihre Hälfte */}
+          <div data-plate-box={page.no} className="absolute inset-x-0 top-0 bottom-[15cqw] overflow-hidden">
             <div className="absolute inset-y-0 w-[200%]" style={{ left: left ? 0 : "-100%" }}>
               <Image
                 src={p.src}
@@ -198,7 +183,7 @@ export function PageView({
             </div>
             <PlateButton no={page.no} />
           </div>
-          {!left && <Caption no={page.no} className="absolute top-[118cqw] left-[4cqw]" />}
+          {!left && <Caption no={page.no} className="absolute bottom-[5cqw] left-[8cqw]" />}
           <Gutter side={side} />
         </div>
       );
