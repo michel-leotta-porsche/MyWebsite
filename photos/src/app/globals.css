@@ -12,7 +12,7 @@
   --paper: #f6f6f2;
   --paper-shade: #e4e4dd;
   --ink: #1b1c1a;
-  --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.4:1 */
+  --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.3:1 */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }

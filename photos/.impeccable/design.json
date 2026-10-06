@@ -1,0 +1,405 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T18:35:35+00:00",
+  "title": "Design System: Fujiventura",
+  "extensions": {
+    "colorMeta": {
+      "table": {
+        "role": "neutral",
+        "displayName": "Meer-Petrol-Leinen",
+        "canonical": "oklch(39.7% 0.054 206)",
+        "tonalRamp": [
+          "oklch(15% 0.023 206)",
+          "oklch(26% 0.031 206)",
+          "oklch(38% 0.039 206)",
+          "oklch(50% 0.047 206)",
+          "oklch(62% 0.052 206)",
+          "oklch(74% 0.044 206)",
+          "oklch(85% 0.037 206)",
+          "oklch(95% 0.030 206)"
+        ]
+      },
+      "table-deep": {
+        "role": "neutral",
+        "displayName": "Tiefes Petrol",
+        "canonical": "oklch(30.9% 0.042 208)",
+        "tonalRamp": [
+          "oklch(15% 0.018 208)",
+          "oklch(26% 0.024 208)",
+          "oklch(38% 0.030 208)",
+          "oklch(50% 0.036 208)",
+          "oklch(62% 0.041 208)",
+          "oklch(74% 0.034 208)",
+          "oklch(85% 0.029 208)",
+          "oklch(95% 0.023 208)"
+        ]
+      },
+      "on-table": {
+        "role": "neutral",
+        "displayName": "Leinenweiß",
+        "canonical": "oklch(94.2% 0.011 159)",
+        "tonalRamp": [
+          "oklch(15% 0.011 159)",
+          "oklch(26% 0.011 159)",
+          "oklch(38% 0.011 159)",
+          "oklch(50% 0.011 159)",
+          "oklch(62% 0.011 159)",
+          "oklch(74% 0.011 159)",
+          "oklch(85% 0.011 159)",
+          "oklch(95% 0.011 159)"
+        ]
+      },
+      "on-table-2": {
+        "role": "neutral",
+        "displayName": "Salbei-Grau",
+        "canonical": "oklch(79.7% 0.029 185)",
+        "tonalRamp": [
+          "oklch(15% 0.020 185)",
+          "oklch(26% 0.020 185)",
+          "oklch(38% 0.020 185)",
+          "oklch(50% 0.020 185)",
+          "oklch(62% 0.020 185)",
+          "oklch(74% 0.020 185)",
+          "oklch(85% 0.020 185)",
+          "oklch(95% 0.020 185)"
+        ]
+      },
+      "cloth": {
+        "role": "primary",
+        "displayName": "Ringelblumen-Buchleinen",
+        "canonical": "oklch(77.1% 0.149 78)",
+        "tonalRamp": [
+          "oklch(15% 0.065 78)",
+          "oklch(26% 0.085 78)",
+          "oklch(38% 0.108 78)",
+          "oklch(50% 0.130 78)",
+          "oklch(62% 0.145 78)",
+          "oklch(74% 0.123 78)",
+          "oklch(85% 0.102 78)",
+          "oklch(95% 0.084 78)"
+        ]
+      },
+      "cloth-deep": {
+        "role": "primary",
+        "displayName": "Tiefes Buchleinen",
+        "canonical": "oklch(63.0% 0.130 72)",
+        "tonalRamp": [
+          "oklch(15% 0.057 72)",
+          "oklch(26% 0.075 72)",
+          "oklch(38% 0.095 72)",
+          "oklch(50% 0.114 72)",
+          "oklch(62% 0.127 72)",
+          "oklch(74% 0.108 72)",
+          "oklch(85% 0.090 72)",
+          "oklch(95% 0.073 72)"
+        ]
+      },
+      "cloth-ink": {
+        "role": "primary",
+        "displayName": "Prägung",
+        "canonical": "oklch(28.9% 0.054 77)",
+        "tonalRamp": [
+          "oklch(15% 0.024 77)",
+          "oklch(26% 0.031 77)",
+          "oklch(38% 0.039 77)",
+          "oklch(50% 0.047 77)",
+          "oklch(62% 0.053 77)",
+          "oklch(74% 0.045 77)",
+          "oklch(85% 0.037 77)",
+          "oklch(95% 0.030 77)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Bilderdruckpapier",
+        "canonical": "oklch(97.2% 0.005 106)",
+        "tonalRamp": [
+          "oklch(15% 0.005 106)",
+          "oklch(26% 0.005 106)",
+          "oklch(38% 0.005 106)",
+          "oklch(50% 0.005 106)",
+          "oklch(62% 0.005 106)",
+          "oklch(74% 0.005 106)",
+          "oklch(85% 0.005 106)",
+          "oklch(95% 0.005 106)"
+        ]
+      },
+      "paper-shade": {
+        "role": "neutral",
+        "displayName": "Papierschatten",
+        "canonical": "oklch(91.7% 0.009 107)",
+        "tonalRamp": [
+          "oklch(15% 0.009 107)",
+          "oklch(26% 0.009 107)",
+          "oklch(38% 0.009 107)",
+          "oklch(50% 0.009 107)",
+          "oklch(62% 0.009 107)",
+          "oklch(74% 0.009 107)",
+          "oklch(85% 0.009 107)",
+          "oklch(95% 0.009 107)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinte",
+        "canonical": "oklch(22.5% 0.004 129)",
+        "tonalRamp": [
+          "oklch(15% 0.004 129)",
+          "oklch(26% 0.004 129)",
+          "oklch(38% 0.004 129)",
+          "oklch(50% 0.004 129)",
+          "oklch(62% 0.004 129)",
+          "oklch(74% 0.004 129)",
+          "oklch(85% 0.004 129)",
+          "oklch(95% 0.004 129)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Graue Tinte",
+        "canonical": "oklch(47.1% 0.010 122)",
+        "tonalRamp": [
+          "oklch(15% 0.010 122)",
+          "oklch(26% 0.010 122)",
+          "oklch(38% 0.010 122)",
+          "oklch(50% 0.010 122)",
+          "oklch(62% 0.010 122)",
+          "oklch(74% 0.010 122)",
+          "oklch(85% 0.010 122)",
+          "oklch(95% 0.010 122)"
+        ]
+      }
+    },
+    "colorModes": {
+      "dark": {
+        "table": "#143a3f",
+        "table-deep": "#0b2629",
+        "on-table": "#dfe9e4",
+        "on-table-2": "#9db9b4",
+        "note": "Nur der Tisch wird dunkler; Buch und Papier bleiben."
+      }
+    },
+    "typographyMeta": {
+      "cover-title": {
+        "displayName": "Einbandtitel",
+        "purpose": "Titel auf dem Einband, die eine h1."
+      },
+      "title-page": {
+        "displayName": "Titelseite",
+        "purpose": "Titel auf der Titelei."
+      },
+      "wordmark": {
+        "displayName": "Wortmarke",
+        "purpose": "Oben links auf dem Tisch."
+      },
+      "caption": {
+        "displayName": "Bildunterschrift",
+        "purpose": "Unterschriften und Kolophon auf Papier; nie unter 11px."
+      },
+      "ui": {
+        "displayName": "Bedienung",
+        "purpose": "Zähler, Hinweis, Vollbild-Knöpfe, Fuß."
+      },
+      "stop-label": {
+        "displayName": "Haltepunkt-Etikett",
+        "purpose": "Nummer und Titel über einem Haltepunkt beim Hover."
+      }
+    },
+    "shadows": [
+      {
+        "name": "book-on-table",
+        "value": "0 28px 50px -18px rgb(4 24 27 / 0.75), 0 6px 14px -6px rgb(4 24 27 / 0.5)",
+        "purpose": "Schatten des Buchs auf dem Tisch, nur unter dem aufgeschlagenen Teil."
+      },
+      {
+        "name": "tipped-in-plate",
+        "value": "1px 2px 3px rgb(58 39 6 / 0.35), 0 0 0 0.5px rgb(58 39 6 / 0.2)",
+        "purpose": "Eingeklebtes Coverbild steht vom Leinen ab."
+      },
+      {
+        "name": "gutter-curve",
+        "value": "linear-gradient(to right, rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.05) 30%, transparent)",
+        "purpose": "Wölbung der Innenseite zum Bund, 14cqw breit."
+      },
+      {
+        "name": "leaf-light",
+        "value": "linear-gradient(to right, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.15)) bei Deckkraft 0 bis 0.42",
+        "purpose": "Blatt dunkelt beim Aufrichten, hellt beim Ablegen."
+      },
+      {
+        "name": "curl-flap",
+        "value": "drop-shadow(-3px -3px 5px rgb(4 24 27 / 0.28))",
+        "purpose": "Lasche des Eselsohrs."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Standard: Haltepunkte, Flug der Tafel, Tafelwechsel."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "Einbandhinweis; das Blatt selbst nutzt kubisches ease-in-out."
+      },
+      {
+        "name": "spring-page",
+        "value": "stiffness 150, damping 26, mass 0.7",
+        "purpose": "Feder auf dem Scrollwert: das Blatt hat Masse."
+      },
+      {
+        "name": "spring-peek",
+        "value": "stiffness 260, damping 22; Keyframes 0, -28°, 0 über 1.8s nach 0.9s",
+        "purpose": "Einband hebt sich einmal beim Laden."
+      },
+      {
+        "name": "spring-curl",
+        "value": "stiffness 420, damping 30",
+        "purpose": "Eselsohr bei Hover."
+      },
+      {
+        "name": "duration-color",
+        "value": "160ms",
+        "purpose": "Farbwechsel."
+      },
+      {
+        "name": "duration-bar",
+        "value": "500ms",
+        "purpose": "Wachsen der Haltepunkte."
+      },
+      {
+        "name": "duration-plate-open",
+        "value": "620ms",
+        "purpose": "Tafel fliegt aus dem Buch."
+      },
+      {
+        "name": "duration-plate-close",
+        "value": "480ms",
+        "purpose": "Tafel fliegt zurück."
+      },
+      {
+        "name": "duration-plate-swap",
+        "value": "260ms",
+        "purpose": "Tafelwechsel im Vollbild, aus scale 0.985."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px",
+        "purpose": "Doppelseiten statt Einzelseiten; Seitenrand 32px statt 16px; Gewebe 32 % statt 18 %."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Textknopf",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Wortknopf auf dem Tisch (Vollbild: Zurück, Weiter, Schließen); Unterstrich in Buchleinen-Gelb bei Hover.",
+      "html": "<div class=\"ds-table\"><button class=\"ds-btn-text\">Zurück</button><button class=\"ds-btn-text\">Weiter</button></div>",
+      "css": ".ds-table { background: var(--table, #1d4f55); padding: 24px; display: flex; gap: 4px; } .ds-btn-text { font-family: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif; font-variant-numeric: tabular-nums; background: none; border: 0; border-radius: 0; color: var(--on-table, #e6eee9); font-size: 14px; padding: 4px 8px; cursor: pointer; text-decoration-color: var(--cloth, #e8a72c); text-decoration-thickness: 2px; text-underline-offset: 4px; } .ds-btn-text:hover { text-decoration-line: underline; } .ds-btn-text:focus-visible { outline: 2px solid var(--cloth, #e8a72c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Bildfolge-Linie",
+      "kind": "nav",
+      "refersTo": "sequence-stop",
+      "description": "Fahrplan-Linie mit Haltepunkten; gefüllte Strecke und aktiver Halt in Buchleinen-Gelb.",
+      "html": "<nav class=\"ds-seq\" aria-label=\"Bildfolge\"><div class=\"ds-seq-base\"></div><div class=\"ds-seq-fill\"></div><ol><li><button aria-label=\"Tafel 1\"><span></span></button></li><li><button aria-label=\"Tafel 2\"><span></span></button></li><li><button aria-label=\"Tafel 3\" aria-current=\"true\"><span></span></button></li><li><button aria-label=\"Tafel 4\"><span></span></button></li><li><button aria-label=\"Tafel 5\"><span></span></button></li><li><button aria-label=\"Tafel 6\"><span></span></button></li></ol></nav>",
+      "css": ".ds-seq { position: relative; background: var(--table, #1d4f55); padding: 24px; height: 24px; } .ds-seq-base, .ds-seq-fill { position: absolute; top: 50%; left: 36px; right: 36px; height: 1px; } .ds-seq-base { background: color-mix(in oklab, var(--on-table-2, #a9c3bf) 40%, transparent); } .ds-seq-fill { background: var(--cloth, #e8a72c); transform-origin: left; transform: scaleX(0.4); } .ds-seq ol { position: absolute; inset: 24px; margin: 0; padding: 0; list-style: none; display: flex; justify-content: space-between; } .ds-seq button { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer; } .ds-seq span { display: block; width: 3px; height: 10px; background: var(--on-table-2, #a9c3bf); transition: scale 500ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease; } .ds-seq button:hover span { scale: 1 1.5; background: var(--on-table, #e6eee9); } .ds-seq button[aria-current] span { scale: 1 1.9; background: var(--cloth, #e8a72c); } .ds-seq button:focus-visible { outline: 2px solid var(--cloth, #e8a72c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Kopfzeile",
+      "kind": "nav",
+      "refersTo": "table-surface",
+      "description": "Wortmarke links, Tafelzähler rechts, auf dem Tischleinen.",
+      "html": "<header class=\"ds-head\"><p class=\"ds-mark\">Fujiventura</p><p class=\"ds-count\"><span>Tafel 3</span> / 15 Tafeln</p></header>",
+      "css": ".ds-head { font-family: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; justify-content: space-between; background: var(--table, #1d4f55); padding: 24px 32px; } .ds-head p { margin: 0; } .ds-mark { color: var(--on-table, #e6eee9); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; font-variation-settings: 'wdth' 80; } .ds-count { color: var(--on-table-2, #a9c3bf); font-size: 14px; } .ds-count span { color: var(--on-table, #e6eee9); }"
+    },
+    {
+      "name": "Einband",
+      "kind": "card",
+      "refersTo": "cover",
+      "description": "Ringelblumen-Buchleinen mit Falz, eingeklebter Tafel und geprägtem Titel.",
+      "html": "<div class=\"ds-cover\"><div class=\"ds-cover-spine\"></div><div class=\"ds-cover-plate\"><div></div></div><div class=\"ds-cover-title\"><h1>Fujiventura</h1><p>Michel Leotta</p></div></div>",
+      "css": ".ds-cover { font-family: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif; font-variant-numeric: tabular-nums; position: relative; container-type: size; width: 260px; height: 338px; background: var(--cloth, #e8a72c); box-shadow: 0 28px 50px -18px rgb(4 24 27 / 0.75), 0 6px 14px -6px rgb(4 24 27 / 0.5); } .ds-cover-spine { position: absolute; inset: 0 auto 0 0; width: 5cqw; background: color-mix(in oklab, var(--cloth-deep, #b97a12) 25%, transparent); border-right: 1px solid color-mix(in oklab, var(--cloth-deep, #b97a12) 60%, transparent); } .ds-cover-plate { position: absolute; top: 11cqw; left: 18cqw; width: 64cqw; aspect-ratio: 4/5; background: var(--paper, #f6f6f2); padding: 1.6cqw; box-sizing: border-box; box-shadow: 1px 2px 3px rgb(58 39 6 / 0.35), 0 0 0 0.5px rgb(58 39 6 / 0.2); } .ds-cover-plate div { width: 100%; height: 100%; background: var(--table, #1d4f55); } .ds-cover-title { position: absolute; left: 18cqw; right: 10cqw; bottom: 10cqw; color: var(--cloth-ink, #3a2706); } .ds-cover-title h1 { margin: 0; font-size: 15.5cqw; line-height: 0.86; font-weight: 700; letter-spacing: -0.035em; font-variation-settings: 'wdth' 78, 'opsz' 96; } .ds-cover-title p { margin: 3cqw 0 0; font-size: 4cqw; font-weight: 500; }"
+    },
+    {
+      "name": "Tafelseite mit Unterschrift",
+      "kind": "card",
+      "refersTo": "page-paper",
+      "description": "Papierseite mit Tafel, Bundwölbung und Bildunterschrift (Nummer halbfett in Tinte).",
+      "html": "<div class=\"ds-page\"><div class=\"ds-page-plate\"></div><p class=\"ds-caption\"><b>3</b><span>Am Wasser</span></p><div class=\"ds-gutter\"></div></div>",
+      "css": ".ds-page { font-family: var(--font-bricolage), 'Bricolage Grotesque', system-ui, sans-serif; font-variant-numeric: tabular-nums; position: relative; container-type: size; width: 260px; height: 338px; background: var(--paper, #f6f6f2); overflow: hidden; } .ds-page-plate { position: absolute; top: 9cqw; left: 16cqw; width: 68cqw; aspect-ratio: 2/3; background: var(--table, #1d4f55); } .ds-caption { position: absolute; top: 115cqw; left: 16cqw; margin: 0; color: var(--ink-2, #5a5c56); font-size: max(11px, 3.1cqw); line-height: 1.375; } .ds-caption b { color: var(--ink, #1b1c1a); font-weight: 600; margin-right: 2.4cqw; } .ds-gutter { position: absolute; inset: 0 auto 0 0; width: 14cqw; pointer-events: none; background: linear-gradient(to right, rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.05) 30%, transparent); }"
+    },
+    {
+      "name": "Unsichtbare Tafelfläche",
+      "kind": "button",
+      "refersTo": "page-paper",
+      "description": "Knopf über einer Tafel, öffnet die Vergrößerung; Fokus in Tinte, nach innen versetzt.",
+      "html": "<div class=\"ds-plate-wrap\"><button class=\"ds-plate-btn\" aria-label=\"Tafel 3 vergrößern\"></button></div>",
+      "css": ".ds-plate-wrap { position: relative; width: 240px; height: 160px; background: var(--table, #1d4f55); outline: 24px solid var(--paper, #f6f6f2); margin: 24px; } .ds-plate-btn { position: absolute; inset: 0; background: transparent; border: 0; border-radius: 0; cursor: zoom-in; } .ds-plate-btn:focus-visible { outline: 2px solid var(--ink, #1b1c1a); outline-offset: -4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Das Buch auf dem Leinentisch",
+    "overview": "Die ganze Oberfläche ist ein Gegenstand: ein Fotobuch der 70er Jahre im Geist von Egglestons „Guide“ und Shores „Uncommon Places“, das auf einem Tisch aus meer-petrolfarbenem Leinen liegt. Es gibt keine Seite im Web-Sinn, sondern Einband, Vorsatz, Titelei, Tafeln und Kolophon. Scrollen blättert das Buch in echtem 3D um. Alles, was nicht Buch ist (Wortmarke, Tafelzähler, Bildfolge-Linie), liegt klein und ruhig auf dem Tisch.\n\nDie Dichte ist gering. Leere Gegenseiten sind gewollt und tragen nur eine Bildunterschrift; Panoramen laufen über den Bund. Farbe kommt aus den Fotos und aus zwei Materialien: dem Tischleinen und dem ringelblumengelben Buchleinen. Das Gelb ist zugleich die einzige Akzentfarbe und markiert nur die Position in der Bildfolge und den Fokus.\n\nLicht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wölbung zum Bund, Abdunkeln eines Blatts beim Aufrichten, das Eselsohr beim Hover. Nichts davon ist Dekoration, alles erklärt, wo Papier liegt und wohin es sich bewegt.",
+    "keyCharacteristics": [
+      "Ein einziger Gegenstand (das Buch) statt Raster, Karten oder Lightbox.",
+      "Zwei Materialien mit Gewebestruktur (Tisch, Einband), glattes Bilderdruckpapier für die Seiten.",
+      "Eine Schrift (Bricolage Grotesque) mit Breiten- und Optik-Achse, Ziffern tabellarisch.",
+      "Keine Radien. Kanten sind Papierkanten.",
+      "Bewegung mit Masse: Federn auf dem Scrollwert, Blätter beschleunigen und setzen weich auf."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Das Buchleinen-Gelb ist außerhalb des Einbands nur Signal: Position in der Bildfolge, Fokus, Hover-Unterstrich. Nie als Fläche auf dem Tisch, nie als Textfarbe.",
+        "section": "colors"
+      },
+      {
+        "name": "The Material Rule",
+        "body": "Jede Fläche ist ein Material: Tischleinen, Buchleinen oder Papier. Eine neue Fläche muss sagen, welches davon sie ist; eine vierte Oberflächenfarbe gibt es nicht.",
+        "section": "colors"
+      },
+      {
+        "name": "The Container Type Rule",
+        "body": "Alles, was auf einer Seite gedruckt ist, wird in `cqw`/`cqh` der Seite gesetzt, nie in `px` oder `rem`. Das Buch skaliert als Ganzes, die Satzspiegel bleiben gleich. Einzige Untergrenze: Bildunterschriften fallen nie unter 11px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plate Number Rule",
+        "body": "Zahlen sind tabellarisch und die Tafelnummer steht immer vor dem Titel, halbfett in der dunkleren Farbe. Keine Kameradaten, keine erfundenen Fakten.",
+        "section": "typography"
+      },
+      {
+        "name": "The Empty Facing Page Rule",
+        "body": "Eine Tafel darf eine leere Gegenseite haben, die nur ihre Unterschrift trägt. Der Leerraum ist Teil der Erzählung und wird nicht aufgefüllt.",
+        "section": "layout"
+      },
+      {
+        "name": "The Physical Light Rule",
+        "body": "Ein Schatten oder Verlauf ist nur erlaubt, wenn er eine Stelle beschreibt, an der Papier oder Leinen liegt, sich biegt oder dreht. Keine Schatten auf Bedienelementen, keine Glanz- oder Glas-Effekte.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do jede neue Fläche einem der drei Materialien zuordnen: Tischleinen (`table`), Buchleinen (`cloth`) oder Papier (`paper`).",
+      "Do `cloth` auf dem Tisch nur für Linien, Balken, Unterstriche und Fokus einsetzen (4.34:1, kein Text).",
+      "Do auf Papier den Fokus in `ink` setzen, auf dem Tisch in `cloth`.",
+      "Do alles auf einer Seite in `cqw`/`cqh` setzen, Bildunterschriften nie unter 11px.",
+      "Do nur `transform`, `opacity` und `clip-path` animieren, Easing `cubic-bezier(0.23, 1, 0.32, 1)` oder `cubic-bezier(0.77, 0, 0.175, 1)`.",
+      "Do bei `prefers-reduced-motion` auf Stufen umschalten: Blätter springen, Feder, Einbandhinweis, Eselsohr und Fluganimation entfallen, Rastpunkte aus.",
+      "Do Schatten aus Petrol (`rgb(4 24 27)`) oder Prägebraun (`rgb(58 39 6)`) mischen, nie aus neutralem Grau."
+    ],
+    "donts": [
+      "Don't Masonry-Raster, Kartengitter oder eine Lightbox ohne Herkunft bauen; Bilder kommen aus dem Buch und kehren dorthin zurück.",
+      "Don't Radien verwenden (`0px` überall).",
+      "Don't `cloth` als Hintergrund einer Fläche auf dem Tisch oder als Textfarbe einsetzen.",
+      "Don't Schatten oder Verläufe auf Bedienelemente legen; Licht gehört dem Papier.",
+      "Don't Kameradaten, Brennweiten, Aufnahmedaten oder Fujifilm-Zeichen zeigen.",
+      "Don't eine zweite Schrift einführen."
+    ]
+  }
+}
