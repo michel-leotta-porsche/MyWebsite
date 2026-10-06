@@ -247,7 +247,7 @@ def main():
     mix = voice + (fx * duck + music * 0.22 * mduck + room)
     out = ROOT / "audio" / "mix_raw.wav"
     sf.write(out, mix.astype(np.float32), SR)
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(out), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "48000", str(ROOT / "audio" / "mix.wav")], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(out), "-af", "loudnorm=I=-14:TP=-1.5:LRA=11", "-ar", "44100", "-ac", "2", str(ROOT / "audio" / "mix.wav")], check=True)
     out.unlink()
     print("audio/mix.wav geschrieben")
 
