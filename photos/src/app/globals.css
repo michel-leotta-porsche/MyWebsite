@@ -83,8 +83,8 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.32;
-  mix-blend-mode: soft-light;
+  /* ohne Mischmodus: WebKit legt sonst für jede Leinenfläche eine eigene Ebene in voller Auflösung an */
+  opacity: 0.13;
   background-image:
     url("/textures/linen-weft.png"),
     url("/textures/linen-warp.png");
@@ -139,7 +139,7 @@ body {
 /* Auf kleinen Schirmen wirkt das Gewebe sonst wie Rauschen */
 @media (max-width: 767px) {
   .linen::after {
-    opacity: 0.18;
+    opacity: 0.08;
   }
 }
 
