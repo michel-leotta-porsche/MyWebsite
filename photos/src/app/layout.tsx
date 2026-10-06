@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
-import "lenis/dist/lenis.css";
 import "./globals.css";
-
-import { SmoothScroll } from "@/components/smooth-scroll";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -31,9 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="de" className={bricolage.variable} suppressHydrationWarning>
       <body className="min-h-svh">
         <script dangerouslySetInnerHTML={{ __html: introScript }} />
-        <SmoothScroll />
         {children}
-        <div aria-hidden className="grain" />
       </body>
     </html>
   );

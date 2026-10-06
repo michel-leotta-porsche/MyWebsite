@@ -15,12 +15,10 @@ import {
 } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { baseTone, plate, plates, singlePages, spreads, type Page } from "@/content/plates";
-import { BookCursor } from "@/components/book-cursor";
+import { plates, singlePages, spreads, type Page } from "@/content/plates";
 import { INTRO_DONE } from "@/components/intro";
 import { PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
-import { getLenis } from "@/components/smooth-scroll";
 
 type Mode = "spread" | "single";
 type Leaf = { front: Page; back: Page };
@@ -235,7 +233,6 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   const curlR = useSpring(0, { stiffness: 420, damping: 30 });
   const curlL = useSpring(0, { stiffness: 420, damping: 30 });
   const hoverable = useRef(false);
-  const [fine, setFine] = useState(false);
 
   // k: Zielseite (für Tastatur und Knöpfe); kt: was gerade sichtbar aufgeschlagen ist
   const [k, setK] = useState(0);
@@ -266,12 +263,6 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   const leftEdgeT = useMotionTemplate`scaleX(${leftEdge})`;
 
   const range = Array.from({ length: count + 1 }, (_, s) => s);
-  // Der Tisch nimmt die Farbe der aufgeschlagenen Tafel an, fließend beim Blättern
-  const toneAt = (step: number) => {
-    const ps = platesAt(mode, step);
-    return ps.length ? plate(ps[0]).tone : baseTone;
-  };
-  const table = useTransform(t, range, range.map(toneAt));
 
   // Fahrplan-Linie: Position in der Bildfolge 0..1
   const progressAt = (step: number) => {
@@ -294,27 +285,20 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
       const el = stops.current[target];
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
-      const lenis = getLenis();
-      if (lenis && !instant) {
-        const dist = Math.abs(target - Math.round(raw.get()));
-        lenis.scrollTo(top, { duration: Math.min(1.8, 0.7 + dist * 0.18), easing: (x) => 1 - Math.pow(1 - x, 4) });
-      } else {
-        window.scrollTo({ top, behavior: reduce || instant ? "auto" : "smooth" });
-      }
+      window.scrollTo({ top, behavior: reduce || instant ? "auto" : "smooth" });
     },
-    [count, finger, raw, reduce, swipe],
+    [count, finger, reduce, swipe],
   );
-
-  // Desktop: kommt das Scrollen zur Ruhe, rastet das Buch sanft auf der nächsten Doppelseite ein
-  const settle = useRef<number | undefined>(undefined);
-  useMotionValueEvent(raw, "change", (v) => {
-    if (swipe || reduce) return;
-    window.clearTimeout(settle.current);
-    settle.current = window.setTimeout(() => {
-      const r = Math.round(raw.get());
-      if (Math.abs(raw.get() - r) > 0.02 && Math.abs(v - raw.get()) < 0.001) goTo(r);
-    }, 220);
-  });
+  // Scrollposition zu einem beliebigen Fortschritt, z. B. halb umgeblättert beim Ziehen
+  const scrollToT = useCallback(
+    (v: number) => {
+      const el = track.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: top + (v / count) * (el.offsetHeight - window.innerHeight), behavior: "instant" });
+    },
+    [count],
+  );
 
   const stepForPlate = useCallback(
     (no: number) => {
@@ -367,16 +351,13 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     const html = document.documentElement;
     const prev = html.style.overflow;
     html.style.overflow = "hidden";
-    getLenis()?.stop();
     return () => {
       html.style.overflow = prev;
-      getLenis()?.start();
     };
   }, [viewer]);
 
   useEffect(() => {
     hoverable.current = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-    setFine(hoverable.current);
   }, []);
 
   // Tastatur: Pfeile blättern, nur für das sichtbare Buch
@@ -413,8 +394,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     };
   }, [finger, peek, reduce]);
 
-  // Cursor-Beschriftung und Eselsohr folgen der Maus
-  const [cursor, setCursor] = useState<string | null>(null);
+  // Eselsohr folgt der Maus
   const plateAt = (x: number, y: number) => {
     for (const no of platesAt(mode, k)) {
       const pr = findRect(no);
@@ -429,18 +409,6 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     const x = (e.clientX - r.left) / r.width;
     const onRight = mode === "single" ? x > 0.35 : x > 0.5;
     const overPlate = plateAt(e.clientX, e.clientY) !== null;
-    const next = overPlate
-      ? "Ansehen"
-      : onRight
-        ? k < count
-          ? k === 0
-            ? "Öffnen"
-            : "Weiter"
-          : null
-        : k > 0
-          ? "Zurück"
-          : null;
-    if (next !== cursor) setCursor(next);
     if (reduce) return;
     curlR.set(!overPlate && onRight && k < count ? 1 : 0);
     curlL.set(!overPlate && !onRight && mode === "spread" && k > 0 ? 1 : 0);
@@ -448,16 +416,16 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   const onPointerLeave = () => {
     curlR.set(0);
     curlL.set(0);
-    setCursor(null);
   };
 
-  // Telefon: die Seite folgt dem Finger
+  // Ziehen mit Maus oder Finger: die Kante der Seite bleibt unter dem Zeiger
   const drag = useRef<{ x0: number; k0: number; moved: boolean; samples: { x: number; time: number }[] } | null>(null);
   const suppressClick = useRef(false);
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!swipe || e.pointerType === "mouse") return;
+    if (e.button !== 0 || reduce) return;
     finger.stop();
-    drag.current = { x0: e.clientX, k0: Math.round(finger.get()), moved: false, samples: [{ x: e.clientX, time: e.timeStamp }] };
+    const k0 = Math.round(swipe ? finger.get() : raw.get());
+    drag.current = { x0: e.clientX, k0, moved: false, samples: [{ x: e.clientX, time: e.timeStamp }] };
   };
   const onDragMove = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -467,16 +435,19 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     if (!d.moved) {
       d.moved = true;
       bookRef.current.setPointerCapture(e.pointerId);
+      curlR.set(0);
+      curlL.set(0);
     }
     d.samples.push({ x: e.clientX, time: e.timeStamp });
     if (d.samples.length > 5) d.samples.shift();
-    const w = bookRef.current.getBoundingClientRect().width;
-    // Kante der Seite soll unter dem Finger bleiben: Winkel aus der Fingerstrecke
-    const travel = clamp01(Math.abs(dx) / (w * 1.05));
+    // Breite einer Seite; bei der Doppelseite wandert die Kante über den Bund, also zwei Breiten
+    const w = bookRef.current.getBoundingClientRect().width / (swipe ? 1 : 2);
+    const travel = clamp01(Math.abs(dx) / (w * (swipe ? 1.05 : 2)));
     const angle = Math.acos(1 - 2 * travel) / Math.PI;
     const s = invTurnEase(angle);
-    const target = dx < 0 ? d.k0 + s : d.k0 - s;
-    finger.set(Math.max(0, Math.min(count, target)));
+    const target = Math.max(0, Math.min(count, dx < 0 ? d.k0 + s : d.k0 - s));
+    if (swipe) finger.set(target);
+    else scrollToT(target);
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -485,12 +456,13 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     suppressClick.current = true;
     const first = d.samples[0];
     const v = (e.clientX - first.x) / Math.max(1, e.timeStamp - first.time); // px pro ms
-    const prog = finger.get() - d.k0;
+    const prog = (swipe ? finger.get() : raw.get()) - d.k0;
     let target = d.k0;
     if (prog > 0.28 || v < -0.35) target = d.k0 + 1;
     else if (prog < -0.28 || v > 0.35) target = d.k0 - 1;
     target = Math.max(0, Math.min(count, target));
-    if (reduce) finger.set(target);
+    if (!swipe) goTo(target);
+    else if (reduce) finger.set(target);
     else animate(finger, target, { type: "spring", stiffness: 210, damping: 26, velocity: -v * 2.2 });
   };
 
@@ -541,8 +513,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
 
       <motion.div
         data-stage
-        className={`linen sticky top-0 flex h-svh flex-col overflow-hidden ${swipe ? "touch-none select-none" : ""}`}
-        style={{ backgroundColor: table }}
+        className={`linen sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
         inert={!!viewer}
       >
         <header className="flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
@@ -568,7 +539,8 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
           <PlateOpenProvider value={openPlate}>
             <motion.div
               ref={bookRef}
-              className={`relative ${fine ? "cursor-none" : ""}`}
+              className="relative cursor-grab active:cursor-grabbing"
+              onDragStart={(e) => e.preventDefault()}
               onPointerMove={onPointerMove}
               onPointerLeave={onPointerLeave}
               onPointerDown={onPointerDown}
@@ -588,12 +560,12 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
               {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
               <div
                 aria-hidden
-                className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(0_0_0/0.6),0_6px_14px_-6px_rgb(0_0_0/0.4)]"
+                className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(4_24_27/0.75),0_6px_14px_-6px_rgb(4_24_27/0.5)]"
                 style={{ left: mode === "spread" ? "50%" : 0 }}
               />
               <motion.div
                 aria-hidden
-                className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(0_0_0/0.6)]"
+                className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(4_24_27/0.75)]"
                 style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
               />
 
@@ -715,8 +687,6 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
           </div>
         </nav>
       </motion.div>
-
-      {fine && !viewer && <BookCursor label={cursor} />}
 
       {viewer && (
         <PlateViewer no={viewer.no} from={viewer.from} reduce={reduce} findRect={findRect} onClose={closePlate} />

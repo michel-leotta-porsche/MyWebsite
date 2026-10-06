@@ -42,15 +42,12 @@ export type Plate = {
   alt: string;
   src: StaticImageData;
   thumb: StaticImageData;
-  /** Tischfarbe zu dieser Tafel: Farbton aus dem Bild, so dunkel, dass Text auf dem Tisch ≥ 7:1 hat */
-  tone: string;
 };
 
 // Reihenfolge wie im Buch: Ankunft, Strand, Pflanzen, Ort, Hunde
 export const plates: Plate[] = [
   {
     no: 1,
-    tone: "#624700",
     title: "Drachenbaum vor gelber Wand",
     note: "Im Fenster: der Fotograf.",
     alt: "Ein verzweigter Drachenbaum vor einer leuchtend gelben Hauswand. Im Fenster spiegelt sich der Fotograf mit Kamera.",
@@ -59,7 +56,6 @@ export const plates: Plate[] = [
   },
   {
     no: 2,
-    tone: "#00535d",
     title: "Rettungsturm",
     note: "Playa El Bajo Negro",
     alt: "Ein gelber Rettungsturm auf Stelzen im Sand, dahinter das türkise Meer.",
@@ -68,7 +64,6 @@ export const plates: Plate[] = [
   },
   {
     no: 3,
-    tone: "#6f400c",
     title: "Am Wasser",
     alt: "Michel läuft lachend in weißem T-Shirt am Strand entlang, hinter ihm Brandung und Steilküste im Abendlicht.",
     src: strand,
@@ -76,7 +71,6 @@ export const plates: Plate[] = [
   },
   {
     no: 4,
-    tone: "#00554d",
     title: "Schild über der Bucht",
     alt: "Ein dreieckiges Warnschild, über und über mit Aufklebern beklebt, auf einer Klippe über dem Meer.",
     src: schild,
@@ -84,7 +78,6 @@ export const plates: Plate[] = [
   },
   {
     no: 5,
-    tone: "#005269",
     title: "Palme",
     alt: "Eine einzelne Dattelpalme vor blauem Himmel, im Hintergrund kahle Berge.",
     src: palme,
@@ -92,7 +85,6 @@ export const plates: Plate[] = [
   },
   {
     no: 6,
-    tone: "#753a22",
     title: "Kaktus und Dachkante",
     alt: "Grüne Säulenkakteen vor einer orange gestrichenen Dachkante und blauem Himmel.",
     src: kaktusDach,
@@ -100,7 +92,6 @@ export const plates: Plate[] = [
   },
   {
     no: 7,
-    tone: "#723e14",
     title: "Im Felsbogen",
     alt: "Michel steht in einem großen, vom Wind ausgehöhlten Sandsteinbogen, dahinter ein grüner Hang.",
     src: felsbogen,
@@ -108,7 +99,6 @@ export const plates: Plate[] = [
   },
   {
     no: 8,
-    tone: "#2d5524",
     title: "Wolfsmilch",
     alt: "Hohe, kandelaberartige Wolfsmilch mit gelben Blüten an den Spitzen vor blauem Himmel.",
     src: wolfsmilch,
@@ -116,7 +106,6 @@ export const plates: Plate[] = [
   },
   {
     no: 9,
-    tone: "#72364f",
     title: "Bougainvillea im Oleander",
     alt: "Ein pinker Bougainvillea-Zweig zwischen schmalen grünen Blättern und gelben Blüten vor blauem Himmel.",
     src: bougainvillea,
@@ -124,7 +113,6 @@ export const plates: Plate[] = [
   },
   {
     no: 10,
-    tone: "#773733",
     title: "Mittagsblume",
     alt: "Eine lachsfarbene Mittagsblume mit gelber Mitte zwischen fleischigen, graugrünen Blättern.",
     src: mittagsblume,
@@ -132,7 +120,6 @@ export const plates: Plate[] = [
   },
   {
     no: 11,
-    tone: "#3f5213",
     title: "Seetraube",
     alt: "Runde grüne Blätter einer Seetraube mit rostroten Rändern und Flecken.",
     src: seetraube,
@@ -140,7 +127,6 @@ export const plates: Plate[] = [
   },
   {
     no: 12,
-    tone: "#1d562d",
     title: "Trompetenblume",
     alt: "Eine einzelne orangerote Trompetenblüte mit langen Staubfäden vor unscharfem Grün und gelber Wand.",
     src: trompetenblume,
@@ -148,7 +134,6 @@ export const plates: Plate[] = [
   },
   {
     no: 13,
-    tone: "#773736",
     title: "Weihnachtsstern im Garten",
     alt: "Ein großer roter Weihnachtsstern-Strauch in einem Garten, dahinter grüne Hügel im Dunst.",
     src: weihnachtsstern,
@@ -156,7 +141,6 @@ export const plates: Plate[] = [
   },
   {
     no: 14,
-    tone: "#703f0e",
     title: "Stuhl im Nebenraum",
     alt: "Durch eine Öffnung in der Wand gesehen: ein gepolsterter Stuhl mit Kreismuster in einem hellen Raum.",
     src: stuhl,
@@ -164,7 +148,6 @@ export const plates: Plate[] = [
   },
   {
     no: 15,
-    tone: "#5f4900",
     title: "Warten vor dem Laden",
     alt: "Vier kleine Hunde an der Leine warten neben einem Kinderwagen vor einer gelben Ladenfront.",
     src: hunde,
@@ -173,9 +156,6 @@ export const plates: Plate[] = [
 ];
 
 export const plate = (no: number) => plates[no - 1];
-
-/** Tischfarbe ohne Tafel (Einband, Titel, Kolophon) */
-export const baseTone = "#1d4f55";
 
 /** Eine Buchseite. `double` zeigt eine Hälfte eines Bildes über den Bund. */
 export type Page =
