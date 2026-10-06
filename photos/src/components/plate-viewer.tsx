@@ -58,6 +58,7 @@ export function PlateViewer({
   const frame = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
+  const controls = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
   const p = plate(current);
 
@@ -94,6 +95,10 @@ export function PlateViewer({
     if (closing.current || !frame.current || !box) return;
     closing.current = true;
     const back = current === no ? findRect(current) : null;
+    // Bedienung zuerst weg, damit nur die Tafel zurückfliegt
+    for (const el of [controls.current, closeBtn.current]) {
+      el?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: "ease-out", fill: "forwards" });
+    }
     const fade = backdrop.current?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: reduce ? 120 : 380,
       easing: "ease-out",
@@ -193,6 +198,7 @@ export function PlateViewer({
             />
           </div>
           <div
+            ref={controls}
             className="text-on-table-2 absolute flex items-baseline justify-between gap-6 text-sm"
             style={{ left: box.left, width: box.width, top: box.top + box.height + 14 }}
           >
