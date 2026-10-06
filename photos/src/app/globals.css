@@ -1,26 +1,119 @@
 @import "tailwindcss";
 
+/* Fujiventura: Leinentisch, Buchleinen, Bilderdruckpapier */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --table: #1d4f55; /* Meer-Petrol, Tischleinen */
+  --table-deep: #12363b;
+  --on-table: #e6eee9; /* Text auf dem Tisch, 7.7:1 */
+  --on-table-2: #a9c3bf; /* Nebentext auf dem Tisch, 4.9:1 */
+  --cloth: #e8a72c; /* Einband, Ringelblume; auch die eine Akzentfarbe */
+  --cloth-deep: #b97a12;
+  --cloth-ink: #3a2706; /* Prägung auf dem Einband, 6.8:1 */
+  --paper: #f6f6f2;
+  --paper-shade: #e4e4dd;
+  --ink: #1b1c1a;
+  --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.4:1 */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --table: #143a3f;
+    --table-deep: #0b2629;
+    --on-table: #dfe9e4;
+    --on-table-2: #9db9b4;
   }
 }
 
+@theme inline {
+  --color-table: var(--table);
+  --color-table-deep: var(--table-deep);
+  --color-on-table: var(--on-table);
+  --color-on-table-2: var(--on-table-2);
+  --color-cloth: var(--cloth);
+  --color-cloth-deep: var(--cloth-deep);
+  --color-cloth-ink: var(--cloth-ink);
+  --color-paper: var(--paper);
+  --color-paper-shade: var(--paper-shade);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --font-sans: var(--font-bricolage);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+}
+
+html {
+  background: var(--table);
+  color: var(--on-table);
+  scroll-snap-type: y proximity;
+  scrollbar-color: var(--cloth) var(--table-deep);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-bricolage), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--cloth);
+  color: var(--cloth-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cloth);
+  outline-offset: 3px;
+}
+
+@layer components {
+/* Gewebe: zwei Fadenrichtungen aus Rauschen, ohne Bilddatei */
+.linen {
+  isolation: isolate;
+}
+.linen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.035' numOctaves='2' seed='3'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.035 0.9' numOctaves='2' seed='8'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.6 -0.45'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
+/* Papier: fast glatt, nur ein Hauch Struktur */
+.paper {
+  background-color: var(--paper);
+}
+
+/* Prägung im Einband */
+.deboss {
+  color: var(--cloth-ink);
+  text-shadow:
+    0 1px 0 color-mix(in oklab, var(--cloth) 60%, white),
+    0 -1px 0 color-mix(in oklab, var(--cloth-ink) 40%, transparent);
+}
+
+/* Fahrplan-Linie: Haltepunkte der Bildfolge */
+.stop {
+  transition:
+    scale 500ms var(--ease-out),
+    background-color 160ms ease;
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-snap-type: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

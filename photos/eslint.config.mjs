@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Skills und Werkzeuge, kein eigener Code:
+    ".claude/**",
+    ".impeccable/**",
   ]),
 ]);
 

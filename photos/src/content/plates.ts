@@ -1,0 +1,180 @@
+import type { StaticImageData } from "next/image";
+
+import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
+import rettungsturm from "../../public/photos/09-rettungsturm.jpg";
+import strand from "../../public/photos/03-strand.jpg";
+import schild from "../../public/photos/01-schild-am-meer.jpg";
+import palme from "../../public/photos/02-palme.jpg";
+import kaktusDach from "../../public/photos/05-kaktus-dach.jpg";
+import felsbogen from "../../public/photos/11-felsbogen.jpg";
+import wolfsmilch from "../../public/photos/07-wolfsmilch.jpg";
+import bougainvillea from "../../public/photos/04-bougainvillea.jpg";
+import mittagsblume from "../../public/photos/06-mittagsblume.jpg";
+import seetraube from "../../public/photos/14-seetraube.jpg";
+import trompetenblume from "../../public/photos/13-trompetenblume.jpg";
+import weihnachtsstern from "../../public/photos/12-weihnachtsstern.jpg";
+import stuhl from "../../public/photos/10-stuhl.jpg";
+import hunde from "../../public/photos/15-hunde.jpg";
+
+export type Plate = {
+  /** Tafelnummer in der Buchfolge, 1 bis 15 */
+  no: number;
+  title: string;
+  /** Kurzer Zusatz unter dem Titel, nur Fakten */
+  note?: string;
+  alt: string;
+  src: StaticImageData;
+};
+
+// Reihenfolge wie im Buch: Ankunft, Strand, Pflanzen, Ort, Hunde
+export const plates: Plate[] = [
+  {
+    no: 1,
+    title: "Drachenbaum vor gelber Wand",
+    note: "Im Fenster: der Fotograf.",
+    alt: "Ein verzweigter Drachenbaum vor einer leuchtend gelben Hauswand. Im Fenster spiegelt sich der Fotograf mit Kamera.",
+    src: drachenbaum,
+  },
+  {
+    no: 2,
+    title: "Rettungsturm",
+    note: "Playa El Bajo Negro",
+    alt: "Ein gelber Rettungsturm auf Stelzen im Sand, dahinter das türkise Meer.",
+    src: rettungsturm,
+  },
+  {
+    no: 3,
+    title: "Am Wasser",
+    alt: "Michel läuft lachend in weißem T-Shirt am Strand entlang, hinter ihm Brandung und Steilküste im Abendlicht.",
+    src: strand,
+  },
+  {
+    no: 4,
+    title: "Schild über der Bucht",
+    alt: "Ein dreieckiges Warnschild, über und über mit Aufklebern beklebt, auf einer Klippe über dem Meer.",
+    src: schild,
+  },
+  {
+    no: 5,
+    title: "Palme",
+    alt: "Eine einzelne Dattelpalme vor blauem Himmel, im Hintergrund kahle Berge.",
+    src: palme,
+  },
+  {
+    no: 6,
+    title: "Kaktus und Dachkante",
+    alt: "Grüne Säulenkakteen vor einer orange gestrichenen Dachkante und blauem Himmel.",
+    src: kaktusDach,
+  },
+  {
+    no: 7,
+    title: "Im Felsbogen",
+    alt: "Michel steht in einem großen, vom Wind ausgehöhlten Sandsteinbogen, dahinter ein grüner Hang.",
+    src: felsbogen,
+  },
+  {
+    no: 8,
+    title: "Wolfsmilch",
+    alt: "Hohe, kandelaberartige Wolfsmilch mit gelben Blüten an den Spitzen vor blauem Himmel.",
+    src: wolfsmilch,
+  },
+  {
+    no: 9,
+    title: "Bougainvillea im Oleander",
+    alt: "Ein pinker Bougainvillea-Zweig zwischen schmalen grünen Blättern und gelben Blüten vor blauem Himmel.",
+    src: bougainvillea,
+  },
+  {
+    no: 10,
+    title: "Mittagsblume",
+    alt: "Eine lachsfarbene Mittagsblume mit gelber Mitte zwischen fleischigen, graugrünen Blättern.",
+    src: mittagsblume,
+  },
+  {
+    no: 11,
+    title: "Seetraube",
+    alt: "Runde grüne Blätter einer Seetraube mit rostroten Rändern und Flecken.",
+    src: seetraube,
+  },
+  {
+    no: 12,
+    title: "Trompetenblume",
+    alt: "Eine einzelne orangerote Trompetenblüte mit langen Staubfäden vor unscharfem Grün und gelber Wand.",
+    src: trompetenblume,
+  },
+  {
+    no: 13,
+    title: "Weihnachtsstern im Garten",
+    alt: "Ein großer roter Weihnachtsstern-Strauch in einem Garten, dahinter grüne Hügel im Dunst.",
+    src: weihnachtsstern,
+  },
+  {
+    no: 14,
+    title: "Stuhl im Nebenraum",
+    alt: "Durch eine Öffnung in der Wand gesehen: ein gepolsterter Stuhl mit Kreismuster in einem hellen Raum.",
+    src: stuhl,
+  },
+  {
+    no: 15,
+    title: "Warten vor dem Laden",
+    alt: "Vier kleine Hunde an der Leine warten neben einem Kinderwagen vor einer gelben Ladenfront.",
+    src: hunde,
+  },
+];
+
+export const plate = (no: number) => plates[no - 1];
+
+/** Eine Buchseite. `double` zeigt eine Hälfte eines Bildes über den Bund. */
+export type Page =
+  | { kind: "cover" }
+  | { kind: "endpaper" }
+  | { kind: "title" }
+  | { kind: "caption"; no: number }
+  | { kind: "plate"; no: number; withCaption?: boolean }
+  | { kind: "double"; no: number; half: "left" | "right" }
+  | { kind: "colophon" }
+  | { kind: "verso" };
+
+export type Spread = { left: Page; right: Page; plates: number[] };
+
+const single = (no: number): Spread => ({
+  left: { kind: "caption", no },
+  right: { kind: "plate", no },
+  plates: [no],
+});
+const pair = (a: number, b: number): Spread => ({
+  left: { kind: "plate", no: a, withCaption: true },
+  right: { kind: "plate", no: b, withCaption: true },
+  plates: [a, b],
+});
+const double = (no: number): Spread => ({
+  left: { kind: "double", no, half: "left" },
+  right: { kind: "double", no, half: "right" },
+  plates: [no],
+});
+
+// Doppelseiten nach dem Aufschlagen des Einbands
+export const spreads: Spread[] = [
+  { left: { kind: "endpaper" }, right: { kind: "title" }, plates: [] },
+  single(1),
+  single(2),
+  double(3),
+  pair(4, 5),
+  single(6),
+  double(7),
+  pair(8, 9),
+  double(10),
+  pair(11, 12),
+  single(13),
+  single(14),
+  single(15),
+  { left: { kind: "colophon" }, right: { kind: "endpaper" }, plates: [] },
+];
+
+/** Einzelseiten für schmale Bildschirme */
+export const singlePages: Page[] = [
+  { kind: "cover" },
+  { kind: "title" },
+  ...plates.map((p): Page => ({ kind: "plate", no: p.no, withCaption: true })),
+  { kind: "colophon" },
+];
