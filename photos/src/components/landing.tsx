@@ -3,15 +3,14 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
-import { FrameButton, linkClass, TextButton } from "@/components/app-ui";
+import { FrameButton, linkClass, TextButton } from "@/components/ui-base";
 import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
-import { signIn } from "@/lib/firebase";
-import { useUser } from "@/lib/use-user";
+import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
@@ -35,20 +34,24 @@ const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(
 
 /** Anmelden und gleich ins Bücherzimmer; wer schon angemeldet ist, geht direkt hinein */
 function useEnter() {
-  const user = useUser();
+  const user = useLazyUser();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  useEffect(prefetchFirebaseWhenIdle, []);
   const enter = () => {
+    const signing = signInNow();
+    // Firebase noch nicht geladen: das Bücherzimmer zeigt dieselbe Anmeldung, dort öffnet sich das Fenster sicher
+    if (!signing) return router.push("/zimmer");
     setBusy(true);
-    signIn()
-      .then(() => router.push("/zimmer"))
-      .catch(() => setBusy(false));
+    signing.then(() => router.push("/zimmer")).catch(() => setBusy(false));
   };
-  return { user, busy, enter };
+  // Firebase schon laden, wenn der Finger oder Zeiger auf dem Knopf landet: beim Klick ist es dann meist da
+  const warm = { onPointerEnter: loadFirebase, onPointerDown: loadFirebase, onFocus: loadFirebase };
+  return { user, busy, enter, warm };
 }
 
 function HeaderSession() {
-  const { user, busy, enter } = useEnter();
+  const { user, busy, enter, warm } = useEnter();
   // solange Firebase prüft, bleibt die Stelle leer statt zu springen
   if (user === undefined) return <span className="text-sm">&nbsp;</span>;
   if (user)
@@ -58,7 +61,7 @@ function HeaderSession() {
       </Link>
     );
   return (
-    <TextButton className="text-sm" disabled={busy} onClick={enter}>
+    <TextButton className="text-sm" disabled={busy} onClick={enter} {...warm}>
       Anmelden
     </TextButton>
   );
@@ -67,7 +70,7 @@ function HeaderSession() {
 const enterClass = "press px-6 py-3 text-base";
 
 function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
-  const { user, busy, enter } = useEnter();
+  const { user, busy, enter, warm } = useEnter();
   if (user)
     return (
       <Link
@@ -78,7 +81,7 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
       </Link>
     );
   return (
-    <FrameButton className={enterClass} disabled={busy || user === undefined} onClick={enter}>
+    <FrameButton className={enterClass} disabled={busy || user === undefined} onClick={enter} {...warm}>
       {busy ? "Einen Moment …" : label}
     </FrameButton>
   );
@@ -232,7 +235,7 @@ function Hero() {
               <EnterButton />
             </div>
             <p className="text-on-table-2 mt-5 text-sm">
-              Lesen geht ohne Konto. Anmeldung über Google, siehe{" "}
+              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung über Google, siehe{" "}
               <Link href="/datenschutz" className={linkClass}>
                 Datenschutz
               </Link>
@@ -491,7 +494,7 @@ function Closing() {
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
             <EnterButton label="Erstes Buch anlegen" />
             <p className="text-on-table-2 text-sm">
-              Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              Kostenlos, Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
               <Link href="/datenschutz" className={linkClass}>
                 Datenschutz
               </Link>

@@ -113,6 +113,7 @@ function Element({ book, el, eager, z, sizes }: { book: BookData; el: El; eager:
                 transformOrigin: `${el.focus[0] * 100}% ${el.focus[1] * 100}%`,
               }}
               loading={eager ? "eager" : "lazy"}
+              fetchPriority={eager ? "high" : undefined}
             />
           </div>
           {el.plate && (
