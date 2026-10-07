@@ -124,11 +124,21 @@ export function MyTable() {
           ),
         }}
         footer={
-          error ? (
-            <p role="alert" className="bg-table px-4 pb-6 text-sm text-on-table md:px-8">
-              Konnte den Tisch nicht laden: {error}
-            </p>
-          ) : null
+          <>
+            {error && (
+              <p role="alert" className="bg-table px-4 pb-6 text-sm text-on-table md:px-8">
+                Konnte den Tisch nicht laden: {error}
+              </p>
+            )}
+            <footer className="linen table-surface relative flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table-deep px-4 py-10 text-sm text-on-table-2 md:px-8">
+              <p>
+                <span className="font-semibold text-on-table">Fujiventura</span> · Fotobücher gestalten und Freunden hinlegen
+              </p>
+              <Link href="/" className={linkClass}>
+                Michels Bücher
+              </Link>
+            </footer>
+          </>
         }
       />
       {sharing && <ShareDialog book={sharing} onClose={() => setSharing(null)} />}

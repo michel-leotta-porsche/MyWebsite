@@ -157,7 +157,7 @@ export function Table({ books, onOpen, headerRight, extra, note, tiles, label }:
       </header>
       <div
         ref={root}
-        className="table-spread relative z-0 flex flex-1 flex-col items-stretch gap-10 px-6 pt-10 pb-16 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-[7vw] md:px-8 md:pt-0 md:pb-10"
+        className="table-spread relative z-0 flex flex-1 flex-col items-stretch gap-10 px-6 pt-10 pb-16 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-[7vw] md:px-8 md:pt-0 md:pb-24"
       >
         {books.map((b, i) => (
           <ClosedBook key={b.id} book={b} index={i} onOpen={() => onOpen(b.id)} extra={extra?.(b)} note={note?.(b)} />

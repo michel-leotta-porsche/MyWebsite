@@ -389,7 +389,7 @@ export function Stage({
   };
 
   // ---- Tastatur auf einem Element ----
-  const onItemKey = (e: React.KeyboardEvent, it: SpreadItem) => {
+  const onItemKey = (e: KeyboardEvent | React.KeyboardEvent, it: SpreadItem) => {
     const step = { x: grid.colPitch, y: grid.rowPitch };
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const a = arrows[e.key];
@@ -472,7 +472,7 @@ export function Stage({
           run: () => commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, caption: i.caption === "auto" ? "off" : "auto" } : i))),
         },
         ...common,
-        { label: "In die Ablage", hint: "Entf", run: () => remove(it) },
+        { label: "Löschen (in die Ablage)", hint: "Entf", run: () => remove(it) },
       ];
     if (it?.t === "text")
       return [
@@ -486,7 +486,7 @@ export function Stage({
           run: () => commit(items.map((i) => (i.id === it.id && i.t === "text" ? { ...i, light: i.light ? undefined : true } : i))),
         },
         ...common,
-        { label: "Text entfernen", hint: "Entf", run: () => remove(it) },
+        { label: "Löschen", hint: "Entf", run: () => remove(it) },
       ];
     const at = menu.at;
     return [
@@ -535,8 +535,15 @@ export function Stage({
   };
 
   // ⌘C / ⌘X / ⌘V; Text aus anderen Apps wird ein neuer Textrahmen
-  const latest = useRef<{ selected: SpreadItem | null; paste: (it: SpreadItem) => void; remove: (it: SpreadItem) => void; addTextWith: (t: string) => void }>({
+  const latest = useRef<{
+    selected: SpreadItem | null;
+    paste: (it: SpreadItem) => void;
+    remove: (it: SpreadItem) => void;
+    addTextWith: (t: string) => void;
+    onItemKey: (e: KeyboardEvent, it: SpreadItem) => void;
+  }>({
     selected: null,
+    onItemKey: () => {},
     paste: () => {},
     remove: () => {},
     addTextWith: () => {},
@@ -584,6 +591,11 @@ export function Stage({
         if (editing) setEditing(null);
         else if (sel) setSel(null);
         else onClose();
+      } else if (latest.current.selected && /^(Delete|Backspace|Arrow(Left|Right|Up|Down)|\[|\])$/.test(e.key) && !(t && (t.tagName === "SELECT" || t.getAttribute("role") === "menuitem"))) {
+        // Entf legt in die Ablage, Pfeile verschieben; gilt für das Gewählte, egal wo der Fokus steht
+        latest.current.onItemKey(e, latest.current.selected);
+      } else if (e.key === "Enter" && latest.current.selected && (t === document.body || !!t?.closest("[data-stage-layer]"))) {
+        latest.current.onItemKey(e, latest.current.selected);
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && latest.current.selected) {
         e.preventDefault();
         latest.current.paste(latest.current.selected);
@@ -602,7 +614,7 @@ export function Stage({
 
   const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : narrow ? page : 0;
   useEffect(() => {
-    latest.current = { selected, paste, remove, addTextWith: (t: string) => addText("body", curPage, undefined, t) };
+    latest.current = { selected, paste, remove, onItemKey, addTextWith: (t: string) => addText("body", curPage, undefined, t) };
   });
   const handle = coarse ? 44 : 24;
   const pct = (b: Box) => ({ left: `${b.x / 2}%`, top: `${b.y}%`, width: `${b.w / 2}%`, height: `${b.h}%` });
@@ -731,6 +743,7 @@ export function Stage({
                 {/* Bearbeitungsebene */}
                 <div
                   ref={layerEl}
+                  data-stage-layer
                   className="absolute inset-0 z-50 cursor-text"
                   onPointerMove={onMove}
                   onPointerUp={onUp}
@@ -789,7 +802,6 @@ export function Stage({
                             if (it.t === "photo") setCrop(it.id);
                             else setEditing(it.id);
                           }}
-                          onKeyDown={(e) => onItemKey(e, it)}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -1037,7 +1049,7 @@ function PhotoPanel({
           Ausschnitt …
         </button>
         <button type="button" className="text-ink-2 underline underline-offset-4" onClick={onRemove}>
-          In die Ablage
+          Löschen (in die Ablage)
         </button>
       </div>
       <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} up={up} down={down} />
