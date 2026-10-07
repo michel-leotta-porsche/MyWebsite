@@ -141,63 +141,6 @@ export function collides(items: SpreadItem[], id: string, box: Box, g: Geom) {
 export const photosOnPage = (items: SpreadItem[], page: 0 | 1) =>
   items.filter((i) => i.t === "photo" && i.box.x + i.box.w / 2 >= page * 100 && i.box.x + i.box.w / 2 < page * 100 + 100).length;
 
-/** Rasterbox aus Spalten c0..c1 und Zeilen r0..r1 (einschließlich) einer Seite */
-function cell(grid: ReturnType<typeof spreadGrid>, page: 0 | 1, c0: number, c1: number, r0: number, r1: number): Box {
-  const cs = grid.cols[page];
-  const x = cs[c0 * 2];
-  const y = grid.rows[r0 * 2];
-  return { x, y, w: cs[c1 * 2 + 1] - x, h: grid.rows[r1 * 2 + 1] - y };
-}
-
-/** Aufteilungen einer Seite für 1 bis 4 Fotos; alle auf dem Raster, nie zentriert */
-export function arrangements(g: Geom, page: 0 | 1, n: number): { label: string; boxes: Box[] }[] {
-  const grid = spreadGrid(g);
-  const c = (c0: number, c1: number, r0: number, r1: number) => cell(grid, page, c0, c1, r0, r1);
-  const px = page * 100;
-  switch (n) {
-    case 1:
-      return [
-        { label: "Randlos", boxes: [{ x: px, y: 0, w: 100, h: 100 }] },
-        { label: "Satzspiegel", boxes: [c(0, 5, 0, 8)] },
-        { label: "Groß oben", boxes: [c(0, 5, 0, 5)] },
-        { label: "Klein oben", boxes: [c(0, 3, 0, 3)] },
-      ];
-    case 2:
-      return [
-        { label: "Übereinander", boxes: [c(0, 5, 0, 3), c(0, 5, 5, 8)] },
-        { label: "Nebeneinander", boxes: [c(0, 2, 1, 6), c(3, 5, 1, 6)] },
-        { label: "Groß und klein", boxes: [c(0, 5, 0, 5), c(0, 2, 7, 8)] },
-        { label: "Versetzt", boxes: [c(0, 3, 0, 3), c(2, 5, 5, 8)] },
-      ];
-    case 3:
-      return [
-        { label: "Eins oben, zwei unten", boxes: [c(0, 5, 0, 4), c(0, 2, 6, 8), c(3, 5, 6, 8)] },
-        { label: "Spalte und zwei", boxes: [c(0, 3, 0, 8), c(4, 5, 0, 3), c(4, 5, 5, 8)] },
-        { label: "Drei Zeilen", boxes: [c(0, 5, 0, 1), c(0, 5, 3, 4), c(0, 5, 6, 7)] },
-      ];
-    case 4:
-      return [
-        { label: "Vier im Raster", boxes: [c(0, 2, 0, 3), c(3, 5, 0, 3), c(0, 2, 5, 8), c(3, 5, 5, 8)] },
-        { label: "Eins groß, drei klein", boxes: [c(0, 5, 0, 4), c(0, 1, 6, 8), c(2, 3, 6, 8), c(4, 5, 6, 8)] },
-      ];
-    default:
-      return [];
-  }
-}
-
-/** Eine Aufteilung auf die Fotos einer Seite anwenden (in Lesereihenfolge); Texte bleiben */
-export function applyArrangement(items: SpreadItem[], page: 0 | 1, boxes: Box[]): SpreadItem[] {
-  const onPage = (i: SpreadItem) => i.t === "photo" && i.box.x + i.box.w / 2 >= page * 100 && i.box.x + i.box.w / 2 < page * 100 + 100;
-  const photos = items.filter(onPage).sort((a, b) => (Math.abs(a.box.y - b.box.y) > 2 ? a.box.y - b.box.y : a.box.x - b.box.x));
-  const next = new Map(photos.map((p, i) => [p.id, boxes[i]]));
-  return items.map((i) => {
-    const b = next.get(i.id);
-    if (!b || i.t !== "photo") return i;
-    // neue Feldform: der Ausschnitt bleibt am Motiv, die Vergrößerung beginnt neu
-    return { ...i, box: b, caption: b.w >= 100 && b.h >= 100 ? "off" : "auto", crop: i.crop ? { ...i.crop, zoom: 1 } : undefined };
-  });
-}
-
 /** Freien Platz für ein neues Element finden: erst unter dem Zeiger, dann Zelle für Zelle */
 export function placeNew(items: SpreadItem[], g: Geom, page: 0 | 1, w: number, h: number, at?: { x: number; y: number }, id = "neu"): Box | null {
   const grid = spreadGrid(g);

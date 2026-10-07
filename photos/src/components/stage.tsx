@@ -9,8 +9,6 @@ import { inputClass, TextButton } from "@/components/app-ui";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
 import {
-  applyArrangement,
-  arrangements,
   boxOf,
   fromSpread,
   itemId,
@@ -49,6 +47,15 @@ const HANDLES: { e: Edges; cls: string; cursor: string; name: string }[] = [
   { e: { l: true }, cls: "left-0 top-1/2", cursor: "ew-resize", name: "links" },
 ];
 
+/** Zwischenablage der Bühne; bleibt über Doppelseiten hinweg, gilt für jede Art von Element */
+let clipboard: { item: SpreadItem; marker: string } | null = null;
+const markerOf = (it: SpreadItem) => (it.t === "text" ? it.text : `[Fujiventura: Foto ${it.key}]`);
+/** Element in die Zwischenablage legen; gibt den Text zurück, der in die Zwischenablage des Systems geht */
+function remember(it: SpreadItem) {
+  clipboard = { item: structuredClone(it), marker: markerOf(it) };
+  return clipboard.marker;
+}
+
 const DEFAULT_TEXT: Record<TextRole, string> = { heading: "Überschrift", body: "Ein paar Sätze zu diesem Tag.", note: "Notiz" };
 
 export function Stage({
@@ -84,7 +91,8 @@ export function Stage({
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onCommit: (items: SpreadItem[], tag?: string) => void;
+  /** pulled: Fotos, die von anderen Doppelseiten hierher wandern (nicht kopiert) */
+  onCommit: (items: SpreadItem[], tag?: string, pulled?: string[]) => void;
   onShelve: (key: string) => void;
   onPhoto: (key: string, patch: Partial<StoredPhoto>, tag: string) => void;
   onReset: () => void;
@@ -103,6 +111,9 @@ export function Stage({
   });
   /** Textrahmen, in dem gerade direkt auf der Seite geschrieben wird */
   const [editing, setEditing] = useState<string | null>(null);
+  /** Kontextmenü: Rechtsklick oder langes Drücken; id null = freies Papier */
+  const [menu, setMenu] = useState<{ cx: number; cy: number; id: string | null; at: { x: number; y: number } } | null>(null);
+  const press = useRef<number>(0);
   const [say, setSay] = useState("");
   const [crop, setCrop] = useState<string | null>(null);
   const [page, setPage] = useState<0 | 1>(0);
@@ -149,8 +160,8 @@ export function Stage({
     }),
   }));
 
-  const commit = (next: SpreadItem[], tag?: string, message?: string) => {
-    onCommit(next, tag);
+  const commit = (next: SpreadItem[], tag?: string, message?: string, pulled?: string[]) => {
+    onCommit(next, tag, pulled);
     if (message) setSay(message);
   };
   const photoRatio = (it: SpreadItem) => {
@@ -282,7 +293,16 @@ export function Stage({
     const wasSelected = sel === it.id;
     setSel(it.id);
     if (editing && editing !== it.id) setEditing(null);
-    // Touch: erst antippen, dann ziehen; so verschiebt Scrollen nichts aus Versehen
+    // Touch: langes Drücken öffnet das Menü; erst antippen, dann ziehen, so verschiebt Scrollen nichts aus Versehen
+    if (e.pointerType === "touch" && !edges) {
+      const { clientX, clientY } = e;
+      window.clearTimeout(press.current);
+      press.current = window.setTimeout(() => {
+        drag.current = null;
+        setDraft(null);
+        openMenu(clientX, clientY, it.id);
+      }, 550);
+    }
     if (e.pointerType === "touch" && !wasSelected && !edges) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = { id: it.id, edges, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey };
@@ -294,6 +314,7 @@ export function Stage({
     if (!it) return;
     if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 3) return;
     d.moved = true;
+    window.clearTimeout(press.current);
     const u = toUnits(e.clientX - d.sx, e.clientY - d.sy);
     const r = d.edges ? resizeBox(it, d.box0, d.edges, u.x, u.y, e.shiftKey) : moveBox(it, d.box0, u.x, u.y, e.altKey);
     const box = it.t === "text" ? { ...r.box, h: it.box.h } : r.box;
@@ -301,6 +322,7 @@ export function Stage({
     setGuides({ xs: r.xs, ys: r.ys });
   };
   const onUp = () => {
+    window.clearTimeout(press.current);
     const d = drag.current;
     drag.current = null;
     setGuides({ xs: [], ys: [] });
@@ -318,17 +340,17 @@ export function Stage({
 
   // ---- Neues Element: Text aus der Palette, Foto aus der Ablage ----
   const pageAt = (x: number): 0 | 1 => (x < 100 ? 0 : 1);
-  const addText = (role: TextRole, p: 0 | 1, at?: { x: number; y: number }) => {
+  const addText = (role: TextRole, p: 0 | 1, at?: { x: number; y: number }, given?: string) => {
     const cols = role === "heading" ? 6 : role === "body" ? 4 : 3;
     const w = cols * grid.cw + (cols - 1) * 2;
-    const text = DEFAULT_TEXT[role];
+    const text = given?.slice(0, 1200) ?? DEFAULT_TEXT[role];
     const h = boxOf({ t: "text", id: "x", text, role, box: { x: 0, y: 0, w, h: 0 } }, geom).h;
     // an der Stelle des Zeigers, auch auf einem Foto (Ebenen); ohne Zeiger die erste freie Stelle
     const box = (at ? snapAt(p, at, w, h) : null) ?? placeNew(items, geom, p, w, h) ?? snapAt(p, { x: grid.ta[p].x, y: grid.rows[0] }, w, h);
     const id = itemId();
     commit([...items, { t: "text", id, text, role, box: { ...box, h } }], undefined, `${TEXT_ROLE[role].label} hinzugefügt: ${where(box)}. Jetzt tippen.`);
     setSel(id);
-    setEditing(id);
+    if (!given) setEditing(id);
   };
   /** Box mit oberer linker Ecke am Raster nahe dem Zeiger, innerhalb der Seite */
   const snapAt = (p: 0 | 1, at: { x: number; y: number }, w: number, h: number): Box => {
@@ -353,7 +375,7 @@ export function Stage({
         const box = placeNew(items, geom, pg, w, h, pg === p ? at : undefined) ?? (pg === p && at && cols === 2 ? snapAt(pg, at, w, h) : null);
         if (box) {
           const id = itemId();
-          commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, `Foto hinzugefügt: ${where(box)}`);
+          commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, `Foto hinzugefügt: ${where(box)}`, [key]);
           setSel(id);
           return;
         }
@@ -394,6 +416,86 @@ export function Stage({
       else setEditing(it.id);
     }
   };
+  /** Kopie eines Elements eine Rasterzelle versetzt einfügen, oben auf den Stapel */
+  const paste = (src: SpreadItem, at?: { x: number; y: number }) => {
+    const id = itemId();
+    const b = src.box;
+    const dx = b.x + b.w + grid.colPitch <= 200 ? grid.colPitch : -grid.colPitch;
+    const dy = b.y + b.h + grid.rowPitch <= 100 ? grid.rowPitch : b.y >= grid.rowPitch ? -grid.rowPitch : 0;
+    const box = at
+      ? { ...snapAt(pageAt(at.x), at, Math.min(b.w, 100), b.h), w: b.w, h: b.h }
+      : { ...b, x: Math.max(0, b.x + dx), y: Math.max(0, b.y + dy) };
+    const copy = (src.t === "photo" ? { ...src, id, box, pairId: undefined } : { ...src, id, box }) as SpreadItem;
+    commit([...items, copy], undefined, `${src.t === "photo" ? "Foto" : "Text"} eingefügt: ${where(box)}`);
+    setSel(id);
+  };
+  const duplicate = (it: SpreadItem) => paste(it);
+
+  const openMenu = (cx: number, cy: number, id: string | null) => {
+    if (id) setSel(id);
+    setEditing(null);
+    setMenu({ cx, cy, id, at: pointOf(cx, cy) });
+  };
+  const copyItem = (it: SpreadItem) => {
+    navigator.clipboard?.writeText(remember(it)).catch(() => {});
+    setSay("Kopiert");
+  };
+  const pasteFromMenu = async (at?: { x: number; y: number }) => {
+    if (clipboard) return paste(clipboard.item, at);
+    const text = await navigator.clipboard?.readText().catch(() => "");
+    if (text?.trim()) addText("body", at ? pageAt(at.x) : curPage, at, text.trim());
+  };
+  const menuEntries = (): MenuEntry[] => {
+    if (!menu) return [];
+    const it = menu.id ? items.find((i) => i.id === menu.id) : undefined;
+    const common: MenuEntry[] = it
+      ? [
+          "sep",
+          { label: "Kopieren", hint: "⌘C", run: () => copyItem(it) },
+          { label: "Ausschneiden", hint: "⌘X", run: () => (copyItem(it), remove(it)) },
+          { label: "Duplizieren", hint: "⌘D", run: () => paste(it) },
+          { label: "Einfügen", hint: "⌘V", run: () => pasteFromMenu() },
+          "sep",
+          { label: "Ganz nach vorn", hint: "⇧⌘]", run: () => layer(it.id, "front") },
+          { label: "Nach vorn", hint: "⌘]", run: () => layer(it.id, "up") },
+          { label: "Nach hinten", hint: "⌘[", run: () => layer(it.id, "down") },
+          { label: "Ganz nach hinten", hint: "⇧⌘[", run: () => layer(it.id, "back") },
+          "sep",
+        ]
+      : [];
+    if (it?.t === "photo")
+      return [
+        { label: "Ausschnitt …", hint: "Enter", run: () => setCrop(it.id) },
+        {
+          label: "Unterschrift auf der Seite",
+          checked: it.caption === "auto",
+          run: () => commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, caption: i.caption === "auto" ? "off" : "auto" } : i))),
+        },
+        ...common,
+        { label: "In die Ablage", hint: "Entf", run: () => remove(it) },
+      ];
+    if (it?.t === "text")
+      return [
+        { label: "Text schreiben", hint: "Enter", run: () => setEditing(it.id) },
+        ...(Object.keys(TEXT_ROLE) as TextRole[]).map(
+          (r): MenuEntry => ({ label: TEXT_ROLE[r].label, checked: it.role === r, run: () => commit(items.map((i) => (i.id === it.id ? { ...i, role: r } : i))) }),
+        ),
+        {
+          label: "Helle Schrift",
+          checked: !!it.light,
+          run: () => commit(items.map((i) => (i.id === it.id && i.t === "text" ? { ...i, light: i.light ? undefined : true } : i))),
+        },
+        ...common,
+        { label: "Text entfernen", hint: "Entf", run: () => remove(it) },
+      ];
+    const at = menu.at;
+    return [
+      { label: "Hier einfügen", hint: "⌘V", run: () => pasteFromMenu(at) },
+      "sep",
+      ...(Object.keys(TEXT_ROLE) as TextRole[]).map((r): MenuEntry => ({ label: `${TEXT_ROLE[r].label} hier`, run: () => addText(r, pageAt(at.x), at) })),
+    ];
+  };
+
   /** Ebenen: die Reihenfolge der Elemente ist die Stapelung, das letzte liegt oben */
   const layer = (id: string, to: "up" | "down" | "front" | "back") => {
     const i = items.findIndex((x) => x.id === id);
@@ -410,6 +512,47 @@ export function Stage({
     else commit(items.filter((i) => i.id !== it.id), undefined, "Text entfernt");
   };
 
+  // ⌘C / ⌘X / ⌘V; Text aus anderen Apps wird ein neuer Textrahmen
+  const latest = useRef<{ selected: SpreadItem | null; paste: (it: SpreadItem) => void; remove: (it: SpreadItem) => void; addTextWith: (t: string) => void }>({
+    selected: null,
+    paste: () => {},
+    remove: () => {},
+    addTextWith: () => {},
+  });
+  useEffect(() => {
+    const typing = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      return !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+    };
+    const onCopy = (e: ClipboardEvent) => {
+      const it = latest.current.selected;
+      if (typing(e) || !it) return;
+      e.clipboardData?.setData("text/plain", remember(it));
+      e.preventDefault();
+      setSay(e.type === "cut" ? "Ausgeschnitten" : "Kopiert");
+      if (e.type === "cut") latest.current.remove(it);
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      if (typing(e)) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (clipboard && (!text || text === clipboard.marker)) {
+        e.preventDefault();
+        latest.current.paste(clipboard.item);
+      } else if (text.trim()) {
+        e.preventDefault();
+        latest.current.addTextWith(text.trim());
+      }
+    };
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("cut", onCopy);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("cut", onCopy);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, []);
+
   // Esc: erst Auswahl, dann Bühne; G: Raster
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -419,6 +562,9 @@ export function Stage({
         if (editing) setEditing(null);
         else if (sel) setSel(null);
         else onClose();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && latest.current.selected) {
+        e.preventDefault();
+        latest.current.paste(latest.current.selected);
       } else if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey) {
         setGridOn((g) => {
           try {
@@ -433,8 +579,9 @@ export function Stage({
   }, [editing, crop, onClose, sel]);
 
   const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : narrow ? page : 0;
-  const nOnPage = photosOnPage(shown, curPage);
-  const options = arrangements(geom, curPage, nOnPage);
+  useEffect(() => {
+    latest.current = { selected, paste, remove, addTextWith: (t: string) => addText("body", curPage, undefined, t) };
+  });
   const handle = coarse ? 44 : 24;
   const pct = (b: Box) => ({ left: `${b.x / 2}%`, top: `${b.y}%`, width: `${b.w / 2}%`, height: `${b.h}%` });
   const cropItem = crop ? items.find((i) => i.id === crop) : undefined;
@@ -571,6 +718,11 @@ export function Stage({
                     setSel(null);
                     setEditing(null);
                   }}
+                  onContextMenu={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    e.preventDefault();
+                    openMenu(e.clientX, e.clientY, null);
+                  }}
                   onDoubleClick={(e) => {
                     if (e.target !== e.currentTarget) return;
                     const at = pointOf(e.clientX, e.clientY);
@@ -615,6 +767,11 @@ export function Stage({
                             else setEditing(it.id);
                           }}
                           onKeyDown={(e) => onItemKey(e, it)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openMenu(e.clientX, e.clientY, it.id);
+                          }}
                           onFocus={() => setSel(it.id)}
                           className={`absolute inset-0 ${isSel ? "cursor-move" : "cursor-pointer"} ${
                             isSel ? "outline-2 outline-mark" : "hover:outline-1 hover:outline-mark/70"
@@ -696,7 +853,7 @@ export function Stage({
               Ziehen verschiebt, die Griffe ändern die Größe. Doppelklick auf ein Foto schneidet zu, auf einen Text schreibt, aufs Papier legt neuen Text an.
               Kanten rasten am Raster ein, <kbd>Alt</kbd> beim Ziehen setzt frei.
               Tastatur: <kbd>Tab</kbd> wählt, Pfeile verschieben um eine Spalte oder Zeile, <kbd>Shift</kbd> + Pfeile ändern die Größe, <kbd>Enter</kbd>{" "}
-              schneidet zu, <kbd>Entf</kbd> nimmt heraus, <kbd>G</kbd> zeigt das Raster.
+              schneidet zu, <kbd>Entf</kbd> nimmt heraus, <kbd>⌘C</kbd> / <kbd>⌘V</kbd> kopiert, <kbd>⌘D</kbd> dupliziert, <kbd>G</kbd> zeigt das Raster.
             </p>
           )}
         </div>
@@ -711,6 +868,7 @@ export function Stage({
               onCrop={() => setCrop(selected.id)}
               onRemove={() => remove(selected)}
               onLayer={(to) => layer(selected.id, to)}
+              onDuplicate={() => duplicate(selected)}
             />
           )}
           {selected?.t === "text" && (
@@ -752,39 +910,13 @@ export function Stage({
                 />
                 Helle Schrift (für Text auf dunklen Fotos)
               </label>
-              <LayerButtons onLayer={(to) => layer(selected.id, to)} />
+              <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} />
               {boxOf(selected, geom).y + boxOf(selected, geom).h > grid.ys[grid.ys.length - 2] + 0.5 && (
                 <p className="text-ink text-[12px] font-semibold">Der Text läuft unten aus dem Satzspiegel. Kürzen oder den Rahmen breiter ziehen.</p>
               )}
               <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
                 Textrahmen entfernen
               </TextButton>
-            </div>
-          )}
-
-          {nOnPage > 0 && options.length > 0 && (
-            <div className="slip text-ink space-y-3 p-5">
-              <p className="text-sm font-semibold">
-                Aufteilung {curPage === 0 ? "links" : "rechts"} · {nOnPage} {nOnPage === 1 ? "Foto" : "Fotos"}
-              </p>
-              <ul className="grid grid-cols-2 gap-3">
-                {options.map((o) => (
-                  <li key={o.label}>
-                    <button
-                      type="button"
-                      onClick={() => commit(applyArrangement(items, curPage, o.boxes), undefined, `Aufteilung „${o.label}“`)}
-                      className="group block w-full text-left"
-                    >
-                      <svg aria-hidden viewBox={`0 0 100 ${grid.H}`} className="bg-paper block w-full border border-ink/20">
-                        {o.boxes.map((b, i) => (
-                          <rect key={i} x={b.x - curPage * 100} y={(b.y / 100) * grid.H} width={b.w} height={(b.h / 100) * grid.H} className="fill-ink/70 group-hover:fill-ink" />
-                        ))}
-                      </svg>
-                      <span className="mt-1 block text-[12px] underline decoration-mark decoration-2 underline-offset-4">{o.label}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
@@ -818,6 +950,7 @@ export function Stage({
         </aside>
       </div>
 
+      {menu && <ContextMenu x={menu.cx} y={menu.cy} entries={menuEntries()} onClose={() => setMenu(null)} />}
       {cropItem && cropItem.t === "photo" && photos.get(cropItem.key) && (
         <CropDialog
           photo={{ ...photos.get(cropItem.key)!, ...(cropItem.crop ?? {}) }}
@@ -839,6 +972,7 @@ function PhotoPanel({
   onCrop,
   onRemove,
   onLayer,
+  onDuplicate,
 }: {
   item: Extract<FreeItem, { t: "photo" }>;
   photo?: StoredPhoto;
@@ -847,6 +981,7 @@ function PhotoPanel({
   onCrop: () => void;
   onRemove: () => void;
   onLayer: (to: "up" | "down" | "front" | "back") => void;
+  onDuplicate: () => void;
 }) {
   return (
     <div className="slip text-ink space-y-3 p-5">
@@ -867,20 +1002,93 @@ function PhotoPanel({
           In die Ablage
         </button>
       </div>
-      <LayerButtons onLayer={onLayer} />
+      <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} />
     </div>
   );
 }
 
-function LayerButtons({ onLayer }: { onLayer: (to: "up" | "down" | "front" | "back") => void }) {
+function LayerButtons({ onLayer, onDuplicate }: { onLayer: (to: "up" | "down" | "front" | "back") => void; onDuplicate: () => void }) {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]" role="group" aria-label="Ebene">
+    <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]" role="group" aria-label="Ebene und Kopie">
+      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onDuplicate} title="⌘D, oder ⌘C und ⌘V">
+        Duplizieren
+      </button>
       <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => onLayer("front")} title="⇧⌘]">
         Ganz nach vorn
       </button>
       <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => onLayer("back")} title="⇧⌘[">
         Ganz nach hinten
       </button>
+    </div>
+  );
+}
+
+type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; run: () => void };
+
+/** Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt */
+function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ left: Math.max(8, Math.min(x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, innerHeight - r.height - 8)) });
+    el.querySelector<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]")?.focus();
+  }, [x, y]);
+  const move = (e: React.KeyboardEvent) => {
+    const list = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]") ?? []);
+    const i = list.indexOf(document.activeElement as HTMLButtonElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      list[(i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length]?.focus();
+    } else if (e.key === "Escape" || e.key === "Tab") {
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+  };
+  return (
+    <div
+      className="fixed inset-0 z-[690]"
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div
+        ref={ref}
+        role="menu"
+        aria-label="Aktionen"
+        onKeyDown={move}
+        className="slip text-ink fixed min-w-56 py-1.5 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]"
+        style={pos}
+      >
+        {entries.map((en, i) =>
+          en === "sep" ? (
+            <div key={i} role="separator" className="my-1.5 border-t border-ink/15" />
+          ) : (
+            <button
+              key={i}
+              type="button"
+              role={en.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+              aria-checked={en.checked}
+              onClick={() => {
+                onClose();
+                en.run();
+              }}
+              className="hover:bg-ink/8 focus-visible:bg-ink/8 flex min-h-8 w-full items-center gap-3 px-3 text-left focus-visible:outline-none"
+            >
+              <span aria-hidden className="w-3 text-center">
+                {en.checked ? "✓" : ""}
+              </span>
+              <span className="flex-1">{en.label}</span>
+              {en.hint && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
+            </button>
+          ),
+        )}
+      </div>
     </div>
   );
 }

@@ -510,12 +510,13 @@ export function Editor() {
   const stageSpread = stageIndex >= 0 ? book.spreads[stageIndex] : undefined;
   const stageItems: SpreadItem[] = stageSpread && data ? toSpread(stageSpread.pages ?? materialize(data, stageIndex)) : [];
   /** Änderung auf der Bühne übernehmen: Doppelseite wird frei, Fotos von anderswo wandern mit */
-  const commitStage = (items: SpreadItem[], tag?: string) => {
+  const commitStage = (items: SpreadItem[], tag?: string, pulled: string[] = []) => {
     if (!stageId) return;
     update((b) => {
       const id = stageId;
       const pages = fromSpread(items);
-      const here = new Set(items.flatMap((i) => (i.t === "photo" ? [i.key] : [])));
+      // nur hereingeholte Fotos verlassen ihre alte Doppelseite; kopierte dürfen mehrfach im Buch stehen
+      const here = new Set(pulled);
       const spreads = b.spreads
         .map((s) => {
           if (s.id === id) return withPages(s, pages);
@@ -524,7 +525,8 @@ export function Editor() {
           return moved.reduce((acc, k) => (acc.pages ? removeKey(acc, k) : { ...acc, keys: acc.keys.filter((x) => x !== k), layout: 0 }), s);
         })
         .filter((s) => s.id === id || keepSpread(s));
-      return { ...b, spreads, aspectLocked: true, photos: b.photos.map((p) => (here.has(p.key) && p.shelved ? { ...p, shelved: false } : p)) };
+      const onStage = new Set(items.flatMap((i) => (i.t === "photo" ? [i.key] : [])));
+      return { ...b, spreads, aspectLocked: true, photos: b.photos.map((p) => (onStage.has(p.key) && p.shelved ? { ...p, shelved: false } : p)) };
     }, tag);
   };
   const resetStage = () => {
