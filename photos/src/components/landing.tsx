@@ -3,9 +3,10 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { FrameButton, linkClass, TextButton } from "@/components/app-ui";
+import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
@@ -149,16 +150,62 @@ const wide = (f: () => void) => {
   return () => mq.removeEventListener("change", f);
 };
 
+/**
+ * Passt der Kopf samt Buch in die Bildschirmhöhe? Quer auf dem Telefon, mit großer Schrift oder Zoom nicht:
+ * dann steht der Kopf nicht still, sondern scrollt normal, und das Buch bekommt eine feste Größe (Härtetest B1/B2).
+ * Nebenbei misst der Hook, wie viel Höhe Kopfzeile und Text brauchen, damit das Buch genau den Rest bekommt.
+ */
+function useHeroFit(mode: Mode) {
+  const header = useRef<HTMLElement>(null);
+  const text = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({ fixed: false, used: 470 });
+  useLayoutEffect(() => {
+    const measure = () => {
+      const h = header.current?.offsetHeight ?? 0;
+      const t = text.current?.offsetHeight ?? 0;
+      const vh = window.innerHeight;
+      // Abstände im Raster plus Zeile „Scrollen zum Blättern“
+      const used = Math.ceil(h + (mode === "single" ? t : 0) + 120);
+      const fixed = mode === "single" ? (vh - used) / 1.5 < 110 : h + t + 80 > vh || vh - 230 < 260;
+      setFit((f) => (f.fixed === fixed && f.used === used ? f : { fixed, used }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (header.current) ro.observe(header.current);
+    if (text.current) ro.observe(text.current);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [mode]);
+  return { header, text, ...fit };
+}
+
 function Hero() {
   const track = useRef<HTMLElement>(null);
   // Doppelseite ab Tablet, sonst Einzelseiten wie auf dem Telefon in der Leseansicht
   const mode: Mode = useSyncExternalStore(wide, () => (window.matchMedia("(min-width: 768px)").matches ? "spread" : "single"), () => "spread");
   const leaves = mode === "spread" ? landingBook.spreads.length : landingBook.singlePages.length - 1;
+  const { header, text, fixed, used } = useHeroFit(mode);
+  const width = fixed
+    ? mode === "spread"
+      ? "min(100%, 900px)"
+      : "min(72vw, 300px)"
+    : mode === "spread"
+      ? "min(100%, calc((100svh - 230px) * 4 / 3))"
+      : `min(72vw, calc((100svh - ${used}px) / 1.5))`;
   return (
-    <section ref={track} aria-labelledby="hero-h" className="hero-track relative" style={{ ["--leaves" as string]: leaves }}>
-      <div className="linen table-surface sticky top-0 flex min-h-svh flex-col overflow-hidden bg-table">
+    <section
+      ref={track}
+      aria-labelledby="hero-h"
+      data-fixed={fixed || undefined}
+      className="hero-track relative"
+      style={{ ["--leaves" as string]: leaves }}
+    >
+      <div className="hero-stick linen table-surface sticky top-0 flex min-h-svh flex-col overflow-hidden bg-table">
         <SunAndShade light="sun" />
-        <header className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-4 md:px-8 md:pt-6">
+        <header ref={header} className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-4 md:px-8 md:pt-6">
           <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
             Fujiventura
           </p>
@@ -171,7 +218,7 @@ function Hero() {
         </header>
 
         <div className="relative z-10 grid flex-1 items-center gap-8 px-4 pt-6 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12">
-          <div className="md:col-span-4 md:self-end md:pb-[14svh]">
+          <div ref={text} className="md:col-span-4 md:self-end md:pb-[14svh]">
             <h1 id="hero-h" className="text-on-table leading-[0.86] font-bold tracking-[-0.04em] [text-wrap:balance]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
               Deine Fotos, gebunden.
             </h1>
@@ -181,14 +228,20 @@ function Hero() {
             <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
               <EnterButton />
             </div>
-            <p className="text-on-table-2 mt-5 text-sm">Lesen geht ohne Konto.</p>
+            <p className="text-on-table-2 mt-5 text-sm">
+              Lesen geht ohne Konto. Anmeldung über Google, siehe{" "}
+              <Link href="/datenschutz" className={linkClass}>
+                Datenschutz
+              </Link>
+              .
+            </p>
           </div>
           <div className="md:col-span-8 md:col-start-5 md:pl-[4vw]">
             <ScrollBook
               book={landingBook}
               mode={mode}
               track={track}
-              width={mode === "spread" ? "min(100%, calc((100svh - 230px) * 4 / 3))" : "min(72vw, calc((100svh - 470px) / 1.5))"}
+              width={width}
             />
             <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">Scrollen zum Blättern</p>
           </div>
@@ -379,7 +432,12 @@ function Closing() {
           </h2>
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
             <EnterButton label="Erstes Buch anlegen" />
-            <p className="text-on-table-2 text-sm">Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.</p>
+            <p className="text-on-table-2 text-sm">
+              Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              <Link href="/datenschutz" className={linkClass}>
+                Datenschutz
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -388,11 +446,14 @@ function Closing() {
           <p>
             <span className="text-on-table font-semibold">Fujiventura</span> · Beispielfotos von Michel Leotta
           </p>
-          <nav aria-label="Räume" className="flex gap-x-5">
-            <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
-              Bücherzimmer
-            </Link>
-          </nav>
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <nav aria-label="Räume" className="flex gap-x-5">
+              <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
+                Bücherzimmer
+              </Link>
+            </nav>
+            <LegalLinks />
+          </div>
         </div>
       </footer>
     </>
