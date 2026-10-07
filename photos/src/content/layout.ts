@@ -333,8 +333,13 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       ]);
     }
 
-    case "blank":
+    case "blank": {
+      // Unterschrift der randlosen Gegenseite; ohne Titel und Zusatz bliebe nur eine verwaiste Nummer,
+      // dann bleibt die Seite reines Papier
+      const p = plateOf(book, page.no);
+      if (!p?.title && !p?.note) return paper([]);
       return paper([{ t: "caption", no: page.no, x: ta.x, y: ta.y + ta.h - 6, w: 60, align: "left" }]);
+    }
 
     case "tall": {
       const no = page.no;

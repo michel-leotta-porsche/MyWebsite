@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { createContext, useContext, type CSSProperties } from "react";
 
-import { plateOf, type BookData, type Page } from "@/content/books";
+import { plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
 
@@ -67,7 +67,7 @@ function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }
         e.stopPropagation();
         jump(el.no);
       }}
-      aria-label={`Zu Tafel ${el.no}: ${p.title}`}
+      aria-label={`Zu ${plateName(el.no, p.title)}`}
       className="group absolute focus-visible:outline-ink"
       style={box(el.x, el.y, el.w, el.h)}
     >

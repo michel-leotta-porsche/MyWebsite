@@ -130,7 +130,8 @@ export function toBookData(b: StoredBook): BookData {
     photos[p.key] = {
       title: p.title,
       note: p.note,
-      alt: p.alt || p.title || "Foto",
+      // ohne Beschreibung und Titel: Platzhalter, die Nummer kommt erst mit der Reihenfolge im Buch (unten)
+      alt: p.alt || p.title || "",
       src: { src: p.src, width: p.w, height: p.h } as StaticImageData,
       thumb: { src: p.thumb, width: 360, height: Math.round((360 * p.h) / p.w) } as StaticImageData,
       focus: p.focus,
@@ -143,7 +144,7 @@ export function toBookData(b: StoredBook): BookData {
   const cloth = CLOTHS[b.cloth] ?? CLOTHS.ringelblume;
   const used = new Set(b.spreads.flatMap((s) => s.keys));
   const year = new Date().getFullYear();
-  return build({
+  const data = build({
     id: b.id,
     author: b.ownerName,
     title: b.title || "Ohne Titel",
@@ -172,6 +173,9 @@ export function toBookData(b: StoredBook): BookData {
       [INDEX, COLOPHON],
     ],
   });
+  // Screenreader hören sonst nur „Foto, Foto, Foto“: wenigstens sagen, welches von wie vielen
+  const n = data.plates.length;
+  return { ...data, plates: data.plates.map((pl) => (pl.alt ? pl : { ...pl, alt: `Foto ${pl.no} von ${n}` })) };
 }
 
 export const newId = () =>

@@ -52,10 +52,13 @@ export function variants(keys: string[], byKey: Map<string, AutoPhoto>): (readon
   if (!ps.length) return [[VERSO, VERSO]];
   if (ps.length === 1) {
     const [a] = ps;
-    if (isLandscape(a)) return [[across(a.key)], [blank(a.key), landscape(a.key)], [landscape(a.key), blank(a.key)]];
+    // Die leere Seite (blank) trägt die Unterschrift der Gegenseite und steht deshalb nur neben dem
+    // randlosen Foto, das selbst keine hat. Neben Tafel, Querformat und kleiner Tafel bliebe sonst
+    // dieselbe Nummer doppelt stehen; dort bleibt gegenüber reines Papier (VERSO).
+    if (isLandscape(a)) return [[across(a.key)], [VERSO, landscape(a.key)], [landscape(a.key), VERSO]];
     // das hohe Format trägt seine Unterschrift im Papierstreifen; gegenüber bleibt leeres Papier
     if (isTall(a)) return [[VERSO, tall(a.key)], [blank(a.key), full(a.key)]];
-    return [[blank(a.key), full(a.key)], [blank(a.key), framed(a.key)], [small(a.key, 3, "top", "outer"), blank(a.key)]];
+    return [[blank(a.key), full(a.key)], [VERSO, framed(a.key)], [small(a.key, 3, "top", "outer"), VERSO]];
   }
   const [a, b] = ps;
   const la = isLandscape(a);
@@ -75,7 +78,8 @@ export function variants(keys: string[], byKey: Map<string, AutoPhoto>): (readon
   ];
 }
 
-const paperRich = (spread: readonly Spec[]) => spread.some((s) => s.kind === "small" || s.kind === "plate" || s.kind === "landscape" || s.kind === "blank");
+const paperRich = (spread: readonly Spec[]) =>
+  spread.some((s) => s.kind === "small" || s.kind === "plate" || s.kind === "landscape" || s.kind === "blank" || s.kind === "verso");
 const fullPair = (spread: readonly Spec[]) => spread.length === 2 && spread.every((s) => s.kind === "full" || s.kind === "tall");
 
 /** Buch aus losen Fotos: Gruppen bilden, Layouts im Rhythmus wählen, Einband bestimmen */
@@ -130,9 +134,9 @@ export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; cov
       if (sincePaper >= 2 && !paperRich(v) && vs.some(paperRich)) return false;
       return true;
     });
-    const starred = keys.length === 1 && byKey.get(keys[0])?.star;
-    if (starred) {
-      // groß: über den Bund, sonst randlos neben der leeren Seite
+    if (keys.length === 1) {
+      // ein Foto allein (wichtig, Querformat über den Bund, das letzte übrige): immer die erste Variante,
+      // groß über den Bund oder randlos neben der leeren Seite. Die anderen lassen eine Seite ohne Grund leer.
       pick = 0;
     } else if (allowed.length) {
       // abwechseln, damit nicht jede Papierseite gleich aussieht
@@ -167,7 +171,8 @@ export function relayoutFree(
   let next = 0;
   for (const s of spreads) {
     if (keep(s)) out.push(s);
-    else if (next < auto.spreads.length) out.push(auto.spreads[next++]);
+    // die Doppelseite behält ihre id, damit Auswahl und Liste beim Neuverteilen nicht springen
+    else if (next < auto.spreads.length) out.push({ ...auto.spreads[next++], id: s.id ?? spreadId() });
   }
   while (next < auto.spreads.length) out.push(auto.spreads[next++]);
   return { spreads: out, coverKey: auto.coverKey };

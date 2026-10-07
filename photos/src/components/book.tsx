@@ -15,7 +15,7 @@ import {
 } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { pageNos, plateOf, type BookData, type Page } from "@/content/books";
+import { pageNos, plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { headPlates } from "@/content/layout";
 import { hasSlip, recipeOf } from "@/content/recipes";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
@@ -273,12 +273,16 @@ export function RollingLabel({ text, reduce }: { text: string; reduce: boolean }
   );
 }
 
-/** Seitenbreite in CSS: Doppelseite oder Einzelseite, nach Seitenformat und Buchgröße */
+/**
+ * Seitenbreite in CSS: Doppelseite oder Einzelseite, nach Seitenformat und Buchgröße.
+ * Gemessen an der Bühne (Size-Container), nicht am Fenster: ein höherer Kopf (große Schrift) oder
+ * ein Telefon quer lassen dem Buch genau den Platz, der übrig ist.
+ */
 export function pageWidth(book: BookData, mode: Mode) {
   const a = book.aspect;
   return mode === "spread"
-    ? `calc(min(calc((100vw - 64px) / 2), calc((100svh - 150px) / ${a}), 640px) * ${book.scale})`
-    : `min(calc(100vw - 24px), calc((100svh - 150px) / ${a}))`;
+    ? `calc(min(calc((100cqw - 16px) / 2), calc((100cqh - 40px) / ${a}), 640px) * ${book.scale})`
+    : `min(100cqw, calc((100cqh - 12px) / ${a}))`;
 }
 
 const SWIPED = "fuji:swiped";
@@ -720,15 +724,18 @@ export function Book({
 
       <motion.div
         data-stage
-        className={`linen table-surface sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
+        // --side: quer auf dem Telefon stehen Kopf und Bildtitel links und rechts neben dem Buch
+        className={`linen table-surface sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none [--side:0px] flat:[--side:min(13rem,27vw)] ${swipe ? "touch-none" : ""}`}
         inert={!!viewer}
       >
         <SunAndShade light={book.light} />
-        <header className="relative z-20 grid grid-cols-[1fr_auto] items-baseline gap-4 px-4 pt-4 md:grid-cols-[1fr_auto_1fr] md:px-8 md:pt-6">
+        {/* Kopf: bricht bei großer Schrift um, statt den Weg zurück aus dem Bild zu schieben.
+            Quer liegt er über der Bühne, links und rechts neben dem Buch. */}
+        <header className="pointer-events-none relative z-20 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 pt-4 md:grid md:grid-cols-[1fr_auto_1fr] md:px-8 md:pt-6 flat:absolute flat:inset-x-0 flat:top-0 flat:grid flat:grid-cols-[calc(var(--side)-1rem)_1fr_calc(var(--side)-1rem)] flat:px-4 flat:pt-3 [&>*]:pointer-events-auto">
           <button
             type="button"
             onClick={onClose}
-            className="text-on-table justify-self-start text-lg font-bold tracking-[-0.02em] decoration-mark decoration-2 underline-offset-4 hover:underline"
+            className="text-on-table justify-self-start text-lg font-bold whitespace-nowrap flat:whitespace-normal tracking-[-0.02em] decoration-mark decoration-2 underline-offset-4 hover:underline"
             style={{ fontVariationSettings: '"wdth" 80' }}
             aria-label="Fujiventura, zurück zum Tisch"
           >
@@ -739,14 +746,14 @@ export function Book({
             Fujiventura
           </button>
           {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
-          <div className="text-on-table-2 hidden items-baseline gap-4 text-sm md:flex">
+          <div className="text-on-table-2 hidden items-baseline gap-4 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col flat:items-start flat:gap-1">
             <span aria-live="polite">
               <RollingLabel text={caption} reduce={reduce} />
             </span>
             <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
             {extra?.(book, current)}
           </div>
-          <p className="text-on-table-2 justify-self-end text-sm" aria-live="polite">
+          <p className="text-on-table-2 ml-auto justify-self-end text-right text-sm flat:col-start-3" aria-live="polite">
             <span className="text-on-table">{book.title}</span>
             <span className="mx-2" aria-hidden>
               ·
@@ -759,20 +766,20 @@ export function Book({
             </span>
             {nPlates}
           </p>
+          {/* Telefon: Titel der randlosen Tafel unter dem Kopf; quer links und rechts neben dem Buch */}
+          <div className="text-on-table-2 flex min-h-6 basis-full flex-wrap items-baseline justify-between gap-x-3 pt-1 text-sm md:hidden flat:max-md:contents">
+            <span aria-hidden className="min-w-0 truncate flat:col-start-1 flat:row-start-2">
+              <RollingLabel text={caption} reduce={reduce} />
+            </span>
+            <span className="flex shrink-0 flex-wrap justify-end gap-x-3 flat:col-start-3 flat:row-start-2 flat:justify-self-end">
+              <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
+              {extra?.(book, current)}
+            </span>
+          </div>
         </header>
-        {/* Telefon: Titel der randlosen Tafel unter dem Kopf */}
-        <div className="text-on-table-2 relative z-20 flex h-6 items-baseline justify-between gap-3 px-4 pt-1 text-sm md:hidden">
-          <span aria-hidden className="min-w-0 truncate">
-            <RollingLabel text={caption} reduce={reduce} />
-          </span>
-          <span className="flex shrink-0 gap-3">
-            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
-            {extra?.(book, current)}
-          </span>
-        </div>
 
         {/* Bühne */}
-        <div className="relative flex flex-1 items-center justify-center px-3 md:px-8">
+        <div className="relative flex min-h-0 flex-1 items-center justify-center px-3 [container-type:size] md:px-8 flat:px-[var(--side)] flat:pt-2">
           <JumpContext.Provider value={jump}>
             <PlateOpenProvider value={openPlate}>
               <motion.div style={{ transform: pullT }} className="relative">
@@ -918,7 +925,7 @@ export function Book({
         {/* Bildfolge als Linie mit Haltepunkten */}
         <nav
           aria-label="Bildfolge"
-          className="relative z-20 mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7"
+          className="relative z-20 mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7 flat:pt-0 flat:pb-[max(0.25rem,env(safe-area-inset-bottom))]"
         >
           <AnimatePresence>
             {!hinted && (
@@ -963,7 +970,7 @@ export function Book({
                     <button
                       type="button"
                       onClick={() => goTo(stepForPlate(p.no))}
-                      aria-label={`Tafel ${p.no}: ${p.title}`}
+                      aria-label={plateName(p.no, p.title)}
                       aria-current={active ? "true" : undefined}
                       className="flex h-full w-full max-w-6 items-center justify-center"
                     >
@@ -1030,7 +1037,7 @@ function SlipButtons({
           key={no}
           type="button"
           aria-expanded={slip === no}
-          aria-label={`${label} zu Tafel ${no}${title ? `: ${title}` : ""}`}
+          aria-label={`${label} zu ${plateName(no, title)}`}
           title={title || undefined}
           onClick={() => onOpen(slip === no ? null : { no, k })}
           onPointerEnter={(e) => e.pointerType === "mouse" && onPoint(no)}

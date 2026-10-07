@@ -292,7 +292,9 @@ export function build(spec: BookSpec): BookData {
     }
     const [l, r] = pair;
     const right = l.kind === "blank" ? page(r) : undefined;
-    const left = page(l);
+    // die leere Seite trägt nur die Unterschrift einer randlosen Gegenseite; hat die Gegenseite eine
+    // eigene (Tafel, Querformat, kleine Tafel), stünde dieselbe Nummer doppelt: dann reines Papier
+    const left = l.kind === "blank" && r.kind !== "full" ? page(VERSO) : page(l);
     const rr = right ?? page(r);
     return { left, right: rr, plates: platesOf(left, rr) };
   });
@@ -643,6 +645,9 @@ const japan = build({
 export const books: BookData[] = [fuerteventura, japan];
 export const bookById = (id: string) => books.find((b) => b.id === id);
 export const plateOf = (book: BookData, no: number) => book.plates[no - 1];
+
+/** Name einer Tafel für Screenreader: „Tafel 3: Palme“, ohne Titel nur „Tafel 3“ (kein leerer Rest nach dem Doppelpunkt) */
+export const plateName = (no: number, title?: string) => (title?.trim() ? `Tafel ${no}: ${title.trim()}` : `Tafel ${no}`);
 
 /** Satzspiegel in cqw: Bund, oben, außen, unten; Breite 82 */
 export function typeArea(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {

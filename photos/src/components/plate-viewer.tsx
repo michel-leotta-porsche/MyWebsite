@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { plateOf, type BookData } from "@/content/books";
+import { plateName, plateOf, type BookData } from "@/content/books";
 
 type Open = (no: number, trigger: HTMLElement) => void;
 const OpenContext = createContext<Open>(() => {});
@@ -15,7 +15,7 @@ export function PlateButton({ book, no }: { book: BookData; no: number }) {
   return (
     <button
       type="button"
-      aria-label={`Tafel ${no} vergrößern: ${plateOf(book, no).title}`}
+      aria-label={`${plateName(no, plateOf(book, no).title)} vergrößern`}
       onClick={(e) => {
         e.stopPropagation();
         open(no, e.currentTarget);
@@ -27,16 +27,32 @@ export function PlateButton({ book, no }: { book: BookData; no: number }) {
 
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
+// History-Eintrag der offenen Tafel: die Zurück-Geste schließt nur die Vergrößerung, nicht das Buch
+const HISTORY_KEY = "fujiPlate";
+const isPlateEntry = () => !!(history.state as Record<string, unknown> | null)?.[HISTORY_KEY];
+
 function fit(book: BookData, no: number) {
   const { width, height } = plateOf(book, no).src;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const maxW = vw * (vw < 768 ? 0.94 : 0.84);
-  const maxH = vh - (vw < 768 ? 150 : 170);
+  // Platz für Kopf und Bedienung wächst mit der Schriftgröße
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  // Wenig Höhe (Telefon quer): Bild über die volle Höhe, Bedienung rechts daneben, wenn dort Platz ist
+  if (vh < 560 && vw > vh) {
+    const s = Math.min((vh - 16) / height, (vw * 0.96) / width);
+    const w = width * s;
+    const h = height * s;
+    const side = (vw - w) / 2;
+    if (side >= 8 * rem) return { left: side, top: (vh - h) / 2, width: w, height: h, side };
+  }
+  const top = Math.max(56, 3.5 * rem);
+  const bottom = Math.max(64, 4.5 * rem);
+  const maxW = vw * (vw < 768 ? 0.96 : 0.84);
+  const maxH = Math.max(120, vh - top - bottom);
   const s = Math.min(maxW / width, maxH / height);
   const w = width * s;
   const h = height * s;
-  return { left: (vw - w) / 2, top: Math.max(56, (vh - h) / 2 - 18), width: w, height: h };
+  return { left: (vw - w) / 2, top: Math.max(top, (vh - h) / 2 - 18), width: w, height: h, side: 0 };
 }
 
 export function PlateViewer({
@@ -93,6 +109,14 @@ export function PlateViewer({
     );
   }, [box, from, reduce]);
 
+  // Die Vergrößerung bekommt einen eigenen Eintrag im Verlauf (nur einmal, auch im Strict Mode)
+  const pushed = useRef(false);
+  useEffect(() => {
+    if (pushed.current) return;
+    pushed.current = true;
+    history.pushState({ [HISTORY_KEY]: true }, "");
+  }, []);
+
   const close = useCallback(async () => {
     if (closing.current || !frame.current || !box) return;
     closing.current = true;
@@ -124,6 +148,21 @@ export function PlateViewer({
     onClose(current);
   }, [box, current, findRect, no, onClose, reduce]);
 
+  // Schließen per Knopf, Esc oder Klick: den eigenen Eintrag abräumen; das popstate darauf schließt dann.
+  // So gibt es nur einen Weg zu, und die Zurück-Geste und der Knopf schließen nie doppelt.
+  const requestClose = useCallback(() => {
+    if (closing.current) return;
+    if (isPlateEntry()) history.back();
+    else close();
+  }, [close]);
+  useEffect(() => {
+    const onPop = () => {
+      if (!isPlateEntry()) close();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [close]);
+
   const n = book.plates.length;
   const step = useCallback(
     (d: number) => {
@@ -147,7 +186,7 @@ export function PlateViewer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (e.key === "Escape") requestClose();
       else if (e.key === "ArrowRight") step(1);
       else if (e.key === "ArrowLeft") step(-1);
       else if (e.key === "Tab") {
@@ -164,24 +203,25 @@ export function PlateViewer({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [close, step]);
+  }, [requestClose, step]);
 
   return (
     <div
       data-viewer
       role="dialog"
       aria-modal="true"
-      aria-label={`Tafel ${current}: ${p.title}`}
-      className="fixed inset-0 z-[500]"
+      aria-label={plateName(current, p.title)}
+      // Zwei Finger zoomen ins Bild; die Bühne darunter blockiert Gesten (touch-none), die Vergrößerung nicht
+      className="fixed inset-0 z-[500] touch-manipulation"
     >
-      <div ref={backdrop} className="linen table-surface absolute inset-0 bg-table-deep" onClick={close} />
+      <div ref={backdrop} className="linen table-surface absolute inset-0 bg-table-deep" onClick={requestClose} />
       {box && (
         <>
           <div
             ref={frame}
             className="absolute origin-top-left overflow-hidden bg-paper will-change-transform"
             style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
-            onClick={close}
+            onClick={requestClose}
           >
             {/* dieselbe Größe wie im Buch liegt schon im Cache: kein unscharfer Moment beim Öffnen */}
             <Image
@@ -205,20 +245,25 @@ export function PlateViewer({
           </div>
           <div
             ref={controls}
-            className="text-on-table-2 absolute flex items-baseline justify-between gap-6 text-sm"
-            style={{ left: box.left, width: box.width, top: box.top + box.height + 14 }}
+            className={`text-on-table-2 absolute flex gap-x-6 gap-y-1 text-sm ${box.side ? "flex-col items-start" : "flex-wrap items-baseline justify-between"}`}
+            style={
+              box.side
+                ? { left: box.left + box.width + 16, width: box.side - 32, bottom: 12 }
+                : { left: box.left, width: box.width, top: box.top + box.height + 14 }
+            }
           >
             <p className="min-w-0">
               <span className="text-on-table font-semibold">{current}</span>
-              <span className="ml-2">{p.title}</span>
+              {p.title && <span className="ml-2">{p.title}</span>}
               {p.note && <span className="ml-2">{p.note}</span>}
             </p>
-            <div className="flex shrink-0 gap-1">
+            {/* „Zurück“ hieße hier zweierlei: zurück aus dem Buch oder zum vorigen Bild */}
+            <div className={`flex shrink-0 flex-wrap gap-1 ${box.side ? "-ml-2" : "-mr-2"}`}>
               <button type="button" onClick={() => step(-1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
-                Zurück
+                Voriges Bild
               </button>
               <button type="button" onClick={() => step(1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
-                Weiter
+                Nächstes Bild
               </button>
             </div>
           </div>
@@ -227,7 +272,7 @@ export function PlateViewer({
       <button
         ref={closeBtn}
         type="button"
-        onClick={close}
+        onClick={requestClose}
         className="text-on-table absolute top-3 right-3 px-3 py-2 text-sm decoration-mark decoration-2 underline-offset-4 hover:underline md:top-5 md:right-6"
       >
         Schließen
