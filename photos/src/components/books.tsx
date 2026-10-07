@@ -80,7 +80,12 @@ export function Library({
   }, []);
 
   const book = view ? bookById(view.id) : undefined;
-  const close = useCallback(() => change(null), [change]);
+  // Zurück auf dem Tisch steht der Fokus wieder auf dem Band, der offen war
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const close = useCallback(() => {
+    setReturnTo(view?.id ?? null);
+    change(null);
+  }, [change, view?.id]);
 
   if (book && wide !== null) {
     return (
@@ -99,7 +104,7 @@ export function Library({
 
   return (
     <>
-      <Table {...table} books={books} onOpen={(id) => change({ id, auto: true })} />
+      <Table {...table} books={books} focusId={returnTo} onOpen={(id) => change({ id, auto: true })} />
       {footer}
     </>
   );
