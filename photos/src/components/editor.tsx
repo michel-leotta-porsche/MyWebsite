@@ -776,13 +776,15 @@ export function Editor() {
                       </div>
                       <div
                         onDoubleClick={() => openStage(i)}
-                        onClickCapture={() => {
-                          // eigene Erkennung: auf ziehbaren Fotos meldet Safari keinen Doppelklick
+                        onClickCapture={(e) => {
+                          // eigene Erkennung: auf ziehbaren Fotos meldet Safari keinen Doppelklick.
+                          // detail ist die Klickzahl nach der Systemeinstellung; die Zeit ist der Rückfall
                           const now = performance.now();
                           const prev = lastClick.current;
                           lastClick.current = { i, at: now };
-                          if (prev && prev.i === i && now - prev.at < 400) {
+                          if (e.detail >= 2 || (prev && prev.i === i && now - prev.at < 600)) {
                             lastClick.current = null;
+                            e.stopPropagation();
                             openStage(i);
                           }
                         }}
