@@ -11,7 +11,7 @@ import { Shelf, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
 import { friendlyError } from "@/lib/errors";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
-import { useRoom } from "@/lib/use-room";
+import { useRoom, type Spread } from "@/lib/use-room";
 
 /** Google-Konten, unter denen Michel angemeldet ist. Kein Schutz: die Fotos liegen ohnehin öffentlich unter /photos */
 const OWNER_EMAILS = ["michel.julian.leotta@gmail.com"];
@@ -113,7 +113,19 @@ function Room({ user }: { user: User }) {
       actions={more$}
       meta={(b) => {
         const s = byId(b.id)?.stored;
-        return s && !s.title.trim() ? `${s.photos.filter((p) => !p.shelved).length} Fotos · ohne Titel` : undefined;
+        if (!s) return undefined;
+        const base = s.title.trim() ? `${b.plates.length} Tafeln` : `${s.photos.filter((p) => !p.shelved).length} Fotos · ohne Titel`;
+        const trail = trailOf(room.spread[s.id]);
+        return (
+          <>
+            {base}
+            {trail.map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </>
+        );
       }}
       tiles={
         ownLoaded ? (
@@ -286,7 +298,10 @@ function Room({ user }: { user: User }) {
       {sharing && (
         <ShareDialog
           book={sharing}
-          onClose={() => setSharing(null)}
+          onClose={() => {
+            setSharing(null);
+            room.recount();
+          }}
           onTitle={async (title) => {
             const b = { ...sharing, title };
             await saveBook(b);
@@ -329,6 +344,15 @@ function Room({ user }: { user: User }) {
       {removed && <UndoToast key={removed.at} text={removed.text} onUndo={removed.undo} onClose={() => setRemoved(null)} />}
     </main>
   );
+}
+
+/** Zeilen unter einem hingelegten Buch: „bei Anna und Tom“, „2 Zettel · 1 Eselsohr“; leer, solange es bei niemandem liegt */
+function trailOf(s: Spread | undefined): string[] {
+  if (!s || s.to.length === 0) return [];
+  const lines = [`bei ${s.to.length <= 2 ? s.to.join(" und ") : `${s.to.slice(0, 2).join(", ")} +${s.to.length - 2}`}`];
+  const back = [s.notes && `${s.notes} Zettel`, s.ears && `${s.ears} ${s.ears === 1 ? "Eselsohr" : "Eselsohren"}`].filter(Boolean);
+  if (back.length) lines.push(back.join(" · "));
+  return lines;
 }
 
 /** Bestand in einer Zeile: „Fünf Bücher: drei von dir, zwei für dich.“ */
