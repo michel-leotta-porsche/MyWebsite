@@ -11,10 +11,13 @@ import { Book } from "@/components/book";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
 import { ShareDialog } from "@/components/share-dialog";
+import { Stage } from "@/components/stage";
 import { relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
+import { addKey, fromSpread, materialize, removeKey, toSpread, withPages, type SpreadItem } from "@/lib/free-layout";
 import { ingest } from "@/lib/ingest";
 import {
   autoPhotos,
+  bottomFor,
   CLOTHS,
   exportBook,
   listVersions,
@@ -43,6 +46,9 @@ type Pending = { key: string; name: string; state: "lesen" | "laden" | "fertig" 
 type Selection = { type: "photo"; key: string } | { type: "spread"; id: string } | null;
 
 const MAX = 60;
+
+/** Eine Doppelseite bleibt, solange etwas auf ihr liegt */
+const keepSpread = (s: SpreadDraft) => s.keys.length > 0 || !!s.text || !!s.pages?.some((p) => p.items.length);
 const UNDO = 60;
 const AUTO_VERSION_MS = 10 * 60 * 1000;
 
@@ -116,6 +122,9 @@ export function Editor() {
   const [sharing, setSharing] = useState(false);
   const [history, setHistory] = useState(false);
   const [crop, setCrop] = useState<string | null>(null);
+  const [stageId, setStageId] = useState<string | null>(null);
+  const lastClick = useRef<{ i: number; at: number } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -231,7 +240,8 @@ export function Editor() {
       ...b,
       spreads,
       coverKey: b.coverKey && inBook.has(b.coverKey) ? b.coverKey : coverKey,
-      aspect: aspectFor(b.photos),
+      // frei gestaltete Seiten frieren das Format ein, sonst verrutscht, was man von Hand gesetzt hat
+      aspect: b.aspectLocked ? b.aspect : aspectFor(b.photos),
     };
   }, []);
 
@@ -244,7 +254,7 @@ export function Editor() {
   };
   const isInternal = (e: DragEvent) => {
     const types = Array.from(e.dataTransfer?.types ?? []);
-    return types.includes("text/x-spread") || types.includes("text/x-photo");
+    return types.includes("text/x-spread") || types.includes("text/x-photo") || types.includes("text/x-role");
   };
   const filesOf = (dt: DataTransfer) => {
     const direct = Array.from(dt.files ?? []);
@@ -420,6 +430,7 @@ export function Editor() {
   // ---- Änderungen an Doppelseiten und Fotos ----
   const mapSpreads = (b: StoredBook, f: (s: SpreadDraft[]) => SpreadDraft[]) => ({ ...b, spreads: f(b.spreads.map((s) => ({ ...s, keys: [...s.keys] }))) });
 
+  const geom = { aspect: book.aspect, bottom: bottomFor(book.aspect) };
   const cycle = (i: number) =>
     update((b) =>
       mapSpreads(b, (ss) =>
@@ -452,7 +463,7 @@ export function Editor() {
     });
     setSel(null);
   };
-  /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz */
+  /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz; freie Seiten bekommen es in die erste freie Zelle */
   const movePhoto = (key: string, to: number) =>
     update((b) =>
       mapSpreads(
@@ -461,6 +472,25 @@ export function Editor() {
           const from = ss.findIndex((s) => s.keys.includes(key));
           const target = ss[to];
           if (!target || from === to) return ss;
+          const ph = b.photos.find((p) => p.key === key);
+          if (target.pages) {
+            const added = ph ? addKey(target, key, ph.w / ph.h, { aspect: b.aspect, bottom: bottomFor(b.aspect) }) : null;
+            if (!added) {
+              setNotice("Auf dieser Doppelseite ist kein Platz frei. Öffne sie mit „Gestalten“ und mach Platz.");
+              return ss;
+            }
+            ss[to] = added;
+            if (from >= 0) ss[from] = ss[from].pages ? removeKey(ss[from], key) : { ...ss[from], keys: ss[from].keys.filter((k) => k !== key), pinned: true, layout: 0 };
+            return ss.filter(keepSpread);
+          }
+          if (from >= 0 && ss[from].pages) {
+            ss[from] = removeKey(ss[from], key);
+            const cap = target.text ? 1 : 2;
+            if (target.keys.length >= cap) return ss;
+            target.keys.push(key);
+            Object.assign(target, { pinned: true, layout: 0 });
+            return ss.filter(keepSpread);
+          }
           const cap = target.text ? 1 : 2;
           const displaced = target.keys.length >= cap ? target.keys.pop() : undefined;
           target.keys.push(key);
@@ -471,13 +501,52 @@ export function Editor() {
             if (displaced) src.keys.push(displaced);
             Object.assign(src, { pinned: true, layout: 0 });
           }
-          return ss.filter((s) => s.keys.length || s.text);
+          return ss.filter(keepSpread);
         },
       ),
     );
+
+  // ---- Bühne: eine Doppelseite frei gestalten ----
+  const stageIndex = stageId ? book.spreads.findIndex((s) => s.id === stageId) : -1;
+  const stageSpread = stageIndex >= 0 ? book.spreads[stageIndex] : undefined;
+  const stageItems: SpreadItem[] = stageSpread && data ? toSpread(stageSpread.pages ?? materialize(data, stageIndex)) : [];
+  /** Änderung auf der Bühne übernehmen: Doppelseite wird frei, Fotos von anderswo wandern mit */
+  const commitStage = (items: SpreadItem[], tag?: string, pulled: string[] = []) => {
+    if (!stageId) return;
+    update((b) => {
+      const id = stageId;
+      const pages = fromSpread(items);
+      // nur hereingeholte Fotos verlassen ihre alte Doppelseite; kopierte dürfen mehrfach im Buch stehen
+      const here = new Set(pulled);
+      const spreads = b.spreads
+        .map((s) => {
+          if (s.id === id) return withPages(s, pages);
+          const moved = s.keys.filter((k) => here.has(k));
+          if (!moved.length) return s;
+          return moved.reduce((acc, k) => (acc.pages ? removeKey(acc, k) : { ...acc, keys: acc.keys.filter((x) => x !== k), layout: 0 }), s);
+        })
+        .filter((s) => s.id === id || keepSpread(s));
+      const onStage = new Set(items.flatMap((i) => (i.t === "photo" ? [i.key] : [])));
+      return { ...b, spreads, aspectLocked: true, photos: b.photos.map((p) => (onStage.has(p.key) && p.shelved ? { ...p, shelved: false } : p)) };
+    }, tag);
+  };
+  const resetStage = () => {
+    if (!stageId) return;
+    snapshot("vor dem Zurücksetzen einer Doppelseite");
+    // auf den Vorschlag zurück; was über zwei Fotos hinausgeht, verteilt die Automatik neu
+    update((b) => relayout(mapSpreads(b, (ss) => ss.map((s) => (s.id === stageId ? { ...s, pages: undefined, pinned: false, layout: 0 } : s)))));
+  };
+  const openStage = (i: number) => {
+    const s = book.spreads[i];
+    if (!s?.id) return;
+    setSel(null);
+    setStageId(s.id);
+  };
   const shelvePhoto = (key: string) =>
     update((b) => ({
-      ...mapSpreads(b, (ss) => ss.map((s) => (s.keys.includes(key) ? { ...s, keys: s.keys.filter((k) => k !== key), layout: 0 } : s)).filter((s) => s.keys.length || s.text)),
+      ...mapSpreads(b, (ss) =>
+        ss.map((s) => (!s.keys.includes(key) ? s : s.pages ? removeKey(s, key) : { ...s, keys: s.keys.filter((k) => k !== key), layout: 0 })).filter(keepSpread),
+      ),
       photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: true } : p)),
     }));
   const unshelvePhoto = (key: string) =>
@@ -499,7 +568,7 @@ export function Editor() {
       else undo();
       return;
     }
-    if (typing || !selPhoto) return;
+    if (typing || !selPhoto || stageId) return;
     const i = spreadOf(selPhoto.key);
     if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       e.preventDefault();
@@ -672,7 +741,7 @@ export function Editor() {
                           className={`text-left ${active ? "text-on-table font-semibold" : ""}`}
                           aria-pressed={active}
                         >
-                          {s.text ? "Textseite" : `Doppelseite ${i + 1}`}
+                          {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
                         </button>
                         <span className="flex items-baseline gap-3">
                           <button
@@ -686,9 +755,14 @@ export function Editor() {
                           >
                             <Lock on={!!s.pinned || !!s.text} />
                           </button>
-                          <TextButton onClick={() => cycle(i)} aria-label={`Layout von Doppelseite ${i + 1} wechseln`}>
-                            Layout
+                          <TextButton onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
+                            Gestalten
                           </TextButton>
+                          {!s.pages && (
+                            <TextButton onClick={() => cycle(i)} aria-label={`Layout von Doppelseite ${i + 1} wechseln`}>
+                              Layout
+                            </TextButton>
+                          )}
                           <TextButton onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label="Nach vorn">
                             ←
                           </TextButton>
@@ -700,7 +774,23 @@ export function Editor() {
                           </TextButton>
                         </span>
                       </div>
-                      <div className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}>
+                      <div
+                        onDoubleClick={() => openStage(i)}
+                        onClickCapture={(e) => {
+                          // eigene Erkennung: auf ziehbaren Fotos meldet Safari keinen Doppelklick.
+                          // detail ist die Klickzahl nach der Systemeinstellung; die Zeit ist der Rückfall
+                          const now = performance.now();
+                          const prev = lastClick.current;
+                          lastClick.current = { i, at: now };
+                          if (e.detail >= 2 || (prev && prev.i === i && now - prev.at < 600)) {
+                            lastClick.current = null;
+                            e.stopPropagation();
+                            openStage(i);
+                          }
+                        }}
+                        title="Doppelklick: gestalten"
+                        className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}
+                      >
                         {(["left", "right"] as const).map((side) => {
                           const page: Page | undefined = sp?.[side];
                           const key = page && "no" in page ? plateOf(data, page.no)?.key : undefined;
@@ -720,6 +810,14 @@ export function Editor() {
                                   aria-label={`Foto auswählen: ${byKey.get(key)?.title || "ohne Titel"}`}
                                   aria-pressed={sel?.type === "photo" && sel.key === key}
                                   className={`absolute inset-0 z-30 ${sel?.type === "photo" && sel.key === key ? "outline-mark outline-2 -outline-offset-2" : ""}`}
+                                />
+                              )}
+                              {page?.kind === "free" && (
+                                <button
+                                  type="button"
+                                  onClick={() => openStage(i)}
+                                  aria-label={`Doppelseite ${i + 1} gestalten`}
+                                  className="absolute inset-0 z-30"
                                 />
                               )}
                               {isText && s.id && (
@@ -845,7 +943,15 @@ export function Editor() {
               </label>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
                 {!selPhoto.shelved && (
-                  <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => setCrop(selPhoto.key)}>
+                  <button
+                    type="button"
+                    className="underline decoration-mark decoration-2 underline-offset-4"
+                    onClick={() => {
+                      const i = spreadOf(selPhoto.key);
+                      if (i >= 0 && book.spreads[i].pages) openStage(i);
+                      else setCrop(selPhoto.key);
+                    }}
+                  >
                     Ausschnitt …
                   </button>
                 )}
@@ -924,12 +1030,44 @@ export function Editor() {
 
           {!selPhoto && !selSpread && data && (
             <p className="text-on-table-2 text-sm leading-relaxed">
-              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Fotos und Doppelseiten lassen sich ziehen.
+              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Doppelklick auf eine Doppelseite öffnet sie zum
+              Gestalten. Fotos und Doppelseiten lassen sich ziehen.
             </p>
           )}
         </aside>
       </div>
 
+      {notice && (
+        <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice(null)} className="text-ink-2 shrink-0 underline underline-offset-4">
+            Ok
+          </button>
+        </div>
+      )}
+      {stageSpread && data && (
+        <Stage
+          data={data}
+          geom={geom}
+          index={stageIndex}
+          items={stageItems}
+          photos={byKey}
+          shelf={shelf}
+          elsewhere={book.spreads.flatMap((sp, n) =>
+            n === stageIndex ? [] : sp.keys.flatMap((k) => (byKey.get(k) ? [{ photo: byKey.get(k)!, spread: n }] : [])),
+          )}
+          free={!!stageSpread.pages}
+          canUndo={undoState.past > 0}
+          canRedo={undoState.future > 0}
+          onUndo={undo}
+          onRedo={redo}
+          onCommit={commitStage}
+          onShelve={shelvePhoto}
+          onPhoto={setPhoto}
+          onReset={resetStage}
+          onClose={() => setStageId(null)}
+        />
+      )}
       {dragOver && (
         <div aria-hidden className="pointer-events-none fixed inset-3 z-[650] flex items-center justify-center border-2 border-dashed border-mark bg-[rgb(12_10_8/0.6)]">
           <p className="text-on-table text-2xl font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>

@@ -127,9 +127,31 @@ export type Page =
   | { kind: "blank"; no: number }
   | { kind: "tall"; no: number }
   /** Textseite: Überschrift und kurze Absätze im Satzspiegel */
-  | { kind: "text"; heading?: string; body: string; style: TextStyle };
+  | { kind: "text"; heading?: string; body: string; style: TextStyle }
+  /** frei gestaltete Seite (Editor V2): Fotos und Textrahmen auf dem Raster */
+  | { kind: "free"; items: FreeEl[] };
 
 export type TextStyle = "text" | "gross";
+
+/** Lage auf einer Seite in % der Seitenbreite (x, w) und Seitenhöhe (y, h); x < 0 oder > 100 für Bilder über den Bund */
+export type Box = { x: number; y: number; w: number; h: number };
+/** Ausschnitt einer Platzierung */
+export type Crop = { focus: [number, number]; zoom: number; fit: "cover" | "contain" };
+export type TextRole = "heading" | "body" | "note";
+export type FontKey = "grotesk" | "serif" | "mono" | "hand";
+/** freie Gestaltung eines Textrahmens; was fehlt, kommt vom Stil (role) */
+export type TextLook = { font?: FontKey; size?: number; color?: string; align?: "left" | "center" | "right"; bold?: boolean; italic?: boolean };
+export type FreeEl =
+  | { t: "photo"; no: number; box: Box; crop?: Crop; caption: "auto" | "off" }
+  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean; look?: TextLook };
+/** dasselbe mit Fotoschlüssel statt Nummer, so steht es im gespeicherten Buch */
+export type FreeItem =
+  | { t: "photo"; id: string; key: string; box: Box; crop?: Crop; caption: "auto" | "off"; pairId?: string; /** Stapelung auf der Doppelseite */ z?: number }
+  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number; /** Text über den Bund: beide Hälften gleich */ pairId?: string };
+
+/** Tafelnummern auf einer Seite; die leere Seite zählt nicht */
+export const pageNos = (p: Page): number[] =>
+  p.kind === "free" ? [...new Set(p.items.flatMap((i) => (i.t === "photo" ? [i.no] : [])))] : "no" in p && p.kind !== "blank" ? [p.no] : [];
 
 export type Spread = { left: Page; right: Page; plates: number[] };
 
@@ -166,7 +188,12 @@ export type Spec =
   | { kind: "cover" | "endpaper" | "title" | "index" | "colophon" | "verso" }
   | { kind: "text"; heading?: string; body: string; style: TextStyle }
   | { kind: "full" | "plate" | "landscape" | "blank" | "tall" | "across"; key: string }
-  | { kind: "small"; key: string; cols: 2 | 3; row: "top" | "bottom"; align: "outer" | "inner" };
+  | { kind: "small"; key: string; cols: 2 | 3; row: "top" | "bottom"; align: "outer" | "inner" }
+  | { kind: "free"; items: FreeItem[] };
+
+/** Lesereihenfolge auf einer freien Seite: oben nach unten, dann links nach rechts (2 % Toleranz) */
+export const readingOrder = <T extends { box: Box }>(items: T[]) =>
+  [...items].sort((a, b) => (Math.abs(a.box.y - b.box.y) > 2 ? a.box.y - b.box.y : a.box.x - b.box.x));
 
 export const full = (key: string): Spec => ({ kind: "full", key });
 export const framed = (key: string): Spec => ({ kind: "plate", key });
@@ -218,13 +245,26 @@ export function build(spec: BookSpec): BookData {
         return { kind: "text", heading: s.heading, body: s.body, style: s.style };
       case "small":
         return { kind: "small", no: noOf(s.key), cols: s.cols, row: s.row, align: s.align };
+      case "free": {
+        // Nummern in Lesereihenfolge, damit sie sich auf einer Mehrbildseite von oben links lesen
+        const nos = new Map<string, number>();
+        for (const it of readingOrder(s.items)) if (it.t === "photo" && !nos.has(it.key)) nos.set(it.key, noOf(it.key));
+        return {
+          kind: "free",
+          items: s.items.map((it): FreeEl =>
+            it.t === "photo"
+              ? { t: "photo", no: nos.get(it.key)!, box: it.box, crop: it.crop, caption: it.caption }
+              : { t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look },
+          ),
+        };
+      }
       case "across":
         return { kind: "across", no: noOf(s.key), half: half ?? "left" };
       default:
         return { kind: s.kind, no: noOf(s.key) } as Page;
     }
   };
-  const platesOf = (...ps: Page[]) => [...new Set(ps.flatMap((p) => ("no" in p && p.kind !== "blank" ? [p.no] : [])))];
+  const platesOf = (...ps: Page[]) => [...new Set(ps.flatMap(pageNos))];
 
   // Unterschriften leerer Seiten zeigen auf die Gegenseite: erst die Bildseiten nummerieren
   const spreads: Spread[] = sequence.map((pair) => {
@@ -588,7 +628,7 @@ export const bookById = (id: string) => books.find((b) => b.id === id);
 export const plateOf = (book: BookData, no: number) => book.plates[no - 1];
 
 /** Satzspiegel in cqw: Bund, oben, außen, unten; Breite 82 */
-export function typeArea(book: BookData, side: "left" | "right") {
+export function typeArea(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
   const inner = 6;
   const outer = 12;
   const top = 9;

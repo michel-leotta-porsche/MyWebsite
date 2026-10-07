@@ -1,9 +1,9 @@
-import { colWidth, plateOf, typeArea, type BookData, type Page } from "@/content/books";
+import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
 // (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
 
-export type Tone = "ink" | "ink2" | "clothInk";
+export type Tone = "ink" | "ink2" | "clothInk" | "paper";
 
 export type El =
   /** Foto, beschnitten auf den Kasten (object-fit: cover) */
@@ -36,6 +36,11 @@ export type El =
       display?: boolean;
       /** Zeilenumbrüche im Text bleiben stehen (Absätze) */
       lines?: boolean;
+      /** freie Textrahmen: Schrift, Farbe, Ausrichtung, kursiv */
+      font?: FontKey;
+      color?: string;
+      align?: "left" | "center" | "right";
+      italic?: boolean;
     }
   /** Abzug im Bildverzeichnis, ganz sichtbar (contain), springt zur Tafel */
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
@@ -232,6 +237,9 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       return paper(els);
     }
 
+    case "free":
+      return paper(layoutFree(book, page.items, side));
+
     case "index": {
       const { cols, cw, ch, top } = indexGrid(book, ta);
       const els: El[] = [
@@ -266,3 +274,10 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
 
 /** Tafeln ohne Unterschrift auf der Seite: ihr Titel steht in der Kopfzeile */
 export const captionless = (page: Page) => page.kind === "full" || page.kind === "across";
+
+/** Tafelnummern einer Seite, deren Titel in die Kopfzeile gehört */
+export function headPlates(book: BookData, page: Page, side: "left" | "right"): number[] {
+  if (page.kind !== "free") return captionless(page) ? pageNos(page) : [];
+  const shown = new Set(layoutPage(book, page, side).els.flatMap((e) => (e.t === "caption" ? [e.no] : [])));
+  return pageNos(page).filter((no) => !shown.has(no));
+}

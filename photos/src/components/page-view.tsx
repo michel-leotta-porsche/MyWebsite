@@ -4,7 +4,7 @@ import Image from "next/image";
 import { createContext, useContext, type CSSProperties } from "react";
 
 import { plateOf, type BookData, type Page } from "@/content/books";
-import { CAPTION, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
+import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
 
 // Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
@@ -12,14 +12,14 @@ import { PlateButton } from "@/components/plate-viewer";
 /** Sprung aus dem Bildverzeichnis zur Tafel */
 export const JumpContext = createContext<(no: number) => void>(() => {});
 
-const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "" };
+const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "", paper: "text-paper" };
 
 function Gutter({ side }: { side: "left" | "right" }) {
   // Wölbung zum Bund hin: das Papier biegt sich, also wird es dunkler
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-y-0 z-20 w-[14cqw]"
+      className="pointer-events-none absolute inset-y-0 z-[300] w-[14cqw]"
       style={{
         [side === "left" ? "right" : "left"]: 0,
         background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(12 10 8 / 0.16), rgb(12 10 8 / 0.05) 30%, transparent)`,
@@ -35,13 +35,14 @@ const box = (x: number, y: number, w: number, h: number): CSSProperties => ({
   height: `${h}cqw`,
 });
 
-function Caption({ book, el }: { book: BookData; el: Extract<El, { t: "caption" }> }) {
+function Caption({ book, el, z }: { book: BookData; el: Extract<El, { t: "caption" }>; z: number }) {
   const p = plateOf(book, el.no);
   const right = el.align === "right";
   return (
     <p
       className={`text-ink-2 absolute ${right ? "text-right" : ""}`}
       style={{
+        zIndex: z,
         top: `${el.y}cqw`,
         [right ? "right" : "left"]: right ? `${100 - el.x}cqw` : `${el.x}cqw`,
         maxWidth: `${el.w}cqw`,
@@ -82,7 +83,7 @@ function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }
   );
 }
 
-function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }) {
+function Element({ book, el, eager, z }: { book: BookData; el: El; eager: boolean; z: number }) {
   switch (el.t) {
     case "img": {
       const p = plateOf(book, el.no);
@@ -92,7 +93,7 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
       const hidden = el.x < 0;
       return (
         <>
-          <div className="absolute overflow-hidden" style={box(el.x, el.y, el.w, el.h)}>
+          <div className="absolute overflow-hidden" style={{ ...box(el.x, el.y, el.w, el.h), zIndex: z }}>
             <Image
               src={p.src}
               alt={hidden ? "" : p.alt}
@@ -110,7 +111,7 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
             />
           </div>
           {el.plate && (
-            <div data-plate-box={el.no} className="absolute" style={box(vx, el.y, vw, el.h)}>
+            <div data-plate-box={el.no} className="absolute" style={{ ...box(vx, el.y, vw, el.h), zIndex: z }}>
               <PlateButton book={book} no={el.no} />
             </div>
           )}
@@ -118,21 +119,25 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
       );
     }
     case "caption":
-      return <Caption book={book} el={el} />;
+      return <Caption book={book} el={el} z={z} />;
     case "text": {
       const Tag = el.display ? "h2" : "p";
       return (
         <Tag
           className={`absolute ${toneClass[el.tone]} ${el.display ? "tracking-[-0.035em]" : ""}`}
           style={{
+            zIndex: z,
             top: `${el.y}cqw`,
             left: `${el.x}cqw`,
-            maxWidth: el.w ? `${el.w}cqw` : undefined,
+            // mittig oder rechts braucht die volle Rahmenbreite
+            ...(el.align && el.align !== "left" && el.w ? { width: `${el.w}cqw`, textAlign: el.align } : { maxWidth: el.w ? `${el.w}cqw` : undefined }),
+            fontFamily: el.font ? FONTS[el.font].css : undefined,
+            fontStyle: el.italic ? "italic" : undefined,
             fontSize: el.size < 3.4 ? `max(${el.size < 2.4 ? 9 : 11}px, ${el.size}cqw)` : `${el.size}cqw`,
             fontWeight: el.weight,
             lineHeight: el.lh,
             whiteSpace: el.lines ? "pre-line" : el.w ? undefined : "nowrap",
-            color: el.tone === "clothInk" ? book.cloth.ink : undefined,
+            color: el.color ?? (el.tone === "clothInk" ? book.cloth.ink : undefined),
             fontVariationSettings: el.display ? '"wdth" 78, "opsz" 96' : undefined,
           }}
         >
@@ -170,11 +175,12 @@ export function PageView({
   const bg = layout.bg === "paper" ? undefined : layout.bg === "cloth" ? book.cloth.base : book.cloth.deep;
   return (
     <div
-      className={`absolute inset-0 overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
+      // isolate: die Stapel-Nummern der Elemente gelten nur innerhalb dieser Seite, nie über andere Blätter hinweg
+      className={`absolute inset-0 isolate overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
       style={{ backgroundColor: bg }}
     >
       {layout.els.map((el, i) => (
-        <Element key={i} book={book} el={el} eager={eager} />
+        <Element key={i} book={book} el={el} eager={eager} z={i + 1} />
       ))}
       {layout.gutter && <Gutter side={side} />}
     </div>

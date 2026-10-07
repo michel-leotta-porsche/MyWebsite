@@ -1,4 +1,4 @@
-import { across, blank, framed, full, landscape, small, tall, textPage, VERSO, type Spec, type TextStyle } from "@/content/books";
+import { across, blank, framed, full, landscape, small, tall, textPage, VERSO, type FreeItem, type Spec, type TextStyle } from "@/content/books";
 
 // Automatische Gestaltung nach den Regeln aus dem Workshop (docs/workshop-konzept.md):
 // Reihenfolge nach Aufnahmezeit, Gegenüber nach Farbe, Seitentypen im Rhythmus.
@@ -11,7 +11,17 @@ export type SpreadText = { heading?: string; body: string; style?: TextStyle };
  * Eine Doppelseite im Entwurf. pinned: von Hand entschieden, die Automatik fasst sie nicht mehr an.
  * text: Textseite (immer fixiert), optional mit einem Foto daneben.
  */
-export type SpreadDraft = { id?: string; keys: string[]; layout: number; pinned?: boolean; text?: SpreadText };
+export type SpreadDraft = {
+  id?: string;
+  keys: string[];
+  layout: number;
+  pinned?: boolean;
+  text?: SpreadText;
+  /** frei gestaltet (Editor V2): hat Vorrang vor layout und text und gilt immer als fixiert */
+  pages?: [PageDraft, PageDraft];
+};
+/** Eine frei gestaltete Seite; die Reihenfolge der Elemente ist die Ebene */
+export type PageDraft = { items: FreeItem[] };
 
 export const spreadId = () => Math.random().toString(36).slice(2, 10);
 
@@ -32,6 +42,7 @@ function textVariants(text: SpreadText, keys: string[], byKey: Map<string, AutoP
 
 /** Mögliche Layouts für eine Doppelseite; die erste Variante ist die ruhigste Wahl */
 export function variantsOf(s: SpreadDraft, byKey: Map<string, AutoPhoto>): (readonly [Spec, Spec] | readonly [Spec])[] {
+  if (s.pages) return [[{ kind: "free", items: s.pages[0].items }, { kind: "free", items: s.pages[1].items }]];
   return s.text ? textVariants(s.text, s.keys, byKey) : variants(s.keys, byKey);
 }
 
@@ -148,13 +159,14 @@ export function relayoutFree(
   photos: AutoPhoto[],
   shelved: Set<string>,
 ): { spreads: SpreadDraft[]; coverKey: string } {
-  const fixed = new Set(spreads.filter((s) => s.pinned || s.text).flatMap((s) => s.keys));
+  const keep = (s: SpreadDraft) => s.pinned || s.text || s.pages;
+  const fixed = new Set(spreads.filter(keep).flatMap((s) => s.keys));
   const free = photos.filter((p) => !fixed.has(p.key) && !shelved.has(p.key));
   const auto = autoSequence(free);
   const out: SpreadDraft[] = [];
   let next = 0;
   for (const s of spreads) {
-    if (s.pinned || s.text) out.push(s);
+    if (keep(s)) out.push(s);
     else if (next < auto.spreads.length) out.push(auto.spreads[next++]);
   }
   while (next < auto.spreads.length) out.push(auto.spreads[next++]);

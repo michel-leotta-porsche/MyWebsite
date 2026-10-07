@@ -2,7 +2,7 @@
 
 import { getImageProps, type StaticImageData } from "next/image";
 
-import { plateOf, type BookData, type Page } from "@/content/books";
+import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
 import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
@@ -47,6 +47,12 @@ function contain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number
   const dh = img.naturalHeight * s;
   // unten bündig wie object-bottom
   ctx.drawImage(img, x + (w - dw) / 2, y + h - dh, dw, dh);
+}
+
+/** Schriftname hinter der CSS-Variable einer Textrahmen-Schrift (Canvas kennt keine var()) */
+function fontFamilyOf(font: FontKey) {
+  const name = { grotesk: "--font-bricolage", serif: "--font-serif", mono: "--font-mono", hand: "--font-hand" }[font];
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "serif";
 }
 
 function setFont(ctx: CanvasRenderingContext2D, weight: number, px: number, family: string, condensed = false) {
@@ -259,12 +265,17 @@ async function drawLayout(
       case "text": {
         const min = el.size < 2.4 ? 9 : 11;
         const px = el.size < 3.4 ? Math.max(min, el.size * cq) : el.size * cq;
-        setFont(ctx, el.weight, px, family, el.display);
+        setFont(ctx, el.weight, px, el.font ? fontFamilyOf(el.font) : family, el.display);
+        if (el.italic) ctx.font = `italic ${ctx.font}`;
         track(ctx, el.display ? -0.035 : 0, px);
-        ctx.fillStyle = el.tone === "ink" ? C.ink : el.tone === "ink2" ? C.ink2 : book.cloth.ink;
+        ctx.fillStyle = el.color ?? (el.tone === "ink" ? C.ink : el.tone === "ink2" ? C.ink2 : el.tone === "paper" ? C.paper : book.cloth.ink);
         const paras = el.lines ? el.text.split("\n") : [el.text];
         const rows = paras.flatMap((para) => (el.w ? (para ? wrap(ctx, para, el.w * cq) : [""]) : [para]));
-        rows.forEach((r, n) => ctx.fillText(r, el.x * cq, baseline(el.y * cq + n * el.lh * px, px, el.lh)));
+        rows.forEach((r, n) => {
+          // Ausrichtung im Rahmen wie im HTML
+          const off = el.w && el.align && el.align !== "left" ? (el.w * cq - ctx.measureText(r).width) * (el.align === "center" ? 0.5 : 1) : 0;
+          ctx.fillText(r, el.x * cq + off, baseline(el.y * cq + n * el.lh * px, px, el.lh));
+        });
         return;
       }
     }
@@ -283,8 +294,15 @@ export async function drawPage(book: BookData, page: Page, side: "left" | "right
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
   ctx.scale(dpr, dpr);
+  const layout = layoutPage(book, page, side);
+  // Schriften der Textrahmen werden erst bei Bedarf geladen; vor dem Zeichnen sicherstellen
+  await Promise.all(
+    layout.els.flatMap((e) =>
+      e.t === "text" && e.font ? [document.fonts.load(`${e.italic ? "italic " : ""}${e.weight} 20px ${fontFamilyOf(e.font)}`).catch(() => [])] : [],
+    ),
+  );
   await document.fonts.ready;
   ctx.textBaseline = "alphabetic";
-  await drawLayout(ctx, book, layoutPage(book, page, side), side, W, H, dpr);
+  await drawLayout(ctx, book, layout, side, W, H, dpr);
   return canvas;
 }

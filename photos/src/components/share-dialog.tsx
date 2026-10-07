@@ -19,7 +19,7 @@ export function ShareDialog({ book, onClose }: { book: StoredBook; onClose: () =
     let alive = true;
     mySharesOf(book.owner)
       .then(async (all) => {
-        const mine = all.filter((s) => s.book.id === book.id);
+        const mine = all.filter((s) => (s.bookId ?? s.book?.id) === book.id && !s.paused);
         if (!alive) return;
         setShares(mine);
         const entries = await Promise.all(mine.map(async (s) => [s.token, await notesOf(s.token).catch(() => [])] as const));

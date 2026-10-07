@@ -47,7 +47,12 @@ export function CropDialog({
     img.src = photo.thumb;
   }, [photo.thumb, subject]);
 
-  const FW = Math.min(560, 420 * aspect);
+  // ganz zeigen, auch bei einem Bild über beide Seiten: so breit, wie der Bildschirm erlaubt
+  const wide = aspect > 1.15;
+  const vw = typeof window === "undefined" ? 1024 : window.innerWidth;
+  const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+  const room = Math.min(wide ? 728 : 408, vw - 64);
+  const FW = Math.min(room, 420 * aspect, vh * 0.55 * aspect);
   const FH = FW / aspect;
   // Bild füllt das Feld (cover), dann Zoom; Lage über den Fokus
   const s = Math.max(FW / photo.w, FH / photo.h);
@@ -85,7 +90,7 @@ export function CropDialog({
   };
 
   return (
-    <SlipDialog label="Ausschnitt" onClose={onClose}>
+    <SlipDialog label="Ausschnitt" onClose={onClose} wide={wide}>
       <div
         ref={frame}
         className="relative mx-auto touch-none overflow-hidden bg-paper select-none"

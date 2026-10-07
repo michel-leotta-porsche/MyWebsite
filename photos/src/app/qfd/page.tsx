@@ -67,6 +67,9 @@ export default function Page() {
               {s.n} {s.title}
             </a>
           ))}
+          <Link href="/kritik" className="text-on-table-2 hover:text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline">
+            UX-Kritik
+          </Link>
         </nav>
       </header>
 

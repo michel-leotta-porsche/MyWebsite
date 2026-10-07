@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque } from "next/font/google";
+import { Bricolage_Grotesque, Caveat, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -7,6 +7,10 @@ const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
   axes: ["wdth", "opsz"],
 });
+// Schriften für Textrahmen im Editor: nicht vorgeladen, sie kommen erst, wenn ein Text sie nutzt
+const serif = Newsreader({ variable: "--font-serif", subsets: ["latin"], style: ["normal", "italic"], preload: false });
+const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], preload: false });
+const hand = Caveat({ variable: "--font-hand", subsets: ["latin"], preload: false });
 
 export const metadata: Metadata = {
   title: "Fujiventura · Fotografien von Michel Leotta",
@@ -26,7 +30,7 @@ const introScript = `try{var h=document.documentElement,o=(new URLSearchParams(l
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // suppressHydrationWarning: das Startskript setzt die Klasse "intro" vor React
-    <html lang="de" className={bricolage.variable} suppressHydrationWarning>
+    <html lang="de" className={`${bricolage.variable} ${serif.variable} ${mono.variable} ${hand.variable}`} suppressHydrationWarning>
       <body className="min-h-svh">
         <script dangerouslySetInnerHTML={{ __html: introScript }} />
         {children}
