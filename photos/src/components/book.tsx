@@ -15,14 +15,14 @@ import {
 } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { plates, singlePages, spreads, type Page } from "@/content/plates";
-import { INTRO_DONE } from "@/components/intro";
+import { plateOf, type BookData, type Page } from "@/content/books";
+import { captionless } from "@/content/layout";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
-import { PageView } from "@/components/page-view";
+import { JumpContext, PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
 import { SunAndShade } from "@/components/sun-and-shade";
 
-type Mode = "spread" | "single";
+export type Mode = "spread" | "single";
 type Leaf = { front: Page; back: Page };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -39,76 +39,85 @@ const invTurnEase = (y: number) => {
   }
   return (lo + hi) / 2;
 };
-// Nur so viele Blätter um die aufgeschlagene Seite tragen Bilder und 3D-Ebenen
+// Nur so viele Blätter um die aufgeschlagene Seite tragen Bilder
 const WINDOW = 2;
+// Nach dem letzten Blatt: so viele Schritte Scrollweg, auf denen sich das Buch zurück auf den Tisch legt
+const OUTRO = 0.9;
 
-function buildLeaves(mode: Mode): { leaves: Leaf[]; base: Page } {
+function buildLeaves(book: BookData, mode: Mode): { leaves: Leaf[]; base: Page } {
   if (mode === "spread") {
+    const { spreads } = book;
     const leaves: Leaf[] = [{ front: { kind: "cover" }, back: spreads[0].left }];
-    for (let k = 0; k < spreads.length - 1; k++) {
-      leaves.push({ front: spreads[k].right, back: spreads[k + 1].left });
-    }
+    for (let k = 0; k < spreads.length - 1; k++) leaves.push({ front: spreads[k].right, back: spreads[k + 1].left });
     return { leaves, base: spreads[spreads.length - 1].right };
   }
+  const pages = book.singlePages;
   return {
-    leaves: singlePages.slice(0, -1).map((front) => ({ front, back: { kind: "verso" } })),
-    base: singlePages[singlePages.length - 1],
+    leaves: pages.slice(0, -1).map((front) => ({ front, back: { kind: "verso" } })),
+    base: pages[pages.length - 1],
   };
 }
 
-/** Welche Tafeln sind sichtbar, wenn k Blätter umgeschlagen sind */
-function platesAt(mode: Mode, k: number): number[] {
-  if (k === 0) return [];
-  if (mode === "spread") return spreads[k - 1]?.plates ?? [];
-  const p = singlePages[k];
-  return p && p.kind === "plate" ? [p.no] : [];
+/** Sichtbare Seiten, wenn k Blätter umgeschlagen sind */
+function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
+  if (k === 0) return [{ kind: "cover" }];
+  if (mode === "spread") {
+    const s = book.spreads[k - 1];
+    return s ? [s.left, s.right] : [];
+  }
+  const p = book.singlePages[k];
+  return p ? [p] : [];
 }
+const platesOn = (pages: Page[]) => [
+  ...new Set(pages.flatMap((p) => ("no" in p && p.kind !== "blank" ? [p.no] : []))),
+];
 
-function labelAt(mode: Mode, k: number, total: number): string {
+function labelAt(book: BookData, mode: Mode, k: number): string {
   if (k === 0) return "Einband";
-  if (k === total) return "Kolophon";
-  const ps = platesAt(mode, k);
-  if (ps.length === 0) return k === 1 ? "Titel" : "Kolophon";
+  const pages = pagesAt(book, mode, k);
+  const ps = platesOn(pages);
+  if (ps.length === 0) {
+    if (pages.some((p) => p.kind === "title")) return "Titel";
+    if (pages.some((p) => p.kind === "index")) return "Verzeichnis";
+    return "Kolophon";
+  }
   return ps.length > 1 ? `Tafel ${ps[0]}–${ps[ps.length - 1]}` : `Tafel ${ps[0]}`;
 }
 
-// Farbe der Papierrückseite, die beim Eselsohr sichtbar wird
-const backTone = (page: Page | undefined) =>
-  page?.kind === "cover" ? "var(--cloth)" : page?.kind === "endpaper" ? "var(--cloth-deep)" : "var(--paper)";
+/** Titel der randlosen Tafeln: sie tragen keine Unterschrift auf der Seite */
+function headCaption(book: BookData, mode: Mode, k: number) {
+  const ps = platesOn(pagesAt(book, mode, k).filter(captionless));
+  return ps.map((no) => `${no} ${plateOf(book, no).title}`).join(" · ");
+}
 
 const noopSubscribe = () => () => {};
 
 // Ferne Blätter: nur der Farbton der Seite, ohne Bild und Text
-function Blank({ page }: { page: Page }) {
-  const bg = page.kind === "cover" ? "bg-cloth" : page.kind === "endpaper" ? "bg-cloth-deep" : "bg-paper";
-  return <div className={`absolute inset-0 ${bg}`} />;
+function Blank({ book, page }: { book: BookData; page: Page }) {
+  const bg = page.kind === "cover" ? book.cloth.base : page.kind === "endpaper" ? book.cloth.deep : undefined;
+  return <div className={`absolute inset-0 ${bg ? "" : "bg-paper"}`} style={{ backgroundColor: bg }} />;
 }
 
 function LeafView({
+  book,
   leaf,
   i,
   count,
   t,
-  peek,
   mode,
   k,
   curl,
 }: {
+  book: BookData;
   leaf: Leaf;
   i: number;
   count: number;
   t: MotionValue<number>;
-  peek: MotionValue<number>;
   mode: Mode;
   k: number;
   curl: CurlStore;
 }) {
-  const rot = useTransform<number, number>([t, peek], ([tv, pv]) => {
-    let r = -180 * turnEase(clamp01(tv - i));
-    // nur beim ersten Hinweis: der Einband hebt sich ein Stück
-    if (i === 0 && tv < 0.02) r += pv;
-    return r;
-  });
+  const rot = useTransform(t, (tv) => -180 * turnEase(clamp01(tv - i)));
   const transform = useMotionTemplate`perspective(2600px) rotateY(${rot}deg)`;
   // Flacher Stapel statt 3D-Kontext: Reihenfolge per z-index, kein Flackern
   const zIndex = useTransform(rot, (r) => (r > -90 ? count - i : i + 1));
@@ -117,7 +126,6 @@ function LeafView({
   const backShade = useTransform(rot, [-90, -180], [0.42, 0]);
   // Auf dem Telefon verschwindet die Rückseite nach links aus dem Bild
   const backOpacity = useTransform(rot, [-172, -180], [1, mode === "single" ? 0 : 1]);
-  const compact = mode === "single";
   const near = Math.abs(i - k) <= WINDOW;
 
   // Bewegt sich das Blatt und hat WebGL seine Textur, zeichnet WebGL es gebogen; das HTML-Blatt tritt zurück
@@ -139,31 +147,32 @@ function LeafView({
         zIndex,
         left: mode === "spread" ? "50%" : 0,
         width: mode === "spread" ? "50%" : "100%",
+        // der geschlossene Einband fliegt beim Öffnen vom Tisch hierher (View Transition);
+        // nur solange er zu ist, sonst flacht der Name das 3D-Blatt ab und die Rückseite verschwindet
+        viewTransitionName: i === 0 && k === 0 ? `cover-${book.id}` : undefined,
       }}
     >
-      <>
-          {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
-          <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
-            {near ? <PageView page={leaf.front} side="right" compact={compact} /> : <Blank page={leaf.front} />}
-            <motion.div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
-              style={{ opacity: frontShade }}
-            />
-          </div>
-          <motion.div
-            className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
-            style={{ opacity: backOpacity }}
-            inert={k !== i + 1 || mode === "single"}
-          >
-            {near ? <PageView page={leaf.back} side="left" compact={compact} /> : <Blank page={leaf.back} />}
-            <motion.div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
-              style={{ opacity: backShade }}
-            />
-          </motion.div>
-      </>
+      {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
+      <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
+        {near ? <PageView book={book} page={leaf.front} side="right" eager={i === 0} /> : <Blank book={book} page={leaf.front} />}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
+          style={{ opacity: frontShade }}
+        />
+      </div>
+      <motion.div
+        className="absolute inset-0 overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
+        style={{ opacity: backOpacity }}
+        inert={k !== i + 1 || mode === "single"}
+      >
+        {near ? <PageView book={book} page={leaf.back} side="left" /> : <Blank book={book} page={leaf.back} />}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
+          style={{ opacity: backShade }}
+        />
+      </motion.div>
     </motion.div>
   );
 }
@@ -206,28 +215,50 @@ function Curl({ side, amount, flap }: { side: "left" | "right"; amount: MotionVa
   );
 }
 
-/** Zähler oben rechts: neue Werte rollen von unten herein */
-function RollingLabel({ text, reduce }: { text: string; reduce: boolean }) {
+/** Wechselnder Text: neue Werte rollen von unten herein */
+export function RollingLabel({ text, reduce }: { text: string; reduce: boolean }) {
   return (
     <span className="relative inline-flex overflow-hidden align-bottom">
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={text}
-          className="inline-block"
+          className="inline-block whitespace-nowrap"
           initial={reduce ? { opacity: 0 } : { y: "100%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={reduce ? { opacity: 0 } : { y: "-100%", opacity: 0 }}
           transition={{ duration: reduce ? 0.12 : 0.55, ease: [0.16, 1, 0.3, 1] }}
         >
-          {text}
+          {text || " "}
         </motion.span>
       </AnimatePresence>
     </span>
   );
 }
 
-export function Book({ mode, className = "" }: { mode: Mode; className?: string }) {
-  const { leaves, base } = useMemo(() => buildLeaves(mode), [mode]);
+/** Seitenbreite in CSS: Doppelseite oder Einzelseite, nach Seitenformat und Buchgröße */
+export function pageWidth(book: BookData, mode: Mode) {
+  const a = book.aspect;
+  return mode === "spread"
+    ? `calc(min(calc((100vw - 64px) / 2), calc((100svh - 150px) / ${a}), 640px) * ${book.scale})`
+    : `min(calc(100vw - 24px), calc((100svh - 150px) / ${a}))`;
+}
+
+const SWIPED = "fuji:swiped";
+
+export function Book({
+  book,
+  mode,
+  autoOpen,
+  onClose,
+}: {
+  book: BookData;
+  mode: Mode;
+  /** Einband nach dem Hinlegen von selbst aufschlagen */
+  autoOpen: boolean;
+  /** Buch zurück auf den Tisch legen */
+  onClose: () => void;
+}) {
+  const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
   // ?ohne=biegung: flach umblättern wie früher (auf dem Server und beim Hydrieren immer aus)
   const bend = useSyncExternalStore(
@@ -238,20 +269,21 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   const count = leaves.length;
   const swipe = mode === "single";
   const reduce = useReducedMotion() ?? false;
+  const nPlates = book.plates.length;
 
   const track = useRef<HTMLElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
   const stops = useRef<(HTMLDivElement | null)[]>([]);
 
   // Antrieb Doppelseite: Scrollposition. Antrieb Telefon: Finger.
+  const span = count + (swipe ? 0 : OUTRO);
   const { scrollYProgress } = useScroll({ target: track, offset: ["start start", "end end"] });
-  const raw = useTransform(scrollYProgress, (p) => p * count);
+  const raw = useTransform(scrollYProgress, (p) => p * span);
   const sprung = useSpring(raw, { stiffness: 150, damping: 26, mass: 0.7 });
-  const stepped = useTransform(raw, (v) => Math.round(v));
+  const stepped = useTransform(raw, (v) => Math.min(count, Math.round(v)));
   const finger = useMotionValue(0);
   const t = swipe ? finger : reduce ? stepped : sprung;
 
-  const peek = useSpring(0, { stiffness: 260, damping: 22 });
   const curlR = useSpring(0, { stiffness: 420, damping: 30 });
   const curlL = useSpring(0, { stiffness: 420, damping: 30 });
   const hoverable = useRef(false);
@@ -259,24 +291,36 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   // k: Zielseite (für Tastatur und Knöpfe); kt: was gerade sichtbar aufgeschlagen ist
   const [k, setK] = useState(0);
   const [kt, setKt] = useState(0);
-  useMotionValueEvent(raw, "change", (v) => !swipe && setK(Math.round(v)));
+  useMotionValueEvent(raw, "change", (v) => !swipe && setK(Math.min(count, Math.round(v))));
   useMotionValueEvent(t, "change", (v) => {
-    const r = Math.round(v);
+    const r = Math.min(count, Math.round(v));
     setKt(r);
     if (swipe) setK(r);
   });
 
+  // Nach dem Kolophon weiterscrollen: das Buch klappt zu und legt sich zurück auf den Tisch
+  const outro = useTransform(t, (v) => clamp01((v - count) / OUTRO));
+  const closed = useRef(false);
+  useMotionValueEvent(outro, "change", (o) => {
+    if (o > 0.82 && !closed.current) {
+      closed.current = true;
+      onClose();
+    }
+  });
+
   // Eselsohr nur, wenn das Buch ruhig aufgeschlagen liegt
-  const resting = useTransform<number, number>(t, (v) => (Math.abs(v - Math.round(v)) < 0.03 ? 1 : 0));
+  const resting = useTransform<number, number>(t, (v) => (Math.abs(v - Math.round(v)) < 0.03 && v <= count ? 1 : 0));
   const curlRight = useTransform<number, number>([curlR, resting], ([c, r]) => c * r);
   const curlLeft = useTransform<number, number>([curlL, resting], ([c, r]) => c * r);
 
   // Geschlossen liegt das Buch flach und rechts versetzt; beim Öffnen richtet es sich auf
   const open = useTransform(t, (v) => clamp01(v));
   const shift = useTransform(open, (o) => (mode === "spread" ? -25 * (1 - o) : 0));
-  const tilt = useTransform(open, (o) => 16 - 12 * o);
-  const lift = useTransform(open, (o) => 0.94 + 0.06 * o);
-  const bookTransform = useMotionTemplate`perspective(1800px) rotateX(${tilt}deg) translateX(${shift}%) scale(${lift})`;
+  const tilt = useTransform<number, number>([open, outro], ([o, x]) => 16 - 12 * o + 14 * x);
+  const lift = useTransform<number, number>([open, outro], ([o, x]) => (0.94 + 0.06 * o) * (1 - 0.18 * x));
+  const sink = useTransform(outro, (x) => 22 * x * x);
+  const bookTransform = useMotionTemplate`perspective(1800px) translateY(${sink}vh) rotateX(${tilt}deg) translateX(${shift}%) scale(${lift})`;
+  const bookOpacity = useTransform(outro, [0.4, 1], [1, 0]);
 
   // Papierkanten: rechts schrumpft der Stapel, links wächst er
   const rightEdge = useTransform(t, (v) => clamp01((count - v) / count));
@@ -288,13 +332,34 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
 
   // Fahrplan-Linie: Position in der Bildfolge 0..1
   const progressAt = (step: number) => {
-    const ps = platesAt(mode, step);
-    if (ps.length) return (ps.reduce((a, b) => a + b, 0) / ps.length - 1) / (plates.length - 1);
+    const ps = platesOn(pagesAt(book, mode, step));
+    if (ps.length) return (ps.reduce((a, b) => a + b, 0) / ps.length - 1) / Math.max(1, nPlates - 1);
     return step <= 1 ? 0 : 1;
   };
   const fill = useTransform(t, range, range.map(progressAt));
   const fillT = useMotionTemplate`scaleX(${fill})`;
-  const hint = useTransform(t, [0, 0.35], [1, 0]);
+
+  // Hinweis zum Blättern: verschwindet nach dem ersten Mal und kommt in dieser Sitzung nicht wieder
+  const seen = useSyncExternalStore(
+    noopSubscribe,
+    () => {
+      try {
+        return sessionStorage.getItem(SWIPED) === "1";
+      } catch {
+        return false;
+      }
+    },
+    () => true,
+  );
+  const [turned, setTurned] = useState(false);
+  useMotionValueEvent(t, "change", (v) => {
+    if (turned || v < 0.9) return;
+    setTurned(true);
+    try {
+      sessionStorage.setItem(SWIPED, "1");
+    } catch {}
+  });
+  const hinted = seen || turned;
 
   const goTo = useCallback(
     (step: number, instant = false) => {
@@ -317,18 +382,26 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
       const el = track.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
-      window.scrollTo({ top: top + (v / count) * (el.offsetHeight - window.innerHeight), behavior: "instant" });
+      window.scrollTo({ top: top + (v / span) * (el.offsetHeight - window.innerHeight), behavior: "instant" });
     },
-    [count],
+    [span],
   );
 
   const stepForPlate = useCallback(
     (no: number) => {
-      for (let s = 1; s <= count; s++) if (platesAt(mode, s).includes(no)) return s;
+      for (let s = 1; s <= count; s++) if (platesOn(pagesAt(book, mode, s)).includes(no)) return s;
       return 0;
     },
-    [count, mode],
+    [book, count, mode],
   );
+  const jump = useCallback((no: number) => goTo(stepForPlate(no)), [goTo, stepForPlate]);
+
+  // Vom Tisch aufgeschlagen: der Einband öffnet sich von selbst, wenn das Buch liegt
+  useEffect(() => {
+    if (!autoOpen || reduce) return;
+    const id = window.setTimeout(() => goTo(1), 420);
+    return () => window.clearTimeout(id);
+  }, [autoOpen, goTo, reduce]);
 
   // Vergrößern: Tafel hebt sich aus dem Buch
   const [viewer, setViewer] = useState<{ no: number; from: DOMRect | null; trigger: HTMLElement } | null>(null);
@@ -382,43 +455,23 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     hoverable.current = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   }, []);
 
-  // Tastatur: Pfeile blättern, nur für das sichtbare Buch
+  // Tastatur: Pfeile blättern, Esc legt das Buch zurück
   useEffect(() => {
     if (viewer) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!track.current || track.current.offsetParent === null) return;
       if (e.key === "ArrowRight") goTo(k + 1);
       else if (e.key === "ArrowLeft") goTo(k - 1);
+      else if (e.key === "Escape") onClose();
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goTo, k, viewer]);
-
-  // Nach dem Einstieg hebt sich der Einband einmal ein Stück: hier lässt sich blättern
-  useEffect(() => {
-    if (reduce) return;
-    let c: ReturnType<typeof animate> | undefined;
-    const nudge = () => {
-      if (window.scrollY > 10 || finger.get() > 0) return;
-      c = animate(peek, [0, -28, 0], { duration: 1.6, delay: 0.25, ease: [0.77, 0, 0.175, 1] });
-    };
-    if (document.documentElement.classList.contains("intro")) {
-      window.addEventListener(INTRO_DONE, nudge, { once: true });
-    } else {
-      const id = window.setTimeout(nudge, 650);
-      return () => window.clearTimeout(id);
-    }
-    return () => {
-      window.removeEventListener(INTRO_DONE, nudge);
-      c?.stop();
-    };
-  }, [finger, peek, reduce]);
+  }, [goTo, k, onClose, viewer]);
 
   // Eselsohr folgt der Maus
   const plateAt = (x: number, y: number) => {
-    for (const no of platesAt(mode, k)) {
+    for (const no of platesOn(pagesAt(book, mode, k))) {
       const pr = findRect(no);
       if (pr && x >= pr.left && x <= pr.right && y >= pr.top && y <= pr.bottom) return no;
     }
@@ -440,33 +493,53 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     curlL.set(0);
   };
 
-  // Ziehen mit Maus oder Finger: die Kante der Seite bleibt unter dem Zeiger
-  const drag = useRef<{ x0: number; k0: number; moved: boolean; samples: { x: number; time: number }[] } | null>(null);
+  // Ziehen mit Maus oder Finger: die Kante der Seite bleibt unter dem Zeiger.
+  // Auf dem Telefon legt Ziehen nach unten das Buch zurück auf den Tisch.
+  const drag = useRef<{
+    x0: number;
+    y0: number;
+    k0: number;
+    moved: "x" | "y" | false;
+    samples: { x: number; y: number; time: number }[];
+  } | null>(null);
   const suppressClick = useRef(false);
+  const pull = useMotionValue(0);
+  const pullScale = useTransform(pull, [0, 240], [1, 0.9]);
+  const pullT = useMotionTemplate`translateY(${pull}px) scale(${pullScale})`;
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || reduce) return;
     finger.stop();
-    const k0 = Math.round(swipe ? finger.get() : raw.get());
-    drag.current = { x0: e.clientX, k0, moved: false, samples: [{ x: e.clientX, time: e.timeStamp }] };
+    const k0 = Math.min(count, Math.round(swipe ? finger.get() : raw.get()));
+    drag.current = { x0: e.clientX, y0: e.clientY, k0, moved: false, samples: [{ x: e.clientX, y: e.clientY, time: e.timeStamp }] };
   };
   const onDragMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d || !bookRef.current) return;
     const dx = e.clientX - d.x0;
-    if (!d.moved && Math.abs(dx) < 6) return;
+    const dy = e.clientY - d.y0;
     if (!d.moved) {
-      d.moved = true;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+      d.moved = swipe && dy > Math.abs(dx) * 1.2 ? "y" : "x";
       bookRef.current.setPointerCapture(e.pointerId);
       curlR.set(0);
       curlL.set(0);
     }
-    d.samples.push({ x: e.clientX, time: e.timeStamp });
+    d.samples.push({ x: e.clientX, y: e.clientY, time: e.timeStamp });
     if (d.samples.length > 5) d.samples.shift();
+    if (d.moved === "y") {
+      pull.set(Math.max(0, dy));
+      return;
+    }
     // Breite einer Seite; bei der Doppelseite wandert die Kante über den Bund, also zwei Breiten
     const w = bookRef.current.getBoundingClientRect().width / (swipe ? 1 : 2);
     const travel = clamp01(Math.abs(dx) / (w * (swipe ? 1.05 : 2)));
     const angle = Math.acos(1 - 2 * travel) / Math.PI;
     const s = invTurnEase(angle);
+    // auf dem Telefon über den Rückdeckel hinaus: zurück auf den Tisch
+    if (swipe && dx < 0 && d.k0 === count) {
+      pull.set(Math.min(240, -dx * 0.6));
+      return;
+    }
     const target = Math.max(0, Math.min(count, dx < 0 ? d.k0 + s : d.k0 - s));
     if (swipe) finger.set(target);
     else scrollToT(target);
@@ -477,7 +550,14 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
     if (!d || !d.moved) return;
     suppressClick.current = true;
     const first = d.samples[0];
-    const v = (e.clientX - first.x) / Math.max(1, e.timeStamp - first.time); // px pro ms
+    const dt = Math.max(1, e.timeStamp - first.time);
+    if (d.moved === "y" || pull.get() > 0) {
+      const vy = (e.clientY - first.y) / dt;
+      if (pull.get() > 80 || vy > 0.6 || (d.moved === "x" && pull.get() > 60)) onClose();
+      else animate(pull, 0, { type: "spring", stiffness: 300, damping: 28 });
+      return;
+    }
+    const v = (e.clientX - first.x) / dt; // px pro ms
     const prog = (swipe ? finger.get() : raw.get()) - d.k0;
     let target = d.k0;
     if (prog > 0.28 || v < -0.35) target = d.k0 + 1;
@@ -514,21 +594,23 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
   const scrubbed = useRef(0);
   const scrubTo = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const no = Math.min(plates.length, Math.max(1, Math.floor(((e.clientX - r.left) / r.width) * plates.length) + 1));
+    const no = Math.min(nPlates, Math.max(1, Math.floor(((e.clientX - r.left) / r.width) * nPlates) + 1));
     if (no === scrubbed.current && e.type !== "pointerdown") return;
     scrubbed.current = no;
     goTo(stepForPlate(no));
   };
 
-  const current = platesAt(mode, k);
-  const label = labelAt(mode, k, count);
+  const current = platesOn(pagesAt(book, mode, k));
+  const label = labelAt(book, mode, k);
+  const caption = headCaption(book, mode, kt);
+  const pw = pageWidth(book, mode);
 
   return (
     <section
       ref={track}
-      aria-label="Fotobuch Fujiventura"
-      className={`relative ${className}`}
-      style={{ height: swipe ? "100svh" : `${count * 85 + 100}svh` }}
+      aria-label={`Fotobuch ${book.title}`}
+      className="relative"
+      style={{ height: swipe ? "100svh" : `${count * 85 + 100 + OUTRO * 85}svh` }}
     >
       {/* Haltepunkte: jedes offene Doppelblatt hat seine Scrollposition */}
       {!swipe &&
@@ -540,7 +622,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
             }}
             aria-hidden
             className="absolute h-px w-px"
-            style={{ top: `calc(${s / count} * (100% - 100svh))` }}
+            style={{ top: `calc(${s / span} * (100% - 100svh))` }}
           />
         ))}
 
@@ -549,131 +631,144 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
         className={`linen table-surface sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
         inert={!!viewer}
       >
-        <SunAndShade />
-        <header className="relative z-20 flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
-          <p
-            className="text-on-table text-lg font-bold tracking-[-0.02em]"
+        <SunAndShade light={book.light} />
+        <header className="relative z-20 grid grid-cols-[1fr_auto] items-baseline gap-4 px-4 pt-4 md:grid-cols-[1fr_auto_1fr] md:px-8 md:pt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-on-table justify-self-start text-lg font-bold tracking-[-0.02em] decoration-mark decoration-2 underline-offset-4 hover:underline"
             style={{ fontVariationSettings: '"wdth" 80' }}
+            aria-label="Fujiventura, zurück zum Tisch"
           >
             Fujiventura
+          </button>
+          {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
+          <p className="text-on-table-2 hidden text-sm md:block" aria-live="polite">
+            <RollingLabel text={caption} reduce={reduce} />
           </p>
-          <p className="text-on-table-2 text-sm" aria-live="polite">
+          <p className="text-on-table-2 justify-self-end text-sm" aria-live="polite">
+            <span className="text-on-table">{book.title}</span>
+            <span className="mx-2" aria-hidden>
+              ·
+            </span>
             <span className="text-on-table">
               <RollingLabel text={label} reduce={reduce} />
             </span>
             <span className="mx-2" aria-hidden>
               /
             </span>
-            {plates.length} Tafeln
+            {nPlates}
           </p>
         </header>
+        {/* Telefon: Titel der randlosen Tafel unter dem Kopf */}
+        <p className="text-on-table-2 relative z-20 h-5 px-4 pt-1 text-sm md:hidden" aria-hidden>
+          <RollingLabel text={caption} reduce={reduce} />
+        </p>
 
         {/* Bühne */}
         <div className="relative flex flex-1 items-center justify-center px-3 md:px-8">
-          <PlateOpenProvider value={openPlate}>
-            <motion.div
-              ref={bookRef}
-              className="relative cursor-grab active:cursor-grabbing"
-              onDragStart={(e) => e.preventDefault()}
-              onPointerMove={onPointerMove}
-              onPointerLeave={onPointerLeave}
-              onPointerDown={onPointerDown}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              onClick={onBookClick}
-              style={{
-                transform: bookTransform,
-                width: mode === "spread" ? "calc(var(--pw) * 2)" : "var(--pw)",
-                height: `calc(var(--pw) * ${mode === "spread" ? 1.3 : 1.46})`,
-                ["--pw" as string]:
-                  mode === "spread"
-                    ? "min(calc((100vw - 64px) / 2), calc((100svh - 150px) / 1.3), 700px)"
-                    : "min(calc(100vw - 24px), calc((100svh - 130px) / 1.46))",
-              }}
-            >
-              {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
-              <div
-                aria-hidden
-                className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
-                style={{ left: mode === "spread" ? "50%" : 0 }}
-              />
-              <motion.div
-                aria-hidden
-                className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75)]"
-                style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
-              />
-
-              {/* Papierkanten */}
-              <motion.div
-                aria-hidden
-                className="absolute top-[0.6%] bottom-[0.6%] left-full w-[7px] origin-left bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
-                style={{ transform: rightEdgeT }}
-              />
-              {mode === "spread" && (
+          <JumpContext.Provider value={jump}>
+            <PlateOpenProvider value={openPlate}>
+              <motion.div style={{ transform: pullT }} className="relative">
                 <motion.div
-                  aria-hidden
-                  className="absolute top-[0.6%] right-full bottom-[0.6%] w-[7px] origin-right bg-[repeating-linear-gradient(to_left,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
-                  style={{ transform: leftEdgeT }}
-                />
-              )}
+                  ref={bookRef}
+                  className="relative cursor-grab active:cursor-grabbing"
+                  onDragStart={(e) => e.preventDefault()}
+                  onPointerMove={onPointerMove}
+                  onPointerLeave={onPointerLeave}
+                  onPointerDown={onPointerDown}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                  onClick={onBookClick}
+                  style={{
+                    transform: bookTransform,
+                    opacity: bookOpacity,
+                    width: mode === "spread" ? "calc(var(--pw) * 2)" : "var(--pw)",
+                    height: `calc(var(--pw) * ${book.aspect})`,
+                    ["--pw" as string]: pw,
+                  }}
+                >
+                  {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
+                    style={{ left: mode === "spread" ? "50%" : 0 }}
+                  />
+                  <motion.div
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75)]"
+                    style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
+                  />
 
-              {/* letzte Seite liegt unten rechts */}
-              <div
-                className="absolute inset-y-0 overflow-hidden"
-                style={{ left: mode === "spread" ? "50%" : 0, width: mode === "spread" ? "50%" : "100%" }}
-                inert={kt !== count}
-              >
-                {kt >= count - WINDOW ? (
-                  <PageView page={base} side="right" compact={mode === "single"} />
-                ) : (
-                  <Blank page={base} />
-                )}
-              </div>
+                  {/* Papierkanten, so dick wie das Buch Seiten hat */}
+                  <motion.div
+                    aria-hidden
+                    className="absolute top-[0.6%] bottom-[0.6%] left-full origin-left bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+                    style={{ transform: rightEdgeT, width: Math.round(3 + count / 4) }}
+                  />
+                  {mode === "spread" && (
+                    <motion.div
+                      aria-hidden
+                      className="absolute top-[0.6%] right-full bottom-[0.6%] origin-right bg-[repeating-linear-gradient(to_left,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+                      style={{ transform: leftEdgeT, width: Math.round(3 + count / 4) }}
+                    />
+                  )}
 
-              {leaves.map((leaf, i) => (
-                <LeafView key={i} leaf={leaf} i={i} count={count} t={t} peek={peek} mode={mode} k={kt} curl={curl} />
-              ))}
+                  {/* letzte Seite liegt unten rechts */}
+                  <div
+                    className="absolute inset-y-0 overflow-hidden"
+                    style={{ left: mode === "spread" ? "50%" : 0, width: mode === "spread" ? "50%" : "100%" }}
+                    inert={kt !== count}
+                  >
+                    {kt >= count - WINDOW ? <PageView book={book} page={base} side="right" /> : <Blank book={book} page={base} />}
+                  </div>
 
-              {bend && !reduce && (
-                <PageCurl leaves={leaves} t={t} k={kt} mode={mode} store={curl} bookRef={bookRef} />
-              )}
+                  {leaves.map((leaf, i) => (
+                    <LeafView key={i} book={book} leaf={leaf} i={i} count={count} t={t} mode={mode} k={kt} curl={curl} />
+                  ))}
 
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 right-0"
-                style={{ width: mode === "spread" ? "50%" : "100%" }}
-              >
-                <Curl side="right" amount={curlRight} flap={backTone(leaves[kt]?.back)} />
-              </div>
-              {mode === "spread" && (
-                <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/2">
-                  <Curl side="left" amount={curlLeft} flap={backTone(leaves[kt - 1]?.front)} />
-                </div>
-              )}
+                  {bend && !reduce && (
+                    <PageCurl book={book} leaves={leaves} t={t} k={kt} mode={mode} store={curl} bookRef={bookRef} />
+                  )}
 
-              {/* Blätterknöpfe für Tastatur und Screenreader, an den Außenkanten */}
-              <button
-                type="button"
-                aria-label="Zurückblättern"
-                disabled={k === 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goTo(k - 1);
-                }}
-                className="absolute inset-y-0 left-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"
-              />
-              <button
-                type="button"
-                aria-label="Weiterblättern"
-                disabled={k === count}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goTo(k + 1);
-                }}
-                className="absolute inset-y-0 right-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"
-              />
-            </motion.div>
-          </PlateOpenProvider>
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 right-0"
+                    style={{ width: mode === "spread" ? "50%" : "100%" }}
+                  >
+                    <Curl side="right" amount={curlRight} flap={backTone(book, leaves[kt]?.back)} />
+                  </div>
+                  {mode === "spread" && (
+                    <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/2">
+                      <Curl side="left" amount={curlLeft} flap={backTone(book, leaves[kt - 1]?.front)} />
+                    </div>
+                  )}
+
+                  {/* Blätterknöpfe für Tastatur und Screenreader, an den Außenkanten */}
+                  <button
+                    type="button"
+                    aria-label="Zurückblättern"
+                    disabled={k === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goTo(k - 1);
+                    }}
+                    className="absolute inset-y-0 left-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Weiterblättern"
+                    disabled={k === count}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goTo(k + 1);
+                    }}
+                    className="absolute inset-y-0 right-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"
+                  />
+                </motion.div>
+              </motion.div>
+            </PlateOpenProvider>
+          </JumpContext.Provider>
         </div>
 
         {/* Bildfolge als Linie mit Haltepunkten */}
@@ -681,13 +776,18 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
           aria-label="Bildfolge"
           className="relative z-20 mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7"
         >
-          <motion.p
-            aria-hidden
-            className="text-on-table-2 absolute -top-3 left-0 w-full text-center text-sm"
-            style={{ opacity: hint }}
-          >
-            {swipe ? "Wischen zum Blättern" : "Scrollen zum Blättern"}
-          </motion.p>
+          <AnimatePresence>
+            {!hinted && (
+              <motion.p
+                aria-hidden
+                className="text-on-table-2 absolute -top-3 left-0 w-full text-center text-sm"
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                {swipe ? "Wischen zum Blättern" : "Scrollen zum Blättern"}
+              </motion.p>
+            )}
+          </AnimatePresence>
           {/* Scrub-Leiste: tippen oder ziehen springt zur nächsten Tafel; die Knöpfe bleiben für die Tastatur */}
           <div
             className="relative h-6 cursor-pointer touch-none"
@@ -703,15 +803,15 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
             <div
               aria-hidden
               className="absolute top-1/2 h-px bg-on-table-2/40"
-              style={{ left: `${50 / plates.length}%`, right: `${50 / plates.length}%` }}
+              style={{ left: `${50 / nPlates}%`, right: `${50 / nPlates}%` }}
             />
             <motion.div
               aria-hidden
               className="absolute top-1/2 h-px origin-left bg-mark"
-              style={{ transform: fillT, left: `${50 / plates.length}%`, right: `${50 / plates.length}%` }}
+              style={{ transform: fillT, left: `${50 / nPlates}%`, right: `${50 / nPlates}%` }}
             />
             <ol className="absolute inset-0 flex">
-              {plates.map((p) => {
+              {book.plates.map((p) => {
                 const active = current.includes(p.no);
                 return (
                   <li key={p.no} className="group relative flex min-w-0 flex-1 justify-center">
@@ -742,8 +842,20 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
       </motion.div>
 
       {viewer && (
-        <PlateViewer no={viewer.no} from={viewer.from} reduce={reduce} findRect={findRect} onClose={closePlate} />
+        <PlateViewer
+          book={book}
+          no={viewer.no}
+          from={viewer.from}
+          reduce={reduce}
+          findRect={findRect}
+          onClose={closePlate}
+        />
       )}
     </section>
   );
+}
+
+// Farbe der Papierrückseite, die beim Eselsohr sichtbar wird
+function backTone(book: BookData, page: Page | undefined) {
+  return page?.kind === "cover" ? book.cloth.base : page?.kind === "endpaper" ? book.cloth.deep : "var(--paper)";
 }

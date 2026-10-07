@@ -1,0 +1,208 @@
+import { colWidth, plateOf, typeArea, type BookData, type Page } from "@/content/books";
+
+// Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
+// (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
+
+export type Tone = "ink" | "ink2" | "clothInk";
+
+export type El =
+  /** Foto, beschnitten auf den Kasten (object-fit: cover) */
+  | { t: "img"; no: number; x: number; y: number; w: number; h: number; focus: [number, number]; plate: boolean }
+  /** Bildunterschrift; y ist die Oberkante, align die Kante, an der sie hängt */
+  | { t: "caption"; no: number; x: number; y: number; w: number; align: "left" | "right"; stack?: boolean }
+  | {
+      t: "text";
+      text: string;
+      x: number;
+      y: number;
+      /** Schriftgröße in cqw */
+      size: number;
+      weight: 400 | 500 | 600 | 700;
+      tone: Tone;
+      lh: number;
+      w?: number;
+      display?: boolean;
+    }
+  /** Abzug im Bildverzeichnis, ganz sichtbar (contain), springt zur Tafel */
+  | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
+  | { t: "rect"; x: number; y: number; w: number; h: number; color: string }
+  /** Prägemulde: Linie innen um das eingelassene Bild */
+  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number };
+
+export type Layout = {
+  bg: "paper" | "cloth" | "clothDeep";
+  linen: boolean;
+  gutter: boolean;
+  els: El[];
+};
+
+/** Schriftgröße der Bildunterschrift in cqw, mindestens 11px */
+export const CAPTION = 2.6;
+export const LEADING = 1.375;
+
+const ratio = (book: BookData, no: number) => {
+  const { width, height } = plateOf(book, no).src;
+  return height / width;
+};
+const focusOf = (book: BookData, no: number) => plateOf(book, no).focus ?? [0.5, 0.5];
+
+export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
+  const H = book.aspect * 100;
+  const ta = typeArea(book, side);
+  const paper = (els: El[], gutter = true): Layout => ({ bg: "paper", linen: false, gutter, els });
+  // Unterschrift an der Außenkante: links auf der linken Seite, rechts auf der rechten
+  const outerCaption = (no: number, x: number, w: number, y: number): El =>
+    side === "left"
+      ? { t: "caption", no, x, y, w, align: "left" }
+      : { t: "caption", no, x: x + w, y, w, align: "right" };
+
+  switch (page.kind) {
+    case "cover": {
+      const no = book.coverNo;
+      const w = 54;
+      const h = w * Math.min(1.5, ratio(book, no));
+      const x = 12;
+      const y = 9;
+      const titleSize = 11;
+      return {
+        bg: "cloth",
+        linen: true,
+        gutter: false,
+        els: [
+          // Falz am Rücken
+          { t: "rect", x: 0, y: 0, w: 5, h: H, color: "rgb(12 10 8 / 0.08)" },
+          { t: "rect", x: 5, y: 0, w: 0.25, h: H, color: "rgb(12 10 8 / 0.18)" },
+          { t: "img", no, x, y, w, h, focus: focusOf(book, no), plate: false },
+          { t: "frame", x, y, w, h, color: book.cloth.deep, width: 0.5 },
+          {
+            t: "text",
+            text: book.title,
+            x,
+            y: H - book.bottom - titleSize * 0.95,
+            size: titleSize,
+            weight: 700,
+            tone: "clothInk",
+            lh: 0.9,
+            display: true,
+          },
+          { t: "text", text: "Michel Leotta", x, y: H - book.bottom + 2.4, size: 3.6, weight: 500, tone: "clothInk", lh: 1.2 },
+        ],
+      };
+    }
+
+    case "endpaper":
+      return { bg: "clothDeep", linen: true, gutter: true, els: [] };
+
+    case "verso":
+      return paper([]);
+
+    case "title": {
+      const els: El[] = [
+        { t: "text", text: book.title, x: ta.x, y: ta.y, size: 7, weight: 700, tone: "ink", lh: 0.95, display: true },
+        { t: "text", text: book.subtitle, x: ta.x, y: ta.y + 9.5, size: 3, weight: 400, tone: "ink", lh: LEADING },
+      ];
+      if (book.places)
+        els.push({ t: "text", text: book.places, x: ta.x, y: ta.y + 14, size: 3, weight: 400, tone: "ink2", lh: LEADING });
+      els.push({ t: "text", text: "Michel Leotta", x: ta.x, y: ta.y + ta.h - 3, size: 3, weight: 400, tone: "ink2", lh: LEADING });
+      return paper(els);
+    }
+
+    case "full": {
+      const no = page.no;
+      return paper([{ t: "img", no, x: 0, y: 0, w: 100, h: H, focus: focusOf(book, no), plate: true }], true);
+    }
+
+    case "plate": {
+      const no = page.no;
+      return paper([
+        { t: "img", no, x: ta.x, y: ta.y, w: ta.w, h: ta.h, focus: focusOf(book, no), plate: true },
+        outerCaption(no, ta.x, ta.w, ta.y + ta.h + 3),
+      ]);
+    }
+
+    case "small": {
+      const no = page.no;
+      const w = colWidth(page.cols);
+      const h = w * ratio(book, no);
+      // außen ist auf der rechten Seite rechts, auf der linken links
+      const atRight = (page.align === "outer") === (side === "right");
+      const x = atRight ? ta.x + ta.w - w : ta.x;
+      const y = page.row === "top" ? ta.y : ta.y + ta.h - h;
+      const cap: El = atRight
+        ? { t: "caption", no, x: x + w, y: y + h + 3, w: 60, align: "right" }
+        : { t: "caption", no, x, y: y + h + 3, w: 60, align: "left" };
+      return paper([{ t: "img", no, x, y, w, h, focus: focusOf(book, no), plate: true }, cap]);
+    }
+
+    case "landscape": {
+      const no = page.no;
+      const h = 100 * ratio(book, no);
+      return paper([
+        { t: "img", no, x: 0, y: ta.y, w: 100, h, focus: focusOf(book, no), plate: true },
+        outerCaption(no, ta.x, ta.w, ta.y + h + 3),
+      ]);
+    }
+
+    case "across": {
+      const no = page.no;
+      // ein Bild über beide Seiten, bis an alle Kanten; jede Seite zeigt ihre Hälfte
+      return paper([
+        { t: "img", no, x: page.half === "left" ? 0 : -100, y: 0, w: 200, h: H, focus: focusOf(book, no), plate: true },
+      ]);
+    }
+
+    case "blank":
+      return paper([{ t: "caption", no: page.no, x: ta.x, y: ta.y + ta.h - 6, w: 60, align: "left" }]);
+
+    case "tall": {
+      const no = page.no;
+      const w = H / ratio(book, no);
+      // am Bund, oben und unten randlos; außen bleibt ein Papierstreifen für die Unterschrift
+      const x = side === "right" ? 0 : 100 - w;
+      const strip = 100 - w;
+      const cx = side === "right" ? w + 2.5 : 2.5;
+      return paper([
+        { t: "img", no, x, y: 0, w, h: H, focus: focusOf(book, no), plate: true },
+        // schmaler Streifen: Nummer und Titel untereinander
+        { t: "caption", no, x: cx, y: ta.y + ta.h - 10, w: strip - 5, align: "left", stack: true },
+      ]);
+    }
+
+    case "index": {
+      const n = book.plates.length;
+      const cols = n > 9 ? 6 : 4;
+      const gap = 2;
+      const cw = (ta.w - (cols - 1) * gap) / cols;
+      const ch = cw * book.aspect;
+      const els: El[] = [
+        { t: "text", text: "Tafeln", x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
+      ];
+      book.plates.forEach((p, i) => {
+        const x = ta.x + (i % cols) * (cw + gap);
+        const y = ta.y + 7 + Math.floor(i / cols) * (ch + 5);
+        els.push({ t: "thumb", no: p.no, x, y, w: cw, h: ch });
+        els.push({ t: "text", text: String(p.no), x, y: y + ch + 0.8, size: 2.1, weight: 400, tone: "ink2", lh: 1.2 });
+      });
+      return paper(els);
+    }
+
+    case "colophon": {
+      // von unten bündig: geschätzte Zeilen, damit HTML und Textur gleich stehen
+      const lines = book.colophon;
+      const size = CAPTION;
+      const lh = size * LEADING;
+      const rows = lines.map((l) => Math.max(1, Math.ceil((l.length * size * 0.5) / 66)));
+      const total = rows.reduce((a, r) => a + r * lh, 0) + (lines.length - 1) * 2;
+      let y = ta.y + ta.h - total;
+      const els: El[] = [];
+      lines.forEach((text, i) => {
+        els.push({ t: "text", text, x: ta.x, y, size, weight: i === 0 ? 600 : 400, tone: i === 0 ? "ink" : "ink2", lh: LEADING, w: 66 });
+        y += rows[i] * lh + 2;
+      });
+      return paper(els);
+    }
+  }
+}
+
+/** Tafeln ohne Unterschrift auf der Seite: ihr Titel steht in der Kopfzeile */
+export const captionless = (page: Page) => page.kind === "full" || page.kind === "across";

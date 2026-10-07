@@ -3,19 +3,19 @@
 import Image from "next/image";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { plate, plates } from "@/content/plates";
+import { plateOf, type BookData } from "@/content/books";
 
 type Open = (no: number, trigger: HTMLElement) => void;
 const OpenContext = createContext<Open>(() => {});
 export const PlateOpenProvider = OpenContext.Provider;
 
 /** Unsichtbare Fläche über einer Tafel: Klick hebt sie aus dem Buch */
-export function PlateButton({ no }: { no: number }) {
+export function PlateButton({ book, no }: { book: BookData; no: number }) {
   const open = useContext(OpenContext);
   return (
     <button
       type="button"
-      aria-label={`Tafel ${no} vergrößern: ${plate(no).title}`}
+      aria-label={`Tafel ${no} vergrößern: ${plateOf(book, no).title}`}
       onClick={(e) => {
         e.stopPropagation();
         open(no, e.currentTarget);
@@ -27,8 +27,8 @@ export function PlateButton({ no }: { no: number }) {
 
 const EASE = "cubic-bezier(0.23, 1, 0.32, 1)";
 
-function fit(no: number) {
-  const { width, height } = plate(no).src;
+function fit(book: BookData, no: number) {
+  const { width, height } = plateOf(book, no).src;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const maxW = vw * (vw < 768 ? 0.94 : 0.84);
@@ -40,12 +40,14 @@ function fit(no: number) {
 }
 
 export function PlateViewer({
+  book,
   no,
   from,
   reduce,
   findRect,
   onClose,
 }: {
+  book: BookData;
   no: number;
   from: DOMRect | null;
   reduce: boolean;
@@ -60,14 +62,14 @@ export function PlateViewer({
   const closeBtn = useRef<HTMLButtonElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
-  const p = plate(current);
+  const p = plateOf(book, current);
 
   useLayoutEffect(() => {
-    const update = () => setBox(fit(current));
+    const update = () => setBox(fit(book, current));
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [current]);
+  }, [book, current]);
 
   // Hinweg: von der Seite im Buch auf volle Größe
   const opened = useRef(false);
@@ -122,9 +124,13 @@ export function PlateViewer({
     onClose(current);
   }, [box, current, findRect, no, onClose, reduce]);
 
-  const step = useCallback((d: number) => {
-    setCurrent((c) => ((c - 1 + d + plates.length) % plates.length) + 1);
-  }, []);
+  const n = book.plates.length;
+  const step = useCallback(
+    (d: number) => {
+      setCurrent((c) => ((c - 1 + d + n) % n) + 1);
+    },
+    [n],
+  );
 
   // Neues Bild beim Blättern im Vollbild: kurz einblenden statt springen
   const first = useRef(true);
@@ -184,7 +190,7 @@ export function PlateViewer({
               alt=""
               aria-hidden
               fill
-              sizes={p.src.width > p.src.height ? "(min-width: 768px) 72vw, 90vw" : "(min-width: 768px) 38vw, 90vw"}
+              sizes="(min-width: 768px) 40vw, 96vw"
               className="object-cover"
             />
             <Image
@@ -208,10 +214,10 @@ export function PlateViewer({
               {p.note && <span className="ml-2">{p.note}</span>}
             </p>
             <div className="flex shrink-0 gap-1">
-              <button type="button" onClick={() => step(-1)} className="text-on-table px-2 py-1 decoration-cloth decoration-2 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => step(-1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
                 Zurück
               </button>
-              <button type="button" onClick={() => step(1)} className="text-on-table px-2 py-1 decoration-cloth decoration-2 underline-offset-4 hover:underline">
+              <button type="button" onClick={() => step(1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
                 Weiter
               </button>
             </div>
@@ -222,7 +228,7 @@ export function PlateViewer({
         ref={closeBtn}
         type="button"
         onClick={close}
-        className="text-on-table absolute top-3 right-3 px-3 py-2 text-sm decoration-cloth decoration-2 underline-offset-4 hover:underline md:top-5 md:right-6"
+        className="text-on-table absolute top-3 right-3 px-3 py-2 text-sm decoration-mark decoration-2 underline-offset-4 hover:underline md:top-5 md:right-6"
       >
         Schließen
       </button>

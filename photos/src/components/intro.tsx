@@ -3,7 +3,9 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
-import { countWord, plates } from "@/content/plates";
+import { books } from "@/content/books";
+
+const plates = books[0].plates;
 
 const EXPO = "cubic-bezier(0.16, 1, 0.3, 1)";
 const IN_OUT = "cubic-bezier(0.77, 0, 0.175, 1)";
@@ -174,7 +176,7 @@ export function Intro() {
           ))}
         </p>
         <p data-sub className="text-on-table-2 mt-3 text-base opacity-0 md:mt-4 md:text-lg">
-          {countWord} Fotografien von Fuerteventura · Michel Leotta
+          Fotografien von Fuerteventura und Japan · Michel Leotta
         </p>
       </div>
     </div>

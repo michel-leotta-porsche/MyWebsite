@@ -3,7 +3,7 @@
 import type { MotionValue } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
-import type { Page } from "@/content/plates";
+import type { BookData, Page } from "@/content/books";
 import { drawPage } from "@/components/page-texture";
 
 // Das umblätternde Blatt als ein Gitternetz in WebGL: biegt sich als glatte Kurve,
@@ -185,6 +185,7 @@ function geometry(s: number, W: number, H: number, out: Float32Array) {
 }
 
 export function PageCurl({
+  book,
   leaves,
   t,
   k,
@@ -192,6 +193,7 @@ export function PageCurl({
   store,
   bookRef,
 }: {
+  book: BookData;
   leaves: Leaf[];
   t: MotionValue<number>;
   k: number;
@@ -290,7 +292,8 @@ export function PageCurl({
     const measure = () => {
       const W = book.offsetWidth / (mode === "spread" ? 2 : 1);
       const H = book.offsetHeight;
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Texturen höchstens etwa 1536px breit: das iPhone hält sonst zu viel Grafikspeicher
+      const dpr = Math.min(2, window.devicePixelRatio || 1, 1536 / Math.max(1, W));
       const changed = Math.abs(W - size.current.W) > 0.5 || Math.abs(H - size.current.H) > 0.5 || dpr !== size.current.dpr;
       size.current = { W, H, dpr };
       c.style.width = `${2 * W}px`;
@@ -339,7 +342,7 @@ export function PageCurl({
   useEffect(() => {
     const st = state.current;
     if (!st) return;
-    const want = [k, k - 1, k + 1, k + 2, k - 2].filter((i) => i >= 0 && i < leaves.length);
+    const want = [k, k - 1, k + 1].filter((i) => i >= 0 && i < leaves.length);
     // ferne Blätter freigeben
     textures.current.forEach((tx, i) => {
       if (want.includes(i)) return;
@@ -358,10 +361,9 @@ export function PageCurl({
         if (!W) return;
         pending.current.add(i);
         try {
-          const compact = mode === "single";
           const [front, back] = await Promise.all([
-            drawPage(leaves[i].front, "right", W, H, dpr, compact),
-            drawPage(leaves[i].back, "left", W, H, dpr, compact),
+            drawPage(book, leaves[i].front, "right", W, H, dpr),
+            drawPage(book, leaves[i].back, "left", W, H, dpr),
           ]);
           const s = state.current;
           if (!s || gen !== generation.current) continue;
@@ -378,7 +380,7 @@ export function PageCurl({
     return () => {
       cancelled = true;
     };
-  }, [k, leaves, mode, store, sizeKey]);
+  }, [book, k, leaves, store, sizeKey]);
 
   return (
     <canvas ref={canvas} aria-hidden className="pointer-events-none absolute z-[140]" style={{ left: 0, top: 0 }} />

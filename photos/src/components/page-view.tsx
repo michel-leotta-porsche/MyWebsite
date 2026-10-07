@@ -1,11 +1,18 @@
-import Image from "next/image";
+"use client";
 
-import { countWord, plate, type Page } from "@/content/plates";
+import Image from "next/image";
+import { createContext, useContext, type CSSProperties } from "react";
+
+import { plateOf, type BookData, type Page } from "@/content/books";
+import { CAPTION, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
 
-// Alle Maße in cqw/cqh: jede Seite ist ein Size-Container.
-// Doppelseiten haben 1:1.3, die Einzelseiten auf dem Telefon sind höher (compact).
-const pageSizes = "(min-width: 768px) 38vw, 90vw";
+// Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
+
+/** Sprung aus dem Bildverzeichnis zur Tafel */
+export const JumpContext = createContext<(no: number) => void>(() => {});
+
+const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "" };
 
 function Gutter({ side }: { side: "left" | "right" }) {
   // Wölbung zum Bund hin: das Papier biegt sich, also wird es dunkler
@@ -21,186 +28,150 @@ function Gutter({ side }: { side: "left" | "right" }) {
   );
 }
 
-function Caption({ no, className = "" }: { no: number; className?: string }) {
-  const p = plate(no);
+const box = (x: number, y: number, w: number, h: number): CSSProperties => ({
+  left: `${x}cqw`,
+  top: `${y}cqw`,
+  width: `${w}cqw`,
+  height: `${h}cqw`,
+});
+
+function Caption({ book, el }: { book: BookData; el: Extract<El, { t: "caption" }> }) {
+  const p = plateOf(book, el.no);
+  const right = el.align === "right";
   return (
-    <p className={`text-ink-2 leading-snug ${className}`} style={{ fontSize: "max(11px, 3.1cqw)" }}>
-      <span className="text-ink font-semibold">{no}</span>
-      <span className="ml-[2.4cqw]">{p.title}</span>
-      {p.note && <span className="block pl-[calc(2.4cqw+1ch)]">{p.note}</span>}
+    <p
+      className={`text-ink-2 absolute ${right ? "text-right" : ""}`}
+      style={{
+        top: `${el.y}cqw`,
+        [right ? "right" : "left"]: right ? `${100 - el.x}cqw` : `${el.x}cqw`,
+        maxWidth: `${el.w}cqw`,
+        fontSize: `max(11px, ${CAPTION}cqw)`,
+        lineHeight: LEADING,
+      }}
+    >
+      <span className={`text-ink font-semibold ${el.stack ? "block" : ""}`}>{el.no}</span>
+      <span className={el.stack ? "block [overflow-wrap:anywhere]" : "ml-[0.6em]"}>{p.title}</span>
+      {p.note && <span className="block">{p.note}</span>}
     </p>
   );
 }
 
+function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }) {
+  const jump = useContext(JumpContext);
+  const p = plateOf(book, el.no);
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        jump(el.no);
+      }}
+      aria-label={`Zu Tafel ${el.no}: ${p.title}`}
+      className="group absolute focus-visible:outline-ink"
+      style={box(el.x, el.y, el.w, el.h)}
+    >
+      <Image
+        src={p.thumb}
+        alt=""
+        fill
+        sizes="120px"
+        className="object-contain object-bottom transition-opacity duration-150 group-hover:opacity-80"
+        loading="lazy"
+      />
+    </button>
+  );
+}
+
+function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }) {
+  switch (el.t) {
+    case "img": {
+      const p = plateOf(book, el.no);
+      // die Fläche zum Vergrößern liegt nur über dem sichtbaren Teil der Seite
+      const vx = Math.max(0, el.x);
+      const vw = Math.min(100, el.x + el.w) - vx;
+      const hidden = el.x < 0;
+      return (
+        <>
+          <div className="absolute overflow-hidden" style={box(el.x, el.y, el.w, el.h)}>
+            <Image
+              src={p.src}
+              alt={hidden ? "" : p.alt}
+              aria-hidden={hidden || undefined}
+              fill
+              sizes={`(min-width: 768px) ${Math.ceil(el.w * 0.4)}vw, ${Math.ceil(el.w * 0.96)}vw`}
+              className="object-cover"
+              style={{ objectPosition: `${el.focus[0] * 100}% ${el.focus[1] * 100}%` }}
+              loading={eager ? "eager" : "lazy"}
+            />
+          </div>
+          {el.plate && (
+            <div data-plate-box={el.no} className="absolute" style={box(vx, el.y, vw, el.h)}>
+              <PlateButton book={book} no={el.no} />
+            </div>
+          )}
+        </>
+      );
+    }
+    case "caption":
+      return <Caption book={book} el={el} />;
+    case "text": {
+      const Tag = el.display ? "h2" : "p";
+      return (
+        <Tag
+          className={`absolute ${toneClass[el.tone]} ${el.display ? "tracking-[-0.035em]" : ""}`}
+          style={{
+            top: `${el.y}cqw`,
+            left: `${el.x}cqw`,
+            maxWidth: el.w ? `${el.w}cqw` : undefined,
+            fontSize: el.size < 3.4 ? `max(${el.size < 2.4 ? 9 : 11}px, ${el.size}cqw)` : `${el.size}cqw`,
+            fontWeight: el.weight,
+            lineHeight: el.lh,
+            whiteSpace: el.w ? undefined : "nowrap",
+            color: el.tone === "clothInk" ? book.cloth.ink : undefined,
+            fontVariationSettings: el.display ? '"wdth" 78, "opsz" 96' : undefined,
+          }}
+        >
+          {el.text}
+        </Tag>
+      );
+    }
+    case "thumb":
+      return <Thumb book={book} el={el} />;
+    case "rect":
+      return <div aria-hidden className="absolute" style={{ ...box(el.x, el.y, el.w, el.h), background: el.color }} />;
+    case "frame":
+      return (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute"
+          style={{ ...box(el.x, el.y, el.w, el.h), boxShadow: `inset 0 0 0 ${el.width}cqw ${el.color}` }}
+        />
+      );
+  }
+}
+
 export function PageView({
+  book,
   page,
   side,
   eager = false,
-  compact = false,
 }: {
+  book: BookData;
   page: Page;
   side: "left" | "right";
   eager?: boolean;
-  compact?: boolean;
 }) {
-  const loading = eager ? "eager" : "lazy";
-
-  switch (page.kind) {
-    case "cover": {
-      const p = plate(2);
-      return (
-        <div className="linen absolute inset-0 overflow-hidden bg-cloth [container-type:size]">
-          {/* Falz am Rücken */}
-          <div aria-hidden className="absolute inset-y-0 left-0 w-[5cqw] bg-cloth-deep/25" />
-          <div aria-hidden className="absolute inset-y-0 left-[5cqw] w-px bg-cloth-deep/60" />
-          {/* eingeklebtes Bild, wie bei den Fotobüchern der 70er: Kante leicht abgehoben */}
-          <div className="absolute top-[11cqw] left-[18cqw] aspect-[4/5] w-[64cqw] bg-paper p-[1.6cqw] shadow-[1px_2px_3px_rgb(58_39_6/0.35),0_0_0_0.5px_rgb(58_39_6/0.2)]">
-            <div className="relative h-full w-full overflow-hidden">
-              <Image
-                src={p.src}
-                alt={p.alt}
-                fill
-                sizes="(min-width: 768px) 28vw, 64vw"
-                className="object-cover object-[50%_40%]"
-                preload
-              />
-            </div>
-          </div>
-          {/* Titel als flacher Druck auf dem Leinen */}
-          <div className="text-cloth-ink absolute right-[10cqw] bottom-[10cqw] left-[18cqw]">
-            <h1
-              className="leading-[0.86] font-bold tracking-[-0.035em]"
-              style={{ fontSize: "15.5cqw", fontVariationSettings: '"wdth" 78, "opsz" 96' }}
-            >
-              Fuji&shy;ventura
-            </h1>
-            <p className="mt-[3cqw] font-medium" style={{ fontSize: "4cqw" }}>
-              Michel Leotta
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    case "endpaper":
-      return (
-        <div className="linen absolute inset-0 bg-cloth-deep/90 [container-type:size]">
-          <Gutter side={side} />
-        </div>
-      );
-
-    case "verso":
-      return (
-        <div className="paper absolute inset-0 [container-type:size]">
-          <Gutter side="left" />
-        </div>
-      );
-
-    case "title":
-      return (
-        <div className="paper text-ink absolute inset-0 [container-type:size]">
-          <Gutter side={side} />
-          <div className="absolute top-[40cqw] right-[8cqw] left-[12cqw]">
-            <h2
-              className="leading-[0.86] font-bold tracking-[-0.04em]"
-              style={{ fontSize: "19cqw", fontVariationSettings: '"wdth" 75, "opsz" 96' }}
-            >
-              Fuji&shy;ventura
-            </h2>
-            <p className="mt-[5cqw] max-w-[60cqw] leading-snug" style={{ fontSize: "4.2cqw" }}>
-              {countWord} Fotografien von Fuerteventura
-            </p>
-          </div>
-          <p className="text-ink-2 absolute bottom-[12cqw] left-[12cqw]" style={{ fontSize: "3.4cqw" }}>
-            Michel Leotta
-          </p>
-        </div>
-      );
-
-    case "caption":
-      return (
-        <div className="paper absolute inset-0 [container-type:size]">
-          <Gutter side={side} />
-          {/* aktiver Leerraum: die Gegenseite trägt nur die Unterschrift */}
-          <Caption no={page.no} className="absolute bottom-[12cqw] left-[12cqw] max-w-[64cqw]" />
-        </div>
-      );
-
-    case "plate": {
-      const p = plate(page.no);
-      const landscape = p.src.width > p.src.height;
-      // Die Bilder laufen bis an die Papierkante. Einzelne Tafeln füllen die ganze Seite
-      // (Unterschrift auf der Gegenseite); Paare und das Telefon lassen unten einen Papierstreifen
-      // für die Unterschrift. Querformate auf dem Telefon laufen seitlich bis an die Kante.
-      const box =
-        compact && landscape
-          ? "top-[calc(50cqh-40cqw)] inset-x-0 aspect-[3/2]"
-          : page.withCaption
-            ? compact
-              ? "inset-x-0 top-0 bottom-[17cqw]"
-              : "inset-x-0 top-0 bottom-[15cqw]"
-            : "inset-0";
-      const captionAt = compact && landscape ? "top-[calc(50cqh+30cqw)] left-[8cqw]" : "bottom-[5cqw] left-[8cqw]";
-      return (
-        <div className="paper absolute inset-0 [container-type:size]">
-          <div data-plate-box={page.no} className={`absolute overflow-hidden ${box}`}>
-            <Image
-              src={p.src}
-              alt={p.alt}
-              fill
-              sizes={pageSizes}
-              className="object-cover"
-              loading={loading}
-            />
-            <PlateButton no={page.no} />
-          </div>
-          {page.withCaption && <Caption no={page.no} className={`absolute max-w-[76cqw] ${captionAt}`} />}
-          <Gutter side={side} />
-        </div>
-      );
-    }
-
-    case "double": {
-      const p = plate(page.no);
-      const left = page.half === "left";
-      return (
-        <div className="paper absolute inset-0 [container-type:size]">
-          {/* ein Bild über den Bund, bis an die Außenkanten: jede Seite zeigt ihre Hälfte */}
-          <div data-plate-box={page.no} className="absolute inset-x-0 top-0 bottom-[15cqw] overflow-hidden">
-            <div className="absolute inset-y-0 w-[200%]" style={{ left: left ? 0 : "-100%" }}>
-              <Image
-                src={p.src}
-                alt={left ? p.alt : ""}
-                aria-hidden={!left}
-                fill
-                sizes="(min-width: 768px) 72vw, 100vw"
-                className="object-cover"
-                loading={loading}
-              />
-            </div>
-            <PlateButton no={page.no} />
-          </div>
-          {!left && <Caption no={page.no} className="absolute bottom-[5cqw] left-[8cqw]" />}
-          <Gutter side={side} />
-        </div>
-      );
-    }
-
-    case "colophon":
-      return (
-        <div className="paper text-ink absolute inset-0 [container-type:size]">
-          <Gutter side={side} />
-          <div
-            className="text-ink-2 absolute bottom-[12cqw] left-[12cqw] max-w-[66cqw] space-y-[2.4cqw] leading-snug"
-            style={{ fontSize: "max(11px, 3.1cqw)" }}
-          >
-            <p className="text-ink font-semibold">Fujiventura</p>
-            <p>{countWord} Fotografien, aufgenommen auf Fuerteventura mit einer Fuji.</p>
-            <p>Fotografie und Gestaltung: Michel Leotta</p>
-            <p>Gesetzt in Bricolage Grotesque.</p>
-            <p>© 2026 Michel Leotta</p>
-          </div>
-        </div>
-      );
-  }
+  const layout = layoutPage(book, page, side);
+  const bg = layout.bg === "paper" ? undefined : layout.bg === "cloth" ? book.cloth.base : book.cloth.deep;
+  return (
+    <div
+      className={`absolute inset-0 overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
+      style={{ backgroundColor: bg }}
+    >
+      {layout.els.map((el, i) => (
+        <Element key={i} book={book} el={el} eager={eager} />
+      ))}
+      {layout.gutter && <Gutter side={side} />}
+    </div>
+  );
 }

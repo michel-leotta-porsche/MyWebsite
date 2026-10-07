@@ -1,19 +1,23 @@
 ---
 name: Fujiventura
-description: Sechsundzwanzig Fotografien von Fuerteventura, gebunden als Buch auf einem Leinentisch.
+description: Fotobücher (Fuerteventura, Japan) auf einem Basalttisch, zum Aufschlagen und Durchblättern.
 colors:
-  table: "#1d4f55"
-  table-deep: "#12363b"
-  on-table: "#e6eee9"
-  on-table-2: "#a9c3bf"
+  table: "#1b1917"
+  table-deep: "#121110"
+  on-table: "#ece6dc"
+  on-table-2: "#a39a8e"
   cloth: "#e8a72c"
   cloth-deep: "#b97a12"
   cloth-ink: "#3a2706"
-  paper: "#f6f6f2"
-  paper-shade: "#e4e4dd"
+  paper: "#eee9df"
+  paper-shade: "#dcd5c8"
   ink: "#1b1c1a"
   ink-2: "#5a5c56"
-  shadow-petrol: "#04181b"
+  cloth-mist: "#c9c8c3"
+  cloth-mist-deep: "#a3a29c"
+  shadow-basalt: "#0c0a08"
+  mistlight: "#d6e2e8"
+  table-light: "#ffecd2"
   sunlight: "#ffcd82"
   yellowing: "#c4a05c"
 typography:
@@ -98,11 +102,11 @@ components:
 
 ## Overview
 
-**Creative North Star: "Das Buch auf dem Leinentisch"**
+**Creative North Star: "Bücher auf dem Basalttisch"**
 
-Die ganze Oberfläche ist ein Gegenstand: ein Fotobuch der 70er Jahre im Geist von Egglestons „Guide“ und Shores „Uncommon Places“, das auf einem Tisch aus meer-petrolfarbenem Leinen liegt. Es gibt keine Seite im Web-Sinn, sondern Einband, Vorsatz, Titelei, Tafeln und Kolophon. Scrollen blättert das Buch in echtem 3D um. Alles, was nicht Buch ist (Wortmarke, Tafelzähler, Bildfolge-Linie), liegt klein und ruhig auf dem Tisch.
+Die ganze Oberfläche ist ein Gegenstand: ein Fotobuch der 70er Jahre im Geist von Egglestons „Guide“ und Shores „Uncommon Places“, das mit seinen Geschwistern auf einem dunklen Basalttisch liegt (Fuerteventura in Ringelblumen-Leinen, Japan in nebelgrauem Leinen; weitere Bände kommen dazu). Der Tisch ist die Navigation: Klick auf einen Band nimmt ihn auf, Esc, die Wortmarke, die Zurück-Taste oder Weiterscrollen nach dem Kolophon legt ihn zurück. Kein Menü, kein Regal. Es gibt keine Seite im Web-Sinn, sondern Einband, Vorsatz, Titelei, Tafeln und Kolophon. Scrollen blättert das Buch in echtem 3D um. Alles, was nicht Buch ist (Wortmarke, Tafelzähler, Bildfolge-Linie), liegt klein und ruhig auf dem Tisch.
 
-Die Dichte ist gering. Leere Gegenseiten sind gewollt und tragen nur eine Bildunterschrift; Panoramen laufen über den Bund. Farbe kommt aus den Fotos und aus zwei Materialien: dem Tischleinen und dem ringelblumengelben Buchleinen. Das Gelb ist zugleich die einzige Akzentfarbe und markiert nur die Position in der Bildfolge und den Fokus.
+Die Seiten haben das Format der Fotos (Fuji 2:3, iPhone 3:4) und einen Satzspiegel auf einem 6-Spalten-Raster. Sieben Seitentypen wechseln sich ab, damit ein Rhythmus entsteht statt eines Metronoms; pro Band gibt es höchstens eine leere Seite. Farbe kommt aus den Fotos und aus zwei Materialien: dem Tischleinen und dem ringelblumengelben Buchleinen. Das Gelb ist zugleich die einzige Akzentfarbe und markiert nur die Position in der Bildfolge und den Fokus.
 
 Licht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wölbung zum Bund, Abdunkeln eines Blatts beim Aufrichten, das Eselsohr beim Hover. Nichts davon ist Dekoration, alles erklärt, wo Papier liegt und wohin es sich bewegt.
 
@@ -115,7 +119,7 @@ Licht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wöl
 
 ## Colors
 
-Monochromer Tisch in Petrol, ein warmes Buchleinen-Gelb als einzige Stimme, kühles Papier mit fast schwarzer Tinte.
+Monochromer Tisch aus Basalt, ein warmes Buchleinen-Gelb als einzige Stimme, Naturpapier mit fast schwarzer Tinte. Jeder Band hat sein eigenes Leinen.
 
 ### Primary
 - **Ringelblumen-Buchleinen** (`cloth`): Fläche des Einbands, sonst nur Signal: gefüllter Teil der Bildfolge-Linie, aktiver Haltepunkt, Unterstrich bei Hover der Textknöpfe, Fokusrahmen auf dem Tisch, Textauswahl, Scrollbalken. Auf dem Tisch erreicht es 4.34:1, also nur für Nicht-Text (Linien, Balken, Rahmen) einsetzen.
@@ -123,16 +127,17 @@ Monochromer Tisch in Petrol, ein warmes Buchleinen-Gelb als einzige Stimme, küh
 - **Prägung** (`cloth-ink`): Titel und Autorname auf dem Einband (6.79:1 auf `cloth`), Textfarbe der Auswahl.
 
 ### Neutral
-- **Meer-Petrol-Leinen** (`table`): der Tisch, Hintergrund der ganzen Bühne und `theme-color`.
-- **Tiefes Petrol** (`table-deep`): Fuß der Seite, Hintergrund der vergrößerten Tafel, Spur des Scrollbalkens.
-- **Leinenweiß** (`on-table`): Haupttext auf dem Tisch: Wortmarke, aktueller Abschnitt im Zähler, Knöpfe im Vollbild (7.72:1 auf `table`).
-- **Salbei-Grau** (`on-table-2`): Nebentext auf dem Tisch, inaktive Haltepunkte, Grundlinie der Bildfolge mit 40 % Deckkraft (4.89:1 auf `table`).
-- **Bilderdruckpapier** (`paper`): alle Innenseiten und der Rahmen um das eingeklebte Coverbild.
+- **Basalt** (`table`): der Tisch, feines Steinkorn statt Gewebe, ein warmer Lichtkegel in der Mitte; Hintergrund der ganzen Bühne und `theme-color`.
+- **Tiefer Basalt** (`table-deep`): Fuß der Seite, Hintergrund der vergrößerten Tafel, Spur des Scrollbalkens.
+- **Leinenweiß** (`on-table`): Haupttext auf dem Tisch: Wortmarke, aktueller Abschnitt im Zähler, Knöpfe im Vollbild (14.1:1 auf `table`).
+- **Aschgrau** (`on-table-2`): Nebentext auf dem Tisch, inaktive Haltepunkte, Grundlinie der Bildfolge mit 40 % Deckkraft (6.3:1 auf `table`).
+- **Naturpapier** (`paper`): alle Innenseiten.
+- **Nebelgraues Leinen** (`cloth-mist`, Falz und Vorsatz `cloth-mist-deep`): Einband des Japan-Bands, Schrift darauf nur in `ink` (10.2:1).
 - **Papierschatten** (`paper-shade`): Papierkanten des Blockstapels, Unterseite im Eselsohr.
-- **Tinte** (`ink`): Titelseite, Tafelnummer in der Bildunterschrift (15.79:1 auf `paper`).
-- **Graue Tinte** (`ink-2`): Text der Bildunterschriften und des Kolophons (6.25:1 auf `paper`).
+- **Tinte** (`ink`): Titelseite, Tafelnummer in der Bildunterschrift (14.1:1 auf `paper`).
+- **Graue Tinte** (`ink-2`): Text der Bildunterschriften und des Kolophons (5.6:1 auf `paper`).
 
-Im dunklen Farbschema des Systems wird nur der Tisch dunkler (`table` #143a3f, `table-deep` #0b2629, `on-table` #dfe9e4, `on-table-2` #9db9b4). Buch und Papier bleiben, wie sie sind: ein Buch ändert im Dunkeln nicht seine Farbe.
+Der Tisch ist immer dunkel, ein eigenes dunkles Farbschema gibt es nicht. Schatten mischen aus warmem Basalt (`rgb(12 10 8)`), nie aus neutralem Grau.
 
 ### Named Rules
 **The One Voice Rule.** Das Buchleinen-Gelb ist außerhalb des Einbands nur Signal: Position in der Bildfolge, Fokus, Hover-Unterstrich. Nie als Fläche auf dem Tisch, nie als Textfarbe.
@@ -147,11 +152,12 @@ Im dunklen Farbschema des Systems wird nur der Tisch dunkler (`table` #143a3f, `
 **Character:** Eine einzige Grotesk mit Charakter, im Titel schmal und schwer wie auf einem Buchrücken der 70er, im Text ruhig und klein wie eine Bildunterschrift. Ziffern sind überall tabellarisch, weil Tafelnummern und Zähler untereinander stehen.
 
 ### Hierarchy
-- **Einbandtitel** (700, 15.5cqw, Zeilenhöhe 0.86, Laufweite -0.035em, Breite 78, Optik 96): „Fujiventura“ auf dem Einband, die eine `h1`.
-- **Titelseite** (700, 19cqw, 0.86, -0.04em, Breite 75, Optik 96): Titel auf der Titelei, darunter ein Satz in 4.2cqw.
+- **Einbandtitel** (700, 11cqw, Zeilenhöhe 0.9, Laufweite -0.035em, Breite 78, Optik 96): Titel des Bands unten links auf der Satzspiegelkante, darunter der Name in 3.6cqw.
+- **Titelseite** (700, 7cqw an der oberen Satzspiegellinie): leise, darunter Anzahl und Orte in 3cqw, der Name am Fuß.
+- **Wortmarke auf dem Tisch** ist die eine `h1`; im Buch ist sie der Knopf „zurück zum Tisch“.
 - **Wortmarke** (700, 18px, -0.02em, Breite 80): oben links auf dem Tisch.
 - **Einstieg** (700, `clamp(56px, 15.5vw, 230px)`, 0.82, -0.035em, Breite 75, Optik 96): „FUJIVENTURA“ in Versalien, Buchstabe für Buchstabe von unten, nur im Einstieg.
-- **Bildunterschrift** (400, max(11px, 3.1cqw), 1.375): Nummer in `ink` halbfett, Abstand 2.4cqw, Titel und Zusatz in `ink-2`. Gleiche Größe im Kolophon. Breite höchstens 64 bis 76cqw der Seite.
+- **Bildunterschrift** (400, max(11px, 2.6cqw), 1.375): Nummer in `ink` halbfett, Titel und Zusatz in `ink-2`, an der Außenkante des Bildes, 3cqw darunter. Gleiche Größe im Kolophon. Randlose Tafeln (Vollbild, über den Bund) tragen keine Unterschrift auf der Seite; ihr Titel steht in der Mitte der Kopfzeile (auf dem Telefon darunter).
 - **Bedienung** (400, 14px): Tafelzähler, Hinweis „Scrollen zum Blättern“, Knöpfe im Vollbild, Fuß.
 - **Haltepunkt-Etikett** (400, 12px): Nummer und Titel über einem Haltepunkt beim Hover.
 
@@ -162,30 +168,36 @@ Im dunklen Farbschema des Systems wird nur der Tisch dunkler (`table` #143a3f, `
 
 ## Layout
 
-Die Bühne ist ein Viewport hoch und klebt (`sticky`), darunter liegt eine Scrollspur von etwa 85dvh pro Blatt. Jedes aufgeschlagene Blatt ist ein Rastpunkt (`scroll-snap-type: y proximity`). Oben eine Zeile mit Wortmarke links und Zähler rechts (Seitenrand 16px, ab 768px 32px), in der Mitte das Buch, unten die Bildfolge-Linie (höchstens 680px breit).
+**Tisch:** alle Bände nebeneinander, leicht gedreht (−4°, +3°, …) und versetzt, darunter klein Titel und Tafelzahl. Einbandbreite `min(22vw, (100svh - 280px) / 1.5, 360px)` mal Maßstab des Bands (Japan 0.85), auf dem Telefon 54vw, abwechselnd links und rechts. Der Buchblock zeigt Papierkanten so dick, wie der Band Seiten hat. Hover hebt einen Band um 8px (`scale(1.015)`, 500ms), ein weicherer Schatten blendet dazu.
 
-Ab 768px wird das Buch als Doppelseite gebunden: Seitenbreite `min((100vw - 64px) / 2, (100dvh - 150px) / 1.3, 700px)`, Seitenformat 1:1.3. Darunter als Einzelseiten: Breite `min(100vw - 24px, (100dvh - 130px) / 1.46)`, Format 1:1.46, jede Tafel mit Unterschrift auf ihrer eigenen Seite.
+**Lesen:** Die Bühne ist ein Viewport hoch und klebt (`sticky`), darunter liegt eine Scrollspur von etwa 85svh pro Blatt plus ein Auslauf, auf dem sich das Buch zurück auf den Tisch legt. Kein Snapping. Kopfzeile: Wortmarke links, Titel der randlosen Tafel in der Mitte, rechts „Band · Tafel 4–5 / 26“. Unten die Bildfolge-Linie des Bands (höchstens 680px).
 
-Der Satzspiegel arbeitet mit großem, ungleichem Weißraum: Bildunterschriften sitzen unten links mit 12cqw Abstand, Hochformate stehen oben mit 8 bis 16cqw Einzug, Querformate mittig. Die Bilder laufen bis an die Papierkante, ohne weißen Rand. Drei Doppelseitentypen wechseln sich ab: eine Tafel randabfallend über die ganze rechte Seite mit der Unterschrift allein auf der Gegenseite; zwei Tafeln, die oben, außen und über den Bund bis an die Kante laufen und unten einen Papierstreifen von 15cqw für ihre Unterschrift lassen; ein Panorama über beide Seiten mit demselben Streifen. Auf dem Telefon läuft jede Hochformat-Tafel oben und seitlich bis an die Kante (Streifen 17cqw), Querformate laufen seitlich bis an die Kante. Randabfallend schneidet ein 2:3-Foto oben und unten etwa 13 % ab; das ganze Bild zeigt die vergrößerte Tafel.
+Ab 768px Doppelseite, Seitenbreite `min((100vw - 64px) / 2, (100svh - 150px) / Format, 640px)` mal Maßstab. Darunter Einzelseiten: `min(100vw - 24px, (100svh - 150px) / Format)`; leere Seiten und Vorsatz entfallen, das Bild über den Bund wird quer.
+
+**Satzspiegel** (cqw, Seitenbreite 100): Bund 6, oben 9, außen 12, unten 18 (Japan 15); Breite 82, Höhe passend zum Fotoformat. Raster: 6 Spalten, 2cqw Fuge. Geometrie für HTML und WebGL-Textur kommt aus derselben Funktion (`src/content/layout.ts`).
+
+**Seitentypen:** Vollbild (randlos, ohne Text) · Tafel (füllt den Satzspiegel, Unterschrift darunter) · kleine Tafel (2 oder 3 Spalten, oben oder unten, außen oder am Bund) · Querformat (volle Breite an der oberen Satzspiegellinie) · über den Bund (beide Seiten, Ausschnitt über `focus`) · leer (nur die Unterschrift der Gegenseite) · hohes Format (9:16 am Bund, außen ein Papierstreifen mit gestapelter Unterschrift). Am Ende jedes Bands: Bildverzeichnis als Kontaktbogen (Klick springt zur Tafel) und Kolophon.
 
 ### Named Rules
-**The Empty Facing Page Rule.** Eine Tafel darf eine leere Gegenseite haben, die nur ihre Unterschrift trägt. Der Leerraum ist Teil der Erzählung und wird nicht aufgefüllt.
+**The Rhythm Rule.** Zwei randlose Paare stehen nie direkt hintereinander; spätestens nach drei Doppelseiten kommt eine Seite mit viel Papier. Höchstens eine leere Seite pro Band.
+
+**The Gutter Rule.** Ein Bild über den Bund legt sein Motiv nie in die Mitte.
 
 ## Elevation & Depth
 
 Tiefe ist physisch, nicht ornamental. Es gibt genau ein Objekt über dem Tisch, das Buch, und sein Licht folgt der Mechanik: Das geschlossene Buch liegt um 16° gekippt und leicht verkleinert, beim Öffnen richtet es sich auf 4° auf. Papierkanten (7px, Streifen aus `paper` und `paper-shade`) wachsen links und schrumpfen rechts mit dem Lesefortschritt.
 
 ### Shadow Vocabulary
-- **Buch auf dem Tisch** (`box-shadow: 0 28px 50px -18px rgb(4 24 27 / 0.75), 0 6px 14px -6px rgb(4 24 27 / 0.5)`): nur unter dem aufgeschlagenen Teil, Farbe aus dem Petrol abgeleitet, nie neutralschwarz.
+- **Buch auf dem Tisch** (`box-shadow: 0 28px 50px -18px rgb(12 10 8 / 0.75), 0 6px 14px -6px rgb(12 10 8 / 0.5)`): nur unter dem aufgeschlagenen Teil, Farbe aus dem Petrol abgeleitet, nie neutralschwarz.
 - **Eingeklebtes Bild** (`box-shadow: 1px 2px 3px rgb(58 39 6 / 0.35), 0 0 0 0.5px rgb(58 39 6 / 0.2)`): das Coverbild steht minimal vom Leinen ab.
-- **Bundwölbung** (Verlauf `rgb(4 24 27 / 0.16)` über `rgb(4 24 27 / 0.05)` bei 30 % zu transparent, 14cqw breit): jede Innenseite dunkelt zum Bund hin.
-- **Blattlicht** (Verlauf `rgb(4 24 27 / 0.55)` zu `rgb(4 24 27 / 0.15)`, Deckkraft 0 bis 0.42): die Vorderseite dunkelt beim Aufrichten, die Rückseite hellt beim Ablegen.
-- **Biegung** (WebGL-Beleuchtung aus der Flächennormale, flach = 1.0, Glanzlicht auf der Wölbung, Petrol-Schatten auf der Seite darunter): steile Stellen werden dunkler, ohne Kanten oder Fugen.
-- **Eselsohr-Loch** (Verlauf `rgb(4 24 27 / 0.28)` an der Falte zu `paper-shade`): die Seite unter der umgeklappten Ecke.
-- **Palmenschatten** (Wedel in `rgb(4 24 27)`, Deckkraft 0.12, auf ein Neuntel der Auflösung gezeichnet und hochskaliert): Schatten einer Palme über Tisch und Buch, wiegt sich langsam (9s und 3.1s, `cubic-bezier(0.77, 0, 0.175, 1)`). Liegt unter Kopfzeile und Bildfolge, nie auf Bedienelementen.
-- **Sonne** (`soft-light`: oben rechts `rgb(255 205 130 / 0.55)` zu transparent, unten links `rgb(4 24 27 / 0.35)`): Licht von draußen, gleiche Stelle wie der Ansatz der Palme.
+- **Bundwölbung** (Verlauf `rgb(12 10 8 / 0.16)` über `rgb(12 10 8 / 0.05)` bei 30 % zu transparent, 14cqw breit): jede Innenseite dunkelt zum Bund hin.
+- **Blattlicht** (Verlauf `rgb(12 10 8 / 0.55)` zu `rgb(12 10 8 / 0.15)`, Deckkraft 0 bis 0.42): die Vorderseite dunkelt beim Aufrichten, die Rückseite hellt beim Ablegen.
+- **Biegung** (WebGL-Beleuchtung aus der Flächennormale, flach = 1.0, Glanzlicht auf der Wölbung, Basalt-Schatten auf der Seite darunter): steile Stellen werden dunkler, ohne Kanten oder Fugen.
+- **Eselsohr-Loch** (Verlauf `rgb(12 10 8 / 0.28)` an der Falte zu `paper-shade`): die Seite unter der umgeklappten Ecke.
+- **Palmenschatten** (Wedel in `rgb(12 10 8)`, Deckkraft 0.12, auf ein Neuntel der Auflösung gezeichnet und hochskaliert): Schatten einer Palme über Tisch und Buch, wiegt sich langsam (9s und 3.1s, `cubic-bezier(0.77, 0, 0.175, 1)`). Liegt unter Kopfzeile und Bildfolge, nie auf Bedienelementen.
+- **Sonne** (`soft-light`: oben rechts `rgb(255 205 130 / 0.55)` zu transparent, unten links `rgb(12 10 8 / 0.35)`): Licht von draußen, gleiche Stelle wie der Ansatz der Palme.
 - **Vergilbung** (Rand `rgb(196 160 92 / 0.16)` ab 72 % des Seitenradius, dazu feine Papierfaser bei 28 % Deckkraft): das Papier hat ein paar Sommer gesehen.
-- **Eselsohr** (`drop-shadow(-3px -3px 5px rgb(4 24 27 / 0.28))`): die Lasche der umgeklappten Ecke.
+- **Eselsohr** (`drop-shadow(-3px -3px 5px rgb(12 10 8 / 0.28))`): die Lasche der umgeklappten Ecke.
 
 ### Named Rules
 **The Physical Light Rule.** Ein Schatten oder Verlauf ist nur erlaubt, wenn er eine Stelle beschreibt, an der Papier oder Leinen liegt, sich biegt oder dreht. Keine Schatten auf Bedienelementen, keine Glanz- oder Glas-Effekte.
@@ -238,7 +250,7 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 - **Do** alles auf einer Seite in `cqw`/`cqh` setzen, Bildunterschriften nie unter 11px.
 - **Do** nur `transform`, `opacity` und `clip-path` animieren, Easing `cubic-bezier(0.23, 1, 0.32, 1)` oder `cubic-bezier(0.77, 0, 0.175, 1)`.
 - **Do** bei `prefers-reduced-motion` auf Stufen umschalten: Blätter springen, Feder, Einbandhinweis, Eselsohr und Fluganimation entfallen, Rastpunkte aus.
-- **Do** Schatten aus Petrol (`rgb(4 24 27)`) oder Prägebraun (`rgb(58 39 6)`) mischen, nie aus neutralem Grau.
+- **Do** Schatten aus Basalt (`rgb(12 10 8)`) oder Prägebraun (`rgb(58 39 6)`) mischen, nie aus neutralem Grau.
 
 ### Don't:
 - **Don't** Masonry-Raster, Kartengitter oder eine Lightbox ohne Herkunft bauen; Bilder kommen aus dem Buch und kehren dorthin zurück.
@@ -247,7 +259,3 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 - **Don't** Schatten oder Verläufe auf Bedienelemente legen; Licht gehört dem Papier.
 - **Don't** Kameradaten, Brennweiten, Aufnahmedaten oder Fujifilm-Zeichen zeigen.
 - **Don't** eine zweite Schrift einführen.
-
-## Tische zum Vergleichen
-
-Neben dem Petrol-Leinen gibt es drei Tische über `?tisch=`: `lava` (Basalt #1b1917, Korn plus Hauch Wolke, warmer Lichtkegel), `kalk` (gekalkte Wand #e8e4dc, feines Korn, Licht von oben rechts) und `sand` (#cdb594). Auf hellen Tischen wird die Marke (Zeitleiste, Fokus) dunkler (`--mark`, ≥ 4.1:1). Einband und Vorsatz bleiben Leinen.

@@ -10,8 +10,8 @@
   --cloth: #e8a72c; /* Einband, Ringelblume; auch die eine Akzentfarbe */
   --cloth-deep: #b97a12;
   --cloth-ink: #3a2706; /* Prägung auf dem Einband, 6.8:1 */
-  --paper: #f6f6f2;
-  --paper-shade: #e4e4dd;
+  --paper: #eee9df; /* Naturpapier; Tinte 14.1:1, Bildunterschrift 5.6:1 */
+  --paper-shade: #dcd5c8;
   --ink: #1b1c1a;
   --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.3:1 */
   --mark: var(--cloth); /* Position und Fokus; auf hellen Tischen dunkler */
@@ -122,6 +122,40 @@ body {
     radial-gradient(ellipse 80% 70% at 0% 100%, rgb(12 10 8 / 0.35), transparent 70%);
 }
 
+/* Nebel: kühles, gestreutes Licht von oben, ohne Schatten von Pflanzen */
+.mistlight {
+  mix-blend-mode: soft-light;
+  background:
+    radial-gradient(ellipse 90% 70% at 50% -10%, rgb(214 226 232 / 0.5), transparent 70%),
+    radial-gradient(ellipse 80% 70% at 100% 100%, rgb(12 10 8 / 0.3), transparent 70%);
+}
+
+/* Bücher auf dem Tisch: gedreht und versetzt; beim Zeigen heben sie sich an */
+.table-book {
+  transform: rotate(var(--rot)) translateY(var(--dy));
+}
+.table-book .lift {
+  transition: transform 500ms var(--ease-out);
+}
+.table-book button:hover .lift,
+.table-book button:focus-visible .lift {
+  transform: translateY(-8px) scale(1.015);
+}
+@media (max-width: 767px) {
+  .table-spread {
+    --tw: 54vw;
+  }
+  .table-book {
+    transform: rotate(calc(var(--rot) * 0.8));
+  }
+  .table-book:nth-child(odd) {
+    align-self: flex-start;
+  }
+  .table-book:nth-child(even) {
+    align-self: flex-end;
+  }
+}
+
 /* Fahrplan-Linie: Haltepunkte der Bildfolge */
 .stop {
   transition:
@@ -150,6 +184,16 @@ html.intro .intro-cover {
     opacity: 0;
     visibility: hidden;
   }
+}
+
+/* Buch vom Tisch nehmen und zurücklegen: der Einband fliegt, alles andere blendet kurz */
+::view-transition-group(*) {
+  animation-duration: 900ms;
+  animation-timing-function: var(--ease-in-out);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 420ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

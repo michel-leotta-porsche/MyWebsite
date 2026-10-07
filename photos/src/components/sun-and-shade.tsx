@@ -62,12 +62,16 @@ function drawPalm(ctx: CanvasRenderingContext2D, w: number, h: number) {
   }
 }
 
-/** Draußen lesen: warmes Licht von oben rechts und ein Palmenschatten, der sich im Wind wiegt */
-export function SunAndShade() {
+/**
+ * Licht über dem Tisch. sun: warmes Licht von oben rechts und ein Palmenschatten, der sich im Wind wiegt.
+ * mist: kühles, gestreutes Licht ohne Pflanzenschatten.
+ */
+export function SunAndShade({ light = "sun" }: { light?: "sun" | "mist" }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const c = canvas.current;
+    if (light !== "sun") return;
     if (document.documentElement.classList.contains("ohne-schatten")) return;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
@@ -82,7 +86,10 @@ export function SunAndShade() {
     draw();
     window.addEventListener("resize", draw);
     return () => window.removeEventListener("resize", draw);
-  }, []);
+  }, [light]);
+
+  if (light === "mist")
+    return <div aria-hidden data-shade className="mistlight pointer-events-none absolute inset-0 z-10 hidden md:block" />;
 
   return (
     <>
