@@ -146,6 +146,13 @@ export const newId = () =>
 // Testmodus ohne Firebase: alles bleibt im Speicher dieser Seite
 const MOCK = process.env.NEXT_PUBLIC_FUJI_MOCK === "1";
 const mem = { books: new Map<string, StoredBook>(), shares: new Map<string, Share>() };
+// im Testmodus überleben geteilte Bücher einen Seitenwechsel (für den Test des Gastlinks)
+if (MOCK && typeof window !== "undefined") {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem("fuji:mock-shares") ?? "[]") as Share[];
+    saved.forEach((sh) => mem.shares.set(sh.token, sh));
+  } catch {}
+}
 
 /** Drei Größen eines Fotos hochladen, Download-Links zurück */
 export async function uploadPhoto(uid: string, bookId: string, ph: Ingested): Promise<Record<SizeName, string>> {
@@ -183,6 +190,9 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
   const token = newId() + newId().slice(0, 8);
   if (MOCK) {
     mem.shares.set(token, { token, owner: b.owner, fromName: b.ownerName, to, book: b });
+    try {
+      sessionStorage.setItem("fuji:mock-shares", JSON.stringify([...mem.shares.values()]));
+    } catch {}
     return token;
   }
   await setDoc(doc(db(), "shares", token), {
@@ -197,6 +207,7 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
 }
 
 export async function loadShare(token: string): Promise<Share | null> {
+  if (MOCK) return mem.shares.get(token) ?? null;
   const s = await getDoc(doc(db(), "shares", token));
   return s.exists() ? (s.data() as Share) : null;
 }
@@ -214,6 +225,7 @@ export async function unshare(token: string) {
 export type Note = { id: string; kind: "note" | "ear"; text?: string; no?: number; from?: string; at?: { seconds: number } };
 
 export async function leaveNote(token: string, n: Omit<Note, "id" | "at">) {
+  if (MOCK) return;
   await addDoc(collection(db(), "shares", token, "notes"), { ...n, at: serverTimestamp() });
 }
 
@@ -225,6 +237,7 @@ export async function notesOf(token: string): Promise<Note[]> {
 
 /** Für mich hingelegt: im eigenen Konto merken, damit es auf meinem Tisch liegt */
 export async function keepInInbox(uid: string, share: Share) {
+  if (MOCK) return;
   await setDoc(doc(db(), "users", uid, "inbox", share.token), {
     token: share.token,
     title: share.book.title,

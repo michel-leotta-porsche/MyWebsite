@@ -28,6 +28,15 @@ service cloud.firestore {
       }
     }
 
+    // Kano-Fragebogen: anonyme Antworten, öffentlich lesbar für die Auswertung auf /qfd
+    match /kano/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['answers', 'camera', 'at'])
+        && request.resource.data.answers is map
+        && request.resource.data.answers.size() <= 30
+        && (!('camera' in request.resource.data) || request.resource.data.camera in ['handy', 'kamera', 'beides']);
+    }
+
     // Bücher, die jemand für mich hingelegt hat
     match /users/{uid}/inbox/{token} {
       allow read, write: if signedIn() && request.auth.uid == uid;

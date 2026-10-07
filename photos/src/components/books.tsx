@@ -32,6 +32,8 @@ export function Library({
   table,
   footer,
   bookExtra,
+  ears,
+  onEar,
 }: {
   books: BookData[];
   /** Kopf, Zusätze und Kacheln des Tisches */
@@ -39,6 +41,9 @@ export function Library({
   footer?: ReactNode;
   /** Zusätzliche Knöpfe in der Kopfzeile des offenen Buchs */
   bookExtra?: (book: BookData, plates: number[]) => ReactNode;
+  /** Eselsohren im offenen Buch und was beim Antippen der Ecke passiert */
+  ears?: number[];
+  onEar?: (no: number) => void;
 }) {
   const bookById = (id: string) => books.find((b) => b.id === id);
   const [wide, setWide] = useState<boolean | null>(null);
@@ -86,6 +91,8 @@ export function Library({
         autoOpen={view?.auto ?? false}
         onClose={close}
         extra={bookExtra}
+        ears={ears}
+        onEar={onEar}
       />
     );
   }

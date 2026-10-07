@@ -217,6 +217,42 @@ function Curl({ side, amount, flap }: { side: "left" | "right"; amount: MotionVa
   );
 }
 
+/** Eselsohr: die obere Außenecke knickt mit einer Feder um und bleibt so; beim Umblättern tritt es zurück */
+function Ear({ side, resting, reduce }: { side: "left" | "right"; resting: MotionValue<number>; reduce: boolean }) {
+  const right = side === "right";
+  const dir = right ? "to bottom left" : "to bottom right";
+  return (
+    <motion.div
+      aria-hidden
+      className="absolute top-0 aspect-square w-[16%] max-w-[96px]"
+      style={{ [right ? "right" : "left"]: 0, transformOrigin: right ? "top right" : "top left", opacity: resting }}
+      initial={reduce ? false : { scale: 0, rotate: right ? 8 : -8 }}
+      animate={{ scale: 1, rotate: 0 }}
+      exit={reduce ? { opacity: 0 } : { scale: 0 }}
+      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 17, mass: 0.8 }}
+    >
+      {/* Loch: darunter liegt die nächste Seite im Schatten der Falte */}
+      <div
+        className="absolute inset-0"
+        style={{
+          clipPath: right ? "polygon(0 0, 100% 0, 100% 100%)" : "polygon(0 0, 100% 0, 0 100%)",
+          background: `linear-gradient(${dir}, var(--paper) 0%, var(--paper-shade) 34%, rgb(12 10 8 / 0.3) 50%)`,
+        }}
+      />
+      {/* Lasche: Rückseite des Blatts, liegt auf der Seite und wirft einen kleinen Schatten */}
+      <div className="absolute inset-0 [filter:drop-shadow(-2px_3px_4px_rgb(12_10_8/0.35))]">
+        <div
+          className="absolute inset-0"
+          style={{
+            clipPath: right ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
+            background: `linear-gradient(${right ? "to top right" : "to top left"}, var(--paper) 50%, color-mix(in oklab, var(--paper) 70%, white) 51%, var(--paper-shade) 100%)`,
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 /** Wechselnder Text: neue Werte rollen von unten herein */
 export function RollingLabel({ text, reduce }: { text: string; reduce: boolean }) {
   return (
@@ -253,6 +289,8 @@ export function Book({
   autoOpen,
   onClose,
   extra,
+  ears,
+  onEar,
 }: {
   book: BookData;
   mode: Mode;
@@ -262,6 +300,10 @@ export function Book({
   onClose: () => void;
   /** Zusätzliche Knöpfe in der Kopfzeile, z. B. Zettel schreiben */
   extra?: (book: BookData, plates: number[]) => React.ReactNode;
+  /** Tafeln mit Eselsohr: die obere Außenecke ist umgeknickt */
+  ears?: number[];
+  /** Ecke antippen setzt ein Eselsohr */
+  onEar?: (no: number) => void;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -616,6 +658,12 @@ export function Book({
   };
 
   const current = platesOn(pagesAt(book, mode, k));
+  // Welche Seite trägt welche Tafel: links/rechts bei der Doppelseite, sonst die eine Seite
+  const sidePlates = (() => {
+    const pages = pagesAt(book, mode, kt);
+    const pick = (p?: Page) => (p && "no" in p && p.kind !== "blank" ? p.no : undefined);
+    return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
+  })();
   const label = labelAt(book, mode, k);
   const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
@@ -771,6 +819,34 @@ export function Book({
                       <Curl side="left" amount={curlLeft} flap={backTone(book, leaves[kt - 1]?.front)} />
                     </div>
                   )}
+
+                  {/* Eselsohren: umgeknickte obere Außenecke; die Ecke selbst ist auch der Knopf dafür */}
+                  {(["left", "right"] as const).map((side) => {
+                    const no = sidePlates[side];
+                    if (no === undefined || (side === "left" && mode !== "spread")) return null;
+                    const on = ears?.includes(no) ?? false;
+                    return (
+                      <div
+                        key={`ear-${side}-${kt}`}
+                        className="pointer-events-none absolute inset-y-0 z-[210]"
+                        style={{ [side]: 0, width: mode === "spread" ? "50%" : "100%" }}
+                      >
+                        <AnimatePresence>{on && <Ear key={no} side={side} resting={resting} reduce={reduce} />}</AnimatePresence>
+                        {onEar && !on && (
+                          <button
+                            type="button"
+                            aria-label={`Eselsohr bei Tafel ${no}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEar(no);
+                            }}
+                            className="pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
+                            style={{ [side]: 0 }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
 
                   {/* Blätterknöpfe für Tastatur und Screenreader, an den Außenkanten */}
                   <button

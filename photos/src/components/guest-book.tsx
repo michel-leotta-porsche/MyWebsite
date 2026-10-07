@@ -77,6 +77,12 @@ export function GuestBook() {
             </p>
           ),
         }}
+        ears={ears}
+        onEar={(no) => {
+          if (ears.includes(no) || !token) return;
+          setEars((e) => [...e, no]);
+          leaveNote(token, { kind: "ear", no, from }).catch(() => {});
+        }}
         bookExtra={(_, plates) => {
           // Eselsohr an der ersten Tafel der aufgeschlagenen Seite
           const no = plates[0];
