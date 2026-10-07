@@ -282,7 +282,7 @@ function Workbench() {
             </p>
           </div>
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
-          <div className="relative aspect-[4/3] w-full">
+          <div className="relative aspect-[4/3] w-full [perspective:1400px]">
             {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
             <div className={`bench-paper absolute inset-0 grid grid-cols-2 ${lifted}`}>
               <div className="relative">
@@ -290,8 +290,10 @@ function Workbench() {
               </div>
               <div className="relative">
                 <PageFace side="right">
-                  <Cap no={2} title="Mittagsblume" x={88} y={81} right />
-                  <Cap no={3} title="Markisen · 4 Platter Reifen" x={88} y={131} right />
+                  <div className="bench-caps absolute inset-0">
+                    <Cap no={2} title="Mittagsblume" x={88} y={81} right />
+                    <Cap no={3} title="Markisen · 4 Platter Reifen" x={88} y={131} right />
+                  </div>
                 </PageFace>
               </div>
             </div>
@@ -313,6 +315,7 @@ function Workbench() {
                   ["--i" as string]: i,
                 }}
               >
+                <div aria-hidden className="bench-shadow absolute inset-0 opacity-0 shadow-[0_60px_80px_-20px_rgb(12_10_8/0.6)]" />
                 <div aria-hidden className="bench-border bg-paper absolute -inset-[5px] shadow-[0_18px_30px_-12px_rgb(12_10_8/0.6)]" />
                 <div className="absolute inset-0">
                   <Image src={s.src} alt="" fill sizes={s.sizes} className="object-cover" />
