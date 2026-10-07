@@ -145,7 +145,7 @@ function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number
 async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
   ctx.fillStyle = C.paper;
   ctx.fillRect(0, 0, W, H);
-  paperTile ??= loadImage("/textures/paper.png");
+  paperTile ??= loadImage("/textures/paper.webp");
   const tile = await paperTile.catch(() => null);
   if (tile) {
     ctx.save();
@@ -171,7 +171,7 @@ async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, sc
 }
 
 async function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
-  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.png"), loadImage("/textures/linen-warp.png")]);
+  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.webp"), loadImage("/textures/linen-warp.webp")]);
   const tiles = await linenTiles.catch(() => []);
   ctx.save();
   ctx.globalAlpha = 0.13;

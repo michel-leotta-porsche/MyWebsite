@@ -83,8 +83,8 @@ body {
   /* ohne Mischmodus: WebKit legt sonst für jede Leinenfläche eine eigene Ebene in voller Auflösung an */
   opacity: 0.13;
   background-image:
-    url("/textures/linen-weft.png"),
-    url("/textures/linen-warp.png");
+    url("/textures/linen-weft.webp"),
+    url("/textures/linen-warp.webp");
 }
 
 /* Papier: Fasern und ein Hauch Vergilbung am Rand, wie ein Buch nach ein paar Sommern */
@@ -98,7 +98,7 @@ body {
   pointer-events: none;
   background-image:
     radial-gradient(ellipse 120% 105% at 50% 50%, transparent 72%, rgb(196 160 92 / 0.16) 100%),
-    url("/textures/paper.png");
+    url("/textures/paper.webp");
   opacity: 0.28;
 }
 
@@ -136,7 +136,7 @@ body {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("/textures/paper.png");
+  background-image: url("/textures/paper.webp");
   opacity: 0.18;
 }
 
@@ -240,6 +240,6 @@ html.ohne-schatten [data-shade] {
   background-image: var(--table-light);
 }
 .table-surface.linen::after {
-  background-image: url("/textures/stone-grain.png"), url("/textures/stone-cloud.png");
+  background-image: url("/textures/stone-grain.webp"), url("/textures/stone-cloud.webp");
   opacity: 0.09;
 }

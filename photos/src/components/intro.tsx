@@ -151,7 +151,9 @@ export function Intro() {
                 alt=""
                 sizes="330px"
                 className="block h-auto w-full"
-                loading="eager"
+                // lazy statt eager: kein Vorladen im Kopf der Seite. Der Einstieg ist ohne html.intro
+                // ausgeblendet (zweiter Besuch, weniger Bewegung), dann lädt der Browser die Abzüge gar nicht
+                loading="lazy"
               />
             </div>
           );

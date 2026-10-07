@@ -1,8 +1,16 @@
+import { preload } from "react-dom";
+
 import { Intro } from "@/components/intro";
 import { Library } from "@/components/books";
 import { books } from "@/content/books";
 
 export default function Home() {
+  // Gewebe von Tisch und Einbänden sind das größte sichtbare Element (LCP). Ohne Hinweis findet der
+  // Browser sie erst im CSS und holt sie hinter den Abzügen des Einstiegs.
+  preload("/textures/linen-weft.webp", { as: "image", fetchPriority: "high" });
+  preload("/textures/linen-warp.webp", { as: "image", fetchPriority: "high" });
+  preload("/textures/stone-grain.webp", { as: "image" });
+  preload("/textures/stone-cloud.webp", { as: "image" });
   return (
     <main>
       <Intro />
