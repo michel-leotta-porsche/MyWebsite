@@ -4,6 +4,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { useEffect, useState } from "react";
 
 import { auth } from "@/lib/firebase";
+import { setSessionHint } from "@/lib/session-hint";
 
 /** Angemeldete Person: undefined solange Firebase noch prüft, null wenn niemand angemeldet ist */
 export function useUser() {
@@ -14,7 +15,11 @@ export function useUser() {
       const id = window.setTimeout(() => setUser({ uid: "test", displayName: "Michel Test" } as User), 0);
       return () => window.clearTimeout(id);
     }
-    return onAuthStateChanged(auth(), (u) => setUser(u));
+    return onAuthStateChanged(auth(), (u) => {
+      setUser(u);
+      // Hinweis für die Landing, ob sie Firebase gleich laden soll
+      setSessionHint(!!u);
+    });
   }, []);
   return user;
 }

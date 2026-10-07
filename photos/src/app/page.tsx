@@ -10,10 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  // Gewebe von Tisch und Einband liegen hinter allem. Ohne Hinweis findet der Browser sie erst im CSS.
+  // Leinen des Einbands: ohne Hinweis findet der Browser es erst im CSS. Das Korn des Tischs ist nur ein Hauch und darf warten.
   preload("/textures/linen-weft.webp", { as: "image", fetchPriority: "high" });
   preload("/textures/linen-warp.webp", { as: "image", fetchPriority: "high" });
-  preload("/textures/stone-grain.webp", { as: "image" });
-  preload("/textures/stone-cloud.webp", { as: "image" });
   return <Landing />;
 }

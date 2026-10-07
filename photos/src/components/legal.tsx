@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Wordmark } from "@/components/app-ui";
+import { Wordmark } from "@/components/ui-base";
 
 // Impressum und Datenschutz: ein ruhiger Tisch mit einer Textspalte, gleicher Kopf wie die Räume.
 
