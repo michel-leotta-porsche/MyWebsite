@@ -16,7 +16,7 @@ import {
   where,
   addDoc,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "firebase/storage";
 
 import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } from "@/content/books";
 import type { CameraInfo, Recipe } from "@/content/recipes";
@@ -92,6 +92,10 @@ export type Share = {
   fromName: string;
   to: string;
   book: StoredBook;
+  /** Kennung des Buchs, auch wenn der Link gerade ruht (dann fehlt die Kopie) */
+  bookId?: string;
+  /** Buch liegt im Papierkorb: der Link zeigt nichts mehr */
+  paused?: boolean;
 };
 
 const ONES = ["", "ein", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
@@ -246,15 +250,67 @@ export async function importBook(file: File, owner: string, ownerName: string): 
   return b;
 }
 
-/** Buch in den Papierkorb legen oder zurück auf den Tisch; geteilte Links behalten ihre Kopie */
-export async function trashBook(id: string, on: boolean) {
+const sharesOfBook = async (uid: string, bookId: string) => (await mySharesOf(uid)).filter((s) => (s.bookId ?? s.book?.id) === bookId);
+const pausedMock = new Map<string, Share>();
+
+/**
+ * Buch in den Papierkorb legen oder zurück auf den Tisch.
+ * Im Papierkorb ruhen seine Links: die Kopie des Buchs wird aus dem Link genommen, Gäste sehen nichts mehr.
+ * Zurück auf dem Tisch bekommen die Links das Buch in seinem jetzigen Stand.
+ */
+export async function trashBook(b: StoredBook, on: boolean) {
   const trashed = on ? Date.now() : null;
   if (MOCK) {
-    const b = mem.books.get(id);
-    if (b) mem.books.set(id, { ...b, trashed: trashed ?? undefined });
+    mem.books.set(b.id, { ...b, trashed: trashed ?? undefined });
+    for (const s of [...mem.shares.values(), ...pausedMock.values()].filter((s) => s.book?.id === b.id)) {
+      if (on) {
+        mem.shares.delete(s.token);
+        pausedMock.set(s.token, s);
+      } else {
+        pausedMock.delete(s.token);
+        mem.shares.set(s.token, { ...s, book: { ...b, trashed: undefined } });
+      }
+    }
     return;
   }
-  await updateDoc(doc(db(), "books", id), { trashed });
+  await updateDoc(doc(db(), "books", b.id), { trashed });
+  const shares = await sharesOfBook(b.owner, b.id);
+  await Promise.all(
+    shares.map((s) =>
+      setDoc(doc(db(), "shares", s.token), {
+        token: s.token,
+        owner: s.owner,
+        fromName: s.fromName,
+        to: s.to,
+        bookId: b.id,
+        ...(on ? { paused: true } : { book: { ...b, trashed: null } }),
+        createdAt: serverTimestamp(),
+      }),
+    ),
+  );
+}
+
+/**
+ * Endgültig löschen: geteilte Links samt Zetteln, Zwischenstände, hochgeladene Fotos, das Buch selbst.
+ * Lässt sich nicht rückgängig machen.
+ */
+export async function deleteBookForever(b: StoredBook) {
+  if (MOCK) {
+    mem.books.delete(b.id);
+    for (const [t, s] of pausedMock) if (s.book?.id === b.id) pausedMock.delete(t);
+    return;
+  }
+  const shares = await sharesOfBook(b.owner, b.id);
+  for (const s of shares) {
+    const notes = await getDocs(collection(db(), "shares", s.token, "notes")).catch(() => null);
+    await Promise.all((notes?.docs ?? []).map((n) => deleteDoc(n.ref)));
+    await deleteDoc(doc(db(), "shares", s.token));
+  }
+  const versions = await getDocs(collection(db(), "books", b.id, "versions"));
+  await Promise.all(versions.docs.map((v) => deleteDoc(v.ref)));
+  const files = await listAll(ref(storage(), `u/${b.owner}/${b.id}`)).catch(() => null);
+  await Promise.all((files?.items ?? []).map((f) => deleteObject(f).catch(() => {})));
+  await deleteDoc(doc(db(), "books", b.id));
 }
 
 /** Geschenktes Buch vom eigenen Tisch nehmen; beim Schenkenden bleibt es */
@@ -289,6 +345,7 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
     fromName: b.ownerName,
     to,
     book: b,
+    bookId: b.id,
     createdAt: serverTimestamp(),
   });
   return token;
@@ -297,7 +354,10 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
 export async function loadShare(token: string): Promise<Share | null> {
   if (MOCK) return mem.shares.get(token) ?? null;
   const s = await getDoc(doc(db(), "shares", token));
-  return s.exists() ? (s.data() as Share) : null;
+  if (!s.exists()) return null;
+  const share = s.data() as Share;
+  // ruhender Link: das Buch liegt im Papierkorb
+  return share.paused || !share.book ? null : share;
 }
 
 export async function mySharesOf(uid: string): Promise<Share[]> {

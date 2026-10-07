@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { linkClass, SignInTable, TextButton } from "@/components/app-ui";
+import { linkClass, SignInTable, SlipDialog, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { ShareDialog } from "@/components/share-dialog";
 import { signOutNow } from "@/lib/firebase";
-import { dropFromInbox, importBook, inbox, keepInInbox, myBooks, toBookData, trashBook, type Share, type StoredBook } from "@/lib/store";
+import { deleteBookForever, dropFromInbox, importBook, inbox, keepInInbox, myBooks, toBookData, trashBook, type Share, type StoredBook } from "@/lib/store";
 import { useUser } from "@/lib/use-user";
 
 /** Mein Tisch: eigene Bücher, Bücher, die jemand für mich hingelegt hat, und ein leeres zum Anlegen */
@@ -21,6 +21,8 @@ export function MyTable() {
   /** zuletzt vom Tisch genommen: für „Rückgängig“ */
   const [removed, setRemoved] = useState<{ title: string; at: number; undo: () => void } | null>(null);
   const [showTrash, setShowTrash] = useState(false);
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [emptying, setEmptying] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,8 +68,24 @@ export function MyTable() {
   const trash = (own ?? []).filter((b) => b.trashed).sort((a, b) => (b.trashed ?? 0) - (a.trashed ?? 0));
 
   const setTrashed = (id: string, on: boolean) => {
-    setOwn((list) => list?.map((b) => (b.id === id ? { ...b, trashed: on ? Date.now() : undefined } : b)) ?? null);
-    trashBook(id, on).catch((e) => setError(String(e?.message ?? e)));
+    const b = own?.find((x) => x.id === id);
+    if (!b) return;
+    setOwn((list) => list?.map((x) => (x.id === id ? { ...x, trashed: on ? Date.now() : undefined } : x)) ?? null);
+    trashBook(b, on).catch((e) => setError(String(e?.message ?? e)));
+  };
+  const emptyTrash = async () => {
+    setEmptying(true);
+    const list = (own ?? []).filter((b) => b.trashed);
+    for (const b of list) {
+      try {
+        await deleteBookForever(b);
+        setOwn((all) => all?.filter((x) => x.id !== b.id) ?? null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      }
+    }
+    setEmptying(false);
+    setConfirmEmpty(false);
   };
   const removeOwn = (s: StoredBook) => {
     setTrashed(s.id, true);
@@ -172,6 +190,9 @@ export function MyTable() {
                   Papierkorb ({trash.length})
                 </TextButton>
                 {showTrash && (
+                  <p className="mt-2 max-w-xl text-[13px]">Bücher im Papierkorb liegen auf keinem Tisch, ihre geteilten Links zeigen nichts mehr.</p>
+                )}
+                {showTrash && (
                   <ul className="mt-4 max-w-xl">
                     {trash.map((b) => (
                       <li key={b.id} className="flex items-baseline justify-between gap-4 border-t border-on-table-2/25 py-2.5">
@@ -181,6 +202,9 @@ export function MyTable() {
                         <TextButton onClick={() => setTrashed(b.id, false)}>Zurück auf den Tisch</TextButton>
                       </li>
                     ))}
+                    <li className="border-t border-on-table-2/25 pt-3">
+                      <TextButton onClick={() => setConfirmEmpty(true)}>Papierkorb leeren …</TextButton>
+                    </li>
                   </ul>
                 )}
               </section>
@@ -197,6 +221,32 @@ export function MyTable() {
         }
       />
       {sharing && <ShareDialog book={sharing} onClose={() => setSharing(null)} />}
+      {confirmEmpty && (
+        <SlipDialog label="Papierkorb leeren" onClose={() => !emptying && setConfirmEmpty(false)}>
+          <p className="text-sm leading-relaxed">
+            {trash.length === 1 ? "Ein Buch wird" : `${trash.length} Bücher werden`} endgültig gelöscht: mit allen Fotos, Zwischenständen und geteilten Links samt
+            Zetteln der Gäste. Das lässt sich nicht rückgängig machen.
+          </p>
+          <ul className="text-ink-2 mt-3 text-[13px]">
+            {trash.map((b) => (
+              <li key={b.id}>· {b.title || "Ohne Titel"}</li>
+            ))}
+          </ul>
+          <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
+            <button
+              type="button"
+              disabled={emptying}
+              onClick={emptyTrash}
+              className="border-ink bg-ink text-paper hover:bg-ink/85 border px-3 py-2 font-semibold disabled:opacity-60"
+            >
+              {emptying ? "Löscht …" : "Endgültig löschen"}
+            </button>
+            <button type="button" disabled={emptying} onClick={() => setConfirmEmpty(false)} className="underline decoration-mark decoration-2 underline-offset-4">
+              Abbrechen
+            </button>
+          </div>
+        </SlipDialog>
+      )}
       {removed && <UndoToast key={removed.at} text={`„${removed.title}“ liegt nicht mehr auf dem Tisch.`} onUndo={removed.undo} onClose={() => setRemoved(null)} />}
     </main>
   );
