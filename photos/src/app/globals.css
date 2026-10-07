@@ -148,29 +148,66 @@ body {
     radial-gradient(ellipse 80% 70% at 100% 100%, rgb(12 10 8 / 0.3), transparent 70%);
 }
 
-/* Bücher auf dem Tisch: gedreht und versetzt; beim Zeigen heben sie sich an */
+/* Bücher in einer Reihe: unten bündig auf der Tischkante, leicht gedreht */
+.shelf {
+  --tw: min(18vw, 248px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 56px clamp(40px, 5vw, 72px);
+  padding-top: 12px;
+}
 .table-book {
-  transform: rotate(var(--rot)) translateY(var(--dy));
+  transform: rotate(var(--rot));
 }
 .table-book .lift {
-  transition: transform 500ms var(--ease-out);
+  transition: transform 160ms var(--ease-out);
 }
-.table-book button:hover .lift,
-.table-book button:focus-visible .lift {
-  transform: translateY(-8px) scale(1.015);
+.table-book.arrive .lift {
+  /* einmal hingelegt: aus 10px über der Ruhelage, sichtbar von Anfang an */
+  animation: lay-down 460ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 50ms);
+}
+@keyframes lay-down {
+  from {
+    transform: translateY(-10px);
+  }
+}
+.table-book button:active .lift {
+  transform: scale(0.985);
+  transition-duration: 120ms;
+}
+/* Anheben nur mit echter Maus; auf dem Telefon bliebe es nach dem Tippen hängen */
+@media (hover: hover) and (pointer: fine) {
+  .table-book button:hover .lift,
+  .table-book button:focus-visible .lift {
+    transform: translateY(-6px) rotate(calc(var(--rot) * -1));
+    transition-duration: 200ms;
+  }
+  .table-book button:hover .lift-shadow,
+  .table-book button:focus-visible .lift-shadow {
+    opacity: 1;
+  }
+  .table-book .book-actions {
+    opacity: 0;
+    transition: opacity 160ms var(--ease-out);
+  }
+  .table-book:hover .book-actions,
+  .table-book:focus-within .book-actions {
+    opacity: 1;
+  }
 }
 @media (max-width: 767px) {
-  .table-spread {
-    --tw: 54vw;
+  /* zwei Spalten statt Zickzack */
+  .shelf {
+    --tw: calc((100vw - 32px - 28px) / 2 - 8px);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 40px 28px;
   }
   .table-book {
-    transform: rotate(calc(var(--rot) * 0.8));
-  }
-  .table-book:nth-child(odd) {
-    align-self: flex-start;
-  }
-  .table-book:nth-child(even) {
-    align-self: flex-end;
+    transform: rotate(calc(var(--rot) * 0.6));
+    align-self: end;
   }
 }
 
@@ -200,8 +237,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sway {
+  .sway,
+  .table-book.arrive .lift {
     animation: none;
+  }
+  .table-book button .lift {
+    transform: none !important;
   }
   *,
   *::before,

@@ -3,6 +3,7 @@
     "public": "out",
     "predeploy": ["npm --prefix \"$PROJECT_DIR\" run export", "node \"$PROJECT_DIR/scripts/check-export.mjs\""],
     "cleanUrls": true,
+    "redirects": [{ "source": "/tisch", "destination": "/zimmer", "type": 301 }],
     "ignore": [
       "firebase.json",
       "**/.*",

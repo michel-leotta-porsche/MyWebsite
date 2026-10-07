@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 
-import { MyTable } from "@/components/my-table";
+import { Moved } from "./moved";
 
+// Die Werkbank als eigener Raum ist im Bücherzimmer aufgegangen; alte Lesezeichen führen dorthin
 export const metadata: Metadata = {
-  title: "Werkbank · Fujiventura",
+  title: "Bücherzimmer · Fujiventura",
   robots: { index: false, follow: false },
 };
 
 export default function Page() {
-  return <MyTable />;
+  return <Moved />;
 }
