@@ -140,11 +140,11 @@ export type Crop = { focus: [number, number]; zoom: number; fit: "cover" | "cont
 export type TextRole = "heading" | "body" | "note";
 export type FreeEl =
   | { t: "photo"; no: number; box: Box; crop?: Crop; caption: "auto" | "off" }
-  | { t: "text"; text: string; role: TextRole; box: Box };
+  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean };
 /** dasselbe mit Fotoschlüssel statt Nummer, so steht es im gespeicherten Buch */
 export type FreeItem =
   | { t: "photo"; id: string; key: string; box: Box; crop?: Crop; caption: "auto" | "off"; pairId?: string }
-  | { t: "text"; id: string; text: string; role: TextRole; box: Box };
+  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean };
 
 /** Tafelnummern auf einer Seite; die leere Seite zählt nicht */
 export const pageNos = (p: Page): number[] =>
@@ -251,7 +251,7 @@ export function build(spec: BookSpec): BookData {
           items: s.items.map((it): FreeEl =>
             it.t === "photo"
               ? { t: "photo", no: nos.get(it.key)!, box: it.box, crop: it.crop, caption: it.caption }
-              : { t: "text", text: it.text, role: it.role, box: it.box },
+              : { t: "text", text: it.text, role: it.role, box: it.box, light: it.light },
           ),
         };
       }

@@ -1033,6 +1033,9 @@ export function Editor() {
           items={stageItems}
           photos={byKey}
           shelf={shelf}
+          elsewhere={book.spreads.flatMap((sp, n) =>
+            n === stageIndex ? [] : sp.keys.flatMap((k) => (byKey.get(k) ? [{ photo: byKey.get(k)!, spread: n }] : [])),
+          )}
           free={!!stageSpread.pages}
           canUndo={undoState.past > 0}
           canRedo={undoState.future > 0}

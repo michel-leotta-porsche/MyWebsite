@@ -374,3 +374,14 @@ Reihenfolge nach Nutzen für Michels Satz („mehrere Bilder, verkleinern, vergr
 2. **Fotos pro Seite:** Wir empfehlen höchstens 4. Brauchst du eine Kontaktbogen-Seite mit 6–9 kleinen Bildern, z. B. für Serien?
 3. **Format einfrieren:** Beim ersten freien Handgriff wird das Seitenformat (2:3 oder 3:4) fest, danach wechselt es nur noch auf ausdrücklichen Wunsch. Passt das, oder soll man das Format gleich am Anfang selbst wählen?
 4. **Raster-Ausnahme schon jetzt:** Soll `Alt` bzw. „Frei setzen“ sofort mit Paket 1 kommen (S7), oder erst nach dem Kano-Fragebogen, wie es das QFD für F20 empfiehlt?
+
+---
+
+## 6. Entscheidungen nach Michels erstem Test (Paket 1 gebaut)
+
+- **Text auf Fotos ist erlaubt** (offene Frage 1 beantwortet). Dafür gibt es **Ebenen**: Die Reihenfolge der Elemente ist die Stapelung. Auf der Bühne gibt es eine Ebenen-Liste mit ↑/↓, „Ganz nach vorn/hinten“ und ⌘] / ⌘[. Fotos dürfen sich überlappen. Neue Fotos suchen trotzdem zuerst eine freie Stelle.
+- **Helle Schrift** als Schalter am Textrahmen, für Text auf dunklen Fotos. Es gibt keine freie Farbwahl.
+- **Text wird direkt auf der Seite geschrieben**: Doppelklick auf einen Text öffnet das Schreibfeld in derselben Schrift an derselben Stelle. Doppelklick aufs Papier legt einen neuen Absatz an. Die Textleiste steht sichtbar über der Doppelseite, Klicken legt ab, Ziehen legt an eine Stelle. Das „antippen, dann auf die Seite tippen“ ist entfallen, weil es nicht selbsterklärend war.
+- **Alle Fotos auf der Bühne**: Unter der Doppelseite steht eine Leiste aus Ablage und den Fotos aller anderen Doppelseiten. Ein hereingeholtes Foto wandert von seiner Doppelseite herüber.
+- **Ein Foto über den Bund** hat nur eine Unterschrift, auf der Seite mit dem größeren Anteil. Der Ausschnitt-Dialog zeigt das ganze Feld über beide Seiten.
+- **Für die UX-Diskussion:** Auf der Bühne gibt es keinen „Speichern“-Knopf, nur „Zur Übersicht“. Gespeichert wird bei jeder Geste von selbst. Offen ist, ob das als Rückmeldung reicht.

@@ -58,14 +58,14 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
 }
 
 /** Dialog auf Zettelpapier, mittig über dem Tisch */
-export function SlipDialog({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
+export function SlipDialog({ label, onClose, children, wide = false }: { label: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 md:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className="slip text-ink relative w-full max-w-md p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]"
+        className={`slip text-ink relative w-full ${wide ? "max-w-3xl" : "max-w-md"} p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
       >

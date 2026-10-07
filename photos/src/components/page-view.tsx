@@ -12,7 +12,7 @@ import { PlateButton } from "@/components/plate-viewer";
 /** Sprung aus dem Bildverzeichnis zur Tafel */
 export const JumpContext = createContext<(no: number) => void>(() => {});
 
-const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "" };
+const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "", paper: "text-paper" };
 
 function Gutter({ side }: { side: "left" | "right" }) {
   // Wölbung zum Bund hin: das Papier biegt sich, also wird es dunkler

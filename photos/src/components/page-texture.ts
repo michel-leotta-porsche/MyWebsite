@@ -261,7 +261,7 @@ async function drawLayout(
         const px = el.size < 3.4 ? Math.max(min, el.size * cq) : el.size * cq;
         setFont(ctx, el.weight, px, family, el.display);
         track(ctx, el.display ? -0.035 : 0, px);
-        ctx.fillStyle = el.tone === "ink" ? C.ink : el.tone === "ink2" ? C.ink2 : book.cloth.ink;
+        ctx.fillStyle = el.tone === "ink" ? C.ink : el.tone === "ink2" ? C.ink2 : el.tone === "paper" ? C.paper : book.cloth.ink;
         const paras = el.lines ? el.text.split("\n") : [el.text];
         const rows = paras.flatMap((para) => (el.w ? (para ? wrap(ctx, para, el.w * cq) : [""]) : [para]));
         rows.forEach((r, n) => ctx.fillText(r, el.x * cq, baseline(el.y * cq + n * el.lh * px, px, el.lh)));

@@ -3,7 +3,7 @@ import { colWidth, pageNos, plateOf, typeArea, type BookData, type FreeEl, type 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
 // (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
 
-export type Tone = "ink" | "ink2" | "clothInk";
+export type Tone = "ink" | "ink2" | "clothInk" | "paper";
 
 export type El =
   /** Foto, beschnitten auf den Kasten (object-fit: cover) */
@@ -137,14 +137,17 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
     const b = boxes[i];
     if (it.t === "photo") {
       els.push({ t: "img", no: it.no, ...b, ...(it.crop ?? view(book, it.no)), plate: true });
-      const visible = b.x < 100 && b.x + b.w > 0;
+      // ein Foto über den Bund trägt nur eine Unterschrift: auf der Seite, auf der mehr von ihm liegt
+      const here = Math.min(100, b.x + b.w) - Math.max(0, b.x);
+      const there = b.x < 0 ? -b.x : Math.max(0, b.x + b.w - 100);
+      const visible = here > 0 && (b.x < 0 ? here > there : here >= there);
       if (it.caption === "auto" && visible) {
         const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i));
         if (cap) els.push(cap);
       }
     } else {
       const st = TEXT_ROLE[it.role];
-      els.push({ t: "text", text: it.text, x: b.x, y: b.y, size: st.size, weight: st.weight, tone: st.tone, lh: st.lh, w: b.w, display: st.display, lines: true });
+      els.push({ t: "text", text: it.text, x: b.x, y: b.y, size: st.size, weight: st.weight, tone: it.light ? "paper" : st.tone, lh: st.lh, w: b.w, display: st.display, lines: true });
     }
   });
   return els;
