@@ -236,7 +236,16 @@ export function Editor() {
   }, []);
 
   // Dateien irgendwo auf der Seite ablegen; nie die Datei im Browser öffnen
-  const hasFiles = (e: DragEvent | React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  // alles, was nicht aus dem Editor selbst kommt, gilt als Datei von außen (Safari und Firefox melden die Typen unterschiedlich)
+  const hasFiles = (e: DragEvent | React.DragEvent) => {
+    const types = Array.from(e.dataTransfer?.types ?? []);
+    if (types.includes("text/x-spread") || types.includes("text/x-photo")) return false;
+    return types.includes("Files") || types.includes("application/x-moz-file") || Array.from(e.dataTransfer?.items ?? []).some((i) => i.kind === "file");
+  };
+  const isInternal = (e: DragEvent) => {
+    const types = Array.from(e.dataTransfer?.types ?? []);
+    return types.includes("text/x-spread") || types.includes("text/x-photo");
+  };
   const filesOf = (dt: DataTransfer) => {
     const direct = Array.from(dt.files ?? []);
     if (direct.length) return direct;
@@ -249,7 +258,8 @@ export function Editor() {
   useEffect(() => {
     let depth = 0;
     const over = (e: DragEvent) => {
-      if (!hasFiles(e)) return;
+      if (isInternal(e)) return;
+      // immer erlauben, sonst öffnet der Browser die Datei selbst
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     };
@@ -264,7 +274,7 @@ export function Editor() {
       if (!depth) setDragOver(false);
     };
     const drop = (e: DragEvent) => {
-      if (!e.dataTransfer || !hasFiles(e)) return;
+      if (!e.dataTransfer || isInternal(e)) return;
       e.preventDefault();
       depth = 0;
       setDragOver(false);
@@ -274,22 +284,24 @@ export function Editor() {
         addRef.current(files);
       } else {
         // z. B. aus der Fotos-App am Mac: dort kommen keine Dateien im Browser an
+        if (!hasFiles(e) && !e.dataTransfer.types.includes("text/uri-list")) return;
         setDropHint("Diese Fotos kamen nicht als Dateien an. Aus der Fotos-App bitte erst in den Finder ziehen oder „Fotos auswählen“ nutzen.");
       }
     };
-    window.addEventListener("dragover", over);
-    window.addEventListener("dragenter", enter);
-    window.addEventListener("dragleave", leave);
-    window.addEventListener("drop", drop);
+    window.addEventListener("dragover", over, true);
+    window.addEventListener("dragenter", enter, true);
+    window.addEventListener("dragleave", leave, true);
+    window.addEventListener("drop", drop, true);
     return () => {
-      window.removeEventListener("dragover", over);
-      window.removeEventListener("dragenter", enter);
-      window.removeEventListener("dragleave", leave);
-      window.removeEventListener("drop", drop);
+      window.removeEventListener("dragover", over, true);
+      window.removeEventListener("dragenter", enter, true);
+      window.removeEventListener("dragleave", leave, true);
+      window.removeEventListener("drop", drop, true);
     };
   }, []);
 
-  // Fotos reinziehen: eins nach dem anderen lesen, kodieren, hochladen; jedes Foto landet auf einer freien Seite
+  // Fotos reinziehen: zwei gleichzeitig lesen und kodieren, Hochladen läuft neben dem nächsten Foto her.
+  // Das Buch wird gesammelt neu gerechnet (höchstens alle 800 ms), nicht nach jedem Foto.
   const addFiles = useCallback(
     async (files: File[]) => {
       const b = bookRef.current;
@@ -297,38 +309,73 @@ export function Editor() {
       const t0 = performance.now();
       performance.mark("fuji:upload-start");
       const room = MAX - b.photos.length;
-      const list = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|heic|png)$/i.test(f.name)).slice(0, room);
+      const isImage = (f: File) => f.type.startsWith("image/") || /\.(jpe?g|heic|heif|png|webp|avif|dng|tiff?)$/i.test(f.name);
+      const skipped = files.filter((f) => !isImage(f));
+      const list = files.filter(isImage).slice(0, room);
+      const over = files.filter(isImage).length - list.length;
       const items: Pending[] = list.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "lesen" }));
-      setPending((p) => [...p, ...items]);
-      for (let i = 0; i < list.length; i++) {
-        const it = items[i];
-        const mark = (state: Pending["state"], error?: string) =>
-          setPending((p) => p.map((x) => (x.key === it.key ? { ...x, state, error } : x)));
-        try {
-          const ph = await ingest(list[i], it.key);
-          mark("laden");
-          const urls = await uploadPhoto(user.uid, b.id, ph);
-          const stored: StoredPhoto = {
-            key: ph.key,
-            title: "",
-            alt: "",
-            w: ph.w,
-            h: ph.h,
-            src: urls.page,
-            large: urls.large,
-            thumb: urls.thumb,
-            color: ph.color,
-            subject: ph.subject,
-            taken: ph.taken,
-            recipe: ph.recipe,
-            camera: ph.camera,
-          };
-          update((cur) => relayout({ ...cur, photos: [...cur.photos, stored] }));
-          mark("fertig");
-        } catch (e) {
-          mark("fehler", e instanceof Error ? e.message : "Fehler");
+      setPending((p) => [
+        ...p,
+        ...items,
+        ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: "kein Foto" })),
+      ]);
+      if (over > 0) setDropHint(`${over} Fotos passen nicht mehr hinein, ein Buch hat höchstens ${MAX}.`);
+      const mark = (key: string, state: Pending["state"], error?: string) =>
+        setPending((p) => p.map((x) => (x.key === key ? { ...x, state, error } : x)));
+
+      let ready: StoredPhoto[] = [];
+      let timer = 0;
+      const flush = () => {
+        window.clearTimeout(timer);
+        timer = 0;
+        if (!ready.length) return;
+        const add = ready;
+        ready = [];
+        update((cur) => relayout({ ...cur, photos: [...cur.photos, ...add] }), "upload");
+        setPending((p) => p.map((x) => (add.some((a) => a.key === x.key) ? { ...x, state: "fertig" } : x)));
+      };
+
+      const uploads: Promise<void>[] = [];
+      let next = 0;
+      const work = async () => {
+        while (next < list.length) {
+          const i = next++;
+          const it = items[i];
+          try {
+            const ph = await ingest(list[i], it.key);
+            mark(it.key, "laden");
+            // Hochladen nicht abwarten: das nächste Foto wird schon gelesen
+            uploads.push(
+              uploadPhoto(user.uid, b.id, ph).then(
+                (urls) => {
+                  ready.push({
+                    key: ph.key,
+                    title: "",
+                    alt: "",
+                    w: ph.w,
+                    h: ph.h,
+                    src: urls.page,
+                    large: urls.large,
+                    thumb: urls.thumb,
+                    color: ph.color,
+                    subject: ph.subject,
+                    taken: ph.taken,
+                    recipe: ph.recipe,
+                    camera: ph.camera,
+                  });
+                  if (!timer) timer = window.setTimeout(flush, 800);
+                },
+                (e) => mark(it.key, "fehler", e instanceof Error ? e.message : "Hochladen fehlgeschlagen"),
+              ),
+            );
+          } catch (e) {
+            mark(it.key, "fehler", e instanceof Error ? e.message : "Fehler");
+          }
         }
-      }
+      };
+      await Promise.all([work(), work()]);
+      await Promise.all(uploads);
+      flush();
       // Messgrundlage T2: Zeit vom Reinziehen bis zum fertigen Erstentwurf
       performance.measure("fuji:erstentwurf", "fuji:upload-start");
       setFirstDraft((performance.now() - t0) / 1000);
@@ -543,13 +590,13 @@ export function Editor() {
             <p className="text-on-table text-lg font-semibold">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</p>
             <p className="text-on-table-2 max-w-[60ch] text-sm leading-relaxed">
               Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen
-              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. Bis zu {MAX} Fotos.
+              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone, bis zu {MAX} Fotos.
             </p>
             <TextButton onClick={() => fileInput.current?.click()}>Fotos auswählen</TextButton>
             <input
               ref={fileInput}
               type="file"
-              accept="image/jpeg,image/heic,image/png"
+              accept="image/*,.heic,.heif,.dng"
               multiple
               className="sr-only"
               onChange={(e) => {
@@ -563,7 +610,12 @@ export function Editor() {
               </p>
             )}
             {pending.length > 0 && (
-              <ul className="text-on-table-2 w-full space-y-1 text-sm" aria-live="polite">
+              <p className="text-on-table text-sm tabular-nums" aria-live="polite">
+                {pending.filter((p) => p.state === "fertig").length} von {pending.filter((p) => p.error !== "kein Foto").length} Fotos im Buch
+              </p>
+            )}
+            {pending.length > 0 && (
+              <ul className="text-on-table-2 max-h-48 w-full space-y-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
                 {pending.map((p) => (
                   <li key={p.key} className="flex justify-between gap-4">
                     <span className="truncate">{p.name}</span>

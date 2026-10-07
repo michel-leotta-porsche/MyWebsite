@@ -179,13 +179,16 @@ if (MOCK && typeof window !== "undefined") {
 export async function uploadPhoto(uid: string, bookId: string, ph: Ingested): Promise<Record<SizeName, string>> {
   if (MOCK)
     return { thumb: URL.createObjectURL(ph.blobs.thumb), page: URL.createObjectURL(ph.blobs.page), large: URL.createObjectURL(ph.blobs.large) };
-  const out = {} as Record<SizeName, string>;
-  for (const size of ["thumb", "page", "large"] as SizeName[]) {
-    const r = ref(storage(), `u/${uid}/${bookId}/${ph.key}-${size}.jpg`);
-    await uploadBytes(r, ph.blobs[size], { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
-    out[size] = await getDownloadURL(r);
-  }
-  return out;
+  // drei Größen gleichzeitig hochladen
+  const sizes = ["thumb", "page", "large"] as SizeName[];
+  const urls = await Promise.all(
+    sizes.map(async (size) => {
+      const r = ref(storage(), `u/${uid}/${bookId}/${ph.key}-${size}.jpg`);
+      await uploadBytes(r, ph.blobs[size], { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
+      return getDownloadURL(r);
+    }),
+  );
+  return Object.fromEntries(sizes.map((s, i) => [s, urls[i]])) as Record<SizeName, string>;
 }
 
 export async function saveBook(b: StoredBook) {
