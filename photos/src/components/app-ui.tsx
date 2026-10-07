@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 import { signIn } from "@/lib/firebase";
 
@@ -57,17 +57,35 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
   );
 }
 
-/** Dialog auf Zettelpapier, mittig über dem Tisch */
+/**
+ * Dialog auf Zettelpapier, mittig über dem Tisch. Natives <dialog> mit showModal(): der Fokus geht hinein und
+ * bleibt drin, der Hintergrund ist inert, Esc schließt, danach kehrt der Fokus zum Auslöser zurück (UX-Kritik K2).
+ */
 export function SlipDialog({ label, onClose, children, wide = false }: { label: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    const back = document.activeElement as HTMLElement | null;
+    if (!d.open) d.showModal();
+    return () => {
+      d.close();
+      back?.focus({ preventScroll: true });
+    };
+  }, []);
   return (
-    <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 md:items-center" onClick={onClose}>
+    <dialog
+      ref={ref}
+      aria-label={label}
+      className="fixed inset-0 z-[700] m-0 flex h-full max-h-none w-full max-w-none items-end justify-center bg-transparent p-3 backdrop:bg-[rgb(12_10_8/0.55)] md:items-center"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        className={`slip text-ink relative w-full ${wide ? "max-w-3xl" : "max-w-md"} p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]`}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
+        className={`slip text-ink relative max-h-full w-full overflow-y-auto ${wide ? "max-w-3xl" : "max-w-md"} p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]`}
       >
         <div className="mb-4 flex items-baseline justify-between gap-4 border-b border-ink/15 pb-3">
           <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
@@ -83,9 +101,9 @@ export function SlipDialog({ label, onClose, children, wide = false }: { label: 
         </div>
         {children}
       </div>
-    </div>
+    </dialog>
   );
 }
 
 export const inputClass =
-  "w-full border border-ink/25 bg-transparent px-3 py-2 text-ink placeholder:text-ink-2 focus-visible:outline-2 focus-visible:outline-ink";
+  "w-full border border-ink-2 bg-transparent px-3 py-2 text-ink placeholder:text-ink-2 focus-visible:outline-2 focus-visible:outline-ink";

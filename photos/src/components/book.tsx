@@ -386,7 +386,8 @@ export function Book({
   const fill = useTransform(t, range, range.map(progressAt));
   const fillT = useMotionTemplate`scaleX(${fill})`;
 
-  // Hinweis zum Blättern: verschwindet nach dem ersten Mal und kommt in dieser Sitzung nicht wieder
+  // Hinweis zum Blättern: verschwindet nach dem ersten eigenen Umblättern und kommt in dieser Sitzung nicht wieder.
+  // Das Aufschlagen des Einbands läuft vom Tisch aus von selbst, deshalb zählt erst das Blatt danach.
   const seen = useSyncExternalStore(
     noopSubscribe,
     () => {
@@ -400,13 +401,18 @@ export function Book({
   );
   const [turned, setTurned] = useState(false);
   useMotionValueEvent(t, "change", (v) => {
-    if (turned || v < 0.9) return;
+    if (turned || v < 1.9) return;
     setTurned(true);
     try {
       sessionStorage.setItem(SWIPED, "1");
     } catch {}
   });
   const hinted = seen || turned;
+
+  // Nach dem Aufschlagen steht der Fokus im Buch, nicht auf body (Pfeiltasten, Tab zur Bildfolge)
+  useEffect(() => {
+    track.current?.focus({ preventScroll: true });
+  }, []);
 
   const goTo = useCallback(
     (step: number, instant = false) => {
@@ -664,6 +670,9 @@ export function Book({
     const pick = (p?: Page) => (p ? pageNos(p)[0] : undefined);
     return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
   })();
+  // Zettel auf die Gegenseite seines Fotos; über den Bund oder als Einzelseite bleibt er rechts
+  const slipSide =
+    mode === "spread" && slipPlate && sidePlates.right === slipPlate.no && sidePlates.left !== slipPlate.no ? "left" : "right";
   const label = labelAt(book, mode, k);
   const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
@@ -675,7 +684,8 @@ export function Book({
     <section
       ref={track}
       aria-label={`Fotobuch ${book.title}`}
-      className="relative"
+      tabIndex={-1}
+      className="relative outline-none"
       style={{ height: swipe ? "100svh" : `${count * 85 + 100 + OUTRO * 85}svh` }}
     >
       {/* Haltepunkte: jedes offene Doppelblatt hat seine Scrollposition */}
@@ -706,6 +716,10 @@ export function Book({
             style={{ fontVariationSettings: '"wdth" 80' }}
             aria-label="Fujiventura, zurück zum Tisch"
           >
+            {/* Pfeil zeigt, dass der Name zurückführt; auf dem Telefon gibt es kein Esc */}
+            <span aria-hidden className="text-on-table-2 mr-1.5 inline-block font-normal">
+              ←
+            </span>
             Fujiventura
           </button>
           {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
@@ -840,9 +854,19 @@ export function Book({
                               e.stopPropagation();
                               onEar(no);
                             }}
-                            className="pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
+                            className="group/ear pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
                             style={{ [side]: 0 }}
-                          />
+                          >
+                            {/* Ecke hebt sich beim Zeigen leicht an: hier lässt sich etwas knicken (UX-Kritik K20) */}
+                            <span
+                              aria-hidden
+                              className="bg-paper-shade absolute top-0 h-5 w-5 opacity-0 shadow-[0_2px_4px_-1px_rgb(12_10_8/0.35)] transition-opacity duration-200 group-hover/ear:opacity-100 group-focus-visible/ear:opacity-100"
+                              style={{
+                                [side]: 0,
+                                clipPath: side === "right" ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
+                              }}
+                            />
+                          </button>
                         )}
                       </div>
                     );
@@ -888,13 +912,14 @@ export function Book({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                {swipe ? "Wischen zum Blättern" : "Scrollen zum Blättern"}
+                {swipe ? "Wischen oder Tippen zum Blättern" : "Scrollen, Klicken oder ← → zum Blättern"}
               </motion.p>
             )}
           </AnimatePresence>
-          {/* Scrub-Leiste: tippen oder ziehen springt zur nächsten Tafel; die Knöpfe bleiben für die Tastatur */}
+          {/* Scrub-Leiste: tippen oder ziehen springt zur nächsten Tafel; die Knöpfe bleiben für die Tastatur.
+              Auf dem Telefon 44px hoch, damit der Finger die schmalen Haltepunkte trifft */}
           <div
-            className="relative h-6 cursor-pointer touch-none"
+            className="relative h-11 cursor-pointer touch-none md:h-6"
             onPointerDown={(e) => {
               scrubbing.current = true;
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -924,7 +949,7 @@ export function Book({
                       onClick={() => goTo(stepForPlate(p.no))}
                       aria-label={`Tafel ${p.no}: ${p.title}`}
                       aria-current={active ? "true" : undefined}
-                      className="flex h-6 w-full max-w-6 items-center justify-center"
+                      className="flex h-full w-full max-w-6 items-center justify-center"
                     >
                       <span
                         aria-hidden
@@ -946,7 +971,7 @@ export function Book({
       </motion.div>
 
       <AnimatePresence>
-        {slipPlate && !viewer && <RecipeSlip key={slipPlate.no} plate={slipPlate} onClose={closeSlip} />}
+        {slipPlate && !viewer && <RecipeSlip key={slipPlate.no} plate={slipPlate} onClose={closeSlip} side={slipSide} />}
       </AnimatePresence>
 
       {viewer && (
@@ -983,6 +1008,7 @@ function SlipButtons({
           key={no}
           type="button"
           aria-expanded={slip === no}
+          aria-label={`${label} zu Tafel ${no}`}
           onClick={() => onOpen(slip === no ? null : { no, k })}
           className="text-on-table underline decoration-mark decoration-2 underline-offset-4"
         >

@@ -13,7 +13,7 @@
   --paper: #eee9df; /* Naturpapier; Tinte 14.1:1, Bildunterschrift 5.6:1 */
   --paper-shade: #dcd5c8;
   --ink: #1b1c1a;
-  --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.3:1 */
+  --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 5.6:1; auf dem Zettel 5.3:1 */
   --slip: #ebe3d1; /* Rezeptzettel, dünneres, vergilbtes Papier; Tinte 13.4:1, graue Tinte 5.3:1 */
   --mark: var(--cloth); /* Position und Fokus; auf hellen Tischen dunkler */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);

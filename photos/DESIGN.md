@@ -122,7 +122,7 @@ Licht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wöl
 Monochromer Tisch aus Basalt, ein warmes Buchleinen-Gelb als einzige Stimme, Naturpapier mit fast schwarzer Tinte. Jeder Band hat sein eigenes Leinen.
 
 ### Primary
-- **Ringelblumen-Buchleinen** (`cloth`): Fläche des Einbands, sonst nur Signal: gefüllter Teil der Bildfolge-Linie, aktiver Haltepunkt, Unterstrich bei Hover der Textknöpfe, Fokusrahmen auf dem Tisch, Textauswahl, Scrollbalken. Auf dem Tisch erreicht es 4.34:1, also nur für Nicht-Text (Linien, Balken, Rahmen) einsetzen.
+- **Ringelblumen-Buchleinen** (`cloth`): Fläche des Einbands, sonst nur Signal: gefüllter Teil der Bildfolge-Linie, aktiver Haltepunkt, Unterstrich bei Hover der Textknöpfe, Fokusrahmen auf dem Tisch, Textauswahl, Scrollbalken. Auf dem Tisch erreicht es 8.34:1, bleibt aber Signal: nur für Nicht-Text (Linien, Balken, Rahmen) einsetzen. Auf Papier und Zettel hat es nur 1.7:1.
 - **Tiefes Buchleinen** (`cloth-deep`): Falz am Rücken des Einbands (25 % und 60 % Deckkraft) und Vorsatzpapier (90 %). Nie für Text.
 - **Prägung** (`cloth-ink`): Titel und Autorname auf dem Einband (6.79:1 auf `cloth`), Textfarbe der Auswahl.
 
@@ -130,7 +130,7 @@ Monochromer Tisch aus Basalt, ein warmes Buchleinen-Gelb als einzige Stimme, Nat
 - **Basalt** (`table`): der Tisch, feines Steinkorn statt Gewebe, ein warmer Lichtkegel in der Mitte; Hintergrund der ganzen Bühne und `theme-color`.
 - **Tiefer Basalt** (`table-deep`): Fuß der Seite, Hintergrund der vergrößerten Tafel, Spur des Scrollbalkens.
 - **Leinenweiß** (`on-table`): Haupttext auf dem Tisch: Wortmarke, aktueller Abschnitt im Zähler, Knöpfe im Vollbild (14.1:1 auf `table`).
-- **Aschgrau** (`on-table-2`): Nebentext auf dem Tisch, inaktive Haltepunkte, Grundlinie der Bildfolge mit 40 % Deckkraft (6.3:1 auf `table`).
+- **Aschgrau** (`on-table-2`): Nebentext auf dem Tisch, inaktive Haltepunkte, Grundlinie der Bildfolge mit 40 % Deckkraft (voll 6.3:1 auf `table`, die Linie mit 40 % etwa 2.1:1, nur Deko).
 - **Naturpapier** (`paper`): alle Innenseiten.
 - **Nebelgraues Leinen** (`cloth-mist`, Falz und Vorsatz `cloth-mist-deep`): Einband des Japan-Bands, Schrift darauf nur in `ink` (10.2:1).
 - **Papierschatten** (`paper-shade`): Papierkanten des Blockstapels, Unterseite im Eselsohr.
@@ -247,7 +247,7 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 
 ### Do:
 - **Do** jede neue Fläche einem der drei Materialien zuordnen: Tischleinen (`table`), Buchleinen (`cloth`) oder Papier (`paper`).
-- **Do** `cloth` auf dem Tisch nur für Linien, Balken, Unterstriche und Fokus einsetzen (4.34:1, kein Text).
+- **Do** `cloth` auf dem Tisch nur für Linien, Balken, Unterstriche und Fokus einsetzen (Signal, kein Text).
 - **Do** auf Papier den Fokus in `ink` setzen, auf dem Tisch in `cloth`.
 - **Do** alles auf einer Seite in `cqw`/`cqh` setzen, Bildunterschriften nie unter 11px.
 - **Do** nur `transform`, `opacity` und `clip-path` animieren, Easing `cubic-bezier(0.23, 1, 0.32, 1)` oder `cubic-bezier(0.77, 0, 0.175, 1)`.

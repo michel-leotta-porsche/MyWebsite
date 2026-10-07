@@ -8,7 +8,8 @@ import { linkClass, SignInTable, SlipDialog, TextButton } from "@/components/app
 import { Library } from "@/components/books";
 import { ShareDialog } from "@/components/share-dialog";
 import { signOutNow } from "@/lib/firebase";
-import { deleteBookForever, dropFromInbox, importBook, inbox, keepInInbox, myBooks, toBookData, trashBook, type Share, type StoredBook } from "@/lib/store";
+import { deleteBookForever, dropFromInbox, importBook, inbox, keepInInbox, myBooks, saveBook, toBookData, trashBook, type Share, type StoredBook } from "@/lib/store";
+import { friendlyError } from "@/lib/errors";
 import { useUser } from "@/lib/use-user";
 
 /** Mein Tisch: eigene Bücher, Bücher, die jemand für mich hingelegt hat, und ein leeres zum Anlegen */
@@ -34,7 +35,7 @@ export function MyTable() {
         setOwn(b);
         setGifts(g);
       })
-      .catch((e) => alive && setError(String(e?.message ?? e)));
+      .catch((e) => alive && setError(friendlyError(e)));
     return () => {
       alive = false;
     };
@@ -71,7 +72,7 @@ export function MyTable() {
     const b = own?.find((x) => x.id === id);
     if (!b) return;
     setOwn((list) => list?.map((x) => (x.id === id ? { ...x, trashed: on ? Date.now() : undefined } : x)) ?? null);
-    trashBook(b, on).catch((e) => setError(String(e?.message ?? e)));
+    trashBook(b, on).catch((e) => setError(friendlyError(e)));
   };
   const emptyTrash = async () => {
     setEmptying(true);
@@ -81,7 +82,7 @@ export function MyTable() {
         await deleteBookForever(b);
         setOwn((all) => all?.filter((x) => x.id !== b.id) ?? null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(friendlyError(e));
       }
     }
     setEmptying(false);
@@ -94,7 +95,7 @@ export function MyTable() {
   const removeGift = (g: Share) => {
     if (!user) return;
     setGifts((list) => list.filter((x) => x.token !== g.token));
-    dropFromInbox(user.uid, g.token).catch((e) => setError(String(e?.message ?? e)));
+    dropFromInbox(user.uid, g.token).catch((e) => setError(friendlyError(e)));
     setRemoved({
       title: g.book.title || "Ohne Titel",
       at: Date.now(),
@@ -128,7 +129,7 @@ export function MyTable() {
                     const b = await importBook(f, user.uid, user.displayName ?? "Ich");
                     location.href = `/neu?id=${b.id}`;
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : String(err));
+                    setError(friendlyError(err));
                   }
                 }}
               />
@@ -220,7 +221,18 @@ export function MyTable() {
           </>
         }
       />
-      {sharing && <ShareDialog book={sharing} onClose={() => setSharing(null)} />}
+      {sharing && (
+        <ShareDialog
+          book={sharing}
+          onClose={() => setSharing(null)}
+          onTitle={async (title) => {
+            const b = { ...sharing, title };
+            await saveBook(b);
+            setOwn((all) => all?.map((x) => (x.id === b.id ? b : x)) ?? null);
+            setSharing(b);
+          }}
+        />
+      )}
       {confirmEmpty && (
         <SlipDialog label="Papierkorb leeren" onClose={() => !emptying && setConfirmEmpty(false)}>
           <p className="text-sm leading-relaxed">
