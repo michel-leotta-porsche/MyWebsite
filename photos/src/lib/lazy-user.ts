@@ -44,10 +44,22 @@ export function useLazyUser() {
   return user;
 }
 
-/** Mit Google anmelden. Ist Firebase schon da, öffnet sich das Fenster noch im Klick (sonst blockt Safari es eher) */
-export async function signInLazily() {
-  const fb = loaded ?? (await loadFirebase());
-  const cred = await fb.signIn();
-  setSessionHint(true);
-  return cred;
+/** Firebase im Leerlauf nach dem Laden holen (nur den Code, ohne Anmeldung): beim Tippen ist es dann meist schon da */
+export function prefetchFirebaseWhenIdle() {
+  const go = () => void loadFirebase();
+  const idle = () => ("requestIdleCallback" in window ? requestIdleCallback(go, { timeout: 4000 }) : setTimeout(go, 2500));
+  if (document.readyState === "complete") idle();
+  else window.addEventListener("load", idle, { once: true });
+}
+
+/**
+ * Mit Google anmelden, das Fenster öffnet sich noch im Tipp. Safari blockt es, wenn zwischen Tipp und Öffnen
+ * erst Code geladen wird; ist Firebase noch nicht da, gibt es null zurück und die Seite leitet zur Anmeldung weiter.
+ */
+export function signInNow() {
+  if (!loaded) return null;
+  return loaded.signIn().then((cred) => {
+    setSessionHint(true);
+    return cred;
+  });
 }

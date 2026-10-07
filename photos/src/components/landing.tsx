@@ -3,14 +3,14 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { FrameButton, linkClass, TextButton } from "@/components/ui-base";
 import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
-import { loadFirebase, signInLazily, useLazyUser } from "@/lib/lazy-user";
+import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
@@ -37,11 +37,13 @@ function useEnter() {
   const user = useLazyUser();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  useEffect(prefetchFirebaseWhenIdle, []);
   const enter = () => {
+    const signing = signInNow();
+    // Firebase noch nicht geladen: das Bücherzimmer zeigt dieselbe Anmeldung, dort öffnet sich das Fenster sicher
+    if (!signing) return router.push("/zimmer");
     setBusy(true);
-    signInLazily()
-      .then(() => router.push("/zimmer"))
-      .catch(() => setBusy(false));
+    signing.then(() => router.push("/zimmer")).catch(() => setBusy(false));
   };
   // Firebase schon laden, wenn der Finger oder Zeiger auf dem Knopf landet: beim Klick ist es dann meist da
   const warm = { onPointerEnter: loadFirebase, onPointerDown: loadFirebase, onFocus: loadFirebase };
