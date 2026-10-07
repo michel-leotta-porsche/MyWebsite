@@ -116,6 +116,10 @@ export function Stage({
   const press = useRef<number>(0);
   const [say, setSay] = useState("");
   const [crop, setCrop] = useState<string | null>(null);
+  /** Zuschneiden direkt auf der Seite (wie in PowerPoint) */
+  const [cropping, setCropping] = useState<string | null>(null);
+  /** Auftrag aus der Werkzeugleiste an den Zuschneide-Modus */
+  const [cropMsg, setCropMsg] = useState<"done" | "cancel" | null>(null);
   const [page, setPage] = useState<0 | 1>(0);
   const [width, setWidth] = useState(0);
   const [coarse, setCoarse] = useState(false);
@@ -156,6 +160,7 @@ export function Stage({
     items: p.items.flatMap((it): FreeEl[] => {
       if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light }];
       const no = noOf(it.key);
+      if (it.id === cropping) return [];
       return no ? [{ t: "photo", no, box: it.box, crop: it.crop, caption: it.caption }] : [];
     }),
   }));
@@ -412,7 +417,7 @@ export function Stage({
       remove(it);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (it.t === "photo") setCrop(it.id);
+      if (it.t === "photo") setCropping(it.id);
       else setEditing(it.id);
     }
   };
@@ -465,7 +470,8 @@ export function Stage({
       : [];
     if (it?.t === "photo")
       return [
-        { label: "Ausschnitt …", hint: "Enter", run: () => setCrop(it.id) },
+        { label: "Zuschneiden", hint: "Doppelklick", run: () => setCropping(it.id) },
+        { label: "Ausschnitt-Dialog …", run: () => setCrop(it.id) },
         {
           label: "Unterschrift auf der Seite",
           checked: it.caption === "auto",
@@ -587,6 +593,7 @@ export function Stage({
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (cropping) return;
       if (e.key === "Escape" && !crop) {
         if (editing) setEditing(null);
         else if (sel) setSel(null);
@@ -610,7 +617,7 @@ export function Stage({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editing, crop, onClose, sel]);
+  }, [editing, crop, cropping, onClose, sel]);
 
   const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : narrow ? page : 0;
   useEffect(() => {
@@ -638,7 +645,7 @@ export function Stage({
   const showGrid = gridOn || !!draft;
 
   return (
-    <div className="linen table-surface fixed inset-0 z-[600] overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
+    <div className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
           <TextButton onClick={onClose}>← Zur Übersicht</TextButton>
@@ -685,6 +692,28 @@ export function Stage({
               ))}
             </div>
           )}
+          {cropping ? (
+            <div className="mb-4 flex min-h-9 items-center gap-x-5 overflow-hidden" role="toolbar" aria-label="Zuschneiden">
+              <span className="text-on-table shrink-0 text-sm font-semibold">Zuschneiden</span>
+              <button type="button" onClick={() => setCropMsg("done")} className="border-on-table text-on-table hover:bg-on-table hover:text-table min-h-9 shrink-0 border px-3 text-sm font-semibold transition-colors duration-150">
+                Fertig
+              </button>
+              <TextButton className="shrink-0" onClick={() => setCropMsg("cancel")}>
+                Abbrechen
+              </TextButton>
+              <TextButton
+                className="shrink-0"
+                onClick={() => {
+                  const id = cropping;
+                  setCropMsg("cancel");
+                  setCrop(id);
+                }}
+              >
+                Mehr …
+              </TextButton>
+              <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
+            </div>
+          ) : (
           <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-on-table text-sm font-semibold">Text</span>
             {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
@@ -702,10 +731,15 @@ export function Stage({
             ))}
             <span className="text-on-table-2 text-[13px]">oder Doppelklick aufs Papier</span>
           </div>
+          )}
           {width > 0 && (
-            <div className="overflow-hidden shadow-[0_24px_48px_-20px_rgb(12_10_8/0.85)]" style={{ width: narrow ? pageW : W }}>
+            <div
+              className="shadow-[0_24px_48px_-20px_rgb(12_10_8/0.85)]"
+              // Griffe dürfen über den Rand ragen; schmal wird nur waagerecht auf eine Seite beschnitten
+              style={{ width: narrow ? pageW : W, overflowX: narrow ? "clip" : "visible", overflowY: "visible" }}
+            >
               <div
-                className="relative transition-transform duration-500 ease-out"
+                className="relative transition-transform duration-500 ease-out select-none"
                 style={{ width: W, height: Hpx, transform: narrow && page === 1 ? `translateX(${-pageW}px)` : undefined }}
               >
                 {(["left", "right"] as const).map((side, i) => (
@@ -744,7 +778,7 @@ export function Stage({
                 <div
                   ref={layerEl}
                   data-stage-layer
-                  className="absolute inset-0 z-50 cursor-text"
+                  className="absolute inset-0 z-50 cursor-text select-none"
                   onPointerMove={onMove}
                   onPointerUp={onUp}
                   onPointerCancel={onUp}
@@ -799,7 +833,7 @@ export function Stage({
                           onPointerDown={(e) => startDrag(e, it, null)}
                           onDoubleClick={(e) => {
                             e.stopPropagation();
-                            if (it.t === "photo") setCrop(it.id);
+                            if (it.t === "photo") setCropping(it.id);
                             else setEditing(it.id);
                           }}
                           onContextMenu={(e) => {
@@ -816,7 +850,7 @@ export function Stage({
                     );
                   })}
                   {/* Griffe des gewählten Elements liegen über allem, ohne das Darunter zu verdecken */}
-                  {selected && selected.id !== editing && (
+                  {selected && selected.id !== editing && selected.id !== cropping && (
                     <div className="pointer-events-none absolute" style={pct(boxOf(selected, geom))}>
                       {draft?.id === selected.id && draft.original && (
                         <span className="bg-ink text-paper absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">Originalformat</span>
@@ -835,6 +869,28 @@ export function Stage({
                         ))}
                     </div>
                   )}
+                  {(() => {
+                    const it = cropping ? items.find((i) => i.id === cropping) : undefined;
+                    const ph = it?.t === "photo" ? photos.get(it.key) : undefined;
+                    if (!it || it.t !== "photo" || !ph) return null;
+                    return (
+                      <CropMode
+                        key={it.id}
+                        item={it}
+                        photo={ph}
+                        H={grid.H}
+                        pxPerUnit={pageW / 100}
+                        snapX={grid.xs}
+                        snapY={grid.ys.map((y) => (y / 100) * grid.H)}
+                        message={cropMsg}
+                        onDone={(box, c) => {
+                          setCropMsg(null);
+                          setCropping(null);
+                          if (box) commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, box, crop: c } : i)), undefined, "Zugeschnitten");
+                        }}
+                      />
+                    );
+                  })()}
                   {editItem && editItem.t === "text" && (
                     <textarea
                       autoFocus
@@ -904,7 +960,7 @@ export function Stage({
               photo={photos.get(selected.key)}
               onCaption={(c) => commit(items.map((i) => (i.id === selected.id ? { ...i, caption: c } : i)))}
               onTitle={(title) => onPhoto(selected.key, { title }, `t-${selected.key}`)}
-              onCrop={() => setCrop(selected.id)}
+              onCrop={() => setCropping(selected.id)}
               onRemove={() => remove(selected)}
               onLayer={(to) => layer(selected.id, to)}
               onDuplicate={() => duplicate(selected)}
@@ -1149,6 +1205,227 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
             </button>
           ),
         )}
+      </div>
+    </div>
+  );
+}
+
+type R = { x: number; y: number; w: number; h: number };
+
+/**
+ * Zuschneiden auf der Seite: Rahmen F und ganzes Bild I in Seiteneinheiten (cqw, y = Höhe in cqw).
+ * Lage wie im Buch: I.x = F.x + Fokus × (F.w − I.w), Zoom = I.w / Breite bei „füllt den Rahmen“.
+ */
+function CropMode({
+  item,
+  photo,
+  H,
+  pxPerUnit,
+  snapX,
+  snapY,
+  message,
+  onDone,
+}: {
+  item: Extract<FreeItem, { t: "photo" }>;
+  photo: StoredPhoto;
+  H: number;
+  pxPerUnit: number;
+  snapX: number[];
+  snapY: number[];
+  message: "done" | "cancel" | null;
+  onDone: (box: Box | null, crop: { focus: [number, number]; zoom: number; fit: "cover" }) => void;
+}) {
+  const start = () => {
+    const F: R = { x: item.box.x, y: (item.box.y / 100) * H, w: item.box.w, h: (item.box.h / 100) * H };
+    const c = item.crop ?? { focus: photo.focus ?? [0.5, 0.5], zoom: photo.zoom ?? 1, fit: photo.fit ?? "cover" };
+    const s0 = Math.max(F.w / photo.w, F.h / photo.h);
+    const z = c.fit === "contain" ? 1 : Math.max(1, c.zoom);
+    const w = photo.w * s0 * z;
+    const h = photo.h * s0 * z;
+    return { F, I: { x: F.x + c.focus[0] * (F.w - w), y: F.y + c.focus[1] * (F.h - h), w, h } };
+  };
+  const [st, setSt] = useState(start);
+  const drag = useRef<{ mode: "pan" | "frame" | "image"; e: Edges; sx: number; sy: number; F0: R; I0: R } | null>(null);
+  const done = useRef(false);
+
+  const finish = (apply: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (!apply) return onDone(null, { focus: [0.5, 0.5], zoom: 1, fit: "cover" });
+    const { F, I } = st;
+    const s0 = Math.max(F.w / photo.w, F.h / photo.h);
+    const zoom = Math.max(1, I.w / (photo.w * s0));
+    const fx = Math.abs(F.w - I.w) < 0.01 ? 0.5 : (I.x - F.x) / (F.w - I.w);
+    const fy = Math.abs(F.h - I.h) < 0.01 ? 0.5 : (I.y - F.y) / (F.h - I.h);
+    const clamp = (v: number) => Math.min(1, Math.max(0, v));
+    onDone({ x: F.x, y: (F.y / H) * 100, w: F.w, h: (F.h / H) * 100 }, { focus: [clamp(fx), clamp(fy)], zoom, fit: "cover" });
+  };
+  const finishRef = useRef(finish);
+  useEffect(() => {
+    finishRef.current = finish;
+  });
+  useEffect(() => {
+    if (message) finishRef.current(message === "done");
+  }, [message]);
+
+  /** Bild deckt den Rahmen immer ganz ab */
+  const fitImage = (I: R, F: R): R => {
+    const k = Math.max(1, F.w / I.w, F.h / I.h);
+    const w = I.w * k;
+    const h = I.h * k;
+    return { w, h, x: Math.min(F.x, Math.max(F.x + F.w - w, I.x)), y: Math.min(F.y, Math.max(F.y + F.h - h, I.y)) };
+  };
+
+  // Tastatur: Pfeile verschieben das Bild, + / − zoomen, Enter übernimmt, Esc bricht ab
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finishRef.current(true);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        finishRef.current(false);
+      } else if (/^Arrow/.test(e.key) || e.key === "+" || e.key === "-" || e.key === "=") {
+        e.preventDefault();
+        setSt(({ F, I }) => {
+          if (e.key === "+" || e.key === "=" || e.key === "-") {
+            const k = e.key === "-" ? 1 / 1.05 : 1.05;
+            const w = I.w * k;
+            const h = I.h * k;
+            return { F, I: fitImage({ x: I.x - (w - I.w) / 2, y: I.y - (h - I.h) / 2, w, h }, F) };
+          }
+          const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key] ?? [0, 0];
+          return { F, I: fitImage({ ...I, x: I.x + d[0], y: I.y + d[1] }, F) };
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+
+  const begin = (e: React.PointerEvent, mode: "pan" | "frame" | "image", edges: Edges = {}) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { mode, e: edges, sx: e.clientX, sy: e.clientY, F0: st.F, I0: st.I };
+  };
+  const near = (v: number, list: number[]) => {
+    const th = 8 / pxPerUnit;
+    let best = v;
+    for (const t of list) if (Math.abs(t - v) < th && Math.abs(t - v) < Math.abs(best - v) + (best === v ? th : 0)) best = t;
+    return best;
+  };
+  const move = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = (e.clientX - d.sx) / pxPerUnit;
+    const dy = (e.clientY - d.sy) / pxPerUnit;
+    const { F0, I0 } = d;
+    if (d.mode === "pan") return setSt({ F: F0, I: fitImage({ ...I0, x: I0.x + dx, y: I0.y + dy }, F0) });
+    if (d.mode === "frame") {
+      // Rahmen schneiden: innerhalb des Bildes, Kanten rasten am Raster ein, das Bild bleibt stehen
+      let l = F0.x;
+      let r = F0.x + F0.w;
+      let t = F0.y;
+      let b = F0.y + F0.h;
+      const min = 4;
+      if (d.e.l) l = Math.min(r - min, Math.max(I0.x, near(F0.x + dx, snapX)));
+      if (d.e.r) r = Math.max(l + min, Math.min(I0.x + I0.w, near(F0.x + F0.w + dx, snapX)));
+      if (d.e.t) t = Math.min(b - min, Math.max(I0.y, near(F0.y + dy, snapY)));
+      if (d.e.b) b = Math.max(t + min, Math.min(I0.y + I0.h, near(F0.y + F0.h + dy, snapY)));
+      l = Math.max(0, l);
+      r = Math.min(200, r);
+      t = Math.max(0, t);
+      b = Math.min(H, b);
+      return setSt({ F: { x: l, y: t, w: r - l, h: b - t }, I: I0 });
+    }
+    // Bild an einer Ecke größer oder kleiner, die Gegenecke bleibt stehen
+    const sx = d.e.r ? 1 : -1;
+    const sy = d.e.b ? 1 : -1;
+    const k0 = Math.max((I0.w + sx * dx) / I0.w, (I0.h + sy * dy) / I0.h);
+    const ax = d.e.r ? I0.x : I0.x + I0.w;
+    const ay = d.e.b ? I0.y : I0.y + I0.h;
+    const need = Math.max(
+      d.e.r ? (F0.x + F0.w - ax) / I0.w : (ax - F0.x) / I0.w,
+      d.e.b ? (F0.y + F0.h - ay) / I0.h : (ay - F0.y) / I0.h,
+    );
+    const k = Math.min(6, Math.max(need, k0));
+    const w = I0.w * k;
+    const h = I0.h * k;
+    setSt({ F: F0, I: { w, h, x: d.e.r ? ax : ax - w, y: d.e.b ? ay : ay - h } });
+  };
+  const up = () => {
+    drag.current = null;
+  };
+
+  const pc = (r: R): React.CSSProperties => ({ left: `${r.x / 2}%`, top: `${(r.y / H) * 100}%`, width: `${r.w / 2}%`, height: `${(r.h / H) * 100}%` });
+  const { F, I } = st;
+  const frameHandles: { e: Edges; cls: string; cursor: string }[] = HANDLES.map((h) => ({ e: h.e, cls: h.cls, cursor: h.cursor }));
+  const corners: { e: Edges; cls: string; cursor: string }[] = [
+    { e: { t: true, l: true }, cls: "left-0 top-0", cursor: "nwse-resize" },
+    { e: { t: true, r: true }, cls: "left-full top-0", cursor: "nesw-resize" },
+    { e: { b: true, r: true }, cls: "left-full top-full", cursor: "nwse-resize" },
+    { e: { b: true, l: true }, cls: "left-0 top-full", cursor: "nesw-resize" },
+  ];
+  return (
+    <div
+      className="absolute inset-0 z-[60] select-none"
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onPointerDown={(e) => e.target === e.currentTarget && finish(true)}
+      onDoubleClick={() => finish(true)}
+    >
+      {/* das ganze Bild, blass; darüber der Ausschnitt im Rahmen voll */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- genaue Lage beim Zuschneiden */}
+      <img
+        src={photo.src}
+        alt=""
+        draggable={false}
+        onPointerDown={(e) => begin(e, "pan")}
+        className="absolute max-w-none cursor-move touch-none select-none opacity-40"
+        style={pc(I)}
+      />
+      <div className="pointer-events-none absolute overflow-hidden outline-2 outline-mark" style={pc(F)}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- genaue Lage beim Zuschneiden */}
+        <img
+          src={photo.src}
+          alt=""
+          draggable={false}
+          className="absolute max-w-none"
+          style={{ left: `${((I.x - F.x) / F.w) * 100}%`, top: `${((I.y - F.y) / F.h) * 100}%`, width: `${(I.w / F.w) * 100}%`, height: `${(I.h / F.h) * 100}%` }}
+        />
+      </div>
+      {/* Griffe am Rahmen: schneiden */}
+      <div className="pointer-events-none absolute" style={pc(F)}>
+        {frameHandles.map((h, i) => {
+          const corner = (h.e.l || h.e.r) && (h.e.t || h.e.b);
+          return (
+            <span
+              key={i}
+              aria-hidden
+              onPointerDown={(e) => begin(e, "frame", h.e)}
+              className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center ${h.cls}`}
+              style={{ width: 28, height: 28, cursor: h.cursor }}
+            >
+              <span className={`bg-ink block border border-paper ${corner ? "h-3 w-3" : h.e.l || h.e.r ? "h-5 w-1.5" : "h-1.5 w-5"}`} />
+            </span>
+          );
+        })}
+      </div>
+      {/* Ecken am Bild: vergrößern */}
+      <div className="pointer-events-none absolute" style={pc(I)}>
+        {corners.map((h, i) => (
+          <span
+            key={i}
+            aria-hidden
+            onPointerDown={(e) => begin(e, "image", h.e)}
+            className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center ${h.cls}`}
+            style={{ width: 28, height: 28, cursor: h.cursor }}
+          >
+            <span className="bg-paper border-ink block h-3 w-3 border" />
+          </span>
+        ))}
       </div>
     </div>
   );
