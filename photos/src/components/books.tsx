@@ -115,7 +115,12 @@ export function Library({
   }, [linked, bookReady]);
 
   const book = view ? bookById(view.id) : undefined;
-  const close = useCallback(() => change(null), [change]);
+  // Zurück auf dem Tisch steht der Fokus wieder auf dem Band, der offen war
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const close = useCallback(() => {
+    setReturnTo(view?.id ?? null);
+    change(null);
+  }, [change, view?.id]);
   // bis der Code da ist, bleibt der Tisch liegen (wie im HTML vom Server)
   const Book = bookReady ? LoadedBook : null;
 

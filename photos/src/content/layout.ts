@@ -79,14 +79,39 @@ export const estimateLines = (text: string, size: number, width: number) =>
 /** Textseite: Größen der beiden Stile in cqw */
 export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh: 1.35 } } as const;
 
-/** Bildverzeichnis: Fuge zwischen den Daumen, Abstand Daumen zu Daumen darunter (Nummer + Luft) */
-const INDEX_GAP = 2;
-const INDEX_ROW = 5;
-/** Platz unter dem letzten Daumen für die Nummer: 0.8 Abstand plus eine Zeile, auch bei 9px auf schmalen Seiten */
-const INDEX_LABEL = 4.4;
+/** Textrahmen auf freien Seiten: drei gesetzte Stile, keine Regler */
+export const TEXT_ROLE: Record<TextRole, { size: number; weight: 400 | 700; lh: number; tone: Tone; display?: boolean; label: string }> = {
+  heading: { size: 6, weight: 700, lh: 1.02, tone: "ink", display: true, label: "Überschrift" },
+  body: { size: 3.2, weight: 400, lh: 1.5, tone: "ink", label: "Absatz" },
+  note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: "Notiz" },
+};
+
+/** Schriften der Textrahmen als CSS-Variablen (layout.tsx) */
+export const FONTS: Record<FontKey, { label: string; css: string; lh: number }> = {
+  grotesk: { label: "Grotesk", css: "var(--font-bricolage)", lh: 1 },
+  serif: { label: "Serif", css: "var(--font-serif)", lh: 1.05 },
+  mono: { label: "Schreibmaschine", css: "var(--font-mono)", lh: 1.05 },
+  hand: { label: "Handschrift", css: "var(--font-hand)", lh: 1 },
+};
+/** Schriftgröße, Stärke und Zeilenabstand eines Textrahmens: Stil plus freie Werte */
+export function textMetrics(role: TextRole, look?: TextLook) {
+  const st = TEXT_ROLE[role];
+  const size = look?.size ?? st.size;
+  const font = look?.font ?? "grotesk";
+  // Schreibmaschine läuft breiter, Handschrift schmaler
+  const width = font === "mono" ? 0.62 / 0.52 : font === "hand" ? 0.42 / 0.52 : 1;
+  return { size, weight: look?.bold === undefined ? st.weight : look.bold ? 700 : 400, lh: st.lh * FONTS[font].lh, font, width };
+}
+
+/** Höhe eines Textrahmens in cqw (dieselbe Schätzung setzt HTML und Textur) */
+export const textHeight = (text: string, role: TextRole, w: number, look?: TextLook) => {
+  const m = textMetrics(role, look);
+  return estimateLines(text || " ", m.size * m.width, w) * m.size * m.lh;
+};
+
 /**
- * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
- * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
+ * Raster einer Seite in cqw: 6 Spalten und 9 Zeilen im Satzspiegel, je 2cqw Fuge.
+ * xs/ys sind alle Linien, an denen eine Kante einrasten darf (Spaltenanfänge und -enden, Seitenkanten).
  */
 export function gridLines(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
   const ta = typeArea(book, side);
@@ -175,6 +200,32 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
     }
   });
   return els;
+}
+
+/** Bildverzeichnis: Fuge zwischen den Daumen, Abstand Daumen zu Daumen darunter (Nummer + Luft) */
+const INDEX_GAP = 2;
+const INDEX_ROW = 5;
+/** Platz unter dem letzten Daumen für die Nummer: 0.8 Abstand plus eine Zeile, auch bei 9px auf schmalen Seiten */
+const INDEX_LABEL = 4.4;
+/**
+ * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
+ * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
+ */
+const INDEX_COLS = [4, 6, 8, 10, 12] as const;
+
+/** Die größten Daumen, bei denen alle Tafeln samt Nummern im Satzspiegel bleiben */
+export function indexGrid(book: BookData, ta: { y: number; w: number; h: number }) {
+  const n = book.plates.length;
+  const top = ta.y + 7;
+  const bottom = ta.y + ta.h;
+  const grid = (cols: number) => {
+    const cw = (ta.w - (cols - 1) * INDEX_GAP) / cols;
+    const ch = cw * book.aspect;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const end = top + (rows - 1) * (ch + INDEX_ROW) + ch + INDEX_LABEL;
+    return { cols, cw, ch, top, rows, end };
+  };
+  return INDEX_COLS.map(grid).find((g) => g.end <= bottom) ?? grid(INDEX_COLS[INDEX_COLS.length - 1]);
 }
 
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
