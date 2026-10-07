@@ -79,39 +79,14 @@ export const estimateLines = (text: string, size: number, width: number) =>
 /** Textseite: Größen der beiden Stile in cqw */
 export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh: 1.35 } } as const;
 
-/** Textrahmen auf freien Seiten: drei gesetzte Stile, keine Regler */
-export const TEXT_ROLE: Record<TextRole, { size: number; weight: 400 | 700; lh: number; tone: Tone; display?: boolean; label: string }> = {
-  heading: { size: 6, weight: 700, lh: 1.02, tone: "ink", display: true, label: "Überschrift" },
-  body: { size: 3.2, weight: 400, lh: 1.5, tone: "ink", label: "Absatz" },
-  note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: "Notiz" },
-};
-
-/** Schriften der Textrahmen als CSS-Variablen (layout.tsx) */
-export const FONTS: Record<FontKey, { label: string; css: string; lh: number }> = {
-  grotesk: { label: "Grotesk", css: "var(--font-bricolage)", lh: 1 },
-  serif: { label: "Serif", css: "var(--font-serif)", lh: 1.05 },
-  mono: { label: "Schreibmaschine", css: "var(--font-mono)", lh: 1.05 },
-  hand: { label: "Handschrift", css: "var(--font-hand)", lh: 1 },
-};
-/** Schriftgröße, Stärke und Zeilenabstand eines Textrahmens: Stil plus freie Werte */
-export function textMetrics(role: TextRole, look?: TextLook) {
-  const st = TEXT_ROLE[role];
-  const size = look?.size ?? st.size;
-  const font = look?.font ?? "grotesk";
-  // Schreibmaschine läuft breiter, Handschrift schmaler
-  const width = font === "mono" ? 0.62 / 0.52 : font === "hand" ? 0.42 / 0.52 : 1;
-  return { size, weight: look?.bold === undefined ? st.weight : look.bold ? 700 : 400, lh: st.lh * FONTS[font].lh, font, width };
-}
-
-/** Höhe eines Textrahmens in cqw (dieselbe Schätzung setzt HTML und Textur) */
-export const textHeight = (text: string, role: TextRole, w: number, look?: TextLook) => {
-  const m = textMetrics(role, look);
-  return estimateLines(text || " ", m.size * m.width, w) * m.size * m.lh;
-};
-
+/** Bildverzeichnis: Fuge zwischen den Daumen, Abstand Daumen zu Daumen darunter (Nummer + Luft) */
+const INDEX_GAP = 2;
+const INDEX_ROW = 5;
+/** Platz unter dem letzten Daumen für die Nummer: 0.8 Abstand plus eine Zeile, auch bei 9px auf schmalen Seiten */
+const INDEX_LABEL = 4.4;
 /**
- * Raster einer Seite in cqw: 6 Spalten und 9 Zeilen im Satzspiegel, je 2cqw Fuge.
- * xs/ys sind alle Linien, an denen eine Kante einrasten darf (Spaltenanfänge und -enden, Seitenkanten).
+ * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
+ * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
  */
 export function gridLines(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
   const ta = typeArea(book, side);
@@ -341,22 +316,13 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       return paper(layoutFree(book, page.items, side));
 
     case "index": {
-      const n = book.plates.length;
-      const gap = 2;
-      // so viele Spalten, dass alle Abzüge in den Satzspiegel passen (bis 60 Fotos)
-      const fits = (c: number) => {
-        const w = (ta.w - (c - 1) * gap) / c;
-        return 7 + Math.ceil(n / c) * (w * book.aspect + 5) <= ta.h;
-      };
-      const cols = [n > 9 ? 6 : 4, 6, 8, 10, 12].find(fits) ?? 12;
-      const cw = (ta.w - (cols - 1) * gap) / cols;
-      const ch = cw * book.aspect;
+      const { cols, cw, ch, top } = indexGrid(book, ta);
       const els: El[] = [
         { t: "text", text: "Tafeln", x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
       ];
       book.plates.forEach((p, i) => {
-        const x = ta.x + (i % cols) * (cw + gap);
-        const y = ta.y + 7 + Math.floor(i / cols) * (ch + 5);
+        const x = ta.x + (i % cols) * (cw + INDEX_GAP);
+        const y = top + Math.floor(i / cols) * (ch + INDEX_ROW);
         els.push({ t: "thumb", no: p.no, x, y, w: cw, h: ch });
         els.push({ t: "text", text: String(p.no), x, y: y + ch + 0.8, size: 2.1, weight: 400, tone: "ink2", lh: 1.2 });
       });
