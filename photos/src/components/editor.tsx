@@ -773,7 +773,11 @@ export function Editor() {
                           </TextButton>
                         </span>
                       </div>
-                      <div className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}>
+                      <div
+                        onDoubleClick={() => openStage(i)}
+                        title="Doppelklick: gestalten"
+                        className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}
+                      >
                         {(["left", "right"] as const).map((side) => {
                           const page: Page | undefined = sp?.[side];
                           const key = page && "no" in page ? plateOf(data, page.no)?.key : undefined;
@@ -1013,7 +1017,8 @@ export function Editor() {
 
           {!selPhoto && !selSpread && data && (
             <p className="text-on-table-2 text-sm leading-relaxed">
-              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Fotos und Doppelseiten lassen sich ziehen.
+              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Doppelklick auf eine Doppelseite öffnet sie zum
+              Gestalten. Fotos und Doppelseiten lassen sich ziehen.
             </p>
           )}
         </aside>
