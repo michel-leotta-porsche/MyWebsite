@@ -746,7 +746,8 @@ export function Stage({
                     else addPhoto(key, pageAt(at.x), at);
                   }}
                 >
-                  {[...shown.filter((i) => i.id !== sel), ...shown.filter((i) => i.id === sel)].map((it) => {
+                  {/* Trefferflächen in der echten Stapelung: was oben liegt, wird zuerst getroffen */}
+                  {shown.map((it) => {
                     const b = boxOf(it, geom);
                     const isSel = it.id === sel;
                     if (it.id === editing) return null;
@@ -777,25 +778,29 @@ export function Stage({
                             isSel ? "outline-2 outline-mark" : "hover:outline-1 hover:outline-mark/70"
                           }`}
                         />
-                        {isSel && draft?.id === it.id && draft.original && (
-                          <span className="bg-ink text-paper pointer-events-none absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">Originalformat</span>
-                        )}
-                        {isSel &&
-                          !draft &&
-                          HANDLES.filter((h) => it.t === "photo" || (!h.e.t && !h.e.b)).map((h) => (
-                            <span
-                              key={h.name}
-                              aria-hidden
-                              onPointerDown={(e) => startDrag(e, it, { ...h.e })}
-                              className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center ${h.cls}`}
-                              style={{ width: handle, height: handle, cursor: h.cursor, touchAction: "none" }}
-                            >
-                              <span className="border-ink bg-paper block h-2.5 w-2.5 border" />
-                            </span>
-                          ))}
                       </div>
                     );
                   })}
+                  {/* Griffe des gewählten Elements liegen über allem, ohne das Darunter zu verdecken */}
+                  {selected && selected.id !== editing && (
+                    <div className="pointer-events-none absolute" style={pct(boxOf(selected, geom))}>
+                      {draft?.id === selected.id && draft.original && (
+                        <span className="bg-ink text-paper absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">Originalformat</span>
+                      )}
+                      {!draft &&
+                        HANDLES.filter((h) => selected.t === "photo" || (!h.e.t && !h.e.b)).map((h) => (
+                          <span
+                            key={h.name}
+                            aria-hidden
+                            onPointerDown={(e) => startDrag(e, selected, { ...h.e })}
+                            className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center ${h.cls}`}
+                            style={{ width: handle, height: handle, cursor: h.cursor, touchAction: "none" }}
+                          >
+                            <span className="border-ink bg-paper block h-2.5 w-2.5 border" />
+                          </span>
+                        ))}
+                    </div>
+                  )}
                   {editItem && editItem.t === "text" && (
                     <textarea
                       autoFocus
