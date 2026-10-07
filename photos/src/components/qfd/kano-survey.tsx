@@ -3,7 +3,7 @@
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ANSWERS, qfd } from "@/content/qfd";
 import { db } from "@/lib/firebase";
@@ -24,12 +24,15 @@ export function KanoSurvey() {
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<Record<string, [number, number]>>({});
   const [state, setState] = useState<"frage" | "sendet" | "fertig" | "fehler">("frage");
+  // beantwortete Schritte, damit „Zurück“ die eigene Antwort zeigt (UX-Kritik K15)
+  const [done, setDone] = useState<Record<string, number>>({});
 
   const answer = async (a: number) => {
     const s = steps[i];
     const cur = answers[s.req] ?? [2, 2];
     const next = { ...answers, [s.req]: (s.kind === "f" ? [a, cur[1]] : [cur[0], a]) as [number, number] };
     setAnswers(next);
+    setDone((d) => ({ ...d, [`${s.req}-${s.kind}`]: a }));
     if (i + 1 < steps.length) return setI(i + 1);
     send(next);
   };
@@ -43,7 +46,25 @@ export function KanoSurvey() {
     }
   };
 
+  const answerRef = useRef(answer);
+  useEffect(() => {
+    answerRef.current = answer;
+  });
+  // Ziffern 1 bis 5 antworten
+  useEffect(() => {
+    if (!started || state !== "frage") return;
+    const onKey = (e: KeyboardEvent) => {
+      const n = Number(e.key);
+      if (e.metaKey || e.ctrlKey || e.altKey || !Number.isInteger(n) || n < 1 || n > ANSWERS.length) return;
+      e.preventDefault();
+      answerRef.current(n - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [started, state]);
+
   const s = steps[i];
+  const chosen = s ? done[`${s.req}-${s.kind}`] : undefined;
   return (
     <main className="linen table-surface flex min-h-svh flex-col bg-table">
       <header className="flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
@@ -110,16 +131,26 @@ export function KanoSurvey() {
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             >
               <p className="text-on-table-2 text-sm">{s.kind === "f" ? "Wenn es das gibt" : "Wenn es das nicht gibt"}</p>
-              <h1 className="text-on-table mt-2 text-2xl leading-snug font-semibold tracking-[-0.01em] md:text-3xl">{s.text}</h1>
+              <h1
+                // neue Frage: der Fokus springt auf sie, sobald sie nach dem Wechsel erscheint, nicht auf body
+                ref={(el) => el?.focus({ preventScroll: true })}
+                tabIndex={-1} className="text-on-table mt-2 text-2xl leading-snug font-semibold tracking-[-0.01em] outline-none md:text-3xl">
+                {s.text}
+              </h1>
               <ul className="mt-8 grid gap-2">
                 {ANSWERS.map((a, n) => (
                   <li key={a}>
                     <button
                       type="button"
+                      aria-pressed={chosen === n}
                       onClick={() => answer(n)}
-                      className="border-on-table-2/50 text-on-table hover:border-on-table hover:bg-on-table/5 w-full border px-4 py-3 text-left text-base transition-colors duration-150"
+                      className={`text-on-table hover:border-on-table hover:bg-on-table/5 flex w-full items-baseline gap-3 border px-4 py-3 text-left text-base transition-colors duration-150 ${chosen === n ? "border-on-table bg-on-table/10" : "border-on-table-2/50"}`}
                     >
+                      <span aria-hidden className="text-on-table-2 text-sm tabular-nums">
+                        {n + 1}
+                      </span>
                       {a}
+                      {chosen === n && <span className="text-on-table-2 ml-auto text-sm">deine Antwort</span>}
                     </button>
                   </li>
                 ))}

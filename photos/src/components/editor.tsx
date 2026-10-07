@@ -60,8 +60,8 @@ function SheetClose({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Klickfläche kleiner Leistenknöpfe: 24px, mit dem Finger 44px (WCAG 2.5.8, UX-Kritik K3) */
-const HIT = "inline-flex min-h-6 min-w-6 items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-11";
+/** Klickfläche kleiner Leistenknöpfe: 24px, mit dem Finger 44px hoch (WCAG 2.5.8, UX-Kritik K3) */
+const HIT = "inline-flex min-h-6 min-w-6 items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-9";
 
 /** Eine Doppelseite bleibt, solange etwas auf ihr liegt */
 const keepSpread = (s: SpreadDraft) => s.keys.length > 0 || !!s.text || !!s.pages?.some((p) => p.items.length);
@@ -753,7 +753,7 @@ export function Editor() {
                       onDrop={(e) => onDrop(i, e)}
                       className="p-3"
                     >
-                      <div className="text-on-table-2 mb-2 flex items-baseline justify-between gap-2 text-xs">
+                      <div className="text-on-table-2 mb-2 flex flex-wrap items-center justify-between gap-x-2 text-xs">
                         <button
                           type="button"
                           onClick={() => s.id && setSel(active ? null : { type: "spread", id: s.id })}
@@ -762,7 +762,7 @@ export function Editor() {
                         >
                           {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
                         </button>
-                        <span className="flex items-center gap-2">
+                        <span className="flex flex-wrap items-center gap-x-2">
                           <button
                             type="button"
                             onClick={() => togglePin(i)}
@@ -829,7 +829,16 @@ export function Editor() {
                           const isText = page?.kind === "text";
                           return (
                             <div key={side} className="relative" style={{ width: pageW, height: pageW * data.aspect }}>
-                              {page && <PageView book={data} page={page} side={side} />}
+                              {/* Textseiten in Lesegröße setzen und verkleinern: sonst greift die Mindestschrift und der Text läuft scheinbar über (UX-Kritik K1) */}
+                              {page && isText && (
+                                <div
+                                  className="absolute top-0 left-0 origin-top-left"
+                                  style={{ width: MEASURE_W, height: MEASURE_W * data.aspect, transform: `scale(${pageW / MEASURE_W})` }}
+                                >
+                                  <PageView book={data} page={page} side={side} />
+                                </div>
+                              )}
+                              {page && !isText && <PageView book={data} page={page} side={side} />}
                               {key && (
                                 <button
                                   type="button"
@@ -1173,7 +1182,9 @@ export function Editor() {
           onClose={() => setHistory(false)}
         />
       )}
-      {sharing && book && <ShareDialog book={book} onClose={() => setSharing(false)} />}
+      {sharing && book && (
+        <ShareDialog book={book} onClose={() => setSharing(false)} onTitle={(title) => update((b) => ({ ...b, title }), "title")} />
+      )}
     </main>
   );
 }

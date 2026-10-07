@@ -854,9 +854,19 @@ export function Book({
                               e.stopPropagation();
                               onEar(no);
                             }}
-                            className="pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
+                            className="group/ear pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
                             style={{ [side]: 0 }}
-                          />
+                          >
+                            {/* Ecke hebt sich beim Zeigen leicht an: hier lässt sich etwas knicken (UX-Kritik K20) */}
+                            <span
+                              aria-hidden
+                              className="bg-paper-shade absolute top-0 h-5 w-5 opacity-0 shadow-[0_2px_4px_-1px_rgb(12_10_8/0.35)] transition-opacity duration-200 group-hover/ear:opacity-100 group-focus-visible/ear:opacity-100"
+                              style={{
+                                [side]: 0,
+                                clipPath: side === "right" ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
+                              }}
+                            />
+                          </button>
                         )}
                       </div>
                     );
