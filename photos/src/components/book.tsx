@@ -25,7 +25,7 @@ import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
 
 export type Mode = "spread" | "single";
-type Leaf = { front: Page; back: Page };
+export type Leaf = { front: Page; back: Page };
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 // Ein Blatt beschleunigt aus dem Liegen und setzt weich auf: ease-in-out
@@ -42,11 +42,11 @@ const invTurnEase = (y: number) => {
   return (lo + hi) / 2;
 };
 // Nur so viele Blätter um die aufgeschlagene Seite tragen Bilder
-const WINDOW = 2;
+export const WINDOW = 2;
 // Nach dem letzten Blatt: so viele Schritte Scrollweg, auf denen sich das Buch zurück auf den Tisch legt
 const OUTRO = 0.9;
 
-function buildLeaves(book: BookData, mode: Mode): { leaves: Leaf[]; base: Page } {
+export function buildLeaves(book: BookData, mode: Mode): { leaves: Leaf[]; base: Page } {
   if (mode === "spread") {
     const { spreads } = book;
     const leaves: Leaf[] = [{ front: { kind: "cover" }, back: spreads[0].left }];
@@ -61,7 +61,7 @@ function buildLeaves(book: BookData, mode: Mode): { leaves: Leaf[]; base: Page }
 }
 
 /** Sichtbare Seiten, wenn k Blätter umgeschlagen sind */
-function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
+export function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
   if (k === 0) return [{ kind: "cover" }];
   if (mode === "spread") {
     const s = book.spreads[k - 1];
@@ -70,7 +70,7 @@ function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
   const p = book.singlePages[k];
   return p ? [p] : [];
 }
-const platesOn = (pages: Page[]) => [...new Set(pages.flatMap(pageNos))];
+export const platesOn = (pages: Page[]) => [...new Set(pages.flatMap(pageNos))];
 
 function labelAt(book: BookData, mode: Mode, k: number): string {
   if (k === 0) return "Einband";
@@ -95,12 +95,12 @@ function headCaption(book: BookData, mode: Mode, k: number) {
 const noopSubscribe = () => () => {};
 
 // Ferne Blätter: nur der Farbton der Seite, ohne Bild und Text
-function Blank({ book, page }: { book: BookData; page: Page }) {
+export function Blank({ book, page }: { book: BookData; page: Page }) {
   const bg = page.kind === "cover" ? book.cloth.base : page.kind === "endpaper" ? book.cloth.deep : undefined;
   return <div className={`absolute inset-0 ${bg ? "" : "bg-paper"}`} style={{ backgroundColor: bg }} />;
 }
 
-function LeafView({
+export function LeafView({
   book,
   leaf,
   i,
