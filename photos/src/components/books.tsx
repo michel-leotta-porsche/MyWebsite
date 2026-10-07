@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { flushSync } from "react-dom";
 
 import type { BookData } from "@/content/books";
-import { Table, type TableProps } from "@/components/table";
+import { OpenBook } from "@/components/table";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Das offene Buch (Umblättern in WebGL, Bewegung, Rezeptzettel) ist der größte Teil des Codes.
@@ -35,7 +35,7 @@ const readHash = () => decodeURIComponent(location.hash.slice(1));
  */
 export function Library({
   books,
-  table,
+  children,
   before,
   footer,
   bookExtra,
@@ -43,8 +43,8 @@ export function Library({
   onEar,
 }: {
   books: BookData[];
-  /** Kopf, Zusätze und Kacheln des Tisches */
-  table?: Omit<TableProps, "books" | "onOpen">;
+  /** Der Tisch mit seinen Reihen; jede Reihe schlägt ihre Bände über OpenBook auf */
+  children: ReactNode;
   /** Über dem Tisch, nur solange kein Buch offen ist (z. B. der Kopf der Landing Page) */
   before?: ReactNode;
   footer?: ReactNode;
@@ -145,7 +145,7 @@ export function Library({
   return (
     <>
       {before}
-      <Table {...table} books={books} focusId={returnTo} onOpen={(id) => change({ id, auto: true })} />
+      <OpenBook value={{ open: (id) => change({ id, auto: true }), focusId: returnTo }}>{children}</OpenBook>
       {footer}
     </>
   );

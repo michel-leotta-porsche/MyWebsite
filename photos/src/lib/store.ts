@@ -8,6 +8,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -319,14 +320,29 @@ export async function dropFromInbox(uid: string, token: string) {
   await deleteDoc(doc(db(), "users", uid, "inbox", token));
 }
 
+const fromDoc = (data: unknown): StoredBook => {
+  const b = data as StoredBook & { trashed?: number | null };
+  return { ...b, trashed: b.trashed ?? undefined };
+};
+
 export async function myBooks(uid: string): Promise<StoredBook[]> {
   if (MOCK) return [...mem.books.values()];
   const q = query(collection(db(), "books"), where("owner", "==", uid));
   const s = await getDocs(q);
-  return s.docs.map((d) => {
-    const b = d.data() as StoredBook & { trashed?: number | null };
-    return { ...b, trashed: b.trashed ?? undefined };
-  });
+  return s.docs.map((d) => fromDoc(d.data()));
+}
+
+/**
+ * Eigene Bücher laufend: die erste Antwort kommt aus dem Zwischenspeicher des Browsers (sofort),
+ * danach der Stand vom Server und jede spätere Änderung. Gibt die Abmeldung zurück.
+ */
+export function watchMyBooks(uid: string, next: (books: StoredBook[]) => void, fail: (e: unknown) => void): () => void {
+  if (MOCK) {
+    queueMicrotask(() => next([...mem.books.values()]));
+    return () => {};
+  }
+  const q = query(collection(db(), "books"), where("owner", "==", uid));
+  return onSnapshot(q, (s) => next(s.docs.map((d) => fromDoc(d.data()))), fail);
 }
 
 /** Buch für jemanden hinlegen: ein Link mit Zufallsschlüssel und einer Kopie des Buchs */
@@ -392,6 +408,25 @@ export async function keepInInbox(uid: string, share: Share) {
     fromName: share.fromName,
     addedAt: serverTimestamp(),
   });
+}
+
+/** Für mich hingelegte Bücher laufend; jeder Eintrag holt sein Buch aus dem geteilten Link, zurückgezogene fallen weg */
+export function watchInbox(uid: string, next: (shares: Share[]) => void, fail: (e: unknown) => void): () => void {
+  if (MOCK) {
+    queueMicrotask(() => next([]));
+    return () => {};
+  }
+  let run = 0;
+  return onSnapshot(
+    collection(db(), "users", uid, "inbox"),
+    (s) => {
+      const mine = ++run;
+      Promise.all(s.docs.map((d) => loadShare(d.id).catch(() => null)))
+        .then((shares) => mine === run && next(shares.filter((x): x is Share => !!x)))
+        .catch(fail);
+    },
+    fail,
+  );
 }
 
 export async function inbox(uid: string): Promise<Share[]> {
