@@ -292,7 +292,9 @@ export function build(spec: BookSpec): BookData {
     }
     const [l, r] = pair;
     const right = l.kind === "blank" ? page(r) : undefined;
-    const left = page(l);
+    // die leere Seite trägt nur die Unterschrift einer randlosen Gegenseite; hat die Gegenseite eine
+    // eigene (Tafel, Querformat, kleine Tafel), stünde dieselbe Nummer doppelt: dann reines Papier
+    const left = l.kind === "blank" && r.kind !== "full" ? page(VERSO) : page(l);
     const rr = right ?? page(r);
     return { left, right: rr, plates: platesOf(left, rr) };
   });
