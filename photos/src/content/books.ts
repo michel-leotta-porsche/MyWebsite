@@ -644,6 +644,9 @@ export const books: BookData[] = [fuerteventura, japan];
 export const bookById = (id: string) => books.find((b) => b.id === id);
 export const plateOf = (book: BookData, no: number) => book.plates[no - 1];
 
+/** Name einer Tafel für Screenreader: „Tafel 3: Palme“, ohne Titel nur „Tafel 3“ (kein leerer Rest nach dem Doppelpunkt) */
+export const plateName = (no: number, title?: string) => (title?.trim() ? `Tafel ${no}: ${title.trim()}` : `Tafel ${no}`);
+
 /** Satzspiegel in cqw: Bund, oben, außen, unten; Breite 82 */
 export function typeArea(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
   const inner = 6;

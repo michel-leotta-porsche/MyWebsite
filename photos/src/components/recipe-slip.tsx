@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import type { Plate } from "@/content/books";
+import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
@@ -337,7 +337,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
   return (
     <motion.aside
       role="dialog"
-      aria-label={`${kind} zu Tafel ${plate.no}: ${plate.title}`}
+      aria-label={`${kind} zu ${plateName(plate.no, plate.title)}`}
       tabIndex={0}
       className={`slip text-ink fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:bottom-24 ${side === "left" ? "md:left-[max(24px,calc(50vw-560px))]" : "md:right-[max(24px,calc(50vw-560px))]"}`}
       style={phone ? { left: 12, bottom: 12 } : undefined}
