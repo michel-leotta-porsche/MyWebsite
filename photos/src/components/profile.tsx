@@ -51,8 +51,8 @@ function Card({ user }: { user: User }) {
   const photos = books?.reduce((n, b) => n + b.photos.filter((p) => !p.shelved).length, 0);
   const titleOf = new Map((own ?? []).map((b) => [b.id, b.title || "Ohne Titel"]));
   const stats = [
-    { label: "Eigene Bücher", value: books?.length, href: "/tisch" },
-    { label: "Fotos darin", value: photos, href: "/tisch" },
+    { label: "Eigene Bücher", value: books?.length, href: "/zimmer#von-dir" },
+    { label: "Fotos darin", value: photos, href: "/zimmer#von-dir" },
     { label: "Hingelegt", value: shares?.length, href: "#hingelegt" },
     { label: "Für dich", value: gifts?.length, href: "/zimmer" },
   ];
@@ -100,7 +100,7 @@ function Card({ user }: { user: User }) {
           </h2>
           {shares && shares.length === 0 && (
             <p className="text-on-table-2 mt-3 text-base">
-              Noch niemand. Auf der Werkbank legst du ein Buch mit „Hinlegen für …“ einem Freund hin.
+              Noch niemand. Im Bücherzimmer legst du ein Buch über „Mehr …“ und „Hinlegen für …“ einem Freund hin.
             </p>
           )}
           {shares && shares.length > 0 && (

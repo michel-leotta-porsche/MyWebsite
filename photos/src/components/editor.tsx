@@ -649,8 +649,8 @@ export function Editor() {
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
           <Wordmark />
-          <Link href="/tisch" className={`${linkClass} text-sm`}>
-            Zur Werkbank
+          <Link href="/zimmer" className={`${linkClass} text-sm`}>
+            Ins Bücherzimmer
           </Link>
         </span>
         <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
@@ -1256,7 +1256,7 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
         <a href={fileUrl} download={`${book.title || "fotobuch"}.fujiventura.json`} className="underline decoration-mark decoration-2 underline-offset-4">
           Projekt als Datei sichern
         </a>
-        <span className="text-ink-2 text-[12px]">Öffnen über die Werkbank</span>
+        <span className="text-ink-2 text-[12px]">Öffnen über das Bücherzimmer</span>
       </div>
     </SlipDialog>
   );

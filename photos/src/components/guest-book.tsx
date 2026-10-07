@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BookData } from "@/content/books";
 import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
+import { Shelf, Table } from "@/components/table";
 import { signIn } from "@/lib/firebase";
 import { keepInInbox, leaveNote, loadShare, toBookData, type Share } from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
@@ -92,25 +93,6 @@ export function GuestBook() {
     <main>
       <Library
         books={[book]}
-        table={{
-          label: `Ein Buch für ${share.to}`,
-          note: () => `Für ${share.to}, von ${share.fromName}`,
-          headerRight: (
-            <p className="text-on-table-2 text-sm">
-              {user ? (
-                kept ? (
-                  <Link href="/zimmer" className={linkClass}>
-                    Liegt in deinem Bücherzimmer
-                  </Link>
-                ) : (
-                  <span>…</span>
-                )
-              ) : (
-                <TextButton onClick={() => signIn().catch(() => {})}>In mein Bücherzimmer legen</TextButton>
-              )}
-            </p>
-          ),
-        }}
         ears={ears}
         onEar={toggleEar}
         bookExtra={(_, plates) => {
@@ -135,7 +117,28 @@ export function GuestBook() {
             </>
           );
         }}
-      />
+      >
+        <Table
+          label={`Ein Buch für ${share.to}`}
+          headerRight={
+            <p className="text-on-table-2 text-sm">
+              {user ? (
+                kept ? (
+                  <Link href="/zimmer" className={linkClass}>
+                    Liegt in deinem Bücherzimmer
+                  </Link>
+                ) : (
+                  <span>…</span>
+                )
+              ) : (
+                <TextButton onClick={() => signIn().catch(() => {})}>In mein Bücherzimmer legen</TextButton>
+              )}
+            </p>
+          }
+        >
+          <Shelf books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
+        </Table>
+      </Library>
       {writing && (
         <SlipDialog label={`Zettel an ${share.fromName}`} onClose={() => setWriting(false)}>
           {sent ? (

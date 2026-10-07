@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Editor } from "@/components/editor";
 
 export const metadata: Metadata = {
-  title: "Buch gestalten · Fujiventura",
+  title: "Werkbank · Fujiventura",
   robots: { index: false, follow: false },
 };
 

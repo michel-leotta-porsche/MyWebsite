@@ -392,9 +392,6 @@ function Closing() {
             <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
               Bücherzimmer
             </Link>
-            <Link href="/tisch" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
-              Werkbank
-            </Link>
           </nav>
         </div>
       </footer>

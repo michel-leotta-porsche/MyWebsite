@@ -9,8 +9,9 @@ import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Textknöpfe mit Unterstrich, Rahmenknopf, Anmeldung.
 
+// Gelb ist Signal: der Unterstrich erscheint erst beim Zeigen oder mit dem Fokus
 export const linkClass =
-  "text-on-table underline decoration-mark decoration-2 underline-offset-4 hover:decoration-on-table disabled:opacity-50";
+  "text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline focus-visible:underline disabled:opacity-50";
 
 export function TextButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" {...p} className={`${linkClass} ${className}`} />;
@@ -52,10 +53,9 @@ export function RoomTitle({ children }: { children: ReactNode }) {
   );
 }
 
-/** Die drei Räume hinter der Anmeldung: lesen, gestalten, man selbst */
+/** Die Räume hinter der Anmeldung: alle Bücher, man selbst. Gestaltet wird ein einzelnes Buch auf der Werkbank (/neu) */
 export const ROOMS = [
   { href: "/zimmer", label: "Bücherzimmer" },
-  { href: "/tisch", label: "Werkbank" },
   { href: "/profil", label: "Profil" },
 ] as const;
 
