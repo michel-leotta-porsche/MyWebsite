@@ -178,6 +178,8 @@ Ab 768px Doppelseite, Seitenbreite `min((100vw - 64px) / 2, (100svh - 150px) / F
 
 **Seitentypen:** Vollbild (randlos, ohne Text) · Tafel (füllt den Satzspiegel, Unterschrift darunter) · kleine Tafel (2 oder 3 Spalten, oben oder unten, außen oder am Bund) · Querformat (volle Breite an der oberen Satzspiegellinie) · über den Bund (beide Seiten, Ausschnitt über `focus`) · leer (nur die Unterschrift der Gegenseite) · hohes Format (9:16 am Bund, außen ein Papierstreifen mit gestapelter Unterschrift). Am Ende jedes Bands: Bildverzeichnis als Kontaktbogen (Klick springt zur Tafel) und Kolophon.
 
+**Bildverzeichnis:** eine Seite, bündig im Satzspiegel, 2cqw Fuge. Die Spaltenzahl folgt der Zahl der Tafeln: die größten Daumen, bei denen alle Tafeln samt Nummer in den Satzspiegel passen (4, 6, 8, 10, Reserve 12; `indexGrid` in `layout.ts`). Bis 60 Tafeln reichen 10 Spalten in beiden Formaten. Klickfläche: Ab 10 Spalten ist ein Daumen auf dem Telefon knapp unter 24px breit. Weil Daumen plus Fuge mindestens 8.4cqw messen (≥ 24px ab 286px Seitenbreite), gilt die Abstandsausnahme von WCAG 2.5.8.
+
 ### Named Rules
 **The Rhythm Rule.** Zwei randlose Paare stehen nie direkt hintereinander; spätestens nach drei Doppelseiten kommt eine Seite mit viel Papier. Höchstens eine leere Seite pro Band.
 
