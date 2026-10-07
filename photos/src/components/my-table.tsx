@@ -4,19 +4,17 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { linkClass, SignInTable, SlipDialog, TextButton } from "@/components/app-ui";
+import { linkClass, RoomNav, RoomTitle, SignInTable, SlipDialog, TextButton, UndoToast } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { ShareDialog } from "@/components/share-dialog";
-import { signOutNow } from "@/lib/firebase";
-import { deleteBookForever, dropFromInbox, importBook, inbox, keepInInbox, myBooks, saveBook, toBookData, trashBook, type Share, type StoredBook } from "@/lib/store";
+import { deleteBookForever, importBook, myBooks, saveBook, toBookData, trashBook, type StoredBook } from "@/lib/store";
 import { friendlyError } from "@/lib/errors";
 import { useUser } from "@/lib/use-user";
 
-/** Mein Tisch: eigene Bücher, Bücher, die jemand für mich hingelegt hat, und ein leeres zum Anlegen */
+/** Werkbank: die eigenen Bücher zum Bearbeiten und Hinlegen, ein leeres zum Anlegen, der Papierkorb. Geschenkte liegen im Bücherzimmer. */
 export function MyTable() {
   const user = useUser();
   const [own, setOwn] = useState<StoredBook[] | null>(null);
-  const [gifts, setGifts] = useState<Share[]>([]);
   const [sharing, setSharing] = useState<StoredBook | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** zuletzt vom Tisch genommen: für „Rückgängig“ */
@@ -29,39 +27,29 @@ export function MyTable() {
   useEffect(() => {
     if (!user) return;
     let alive = true;
-    Promise.all([myBooks(user.uid), inbox(user.uid)])
-      .then(([b, g]) => {
-        if (!alive) return;
-        setOwn(b);
-        setGifts(g);
-      })
+    myBooks(user.uid)
+      .then((b) => alive && setOwn(b))
       .catch((e) => alive && setError(friendlyError(e)));
     return () => {
       alive = false;
     };
   }, [user]);
 
-  // geteilte Bücher bekommen eine eigene Kennung, damit sie neben gleichnamigen eigenen liegen können
   const data = useMemo(() => {
-    const list: { book: BookData; stored?: StoredBook; gift?: Share }[] = [];
+    const list: { book: BookData; stored: StoredBook }[] = [];
     for (const b of (own ?? []).filter((b) => !b.trashed)) {
       try {
         list.push({ book: toBookData(b), stored: b });
       } catch {}
     }
-    for (const g of gifts) {
-      try {
-        list.push({ book: { ...toBookData(g.book), id: `geschenk-${g.token.slice(0, 10)}` }, gift: g });
-      } catch {}
-    }
     return list;
-  }, [own, gifts]);
+  }, [own]);
 
   if (user === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
   if (user === null)
     return (
-      <SignInTable title="Dein Tisch">
-        Hier liegen deine eigenen Fotobücher und die, die Freunde für dich hingelegt haben.
+      <SignInTable title="Die Werkbank">
+        Hier gestaltest du deine Fotobücher und legst sie Freunden hin.
       </SignInTable>
     );
 
@@ -92,62 +80,16 @@ export function MyTable() {
     setTrashed(s.id, true);
     setRemoved({ title: s.title || "Ohne Titel", at: Date.now(), undo: () => setTrashed(s.id, false) });
   };
-  const removeGift = (g: Share) => {
-    if (!user) return;
-    setGifts((list) => list.filter((x) => x.token !== g.token));
-    dropFromInbox(user.uid, g.token).catch((e) => setError(friendlyError(e)));
-    setRemoved({
-      title: g.book.title || "Ohne Titel",
-      at: Date.now(),
-      undo: () => {
-        setGifts((list) => [...list, g]);
-        keepInInbox(user.uid, g).catch(() => {});
-      },
-    });
-  };
-
   return (
     <main>
       <Library
         books={data.map((d) => d.book)}
         table={{
-          label: "Mein Tisch",
-          headerRight: (
-            <p className="text-on-table-2 flex items-baseline gap-4 text-sm">
-              <span className="hidden md:inline">{user.displayName}</span>
-              <TextButton onClick={() => importInput.current?.click()}>Aus Datei öffnen</TextButton>
-              <input
-                ref={importInput}
-                type="file"
-                accept="application/json,.json"
-                className="sr-only"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  try {
-                    const b = await importBook(f, user.uid, user.displayName ?? "Ich");
-                    location.href = `/neu?id=${b.id}`;
-                  } catch (err) {
-                    setError(friendlyError(err));
-                  }
-                }}
-              />
-              <TextButton onClick={() => signOutNow()}>Abmelden</TextButton>
-            </p>
-          ),
-          note: (b) => {
-            const g = byId(b.id)?.gift;
-            return g ? `Für ${g.to}, von ${g.fromName}` : undefined;
-          },
+          label: "Werkbank",
+          title: <RoomTitle>Werkbank</RoomTitle>,
+          headerRight: <RoomNav />,
           extra: (b) => {
             const d = byId(b.id);
-            if (d?.gift)
-              return (
-                <TextButton onClick={() => removeGift(d.gift!)} title="Nur von deinem Tisch; beim Schenkenden bleibt das Buch">
-                  Vom Tisch nehmen
-                </TextButton>
-              );
             const s = d?.stored;
             if (!s) return null;
             return (
@@ -175,6 +117,26 @@ export function MyTable() {
                 </span>
               </Link>
               <p className="text-on-table-2 mt-5 text-sm">Fotos reinziehen, fertig.</p>
+              <p className="mt-2 text-sm">
+                <TextButton onClick={() => importInput.current?.click()}>Aus Datei öffnen</TextButton>
+              </p>
+              <input
+                ref={importInput}
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  try {
+                    const b = await importBook(f, user.uid, user.displayName ?? "Ich");
+                    location.href = `/neu?id=${b.id}`;
+                  } catch (err) {
+                    setError(friendlyError(err));
+                  }
+                }}
+              />
             </div>
           ),
         }}
@@ -182,7 +144,7 @@ export function MyTable() {
           <>
             {error && (
               <p role="alert" className="bg-table px-4 pb-6 text-sm text-on-table md:px-8">
-                Konnte den Tisch nicht laden: {error}
+                Konnte die Werkbank nicht laden: {error}
               </p>
             )}
             {trash.length > 0 && (
@@ -200,7 +162,7 @@ export function MyTable() {
                         <span className="text-on-table min-w-0 truncate">
                           {b.title || "Ohne Titel"} <span className="text-on-table-2">· {b.photos.filter((p) => !p.shelved).length} Fotos</span>
                         </span>
-                        <TextButton onClick={() => setTrashed(b.id, false)}>Zurück auf den Tisch</TextButton>
+                        <TextButton onClick={() => setTrashed(b.id, false)}>Zurücklegen</TextButton>
                       </li>
                     ))}
                     <li className="border-t border-on-table-2/25 pt-3">
@@ -214,8 +176,8 @@ export function MyTable() {
               <p>
                 <span className="font-semibold text-on-table">Fujiventura</span> · Fotobücher gestalten und Freunden hinlegen
               </p>
-              <Link href="/" className={linkClass}>
-                Michels Bücher
+              <Link href="/zimmer" className={linkClass}>
+                Ins Bücherzimmer
               </Link>
             </footer>
           </>
@@ -259,30 +221,7 @@ export function MyTable() {
           </div>
         </SlipDialog>
       )}
-      {removed && <UndoToast key={removed.at} text={`„${removed.title}“ liegt nicht mehr auf dem Tisch.`} onUndo={removed.undo} onClose={() => setRemoved(null)} />}
+      {removed && <UndoToast key={removed.at} text={`„${removed.title}“ liegt im Papierkorb.`} onUndo={removed.undo} onClose={() => setRemoved(null)} />}
     </main>
-  );
-}
-
-/** Hinweis mit Rückgängig; verschwindet nach zehn Sekunden */
-function UndoToast({ text, onUndo, onClose }: { text: string; onUndo: () => void; onClose: () => void }) {
-  useEffect(() => {
-    const id = window.setTimeout(onClose, 10000);
-    return () => window.clearTimeout(id);
-  }, [onClose]);
-  return (
-    <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]">
-      <span>{text}</span>
-      <button
-        type="button"
-        onClick={() => {
-          onUndo();
-          onClose();
-        }}
-        className="shrink-0 font-semibold underline decoration-mark decoration-2 underline-offset-4"
-      >
-        Rückgängig
-      </button>
-    </div>
   );
 }

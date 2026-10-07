@@ -36,6 +36,7 @@ const readHash = () => decodeURIComponent(location.hash.slice(1));
 export function Library({
   books,
   table,
+  before,
   footer,
   bookExtra,
   ears,
@@ -44,6 +45,8 @@ export function Library({
   books: BookData[];
   /** Kopf, Zusätze und Kacheln des Tisches */
   table?: Omit<TableProps, "books" | "onOpen">;
+  /** Über dem Tisch, nur solange kein Buch offen ist (z. B. der Kopf der Landing Page) */
+  before?: ReactNode;
   footer?: ReactNode;
   /** Zusätzliche Knöpfe in der Kopfzeile des offenen Buchs */
   bookExtra?: (book: BookData, plates: number[]) => ReactNode;
@@ -141,6 +144,7 @@ export function Library({
 
   return (
     <>
+      {before}
       <Table {...table} books={books} focusId={returnTo} onOpen={(id) => change({ id, auto: true })} />
       {footer}
     </>

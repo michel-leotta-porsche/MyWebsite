@@ -109,11 +109,13 @@ export type TableProps = {
   /** Weitere Dinge auf dem Tisch, z. B. ein leeres Buch zum Anlegen */
   tiles?: ReactNode;
   label?: string;
+  /** Überschrift links im Kopf; ohne Angabe die Wortmarke als h1 */
+  title?: ReactNode;
   /** Band, der beim Erscheinen den Fokus bekommt (das Buch, das gerade zugeklappt wurde) */
   focusId?: string | null;
 };
 
-export function Table({ books, onOpen, headerRight, extra, note, tiles, label, focusId }: TableProps) {
+export function Table({ books, onOpen, headerRight, extra, note, tiles, label, title, focusId }: TableProps) {
   const root = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
@@ -158,10 +160,12 @@ export function Table({ books, onOpen, headerRight, extra, note, tiles, label, f
       }}
     >
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
-        <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          Fujiventura
-        </h1>
+      <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-8 md:pt-6">
+        {title ?? (
+          <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+            Fujiventura
+          </h1>
+        )}
         {headerRight ?? (
           <p className="text-on-table-2 text-sm">
             {NUMBER[books.length] ?? books.length} Bücher von Michel Leotta

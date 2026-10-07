@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { inputClass, SlipDialog, TextButton } from "@/components/app-ui";
+import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { signIn } from "@/lib/firebase";
 import { keepInInbox, leaveNote, loadShare, toBookData, type Share } from "@/lib/store";
@@ -38,7 +39,7 @@ export function GuestBook() {
     };
   }, [token]);
 
-  // angemeldet: das Buch bleibt auf dem eigenen Tisch liegen
+  // angemeldet: das Buch bleibt im eigenen Bücherzimmer liegen
   useEffect(() => {
     if (!user || !share || kept) return;
     keepInInbox(user.uid, share)
@@ -98,12 +99,14 @@ export function GuestBook() {
             <p className="text-on-table-2 text-sm">
               {user ? (
                 kept ? (
-                  <span>Liegt auf deinem Tisch</span>
+                  <Link href="/zimmer" className={linkClass}>
+                    Liegt in deinem Bücherzimmer
+                  </Link>
                 ) : (
                   <span>…</span>
                 )
               ) : (
-                <TextButton onClick={() => signIn().catch(() => {})}>Auf meinen Tisch legen</TextButton>
+                <TextButton onClick={() => signIn().catch(() => {})}>In mein Bücherzimmer legen</TextButton>
               )}
             </p>
           ),

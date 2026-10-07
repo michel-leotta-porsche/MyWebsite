@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import { MyTable } from "@/components/my-table";
+import { Profile } from "@/components/profile";
 
 export const metadata: Metadata = {
-  title: "Werkbank · Fujiventura",
+  title: "Profil · Fujiventura",
   robots: { index: false, follow: false },
 };
 
 export default function Page() {
-  return <MyTable />;
+  return <Profile />;
 }
