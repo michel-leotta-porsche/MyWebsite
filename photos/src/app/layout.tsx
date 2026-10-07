@@ -13,9 +13,8 @@ const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight
 const hand = Caveat({ variable: "--font-hand", subsets: ["latin"], preload: false });
 
 export const metadata: Metadata = {
-  title: "Fujiventura · Fotografien von Michel Leotta",
-  description:
-    "Sechsundzwanzig Fotografien von Fuerteventura, gebunden als Buch zum Durchblättern.",
+  title: "Fujiventura · Fotobücher zum Blättern",
+  description: "Deine Fotos als Buch zum Umblättern. Gestalten, Freunden hinlegen, Zettel zurückbekommen.",
 };
 
 export const viewport: Viewport = {
@@ -23,16 +22,15 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Läuft vor dem ersten Bild: Einstieg nur einmal pro Sitzung und nie bei reduzierter Bewegung
-// ?ohne=intro,schatten,struktur,biegung schaltet Teile ab, um Probleme auf einem Gerät einzugrenzen
-const introScript = `try{var h=document.documentElement,o=(new URLSearchParams(location.search).get("ohne")||"").split(",");if(o.indexOf("alles")>-1)o=["intro","schatten","struktur","biegung"];o.forEach(function(x){if(x)h.classList.add("ohne-"+x)});if(o.indexOf("intro")<0&&!matchMedia("(prefers-reduced-motion: reduce)").matches&&!sessionStorage.getItem("intro"))h.classList.add("intro")}catch(e){}`;
+// Läuft vor dem ersten Bild: ?ohne=schatten,struktur,biegung schaltet Teile ab, um Probleme auf einem Gerät einzugrenzen
+const flagScript = `try{var h=document.documentElement,o=(new URLSearchParams(location.search).get("ohne")||"").split(",");if(o.indexOf("alles")>-1)o=["schatten","struktur","biegung"];o.forEach(function(x){if(x)h.classList.add("ohne-"+x)})}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // suppressHydrationWarning: das Startskript setzt die Klasse "intro" vor React
+    // suppressHydrationWarning: das Startskript setzt Klassen (ohne-…) vor React
     <html lang="de" className={`${bricolage.variable} ${serif.variable} ${mono.variable} ${hand.variable}`} suppressHydrationWarning>
       <body className="min-h-svh">
-        <script dangerouslySetInnerHTML={{ __html: introScript }} />
+        <script dangerouslySetInnerHTML={{ __html: flagScript }} />
         {children}
       </body>
     </html>
