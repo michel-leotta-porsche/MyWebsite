@@ -155,7 +155,7 @@ const wide = (f: () => void) => {
  * dann steht der Kopf nicht still, sondern scrollt normal, und das Buch bekommt eine feste Größe (Härtetest B1/B2).
  * Nebenbei misst der Hook, wie viel Höhe Kopfzeile und Text brauchen, damit das Buch genau den Rest bekommt.
  */
-function useHeroFit(mode: Mode) {
+function useHeroFit(phone: boolean) {
   const header = useRef<HTMLElement>(null);
   const text = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState({ fixed: false, used: 470 });
@@ -165,8 +165,9 @@ function useHeroFit(mode: Mode) {
       const t = text.current?.offsetHeight ?? 0;
       const vh = window.innerHeight;
       // Abstände im Raster plus Zeile „Scrollen zum Blättern“
-      const used = Math.ceil(h + (mode === "single" ? t : 0) + 120);
-      const fixed = mode === "single" ? (vh - used) / 1.5 < 110 : h + t + 80 > vh || vh - 230 < 260;
+      const used = Math.ceil(h + (phone ? t : 0) + 120);
+      // Telefon: die Doppelseite braucht mindestens 170px Höhe
+      const fixed = phone ? vh - used < 170 : h + t + 80 > vh || vh - 230 < 260;
       setFit((f) => (f.fixed === fixed && f.used === used ? f : { fixed, used }));
     };
     measure();
@@ -178,23 +179,25 @@ function useHeroFit(mode: Mode) {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [mode]);
+  }, [phone]);
   return { header, text, ...fit };
 }
 
 function Hero() {
   const track = useRef<HTMLElement>(null);
-  // Doppelseite ab Tablet, sonst Einzelseiten wie auf dem Telefon in der Leseansicht
-  const mode: Mode = useSyncExternalStore(wide, () => (window.matchMedia("(min-width: 768px)").matches ? "spread" : "single"), () => "spread");
-  const leaves = mode === "spread" ? landingBook.spreads.length : landingBook.singlePages.length - 1;
-  const { header, text, fixed, used } = useHeroFit(mode);
+  // Immer die ganze Doppelseite, auch auf dem Telefon (dort kleiner, unter dem Text)
+  const phone = useSyncExternalStore(wide, () => !window.matchMedia("(min-width: 768px)").matches, () => false);
+  const mode: Mode = "spread";
+  const leaves = landingBook.spreads.length;
+  const { header, text, fixed, used } = useHeroFit(phone);
+  // Papierkanten ragen links und rechts über das Buch hinaus: auf dem Telefon 28px Luft je Seite
   const width = fixed
-    ? mode === "spread"
-      ? "min(100%, 900px)"
-      : "min(72vw, 300px)"
-    : mode === "spread"
-      ? "min(100%, calc((100svh - 230px) * 4 / 3))"
-      : `min(72vw, calc((100svh - ${used}px) / 1.5))`;
+    ? phone
+      ? "calc(100vw - 56px)"
+      : "min(100%, 900px)"
+    : phone
+      ? `min(calc(100vw - 56px), calc((100svh - ${used}px) * 4 / 3))`
+      : "min(100%, calc((100svh - 230px) * 4 / 3))";
   return (
     <section
       ref={track}
@@ -253,12 +256,13 @@ function Hero() {
 
 /* ------------------------------------------------------------------ 2. Werkbank: Abzüge werden eine Doppelseite */
 
-// Platz auf der Doppelseite in % (Breite 2 Seiten, Höhe 1.5 Seiten) und Startlage als loser Abzug auf dem Tisch
+// Platz auf der Doppelseite in % (Breite 2 Seiten, Höhe 1.5 Seiten) und Startlage als loser Abzug auf dem Tisch.
+// Auf dem Telefon liegt der Text über dem Buch: dort gleiten die Abzüge von links und rechts herein (phone), nicht von oben
 const SLOTS = [
-  { src: drachenbaum, box: [0, 0, 50, 100], from: ["6vw", "-58svh", "-9deg"], sizes: "(min-width: 768px) 30vw, 50vw" },
-  { src: mittagsblume, box: [56, 6, 38, 33.8], from: ["-14vw", "-46svh", "8deg"], sizes: "(min-width: 768px) 22vw, 40vw" },
-  { src: markisen, box: [56, 48, 18, 36], from: ["-30vw", "40svh", "-7deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
-  { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
+  { src: drachenbaum, box: [0, 0, 50, 100], from: ["6vw", "-58svh", "-9deg"], phone: ["-75vw", "3svh", "-8deg"], sizes: "(min-width: 768px) 30vw, 50vw" },
+  { src: mittagsblume, box: [56, 6, 38, 33.8], from: ["-14vw", "-46svh", "8deg"], phone: ["70vw", "-2svh", "7deg"], sizes: "(min-width: 768px) 22vw, 40vw" },
+  { src: markisen, box: [56, 48, 18, 36], from: ["-30vw", "40svh", "-7deg"], phone: ["80vw", "4svh", "-6deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
+  { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], phone: ["70vw", "6svh", "9deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
 ] as const;
 
 function Workbench() {
@@ -303,6 +307,9 @@ function Workbench() {
                   ["--fx" as string]: s.from[0],
                   ["--fy" as string]: s.from[1],
                   ["--fr" as string]: s.from[2],
+                  ["--px" as string]: s.phone[0],
+                  ["--py" as string]: s.phone[1],
+                  ["--pr" as string]: s.phone[2],
                   ["--i" as string]: i,
                 }}
               >

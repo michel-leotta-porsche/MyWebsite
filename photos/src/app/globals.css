@@ -341,6 +341,13 @@ html.ohne-schatten [data-shade] {
         transform: none;
       }
     }
+    @media (max-width: 767px) {
+      .bench-print {
+        --fx: var(--px) !important;
+        --fy: var(--py) !important;
+        --fr: var(--pr) !important;
+      }
+    }
     .bench-border {
       animation: border-out linear both;
       animation-timeline: --bench;
