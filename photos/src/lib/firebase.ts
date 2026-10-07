@@ -1,7 +1,6 @@
 "use client";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type User } from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -16,20 +15,7 @@ const config = {
   appId: "1:972013615891:web:eb81ae8570a0eb0c3678e6",
 };
 
-// App Check: reCAPTCHA v3 belegt bei jeder Anfrage an Firestore und Storage, dass sie von dieser Seite kommt.
-// Der Site-Schlüssel ist öffentlich und kommt beim Build aus NEXT_PUBLIC_FUJI_APPCHECK_KEY; ohne ihn bleibt App Check aus.
-const appCheckKey = process.env.NEXT_PUBLIC_FUJI_APPCHECK_KEY;
-
-export const app = () => {
-  if (getApps().length) return getApp();
-  const a = initializeApp(config);
-  if (appCheckKey && typeof window !== "undefined") {
-    // Entwicklung: Debug-Token statt reCAPTCHA, die Konsole des Browsers zeigt ihn zum Freischalten in Firebase
-    if (process.env.NODE_ENV !== "production") (self as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-    initializeAppCheck(a, { provider: new ReCaptchaV3Provider(appCheckKey), isTokenAutoRefreshEnabled: true });
-  }
-  return a;
-};
+export const app = () => (getApps().length ? getApp() : initializeApp(config));
 export const auth = () => getAuth(app());
 
 let fs: Firestore | null = null;
