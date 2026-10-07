@@ -17,9 +17,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { plateOf, type BookData, type Page } from "@/content/books";
 import { captionless } from "@/content/layout";
+import { hasSlip, recipeOf } from "@/content/recipes";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
 import { JumpContext, PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
+import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
 
 export type Mode = "spread" | "single";
@@ -403,6 +405,11 @@ export function Book({
     return () => window.clearTimeout(id);
   }, [autoOpen, goTo, reduce]);
 
+  // Rezeptzettel: gehört zur aufgeschlagenen Doppelseite und schließt sich beim Weiterblättern
+  const [slip, setSlip] = useState<{ no: number; k: number } | null>(null);
+  const slipPlate = slip && slip.k === k ? plateOf(book, slip.no) : null;
+  const closeSlip = useCallback(() => setSlip(null), []);
+
   // Vergrößern: Tafel hebt sich aus dem Buch
   const [viewer, setViewer] = useState<{ no: number; from: DOMRect | null; trigger: HTMLElement } | null>(null);
   const findRect = useCallback((no: number) => {
@@ -462,12 +469,17 @@ export function Book({
       if (e.key === "ArrowRight") goTo(k + 1);
       else if (e.key === "ArrowLeft") goTo(k - 1);
       else if (e.key === "Escape") onClose();
+      else if (e.key === "r" || e.key === "R") {
+        const no = platesOn(pagesAt(book, mode, k)).find((n) => hasSlip(plateOf(book, n)));
+        if (no) setSlip((cur) => (cur && cur.no === no && cur.k === k ? null : { no, k }));
+        else return;
+      }
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goTo, k, onClose, viewer]);
+  }, [book, goTo, k, mode, onClose, viewer]);
 
   // Eselsohr folgt der Maus
   const plateAt = (x: number, y: number) => {
@@ -604,6 +616,9 @@ export function Book({
   const label = labelAt(book, mode, k);
   const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
+  const slipNos = current
+    .filter((no) => hasSlip(plateOf(book, no)))
+    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : "Kamera" }));
 
   return (
     <section
@@ -643,9 +658,12 @@ export function Book({
             Fujiventura
           </button>
           {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
-          <p className="text-on-table-2 hidden text-sm md:block" aria-live="polite">
-            <RollingLabel text={caption} reduce={reduce} />
-          </p>
+          <div className="text-on-table-2 hidden items-baseline gap-4 text-sm md:flex">
+            <span aria-live="polite">
+              <RollingLabel text={caption} reduce={reduce} />
+            </span>
+            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+          </div>
           <p className="text-on-table-2 justify-self-end text-sm" aria-live="polite">
             <span className="text-on-table">{book.title}</span>
             <span className="mx-2" aria-hidden>
@@ -661,9 +679,12 @@ export function Book({
           </p>
         </header>
         {/* Telefon: Titel der randlosen Tafel unter dem Kopf */}
-        <p className="text-on-table-2 relative z-20 h-5 px-4 pt-1 text-sm md:hidden" aria-hidden>
-          <RollingLabel text={caption} reduce={reduce} />
-        </p>
+        <div className="text-on-table-2 relative z-20 flex h-6 items-baseline justify-between gap-3 px-4 pt-1 text-sm md:hidden">
+          <span aria-hidden className="min-w-0 truncate">
+            <RollingLabel text={caption} reduce={reduce} />
+          </span>
+          <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+        </div>
 
         {/* Bühne */}
         <div className="relative flex flex-1 items-center justify-center px-3 md:px-8">
@@ -841,6 +862,10 @@ export function Book({
         </nav>
       </motion.div>
 
+      <AnimatePresence>
+        {slipPlate && !viewer && <RecipeSlip key={slipPlate.no} plate={slipPlate} onClose={closeSlip} />}
+      </AnimatePresence>
+
       {viewer && (
         <PlateViewer
           book={book}
@@ -852,6 +877,37 @@ export function Book({
         />
       )}
     </section>
+  );
+}
+
+/** Textknöpfe „Rezept“ für die Tafeln der aufgeschlagenen Doppelseite */
+function SlipButtons({
+  nos,
+  k,
+  slip,
+  onOpen,
+}: {
+  nos: { no: number; label: string }[];
+  k: number;
+  slip: number | null;
+  onOpen: (s: { no: number; k: number } | null) => void;
+}) {
+  if (!nos.length) return null;
+  return (
+    <span className="flex shrink-0 gap-3">
+      {nos.map(({ no, label }) => (
+        <button
+          key={no}
+          type="button"
+          aria-expanded={slip === no}
+          onClick={() => onOpen(slip === no ? null : { no, k })}
+          className="text-on-table underline decoration-mark decoration-2 underline-offset-4"
+        >
+          {label}
+          {nos.length > 1 ? ` ${no}` : ""}
+        </button>
+      ))}
+    </span>
   );
 }
 

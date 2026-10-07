@@ -1,0 +1,92 @@
+{
+  "sakeSaeulen": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 15.66mm f/2.8",
+    "focal35": 120,
+    "aperture": 2.8,
+    "shutter": 0.010101010101010102,
+    "iso": 160,
+    "ev": -0.33466408311896567,
+    "date": "2026-01-10"
+  },
+  "sakeSaeule": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 15.66mm f/2.8",
+    "focal35": 120,
+    "aperture": 2.8,
+    "shutter": 0.010101010101010102,
+    "iso": 64,
+    "ev": -0.33466408311896567,
+    "date": "2026-01-10"
+  },
+  "jizo": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 15.66mm f/2.8",
+    "focal35": 120,
+    "aperture": 2.8,
+    "shutter": 0.010101010101010102,
+    "iso": 160,
+    "ev": -0.33466408311896567,
+    "date": "2026-01-10"
+  },
+  "torii": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 15.66mm f/2.8",
+    "focal35": 120,
+    "aperture": 2.8,
+    "shutter": 0.0002990430622009569,
+    "iso": 50,
+    "ev": -0.33466408311896567,
+    "date": "2026-01-10"
+  },
+  "stadt": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 6.765mm f/1.78",
+    "focal35": 48,
+    "aperture": 1.7799999713880652,
+    "shutter": 0.0031446540880503146,
+    "iso": 64,
+    "ev": -0.33466408311896567,
+    "date": "2026-01-10"
+  },
+  "fenster": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 15.66mm f/2.8",
+    "focal35": 120,
+    "aperture": 2.8,
+    "shutter": 0.005681818181818182,
+    "iso": 50,
+    "ev": -1.3275746571237175,
+    "date": "2026-01-12"
+  },
+  "leuchtreklame": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 6.765mm f/1.78",
+    "focal35": 48,
+    "aperture": 1.7799999713880652,
+    "shutter": 0.0019157088122605363,
+    "iso": 64,
+    "ev": -1.3275746571237175,
+    "date": "2026-01-13"
+  },
+  "ramen": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 2.22mm f/2.2",
+    "focal35": 24,
+    "aperture": 2.2,
+    "shutter": 0.016666666666666666,
+    "iso": 160,
+    "ev": -1.3275746571237175,
+    "date": "2026-01-13"
+  },
+  "hirsche": {
+    "device": "iPhone 15 Pro Max",
+    "lens": "iPhone 15 Pro Max back triple camera 6.765mm f/1.78",
+    "focal35": 98,
+    "aperture": 1.7799999713880652,
+    "shutter": 0.008264462809917356,
+    "iso": 100,
+    "ev": -1,
+    "date": "2026-01-11"
+  }
+}

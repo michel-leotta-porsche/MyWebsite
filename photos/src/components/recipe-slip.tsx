@@ -1,0 +1,367 @@
+"use client";
+
+import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
+import type { Plate } from "@/content/books";
+import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
+import { parseXmp, type LightroomSettings } from "@/lib/xmp";
+
+// Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
+// Werte rollen wie ein Zählwerk ein, die Filmsimulation wird gestempelt, Stufen füllen sich.
+// Alle Werte stehen sofort im DOM; die Bewegung ist nur der Weg dorthin.
+
+const EXPO = [0.16, 1, 0.3, 1] as const;
+const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : "0");
+
+/** Ein Wert rollt von unten in sein Fenster */
+function Roll({ children, i, reduce }: { children: React.ReactNode; i: number; reduce: boolean }) {
+  return (
+    <span className="relative inline-flex overflow-hidden align-bottom">
+      <motion.span
+        className="inline-block"
+        initial={reduce ? false : { y: "105%" }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.5, delay: 0.32 + i * 0.04, ease: EXPO }}
+      >
+        {children}
+      </motion.span>
+    </span>
+  );
+}
+
+/** Drei Stufen (aus, schwach, stark) als Balken, die sich nacheinander füllen */
+function Steps({ value, i, reduce, label }: { value: 0 | 1 | 2; i: number; reduce: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span aria-hidden className="flex gap-[3px]">
+        {[0, 1].map((s) => (
+          <span key={s} className="relative block h-2 w-5 bg-ink/12">
+            {value > s && (
+              <motion.span
+                className="absolute inset-0 origin-left bg-ink"
+                initial={reduce ? false : { scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 0.5, delay: 0.4 + i * 0.04 + s * 0.12, ease: EXPO }}
+              />
+            )}
+          </span>
+        ))}
+      </span>
+      <Roll i={i} reduce={reduce}>
+        {label}
+      </Roll>
+    </span>
+  );
+}
+
+/** Weißabgleich-Verschiebung: ein Punkt wandert von der Mitte auf R/B */
+function WbCross({ r, b, reduce }: { r: number; b: number; reduce: boolean }) {
+  const s = 3.2; // Pixel pro Stufe, ±9 Stufen
+  return (
+    <svg aria-hidden viewBox="-32 -32 64 64" className="h-12 w-12 shrink-0 overflow-visible">
+      <line x1="-30" y1="0" x2="30" y2="0" className="stroke-ink/25" strokeWidth="1" />
+      <line x1="0" y1="-30" x2="0" y2="30" className="stroke-ink/25" strokeWidth="1" />
+      <text x="31" y="-3" className="fill-ink-2 text-[9px]" textAnchor="end">R</text>
+      <text x="3" y="-24" className="fill-ink-2 text-[9px]">B</text>
+      <motion.circle
+        r="3.2"
+        className="fill-ink"
+        initial={reduce ? false : { x: 0, y: 0 }}
+        animate={{ x: r * s, y: -b * s }}
+        transition={{ duration: 0.9, delay: 0.45, ease: [0.77, 0, 0.175, 1] }}
+      />
+    </svg>
+  );
+}
+
+type Row = { id: string; label: string; value: React.ReactNode };
+
+/** Zeilen in der Reihenfolge des Bildqualitäts-Menüs der Kamera */
+function fujiRows(r: FujiRecipe, reduce: boolean): Row[] {
+  const grain = ["Aus", "Schwach", "Stark"][r.grain.strength] + (r.grain.strength ? `, ${r.grain.size}` : "");
+  const level = (v: 0 | 1 | 2) => ["Aus", "Schwach", "Stark"][v];
+  let i = 0;
+  const roll = (v: React.ReactNode) => (
+    <Roll i={i++} reduce={reduce}>
+      {v}
+    </Roll>
+  );
+  return [
+    { id: "grain", label: "Körnung", value: <Steps value={r.grain.strength} i={i++} reduce={reduce} label={grain} /> },
+    { id: "cc", label: "Color Chrome", value: <Steps value={r.colorChrome} i={i++} reduce={reduce} label={level(r.colorChrome)} /> },
+    { id: "fxb", label: "Color Chrome FX Blau", value: <Steps value={r.fxBlue} i={i++} reduce={reduce} label={level(r.fxBlue)} /> },
+    { id: "wb", label: "Weißabgleich", value: roll(`${r.wb.mode}, R${signed(r.wb.r)} B${signed(r.wb.b)}`) },
+    { id: "dr", label: "Dynamikbereich", value: roll(r.dr) },
+    { id: "hl", label: "Lichter", value: roll(signed(r.highlight)) },
+    { id: "sh", label: "Schatten", value: roll(signed(r.shadow)) },
+    { id: "col", label: "Farbe", value: roll(signed(r.color)) },
+    { id: "sharp", label: "Schärfe", value: roll(signed(r.sharpness)) },
+    { id: "nr", label: "Rauschminderung", value: roll(signed(r.nr)) },
+    { id: "cl", label: "Klarheit", value: roll(signed(r.clarity)) },
+    { id: "iso", label: "ISO", value: roll(r.iso) },
+    { id: "ev", label: "Belichtungskorrektur", value: roll(r.ev) },
+  ];
+}
+
+// Abhaken an der Kamera, gemerkt pro Rezept auf diesem Gerät
+const checkKey = (name: string) => `fuji:check:${name}`;
+const readChecks = (name: string): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(checkKey(name)) ?? "[]");
+  } catch {
+    return [];
+  }
+};
+
+function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
+  const [dial, setDial] = useState(false);
+  const [checked, setChecked] = useState<string[]>([]);
+  const rows = fujiRows(recipe, reduce);
+  const toggle = (id: string) => {
+    const next = checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id];
+    setChecked(next);
+    try {
+      localStorage.setItem(checkKey(recipe.name), JSON.stringify(next));
+    } catch {}
+  };
+  const done = checked.length === rows.length;
+
+  return (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        {/* Filmsimulation als Stempel */}
+        <motion.p
+          className="border-2 px-2 py-1 text-[15px] leading-none font-bold tracking-[-0.01em] uppercase"
+          style={{ color: "var(--cloth-ink)", borderColor: "var(--cloth-ink)", fontVariationSettings: '"wdth" 80' }}
+          initial={reduce ? false : { clipPath: "inset(0 100% 0 0)", rotate: -6, scale: 1.12 }}
+          animate={{ clipPath: "inset(0 0% 0 0)", rotate: -2, scale: 1 }}
+          transition={{ duration: 0.45, delay: 0.22, ease: EXPO }}
+        >
+          {recipe.film}
+        </motion.p>
+        <WbCross r={recipe.wb.r} b={recipe.wb.b} reduce={reduce} />
+      </div>
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+        {rows.map((row) => (
+          <div key={row.id} className="contents">
+            <dt className="text-ink-2">
+              {dial ? (
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked.includes(row.id)}
+                    onChange={() => toggle(row.id)}
+                    className="h-4 w-4 accent-[var(--ink)]"
+                  />
+                  {row.label}
+                </label>
+              ) : (
+                row.label
+              )}
+            </dt>
+            <dd className={`text-ink ${dial && checked.includes(row.id) ? "line-through decoration-ink-2" : ""}`}>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (!dial) setChecked(readChecks(recipe.name));
+            setDial((d) => !d);
+          }}
+          className="text-ink text-sm font-semibold underline decoration-mark decoration-2 underline-offset-4"
+        >
+          {dial ? (done ? "Fertig. Auf C1 gespeichert?" : "Zurück zum Rezept") : "An der Kamera einstellen"}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Lightroom: Grundwerte, Tonkurve, die sich zeichnet, HSL als Balken um die Mitte */
+function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: boolean }) {
+  const [s, setS] = useState<LightroomSettings | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(recipe.xmp)
+      .then((r) => r.text())
+      .then((t) => alive && setS(parseXmp(t)))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [recipe.xmp]);
+  if (!s) return <p className="text-ink-2 text-sm">Lade Preset …</p>;
+  const path = s.curve.map(([x, y], i) => `${i ? "L" : "M"}${(x / 255) * 100},${100 - (y / 255) * 100}`).join(" ");
+  const fmt = (v: number, unit?: string) => (unit === "EV" ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}` : signed(v));
+  return (
+    <>
+      <div className="flex items-start gap-4">
+        <svg aria-label="Gradationskurve" role="img" viewBox="-2 -2 104 104" className="h-24 w-24 shrink-0">
+          <rect x="0" y="0" width="100" height="100" className="fill-none stroke-ink/20" strokeWidth="0.8" />
+          <line x1="0" y1="100" x2="100" y2="0" className="stroke-ink/20" strokeWidth="0.8" strokeDasharray="2 2" />
+          <motion.path
+            d={path}
+            className="fill-none stroke-ink"
+            strokeWidth="1.6"
+            initial={reduce ? false : { pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.9, delay: 0.3, ease: [0.77, 0, 0.175, 1] }}
+          />
+        </svg>
+        <dl className="grid flex-1 grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
+          {s.basics
+            .filter((b) => b.value !== 0)
+            .map((b, i) => (
+              <div key={b.key} className="contents">
+                <dt className="text-ink-2">{b.label}</dt>
+                <dd className="text-ink text-right">
+                  <Roll i={i} reduce={reduce}>
+                    {fmt(b.value, b.unit)}
+                  </Roll>
+                </dd>
+              </div>
+            ))}
+        </dl>
+      </div>
+      <p className="text-ink-2 mt-4 text-[12px]">Farbmischer, Sättigung</p>
+      <ul className="mt-1 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 text-[12px]">
+        {s.hsl.map((h, i) => (
+          <li key={h.color} className="contents">
+            <span className="text-ink-2">{h.color}</span>
+            <span aria-hidden className="relative h-1.5 bg-ink/10">
+              <span className="absolute inset-y-0 left-1/2 w-px bg-ink/30" />
+              {h.sat !== 0 && (
+                <motion.span
+                  className="absolute inset-y-0 bg-ink"
+                  style={{
+                    left: h.sat > 0 ? "50%" : `${50 + h.sat / 2}%`,
+                    width: `${Math.abs(h.sat) / 2}%`,
+                    transformOrigin: h.sat > 0 ? "left" : "right",
+                  }}
+                  initial={reduce ? false : { scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.5, delay: 0.5 + i * 0.04, ease: EXPO }}
+                />
+              )}
+            </span>
+            <span className="text-ink w-8 text-right">{signed(h.sat)}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
+        <a
+          href={recipe.xmp}
+          download
+          className="text-ink text-sm font-semibold underline decoration-mark decoration-2 underline-offset-4"
+        >
+          Preset laden (.xmp)
+        </a>
+        <a href={recipe.source.url} className="text-ink-2 text-[12px] underline underline-offset-2" target="_blank" rel="noreferrer">
+          {recipe.source.label}
+        </a>
+      </div>
+    </>
+  );
+}
+
+const lens = (c: CameraInfo) => {
+  const t = c.shutter ? (c.shutter >= 1 ? `${c.shutter}s` : `1/${Math.round(1 / c.shutter)}s`) : undefined;
+  return [
+    ["Gerät", c.device],
+    ["Brennweite", c.focal35 ? `${c.focal35} mm (KB)` : undefined],
+    ["Blende", c.aperture ? `f/${c.aperture.toFixed(1)}` : undefined],
+    ["Zeit", t],
+    ["ISO", c.iso?.toString()],
+    ["Belichtung", c.ev !== undefined ? `${c.ev > 0 ? "+" : c.ev < 0 ? "−" : "±"}${Math.abs(c.ev).toFixed(1)} EV` : undefined],
+    ["Datum", c.date ? new Date(c.date).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }) : undefined],
+  ].filter((r): r is [string, string] => !!r[1]);
+};
+
+function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+      {lens(camera).map(([k, v], i) => (
+        <div key={k} className="contents">
+          <dt className="text-ink-2">{k}</dt>
+          <dd className="text-ink">
+            <Roll i={i} reduce={reduce}>
+              {v}
+            </Roll>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+const noopSubscribe = () => () => {};
+
+export function RecipeSlip({ plate, onClose }: { plate: Plate; onClose: () => void }) {
+  const reduce = useReducedMotion() ?? false;
+  const recipe = recipeOf(plate);
+  const camera = cameraOf(plate);
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  const phone = useSyncExternalStore(noopSubscribe, () => window.innerWidth < 768, () => false);
+
+  useEffect(() => {
+    closeBtn.current?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  const kind = recipe?.kind === "fuji" ? "Fuji-Rezept" : recipe?.kind === "lightroom" ? "Lightroom-Preset" : "Kamera";
+  const title = recipe?.name ?? camera?.device ?? "";
+
+  return (
+    <motion.aside
+      role="dialog"
+      aria-label={`${kind} zu Tafel ${plate.no}: ${plate.title}`}
+      tabIndex={0}
+      className="slip text-ink fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:right-[max(24px,calc(50vw-560px))] md:bottom-24"
+      style={phone ? { left: 12, bottom: 12 } : undefined}
+      initial={reduce ? false : { y: 140, clipPath: "inset(100% 0 0 0)", rotate: 0 }}
+      animate={{ y: 0, clipPath: "inset(0% 0 0 0)", rotate: phone ? -0.6 : -1.6 }}
+      exit={reduce ? { opacity: 0 } : { y: 120, clipPath: "inset(100% 0 0 0)", rotate: 0 }}
+      transition={{ duration: 0.5, ease: EXPO }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-ink/15 pb-3">
+        <div className="min-w-0">
+          <p className="text-ink-2 text-[12px]">
+            {kind} · Tafel {plate.no}
+          </p>
+          <p className="truncate text-lg leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+            {title}
+          </p>
+        </div>
+        <button
+          ref={closeBtn}
+          type="button"
+          onClick={onClose}
+          className="text-ink -mr-2 px-2 py-1 text-sm underline decoration-mark decoration-2 underline-offset-4"
+        >
+          Schließen
+        </button>
+      </header>
+      {recipe?.kind === "fuji" && <FujiSlip recipe={recipe} reduce={reduce} />}
+      {recipe?.kind === "lightroom" && <LightroomSlip recipe={recipe} reduce={reduce} />}
+      {recipe && camera && <div className="my-4 border-t border-ink/15" />}
+      {camera && <CameraSlip camera={camera} reduce={reduce} />}
+      {recipe?.placeholder && (
+        <p className="text-ink-2 mt-4 text-[12px]">
+          {recipe.kind === "fuji"
+            ? "Platzhalter: Die echten Werte kommen aus den Originaldateien der Kamera."
+            : "Beispiel-Preset für den Prototyp, nicht die Bearbeitung dieses Fotos."}
+        </p>
+      )}
+    </motion.aside>
+  );
+}

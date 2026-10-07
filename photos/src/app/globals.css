@@ -14,6 +14,7 @@
   --paper-shade: #dcd5c8;
   --ink: #1b1c1a;
   --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.3:1 */
+  --slip: #ebe3d1; /* Rezeptzettel, dünneres, vergilbtes Papier; Tinte 13.4:1, graue Tinte 5.3:1 */
   --mark: var(--cloth); /* Position und Fokus; auf hellen Tischen dunkler */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -120,6 +121,21 @@ body {
   background:
     radial-gradient(ellipse 70% 60% at 92% 0%, rgb(255 205 130 / 0.55), transparent 70%),
     radial-gradient(ellipse 80% 70% at 0% 100%, rgb(12 10 8 / 0.35), transparent 70%);
+}
+
+/* Rezeptzettel: vergilbtes Papier mit Fasern */
+.slip {
+  background-color: var(--slip);
+  isolation: isolate;
+}
+.slip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("/textures/paper.png");
+  opacity: 0.18;
 }
 
 /* Nebel: kühles, gestreutes Licht von oben, ohne Schatten von Pflanzen */

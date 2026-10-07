@@ -95,7 +95,7 @@ export type Photo = {
 };
 
 /** Tafel: ein Foto mit seiner Nummer im Buch (Reihenfolge des ersten Auftritts) */
-export type Plate = Photo & { no: number };
+export type Plate = Photo & { no: number; key: string };
 
 /**
  * Seitentypen nach dem Workshop-Konzept (docs/workshop-konzept.md):
@@ -219,7 +219,7 @@ function build(spec: BookSpec): BookData {
     return { left, right: rr, plates: platesOf(left, rr) };
   });
 
-  const plates: Plate[] = order.map((key, i) => ({ ...photos[key], no: i + 1 }));
+  const plates: Plate[] = order.map((key, i) => ({ ...photos[key], key, no: i + 1 }));
   const unused = Object.keys(photos).filter((k) => !order.includes(k));
   if (unused.length) throw new Error(`Fotos ohne Seite: ${unused.join(", ")}`);
 
