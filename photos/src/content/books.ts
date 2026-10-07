@@ -141,13 +141,28 @@ export type TextRole = "heading" | "body" | "note";
 export type FontKey = "grotesk" | "serif" | "mono" | "hand";
 /** freie Gestaltung eines Textrahmens; was fehlt, kommt vom Stil (role) */
 export type TextLook = { font?: FontKey; size?: number; color?: string; align?: "left" | "center" | "right"; bold?: boolean; italic?: boolean };
+/** Formen: Linie, Pfeil und Klebestreifen laufen von Ecke zu Ecke ihrer Box, from ist die Ecke am Anfang (Standard oben links) */
+export type Corner = "tl" | "tr" | "bl" | "br";
+export type ShapeKind = "line" | "arrow" | "rect" | "ellipse" | "tape";
+/** Aussehen einer Form; Strichstärke als Stufe, damit es ruhig bleibt */
+export type ShapeLook = { color: string; fill?: string; weight: 1 | 2 | 3; dashed?: boolean };
+/** Ein Strich mit Stift oder Maus: Farbe, Breite in cqw, Punkte flach [x, y, Druck, …], x/y in 0..1000 der Box, Druck 0..100 */
+export type InkStroke = { c: string; s: number; p: number[]; /** Druck kommt vom Stift (sonst aus dem Tempo) */ pen?: true };
 export type FreeEl =
   | { t: "photo"; no: number; box: Box; crop?: Crop; caption: "auto" | "off" }
-  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean; look?: TextLook };
+  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean; look?: TextLook }
+  | { t: "shape"; kind: ShapeKind; box: Box; look: ShapeLook; from?: Corner }
+  | { t: "ink"; box: Box; strokes: InkStroke[] };
 /** dasselbe mit Fotoschlüssel statt Nummer, so steht es im gespeicherten Buch */
 export type FreeItem =
   | { t: "photo"; id: string; key: string; box: Box; crop?: Crop; caption: "auto" | "off"; pairId?: string; /** Stapelung auf der Doppelseite */ z?: number }
-  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number; /** Text über den Bund: beide Hälften gleich */ pairId?: string };
+  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number; /** Text über den Bund: beide Hälften gleich */ pairId?: string }
+  | { t: "shape"; id: string; kind: ShapeKind; box: Box; look: ShapeLook; from?: Corner; z?: number; pairId?: string }
+  | { t: "ink"; id: string; box: Box; strokes: InkStroke[]; z?: number; pairId?: string };
+
+/** Form oder Zeichnung ohne Verwaltungsfelder (id, z, pairId) */
+export const toEl = (it: Extract<FreeItem, { t: "shape" | "ink" }>): FreeEl =>
+  it.t === "shape" ? { t: "shape", kind: it.kind, box: it.box, look: it.look, from: it.from } : { t: "ink", box: it.box, strokes: it.strokes };
 
 /** Tafelnummern auf einer Seite; die leere Seite zählt nicht */
 export const pageNos = (p: Page): number[] =>
@@ -254,7 +269,9 @@ export function build(spec: BookSpec): BookData {
           items: s.items.map((it): FreeEl =>
             it.t === "photo"
               ? { t: "photo", no: nos.get(it.key)!, box: it.box, crop: it.crop, caption: it.caption }
-              : { t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look },
+              : it.t === "text"
+                ? { t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look }
+                : toEl(it),
           ),
         };
       }

@@ -83,7 +83,12 @@ function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }
   );
 }
 
-function Element({ book, el, eager, z }: { book: BookData; el: El; eager: boolean; z: number }) {
+/** sizes für ein Foto, das w Prozent der Seitenbreite einnimmt */
+type SizesFor = (w: number) => string;
+// Standard: Seite im offenen Buch, Doppelseite ab Tablet, Einzelseite auf dem Telefon
+const bookSizes: SizesFor = (w) => `(min-width: 768px) ${Math.ceil(w * 0.4)}vw, ${Math.ceil(w * 0.96)}vw`;
+
+function Element({ book, el, eager, z, sizes }: { book: BookData; el: El; eager: boolean; z: number; sizes: SizesFor }) {
   switch (el.t) {
     case "img": {
       const p = plateOf(book, el.no);
@@ -99,7 +104,7 @@ function Element({ book, el, eager, z }: { book: BookData; el: El; eager: boolea
               alt={hidden ? "" : p.alt}
               aria-hidden={hidden || undefined}
               fill
-              sizes={`(min-width: 768px) ${Math.ceil(el.w * 0.4)}vw, ${Math.ceil(el.w * 0.96)}vw`}
+              sizes={sizes(el.w)}
               className={el.fit === "contain" ? "object-contain" : "object-cover"}
               style={{
                 objectPosition: el.fit === "contain" ? "50% 50%" : `${el.focus[0] * 100}% ${el.focus[1] * 100}%`,
@@ -157,6 +162,28 @@ function Element({ book, el, eager, z }: { book: BookData; el: El; eager: boolea
           style={{ ...box(el.x, el.y, el.w, el.h), boxShadow: `inset 0 0 0 ${el.width}cqw ${el.color}` }}
         />
       );
+    case "path":
+      // Pfad in cqw: viewBox = Seite (100 breit, Höhe in cqw); dieselben Pfade zeichnet die Textur
+      return (
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          style={{ zIndex: z }}
+          viewBox={`0 0 100 ${book.aspect * 100}`}
+          preserveAspectRatio="none"
+        >
+          <path
+            d={el.d}
+            fill={el.fill ?? "none"}
+            stroke={el.stroke}
+            strokeWidth={el.width}
+            strokeDasharray={el.dash?.join(" ")}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={el.opacity}
+          />
+        </svg>
+      );
   }
 }
 
@@ -165,11 +192,14 @@ export function PageView({
   page,
   side,
   eager = false,
+  sizes = bookSizes,
 }: {
   book: BookData;
   page: Page;
   side: "left" | "right";
   eager?: boolean;
+  /** Wie breit Fotos dargestellt werden, falls die Seite kleiner ist als im offenen Buch (Einband auf dem Tisch) */
+  sizes?: SizesFor;
 }) {
   const layout = layoutPage(book, page, side);
   const bg = layout.bg === "paper" ? undefined : layout.bg === "cloth" ? book.cloth.base : book.cloth.deep;
@@ -180,7 +210,7 @@ export function PageView({
       style={{ backgroundColor: bg }}
     >
       {layout.els.map((el, i) => (
-        <Element key={i} book={book} el={el} eager={eager} z={i + 1} />
+        <Element key={i} book={book} el={el} eager={eager} z={i + 1} sizes={sizes} />
       ))}
       {layout.gutter && <Gutter side={side} />}
     </div>

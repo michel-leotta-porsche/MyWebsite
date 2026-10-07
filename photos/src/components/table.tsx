@@ -1,12 +1,12 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { type BookData } from "@/content/books";
 import { INTRO_DONE } from "@/components/intro";
 import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Wie die Bücher auf dem Tisch liegen: leicht gedreht und versetzt, nie in Reih und Glied
 const POSE = [
@@ -18,6 +18,12 @@ const POSE = [
 const NUMBER = ["Kein", "Ein", "Zwei", "Drei", "Vier", "Fünf", "Sechs", "Sieben", "Acht", "Neun", "Zehn"];
 
 /** Breite des Einbands auf dem Tisch, das größte Buch ist der Maßstab */
+// --tw ist min(22vw, …, 360px); die Höhenbegrenzung macht den Einband nur kleiner, 22vw bis 360px reicht als Obergrenze
+const coverSizes = (book: BookData) => (w: number) => {
+  const f = (book.scale * w) / 100;
+  return `(min-width: 1637px) ${Math.ceil(360 * f)}px, ${Math.ceil(22 * f)}vw`;
+};
+
 const coverWidth = (book: BookData) =>
   `calc(var(--tw) * ${book.scale})`;
 
@@ -40,7 +46,7 @@ function ClosedBook({
     <div
       className="table-book relative"
       style={{ ["--rot" as string]: `${pose.rot}deg`, ["--dy" as string]: `${pose.y}px` }}
-      data-table-book
+      data-table-book={book.id}
     >
       <button
         type="button"
@@ -69,7 +75,7 @@ function ClosedBook({
             className="absolute inset-0"
             style={{ viewTransitionName: `cover-${book.id}` }}
           >
-            <PageView book={book} page={{ kind: "cover" }} side="right" eager />
+            <PageView book={book} page={{ kind: "cover" }} side="right" eager sizes={coverSizes(book)} />
           </div>
         </div>
       </button>
@@ -103,11 +109,20 @@ export type TableProps = {
   /** Weitere Dinge auf dem Tisch, z. B. ein leeres Buch zum Anlegen */
   tiles?: ReactNode;
   label?: string;
+  /** Überschrift links im Kopf; ohne Angabe die Wortmarke als h1 */
+  title?: ReactNode;
+  /** Band, der beim Erscheinen den Fokus bekommt (das Buch, das gerade zugeklappt wurde) */
+  focusId?: string | null;
 };
 
-export function Table({ books, onOpen, headerRight, extra, note, tiles, label }: TableProps) {
+export function Table({ books, onOpen, headerRight, extra, note, tiles, label, title, focusId }: TableProps) {
   const root = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion() ?? false;
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!focusId) return;
+    root.current?.querySelector<HTMLElement>(`[data-table-book="${CSS.escape(focusId)}"] button`)?.focus({ preventScroll: true });
+  }, [focusId]);
 
   // Nach dem Einstieg hebt sich jedes Buch einmal kurz an: hier lässt sich etwas aufschlagen
   useEffect(() => {
@@ -145,10 +160,12 @@ export function Table({ books, onOpen, headerRight, extra, note, tiles, label }:
       }}
     >
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
-        <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          Fujiventura
-        </h1>
+      <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-8 md:pt-6">
+        {title ?? (
+          <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+            Fujiventura
+          </h1>
+        )}
         {headerRight ?? (
           <p className="text-on-table-2 text-sm">
             {NUMBER[books.length] ?? books.length} Bücher von Michel Leotta

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import { MyTable } from "@/components/my-table";
+import { BookRoom } from "@/components/book-room";
 
 export const metadata: Metadata = {
-  title: "Werkbank · Fujiventura",
+  title: "Bücherzimmer · Fujiventura",
   robots: { index: false, follow: false },
 };
 
 export default function Page() {
-  return <MyTable />;
+  return <BookRoom />;
 }

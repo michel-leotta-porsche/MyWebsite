@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
-import { signIn } from "@/lib/firebase";
+import { signIn, type User } from "@/lib/firebase";
+import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Textknöpfe mit Unterstrich, Rahmenknopf, Anmeldung.
 
@@ -37,6 +39,61 @@ export function Wordmark({ href = "/" }: { href?: string }) {
   );
 }
 
+/** Kopf eines Raums: Wortmarke führt zur Landing Page, daneben der Raum als Überschrift der Seite */
+export function RoomTitle({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <Wordmark />
+      <span aria-hidden className="text-on-table-2">
+        /
+      </span>
+      <h1 className="text-on-table text-lg font-semibold tracking-[-0.01em]">{children}</h1>
+    </div>
+  );
+}
+
+/** Die drei Räume hinter der Anmeldung: lesen, gestalten, man selbst */
+export const ROOMS = [
+  { href: "/zimmer", label: "Bücherzimmer" },
+  { href: "/tisch", label: "Werkbank" },
+  { href: "/profil", label: "Profil" },
+] as const;
+
+/** Wege zwischen den Räumen; der aktuelle Raum trägt den gelben Unterstrich und ist kein Link */
+export function RoomNav({ className = "" }: { className?: string }) {
+  const path = usePathname();
+  return (
+    <nav aria-label="Räume" className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${className}`}>
+      {ROOMS.map((r) =>
+        path === r.href ? (
+          <span key={r.href} aria-current="page" className="text-on-table underline decoration-mark decoration-2 underline-offset-4">
+            {r.label}
+          </span>
+        ) : (
+          <Link
+            key={r.href}
+            href={r.href}
+            className="text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline"
+          >
+            {r.label}
+          </Link>
+        ),
+      )}
+    </nav>
+  );
+}
+
+/**
+ * Räume nur mit Anmeldung: solange Firebase prüft, liegt der leere Tisch da, ohne Konto die Anmeldung.
+ * Die Daten schützen firestore.rules; das hier ist der Weg, nicht das Schloss.
+ */
+export function RequireUser({ title, text, children }: { title: string; text: ReactNode; children: (user: User) => ReactNode }) {
+  const user = useUser();
+  if (user === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
+  if (user === null) return <SignInTable title={title}>{text}</SignInTable>;
+  return <>{children(user)}</>;
+}
+
 /** Leerer Tisch mit Anmeldung */
 export function SignInTable({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -57,17 +114,35 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
   );
 }
 
-/** Dialog auf Zettelpapier, mittig über dem Tisch */
+/**
+ * Dialog auf Zettelpapier, mittig über dem Tisch. Natives <dialog> mit showModal(): der Fokus geht hinein und
+ * bleibt drin, der Hintergrund ist inert, Esc schließt, danach kehrt der Fokus zum Auslöser zurück (UX-Kritik K2).
+ */
 export function SlipDialog({ label, onClose, children, wide = false }: { label: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    const back = document.activeElement as HTMLElement | null;
+    if (!d.open) d.showModal();
+    return () => {
+      d.close();
+      back?.focus({ preventScroll: true });
+    };
+  }, []);
   return (
-    <div className="fixed inset-0 z-[700] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 md:items-center" onClick={onClose}>
+    <dialog
+      ref={ref}
+      aria-label={label}
+      className="fixed inset-0 z-[700] m-0 flex h-full max-h-none w-full max-w-none items-end justify-center bg-transparent p-3 backdrop:bg-[rgb(12_10_8/0.55)] md:items-center"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        className={`slip text-ink relative w-full ${wide ? "max-w-3xl" : "max-w-md"} p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]`}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
+        className={`slip text-ink relative max-h-full w-full overflow-y-auto ${wide ? "max-w-3xl" : "max-w-md"} p-5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]`}
       >
         <div className="mb-4 flex items-baseline justify-between gap-4 border-b border-ink/15 pb-3">
           <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
@@ -83,9 +158,32 @@ export function SlipDialog({ label, onClose, children, wide = false }: { label: 
         </div>
         {children}
       </div>
-    </div>
+    </dialog>
   );
 }
 
 export const inputClass =
-  "w-full border border-ink/25 bg-transparent px-3 py-2 text-ink placeholder:text-ink-2 focus-visible:outline-2 focus-visible:outline-ink";
+  "w-full border border-ink-2 bg-transparent px-3 py-2 text-ink placeholder:text-ink-2 focus-visible:outline-2 focus-visible:outline-ink";
+
+/** Hinweis mit Rückgängig; verschwindet nach zehn Sekunden */
+export function UndoToast({ text, onUndo, onClose }: { text: string; onUndo: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const id = window.setTimeout(onClose, 10000);
+    return () => window.clearTimeout(id);
+  }, [onClose]);
+  return (
+    <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]">
+      <span>{text}</span>
+      <button
+        type="button"
+        onClick={() => {
+          onUndo();
+          onClose();
+        }}
+        className="shrink-0 font-semibold underline decoration-mark decoration-2 underline-offset-4"
+      >
+        Rückgängig
+      </button>
+    </div>
+  );
+}

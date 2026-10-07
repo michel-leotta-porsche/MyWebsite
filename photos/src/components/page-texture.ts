@@ -14,10 +14,17 @@ const C = {
   ink2: "#5a5c56",
 };
 
+// Nur die zuletzt gezeichneten Fotos bleiben im Speicher. Ohne Grenze hielt jede besuchte Seite ihr
+// entpacktes Foto fest (etwa 5 MB bei 960px), und WebKit beendete auf dem iPhone nach einigen Seiten den Tab.
+const MAX_IMAGES = 8;
 const images = new Map<string, Promise<HTMLImageElement>>();
 function loadImage(url: string) {
   let p = images.get(url);
-  if (!p) {
+  if (p) {
+    // zuletzt benutzt: ans Ende der Reihenfolge
+    images.delete(url);
+    images.set(url, p);
+  } else {
     p = new Promise((resolve, reject) => {
       const img = new Image();
       // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
@@ -28,6 +35,7 @@ function loadImage(url: string) {
       img.src = url;
     });
     images.set(url, p);
+    while (images.size > MAX_IMAGES) images.delete(images.keys().next().value!);
   }
   return p;
 }
@@ -145,7 +153,7 @@ function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number
 async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
   ctx.fillStyle = C.paper;
   ctx.fillRect(0, 0, W, H);
-  paperTile ??= loadImage("/textures/paper.png");
+  paperTile ??= loadImage("/textures/paper.webp");
   const tile = await paperTile.catch(() => null);
   if (tile) {
     ctx.save();
@@ -171,7 +179,7 @@ async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, sc
 }
 
 async function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
-  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.png"), loadImage("/textures/linen-warp.png")]);
+  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.webp"), loadImage("/textures/linen-warp.webp")]);
   const tiles = await linenTiles.catch(() => []);
   ctx.save();
   ctx.globalAlpha = 0.13;
@@ -262,6 +270,27 @@ async function drawLayout(
         ctx.lineWidth = el.width * cq;
         ctx.strokeRect((el.x + el.width / 2) * cq, (el.y + el.width / 2) * cq, (el.w - el.width) * cq, (el.h - el.width) * cq);
         return;
+      case "path": {
+        // dieselben Pfade wie im SVG der Seite, in cqw
+        ctx.save();
+        ctx.scale(cq, cq);
+        const path = new Path2D(el.d);
+        if (el.opacity !== undefined) ctx.globalAlpha = el.opacity;
+        if (el.fill) {
+          ctx.fillStyle = el.fill;
+          ctx.fill(path);
+        }
+        if (el.stroke && el.width) {
+          ctx.strokeStyle = el.stroke;
+          ctx.lineWidth = el.width;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          if (el.dash) ctx.setLineDash(el.dash);
+          ctx.stroke(path);
+        }
+        ctx.restore();
+        return;
+      }
       case "text": {
         const min = el.size < 2.4 ? 9 : 11;
         const px = el.size < 3.4 ? Math.max(min, el.size * cq) : el.size * cq;

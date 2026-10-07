@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { inputClass, SlipDialog, TextButton } from "@/components/app-ui";
+import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { signIn } from "@/lib/firebase";
 import { keepInInbox, leaveNote, loadShare, toBookData, type Share } from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
+
+const EAR_DELAY_MS = 5000;
 
 /** Ein Buch, das jemand für mich hingelegt hat: ohne Konto lesbar, mit Zettel und Eselsohr zurück */
 export function GuestBook() {
@@ -19,6 +22,10 @@ export function GuestBook() {
   const [text, setText] = useState("");
   const [sent, setSent] = useState<string | null>(null);
   const [ears, setEars] = useState<number[]>([]);
+  // Eselsohren gehen erst nach ein paar Sekunden raus; bis dahin lassen sie sich zurücknehmen (UX-Kritik K12)
+  const earTimers = useRef(new Map<number, number>());
+  const [earsSent, setEarsSent] = useState<number[]>([]);
+  const [failed, setFailed] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
 
   useEffect(() => {
@@ -32,7 +39,7 @@ export function GuestBook() {
     };
   }, [token]);
 
-  // angemeldet: das Buch bleibt auf dem eigenen Tisch liegen
+  // angemeldet: das Buch bleibt im eigenen Bücherzimmer liegen
   useEffect(() => {
     if (!user || !share || kept) return;
     keepInInbox(user.uid, share)
@@ -56,6 +63,31 @@ export function GuestBook() {
 
   const from = user?.displayName ?? share.to;
 
+  const toggleEar = (no: number) => {
+    if (!token || earsSent.includes(no)) return;
+    const pending = earTimers.current.get(no);
+    if (pending !== undefined) {
+      window.clearTimeout(pending);
+      earTimers.current.delete(no);
+      setEars((e) => e.filter((x) => x !== no));
+      return;
+    }
+    setFailed(null);
+    setEars((e) => [...e, no]);
+    earTimers.current.set(
+      no,
+      window.setTimeout(() => {
+        earTimers.current.delete(no);
+        leaveNote(token, { kind: "ear", no, from })
+          .then(() => setEarsSent((s) => [...s, no]))
+          .catch(() => {
+            setEars((e) => e.filter((x) => x !== no));
+            setFailed("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal.");
+          });
+      }, EAR_DELAY_MS),
+    );
+  };
+
   return (
     <main>
       <Library
@@ -67,38 +99,37 @@ export function GuestBook() {
             <p className="text-on-table-2 text-sm">
               {user ? (
                 kept ? (
-                  <span>Liegt auf deinem Tisch</span>
+                  <Link href="/zimmer" className={linkClass}>
+                    Liegt in deinem Bücherzimmer
+                  </Link>
                 ) : (
                   <span>…</span>
                 )
               ) : (
-                <TextButton onClick={() => signIn().catch(() => {})}>Auf meinen Tisch legen</TextButton>
+                <TextButton onClick={() => signIn().catch(() => {})}>In mein Bücherzimmer legen</TextButton>
               )}
             </p>
           ),
         }}
         ears={ears}
-        onEar={(no) => {
-          if (ears.includes(no) || !token) return;
-          setEars((e) => [...e, no]);
-          leaveNote(token, { kind: "ear", no, from }).catch(() => {});
-        }}
+        onEar={toggleEar}
         bookExtra={(_, plates) => {
           // Eselsohr an der ersten Tafel der aufgeschlagenen Seite
           const no = plates[0];
           return (
             <>
-              {no !== undefined && (
-                <TextButton
-                  aria-pressed={ears.includes(no)}
-                  onClick={() => {
-                    if (ears.includes(no) || !token) return;
-                    setEars((e) => [...e, no]);
-                    leaveNote(token, { kind: "ear", no, from }).catch(() => {});
-                  }}
-                >
-                  {ears.includes(no) ? "Eselsohr gesetzt" : "Eselsohr"}
-                </TextButton>
+              {no !== undefined &&
+                (earsSent.includes(no) ? (
+                  <span className="text-on-table-2">Eselsohr bei {share.fromName}</span>
+                ) : (
+                  <TextButton aria-pressed={ears.includes(no)} onClick={() => toggleEar(no)}>
+                    {ears.includes(no) ? "Eselsohr · zurücknehmen" : "Eselsohr"}
+                  </TextButton>
+                ))}
+              {failed && (
+                <span role="alert" className="text-on-table">
+                  {failed}
+                </span>
               )}
               <TextButton onClick={() => setWriting(true)}>Zettel</TextButton>
             </>
@@ -114,9 +145,10 @@ export function GuestBook() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!text.trim() || !token) return;
+                setFailed(null);
                 leaveNote(token, { kind: "note", text: text.trim(), from })
                   .then(() => setSent(text.trim()))
-                  .catch(() => {});
+                  .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
               }}
             >
               <label htmlFor="note" className="sr-only">
@@ -130,6 +162,11 @@ export function GuestBook() {
                 className={inputClass}
                 placeholder="Was dir gefällt, eine Frage zum Rezept …"
               />
+              {failed && (
+                <p role="alert" className="text-ink mt-2 text-[13px] font-semibold">
+                  {failed}
+                </p>
+              )}
               <div className="mt-2 flex items-baseline justify-between">
                 <span className="text-ink-2 text-[12px]">{text.length} / 280 · nur {share.fromName} liest das</span>
                 <button

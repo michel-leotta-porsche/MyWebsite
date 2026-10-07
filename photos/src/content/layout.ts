@@ -1,3 +1,4 @@
+import { inkPaths, shapePaths, type PathEl } from "@/content/shapes";
 import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
@@ -46,7 +47,9 @@ export type El =
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
   | { t: "rect"; x: number; y: number; w: number; h: number; color: string }
   /** Prägemulde: Linie innen um das eingelassene Bild */
-  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number };
+  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number }
+  /** Form oder Handschrift als Pfad in cqw (shapes.ts) */
+  | PathEl;
 
 export type Layout = {
   bg: "paper" | "cloth" | "clothDeep";
@@ -154,6 +157,8 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
     // Textrahmen: Höhe folgt dem Text
     return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w, it.look) } : c;
   });
+  // Formen und Zeichnungen stören keine Bildunterschrift: sie liegen bewusst auf der Seite
+  const solid = items.map((it) => it.t === "photo" || it.t === "text");
   const els: El[] = [];
   items.forEach((it, i) => {
     const b = boxes[i];
@@ -164,9 +169,13 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
       const there = b.x < 0 ? -b.x : Math.max(0, b.x + b.w - 100);
       const visible = here > 0 && (b.x < 0 ? here > there : here >= there);
       if (it.caption === "auto" && visible) {
-        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i));
+        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i && solid[n]));
         if (cap) els.push(cap);
       }
+    } else if (it.t === "shape") {
+      els.push(...shapePaths(it.kind, it.box, it.look, it.from, H));
+    } else if (it.t === "ink") {
+      els.push(...inkPaths(it.strokes, it.box, H));
     } else {
       const st = TEXT_ROLE[it.role];
       const m = textMetrics(it.role, it.look);
@@ -191,6 +200,32 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
     }
   });
   return els;
+}
+
+/** Bildverzeichnis: Fuge zwischen den Daumen, Abstand Daumen zu Daumen darunter (Nummer + Luft) */
+const INDEX_GAP = 2;
+const INDEX_ROW = 5;
+/** Platz unter dem letzten Daumen für die Nummer: 0.8 Abstand plus eine Zeile, auch bei 9px auf schmalen Seiten */
+const INDEX_LABEL = 4.4;
+/**
+ * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
+ * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
+ */
+const INDEX_COLS = [4, 6, 8, 10, 12] as const;
+
+/** Die größten Daumen, bei denen alle Tafeln samt Nummern im Satzspiegel bleiben */
+export function indexGrid(book: BookData, ta: { y: number; w: number; h: number }) {
+  const n = book.plates.length;
+  const top = ta.y + 7;
+  const bottom = ta.y + ta.h;
+  const grid = (cols: number) => {
+    const cw = (ta.w - (cols - 1) * INDEX_GAP) / cols;
+    const ch = cw * book.aspect;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const end = top + (rows - 1) * (ch + INDEX_ROW) + ch + INDEX_LABEL;
+    return { cols, cw, ch, top, rows, end };
+  };
+  return INDEX_COLS.map(grid).find((g) => g.end <= bottom) ?? grid(INDEX_COLS[INDEX_COLS.length - 1]);
 }
 
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
@@ -332,22 +367,13 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       return paper(layoutFree(book, page.items, side));
 
     case "index": {
-      const n = book.plates.length;
-      const gap = 2;
-      // so viele Spalten, dass alle Abzüge in den Satzspiegel passen (bis 60 Fotos)
-      const fits = (c: number) => {
-        const w = (ta.w - (c - 1) * gap) / c;
-        return 7 + Math.ceil(n / c) * (w * book.aspect + 5) <= ta.h;
-      };
-      const cols = [n > 9 ? 6 : 4, 6, 8, 10, 12].find(fits) ?? 12;
-      const cw = (ta.w - (cols - 1) * gap) / cols;
-      const ch = cw * book.aspect;
+      const { cols, cw, ch, top } = indexGrid(book, ta);
       const els: El[] = [
         { t: "text", text: "Tafeln", x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
       ];
       book.plates.forEach((p, i) => {
-        const x = ta.x + (i % cols) * (cw + gap);
-        const y = ta.y + 7 + Math.floor(i / cols) * (ch + 5);
+        const x = ta.x + (i % cols) * (cw + INDEX_GAP);
+        const y = top + Math.floor(i / cols) * (ch + INDEX_ROW);
         els.push({ t: "thumb", no: p.no, x, y, w: cw, h: ch });
         els.push({ t: "text", text: String(p.no), x, y: y + ch + 0.8, size: 2.1, weight: 400, tone: "ink2", lh: 1.2 });
       });

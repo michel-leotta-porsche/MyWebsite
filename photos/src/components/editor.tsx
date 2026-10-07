@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { plateOf, typeArea, type BookData, type Page } from "@/content/books";
-import { estimateLines, layoutPage, TEXT_STYLE } from "@/content/layout";
+import { layoutPage, TEXT_STYLE } from "@/content/layout";
 import { FrameButton, inputClass, linkClass, SignInTable, SlipDialog, TextButton, Wordmark } from "@/components/app-ui";
 import { Book } from "@/components/book";
 import { CropDialog } from "@/components/crop-dialog";
@@ -46,6 +46,22 @@ type Pending = { key: string; name: string; state: "lesen" | "laden" | "fertig" 
 type Selection = { type: "photo"; key: string } | { type: "spread"; id: string } | null;
 
 const MAX = 60;
+/** Unter 768px: Panel des Gewählten als Blatt am unteren Rand, direkt beim Foto statt weit darunter */
+const SHEET =
+  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
+
+function SheetClose({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex justify-end md:hidden">
+      <button type="button" onClick={onClose} className="-my-2 min-h-11 px-2 text-sm underline decoration-mark decoration-2 underline-offset-4">
+        Fertig
+      </button>
+    </div>
+  );
+}
+
+/** Klickfläche kleiner Leistenknöpfe: 24px, mit dem Finger 44px hoch (WCAG 2.5.8, UX-Kritik K3) */
+const HIT = "inline-flex min-h-6 min-w-6 items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-9";
 
 /** Eine Doppelseite bleibt, solange etwas auf ihr liegt */
 const keepSpread = (s: SpreadDraft) => s.keys.length > 0 || !!s.text || !!s.pages?.some((p) => p.items.length);
@@ -125,6 +141,13 @@ export function Editor() {
   const [stageId, setStageId] = useState<string | null>(null);
   const lastClick = useRef<{ i: number; at: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Hinweis mit Rückgängig nach dem Ablegen; verschwindet nach ein paar Sekunden von selbst
+  const [undoNotice, setUndoNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!undoNotice) return;
+    const id = window.setTimeout(() => setUndoNotice(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [undoNotice]);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -542,13 +565,15 @@ export function Editor() {
     setSel(null);
     setStageId(s.id);
   };
-  const shelvePhoto = (key: string) =>
+  const shelvePhoto = (key: string) => {
+    setUndoNotice("In die Ablage gelegt.");
     update((b) => ({
       ...mapSpreads(b, (ss) =>
         ss.map((s) => (!s.keys.includes(key) ? s : s.pages ? removeKey(s, key) : { ...s, keys: s.keys.filter((k) => k !== key), layout: 0 })).filter(keepSpread),
       ),
       photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: true } : p)),
     }));
+  };
   const unshelvePhoto = (key: string) =>
     update((b) => relayout({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: false } : p)) }));
   const setPhoto = (key: string, patch: Partial<StoredPhoto>, tag?: string) =>
@@ -612,14 +637,8 @@ export function Editor() {
     return { aspect: 2 / 3, gutter: false };
   };
 
-  // Textseite: passt der Text?
-  const textFits = (s: SpreadDraft) => {
-    if (!s.text || !data) return true;
-    const st = TEXT_STYLE[s.text.style ?? "text"];
-    const ta = typeArea(data, "right");
-    const head = s.text.heading ? estimateLines(s.text.heading, 6, ta.w) * 6 * 1.02 + 5 : 0;
-    return head + estimateLines(s.text.body || " ", st.size, 66) * st.size * st.lh <= ta.h;
-  };
+  // Textseite: passt der Text? Gemessen in echter Schrift auf einer Leseseite, nicht geschätzt
+  const textFits = (s: SpreadDraft) => textOverflow(s, data) === 0;
 
   const status =
     saved === "speichert" ? "Speichert …" : saved === "gespeichert" ? "Gespeichert" : saved === "offline" ? "Offline gespeichert, geht raus, sobald Netz da ist" : saved === "fehler" ? "Speichern fehlgeschlagen" : "";
@@ -629,9 +648,9 @@ export function Editor() {
       <Keys onKey={onKey} />
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
-          <Wordmark href="/tisch" />
+          <Wordmark />
           <Link href="/tisch" className={`${linkClass} text-sm`}>
-            Zum Tisch
+            Zur Werkbank
           </Link>
         </span>
         <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
@@ -652,7 +671,7 @@ export function Editor() {
         </span>
       </header>
 
-      <div className="grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_320px] md:px-8">
+      <div className={`grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
         <section aria-label="Doppelseiten" className="min-w-0">
           {/* Fotos */}
           <div className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6">
@@ -734,7 +753,7 @@ export function Editor() {
                       onDrop={(e) => onDrop(i, e)}
                       className="p-3"
                     >
-                      <div className="text-on-table-2 mb-2 flex items-baseline justify-between gap-2 text-xs">
+                      <div className="text-on-table-2 mb-2 flex flex-wrap items-center justify-between gap-x-2 text-xs">
                         <button
                           type="button"
                           onClick={() => s.id && setSel(active ? null : { type: "spread", id: s.id })}
@@ -743,14 +762,14 @@ export function Editor() {
                         >
                           {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
                         </button>
-                        <span className="flex items-baseline gap-3">
+                        <span className="flex flex-wrap items-center gap-x-2">
                           <button
                             type="button"
                             onClick={() => togglePin(i)}
                             disabled={!!s.text}
                             aria-pressed={!!s.pinned || !!s.text}
                             aria-label={s.pinned || s.text ? `Doppelseite ${i + 1} lösen` : `Doppelseite ${i + 1} fixieren`}
-                            className={s.pinned || s.text ? "text-mark" : "text-on-table-2 hover:text-on-table"}
+                            className={`${HIT} ${s.pinned || s.text ? "text-mark" : "text-on-table-2 hover:text-on-table"}`}
                             title={s.pinned ? "fixiert: die Automatik lässt sie in Ruhe" : "frei: die Automatik darf sie neu ordnen"}
                           >
                             <Lock on={!!s.pinned || !!s.text} />
@@ -759,17 +778,30 @@ export function Editor() {
                             Gestalten
                           </TextButton>
                           {!s.pages && (
-                            <TextButton onClick={() => cycle(i)} aria-label={`Layout von Doppelseite ${i + 1} wechseln`}>
-                              Layout
+                            <TextButton
+                              onClick={() => cycle(i)}
+                              aria-label={`Layout von Doppelseite ${i + 1} wechseln, ${s.layout + 1} von ${variantsOf(s, auto).length}`}
+                            >
+                              Layout {s.layout + 1}/{variantsOf(s, auto).length}
                             </TextButton>
                           )}
-                          <TextButton onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label="Nach vorn">
+                          <TextButton className={HIT} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
                             ←
                           </TextButton>
-                          <TextButton onClick={() => moveSpread(i, i + 1)} disabled={i === book.spreads.length - 1} aria-label="Nach hinten">
+                          <TextButton
+                            className={HIT}
+                            onClick={() => moveSpread(i, i + 1)}
+                            disabled={i === book.spreads.length - 1}
+                            aria-label={`Doppelseite ${i + 1} nach hinten`}
+                          >
                             →
                           </TextButton>
-                          <TextButton onClick={() => removeSpread(i)} aria-label={`Doppelseite ${i + 1} entfernen, Fotos in die Ablage`}>
+                          {/* Entfernen mit Abstand zu den Pfeilen, damit ein Fehltreffer nicht löscht */}
+                          <TextButton
+                            className={`${HIT} ml-3`}
+                            onClick={() => removeSpread(i)}
+                            aria-label={`Doppelseite ${i + 1} entfernen, Fotos in die Ablage`}
+                          >
                             ×
                           </TextButton>
                         </span>
@@ -797,7 +829,16 @@ export function Editor() {
                           const isText = page?.kind === "text";
                           return (
                             <div key={side} className="relative" style={{ width: pageW, height: pageW * data.aspect }}>
-                              {page && <PageView book={data} page={page} side={side} />}
+                              {/* Textseiten in Lesegröße setzen und verkleinern: sonst greift die Mindestschrift und der Text läuft scheinbar über (UX-Kritik K1) */}
+                              {page && isText && (
+                                <div
+                                  className="absolute top-0 left-0 origin-top-left"
+                                  style={{ width: MEASURE_W, height: MEASURE_W * data.aspect, transform: `scale(${pageW / MEASURE_W})` }}
+                                >
+                                  <PageView book={data} page={page} side={side} />
+                                </div>
+                              )}
+                              {page && !isText && <PageView book={data} page={page} side={side} />}
                               {key && (
                                 <button
                                   type="button"
@@ -837,7 +878,9 @@ export function Editor() {
                           );
                         })}
                       </div>
-                      {!textFits(s) && <p className="text-on-table mt-2 text-xs">Der Text ist zu lang für die Seite.</p>}
+                      {!textFits(s) && (
+                        <p className="text-on-table mt-2 text-xs">Der Text ist etwa {textOverflow(s, data)} Zeilen zu lang für die Seite.</p>
+                      )}
                     </li>
                   );
                 })}
@@ -874,7 +917,8 @@ export function Editor() {
         </section>
 
         {/* Buch, gewähltes Foto, gewählte Textseite */}
-        <aside className="space-y-6 md:sticky md:top-20 md:self-start">
+        {/* Telefon: Buch-Angaben über den Doppelseiten, Werkzeuge des Gewählten als Blatt am unteren Rand (UX-Kritik K4) */}
+        <aside className="space-y-6 max-md:order-first md:sticky md:top-20 md:self-start">
           <div className="slip text-ink space-y-3 p-5">
             <p className="text-sm font-semibold">Buch</p>
             <label className="block text-[13px]">
@@ -910,7 +954,8 @@ export function Editor() {
           </div>
 
           {selPhoto && (
-            <div className="slip text-ink space-y-3 p-5">
+            <div className={`slip text-ink space-y-3 p-5 ${SHEET}`}>
+              <SheetClose onClose={() => setSel(null)} />
               <div className="flex gap-3">
                 <div className="relative h-24 w-24 shrink-0">
                   <Image src={selPhoto.thumb} alt="" fill sizes="96px" className="object-contain object-left-top" />
@@ -921,7 +966,7 @@ export function Editor() {
                 type="button"
                 aria-pressed={!!selPhoto.star}
                 onClick={() => toggleStar(selPhoto.key)}
-                className={`flex items-center gap-2 border px-3 py-1.5 text-sm ${selPhoto.star ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                className={`flex items-center gap-2 border px-3 py-1.5 text-sm ${selPhoto.star ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
               >
                 <Star on={!!selPhoto.star} /> {selPhoto.star ? "Wichtig: kommt groß ins Buch" : "Als wichtig markieren"}
               </button>
@@ -980,14 +1025,35 @@ export function Editor() {
                   </button>
                 )}
               </div>
+              {!selPhoto.shelved && spreadOf(selPhoto.key) >= 0 && (
+                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                  <button
+                    type="button"
+                    className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-50"
+                    disabled={spreadOf(selPhoto.key) <= 0}
+                    onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) - 1)}
+                  >
+                    ← Nach vorn
+                  </button>
+                  <button
+                    type="button"
+                    className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-50"
+                    disabled={spreadOf(selPhoto.key) >= book.spreads.length - 1}
+                    onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) + 1)}
+                  >
+                    Nach hinten →
+                  </button>
+                </div>
+              )}
               {!selPhoto.shelved && (
-                <p className="text-ink-2 text-[12px]">Ziehen auf eine andere Doppelseite verschiebt das Foto. Tastatur: Alt + ← / → , Entf legt es in die Ablage.</p>
+                <p className="text-ink-2 text-[12px]">Ziehen auf eine andere Doppelseite verschiebt das Foto auch. Tastatur: Alt + ← / → , Entf legt es in die Ablage.</p>
               )}
             </div>
           )}
 
           {selSpread?.text && (
-            <div className="slip text-ink space-y-3 p-5">
+            <div className={`slip text-ink space-y-3 p-5 ${SHEET}`}>
+              <SheetClose onClose={() => setSel(null)} />
               <p className="text-sm font-semibold">Textseite</p>
               <label className="block text-[13px]">
                 <span className="text-ink-2">Überschrift (optional)</span>
@@ -1016,14 +1082,16 @@ export function Editor() {
                     type="button"
                     aria-pressed={(selSpread.text?.style ?? "text") === st}
                     onClick={() => setText(selSpreadIndex, { style: st })}
-                    className={`border px-3 py-1.5 ${(selSpread.text?.style ?? "text") === st ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                    className={`border px-3 py-1.5 ${(selSpread.text?.style ?? "text") === st ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
                   >
                     {st === "text" ? "Absatz" : "Groß"}
                   </button>
                 ))}
               </fieldset>
               <p className={`text-[12px] ${textFits(selSpread) ? "text-ink-2" : "text-ink font-semibold"}`}>
-                {textFits(selSpread) ? "Passt auf die Seite. Daneben kann ein Foto stehen: einfach hierher ziehen." : "Zu lang für die Seite: kürzen oder „Absatz“ wählen."}
+                {textFits(selSpread)
+                  ? "Passt auf die Seite. Daneben kann ein Foto stehen: einfach hierher ziehen."
+                  : `Etwa ${textOverflow(selSpread, data)} Zeilen zu lang für die Seite: kürzen${selSpread.text.style === "gross" ? " oder „Absatz“ wählen" : ""}.`}
               </p>
             </div>
           )}
@@ -1037,6 +1105,21 @@ export function Editor() {
         </aside>
       </div>
 
+      {undoNotice && !notice && (
+        <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
+          <span>{undoNotice}</span>
+          <button
+            type="button"
+            onClick={() => {
+              undo();
+              setUndoNotice(null);
+            }}
+            className="shrink-0 underline decoration-mark decoration-2 underline-offset-4"
+          >
+            Rückgängig
+          </button>
+        </div>
+      )}
       {notice && (
         <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
           <span>{notice}</span>
@@ -1099,7 +1182,9 @@ export function Editor() {
           onClose={() => setHistory(false)}
         />
       )}
-      {sharing && book && <ShareDialog book={book} onClose={() => setSharing(false)} />}
+      {sharing && book && (
+        <ShareDialog book={book} onClose={() => setSharing(false)} onTitle={(title) => update((b) => ({ ...b, title }), "title")} />
+      )}
     </main>
   );
 }
@@ -1171,8 +1256,49 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
         <a href={fileUrl} download={`${book.title || "fotobuch"}.fujiventura.json`} className="underline decoration-mark decoration-2 underline-offset-4">
           Projekt als Datei sichern
         </a>
-        <span className="text-ink-2 text-[12px]">Öffnen über „Mein Tisch“</span>
+        <span className="text-ink-2 text-[12px]">Öffnen über die Werkbank</span>
       </div>
     </SlipDialog>
   );
+}
+
+// ---- Überlauf der Textseite ----
+// Gemessen wird mit derselben Schrift, Größe und Breite wie im Lesebuch (page-view.tsx), auf einer
+// Seite von 480px. Die Schätzung in layout.ts liegt bei langen Absätzen deutlich daneben (UX-Kritik K1).
+const MEASURE_W = 480;
+const overflowCache = new Map<string, number>();
+
+/** Wie viele Zeilen zu viel auf der Textseite stehen (0 = passt) */
+function textOverflow(s: SpreadDraft, data: BookData | null): number {
+  if (!s.text || !data || typeof document === "undefined") return 0;
+  const style = s.text.style ?? "text";
+  const key = `${data.aspect}|${data.bottom}|${style}|${s.text.heading ?? ""}|${s.text.body}`;
+  const hit = overflowCache.get(key);
+  if (hit !== undefined) return hit;
+
+  const st = TEXT_STYLE[style];
+  const ta = typeArea(data, "right");
+  const px = (cqw: number) => (cqw * MEASURE_W) / 100;
+  const host = document.createElement("div");
+  host.style.cssText = `position:absolute;left:-9999px;top:0;visibility:hidden;width:${MEASURE_W}px`;
+  const block = (text: string, size: number, lh: number, width: number, heading: boolean) => {
+    const el = document.createElement(heading ? "h2" : "p");
+    el.textContent = text;
+    el.style.cssText = `margin:0;width:${px(width)}px;font-size:${px(size)}px;line-height:${lh};white-space:pre-line;font-weight:${heading ? 700 : 400}`;
+    if (heading) Object.assign(el.style, { letterSpacing: "-0.035em", fontVariationSettings: '"wdth" 78, "opsz" 96' });
+    host.appendChild(el);
+    return el;
+  };
+  const head = s.text.heading ? block(s.text.heading, 6, 1.02, ta.w, true) : null;
+  const body = block(s.text.body || " ", st.size, st.lh, 66, false);
+  document.body.appendChild(host);
+  const used = (head ? head.offsetHeight + px(5) : 0) + body.offsetHeight;
+  host.remove();
+
+  const lineH = px(st.size) * st.lh;
+  // eine halbe Zeile Spiel gegen Rundung
+  const over = used > px(ta.h) + lineH / 2 ? Math.ceil((used - px(ta.h)) / lineH) : 0;
+  if (overflowCache.size > 200) overflowCache.clear();
+  overflowCache.set(key, over);
+  return over;
 }
