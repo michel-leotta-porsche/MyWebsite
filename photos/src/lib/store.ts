@@ -12,6 +12,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   addDoc,
 } from "firebase/firestore";
@@ -78,6 +79,8 @@ export type StoredBook = {
   spreads: SpreadDraft[];
   /** gesetzt, sobald eine Doppelseite frei gestaltet ist: das Seitenformat ändert sich dann nicht mehr von selbst */
   aspectLocked?: boolean;
+  /** im Papierkorb: liegt nicht mehr auf dem Tisch, lässt sich zurücklegen (Millisekunden seit 1970) */
+  trashed?: number;
 };
 
 /** Unterer Rand des Satzspiegels, wie in toBookData */
@@ -243,11 +246,31 @@ export async function importBook(file: File, owner: string, ownerName: string): 
   return b;
 }
 
+/** Buch in den Papierkorb legen oder zurück auf den Tisch; geteilte Links behalten ihre Kopie */
+export async function trashBook(id: string, on: boolean) {
+  const trashed = on ? Date.now() : null;
+  if (MOCK) {
+    const b = mem.books.get(id);
+    if (b) mem.books.set(id, { ...b, trashed: trashed ?? undefined });
+    return;
+  }
+  await updateDoc(doc(db(), "books", id), { trashed });
+}
+
+/** Geschenktes Buch vom eigenen Tisch nehmen; beim Schenkenden bleibt es */
+export async function dropFromInbox(uid: string, token: string) {
+  if (MOCK) return;
+  await deleteDoc(doc(db(), "users", uid, "inbox", token));
+}
+
 export async function myBooks(uid: string): Promise<StoredBook[]> {
   if (MOCK) return [...mem.books.values()];
   const q = query(collection(db(), "books"), where("owner", "==", uid));
   const s = await getDocs(q);
-  return s.docs.map((d) => d.data() as StoredBook);
+  return s.docs.map((d) => {
+    const b = d.data() as StoredBook & { trashed?: number | null };
+    return { ...b, trashed: b.trashed ?? undefined };
+  });
 }
 
 /** Buch für jemanden hinlegen: ein Link mit Zufallsschlüssel und einer Kopie des Buchs */
@@ -312,6 +335,7 @@ export async function keepInInbox(uid: string, share: Share) {
 }
 
 export async function inbox(uid: string): Promise<Share[]> {
+  if (MOCK) return [];
   const s = await getDocs(collection(db(), "users", uid, "inbox"));
   const shares = await Promise.all(s.docs.map((d) => loadShare(d.id).catch(() => null)));
   return shares.filter((x): x is Share => !!x);
