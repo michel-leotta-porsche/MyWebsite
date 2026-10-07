@@ -460,6 +460,16 @@ export function Book({
   const [slip, setSlip] = useState<{ no: number; k: number } | null>(null);
   const slipPlate = slip && slip.k === k ? plateOf(book, slip.no) : null;
   const closeSlip = useCallback(() => setSlip(null), []);
+  // Welches Foto gehört zum Knopf? Zeigen oder Fokus auf „Rezept“ und der offene Zettel heben sein Foto hervor
+  const [pointed, setPointed] = useState<number | null>(null);
+  const marked = pointed ?? slip?.no ?? null;
+  useEffect(() => {
+    const root = bookRef.current;
+    if (!root || marked === null) return;
+    const boxes = Array.from(root.querySelectorAll<HTMLElement>(`[data-plate-box="${marked}"]`));
+    boxes.forEach((el) => (el.dataset.marked = ""));
+    return () => boxes.forEach((el) => delete el.dataset.marked);
+  }, [marked, kt]);
 
   // Vergrößern: Tafel hebt sich aus dem Buch
   const [viewer, setViewer] = useState<{ no: number; from: DOMRect | null; trigger: HTMLElement } | null>(null);
@@ -671,14 +681,20 @@ export function Book({
     return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
   })();
   // Zettel auf die Gegenseite seines Fotos; über den Bund oder als Einzelseite bleibt er rechts
-  const slipSide =
-    mode === "spread" && slipPlate && sidePlates.right === slipPlate.no && sidePlates.left !== slipPlate.no ? "left" : "right";
+  // Zettel auf die Gegenseite der Seite, auf der sein Foto liegt; auch bei mehreren Fotos pro Seite
+  const slipSide = (() => {
+    if (mode !== "spread" || !slipPlate) return "right";
+    const [l, r] = pagesAt(book, mode, kt);
+    const onLeft = !!l && pageNos(l).includes(slipPlate.no);
+    const onRight = !!r && pageNos(r).includes(slipPlate.no);
+    return onRight && !onLeft ? "left" : "right";
+  })();
   const label = labelAt(book, mode, k);
   const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
   const slipNos = current
     .filter((no) => hasSlip(plateOf(book, no)))
-    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : "Kamera" }));
+    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : "Kamera", title: plateOf(book, no).title }));
 
   return (
     <section
@@ -727,7 +743,7 @@ export function Book({
             <span aria-live="polite">
               <RollingLabel text={caption} reduce={reduce} />
             </span>
-            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
             {extra?.(book, current)}
           </div>
           <p className="text-on-table-2 justify-self-end text-sm" aria-live="polite">
@@ -750,7 +766,7 @@ export function Book({
             <RollingLabel text={caption} reduce={reduce} />
           </span>
           <span className="flex shrink-0 gap-3">
-            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
             {extra?.(book, current)}
           </span>
         </div>
@@ -988,32 +1004,45 @@ export function Book({
   );
 }
 
-/** Textknöpfe „Rezept“ für die Tafeln der aufgeschlagenen Doppelseite */
+/**
+ * Textknöpfe „Rezept“ für die Tafeln der aufgeschlagenen Doppelseite. Bei mehreren Fotos trägt der Knopf den
+ * Fototitel, und Zeigen oder Fokus hebt das Foto auf der Seite hervor; die Nummer allein sagt nicht, welches es ist.
+ */
 function SlipButtons({
   nos,
   k,
   slip,
   onOpen,
+  onPoint,
 }: {
-  nos: { no: number; label: string }[];
+  nos: { no: number; label: string; title: string }[];
   k: number;
   slip: number | null;
   onOpen: (s: { no: number; k: number } | null) => void;
+  onPoint: (no: number | null) => void;
 }) {
   if (!nos.length) return null;
+  const many = nos.length > 1;
   return (
-    <span className="flex shrink-0 gap-3">
-      {nos.map(({ no, label }) => (
+    <span className="flex min-w-0 shrink-0 gap-x-3 md:flex-wrap">
+      {nos.map(({ no, label, title }) => (
         <button
           key={no}
           type="button"
           aria-expanded={slip === no}
-          aria-label={`${label} zu Tafel ${no}`}
+          aria-label={`${label} zu Tafel ${no}${title ? `: ${title}` : ""}`}
+          title={title || undefined}
           onClick={() => onOpen(slip === no ? null : { no, k })}
-          className="text-on-table underline decoration-mark decoration-2 underline-offset-4"
+          onPointerEnter={(e) => e.pointerType === "mouse" && onPoint(no)}
+          onPointerLeave={() => onPoint(null)}
+          onFocus={() => onPoint(no)}
+          onBlur={() => onPoint(null)}
+          className="text-on-table max-w-[11rem] truncate underline decoration-mark decoration-2 underline-offset-4"
         >
           {label}
-          {nos.length > 1 ? ` ${no}` : ""}
+          {/* Telefon: nur die Nummer, sonst passt die Zeile nicht; der offene Zettel hebt sein Foto hervor */}
+          {many && <span className="md:hidden"> {no}</span>}
+          {many && <span className="max-md:hidden">{title ? ` · ${title}` : ` ${no}`}</span>}
         </button>
       ))}
     </span>
