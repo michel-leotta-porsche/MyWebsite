@@ -13,6 +13,7 @@
   --paper-shade: #e4e4dd;
   --ink: #1b1c1a;
   --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 6.3:1 */
+  --mark: var(--cloth); /* Position und Fokus; auf hellen Tischen dunkler */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -32,6 +33,7 @@
   --color-on-table: var(--on-table);
   --color-on-table-2: var(--on-table-2);
   --color-cloth: var(--cloth);
+  --color-mark: var(--mark);
   --color-cloth-deep: var(--cloth-deep);
   --color-cloth-ink: var(--cloth-ink);
   --color-paper: var(--paper);
@@ -67,7 +69,7 @@ body {
 @layer base {
   /* Fokus in Einbandgelb auf dem Tisch; auf Papier setzen Elemente Tinte (outline-ink) */
   :focus-visible {
-    outline: 2px solid var(--cloth);
+    outline: 2px solid var(--mark);
     outline-offset: 3px;
   }
 }
@@ -177,4 +179,41 @@ html.ohne-struktur .paper::before {
 }
 html.ohne-schatten [data-shade] {
   display: none;
+}
+
+/* Tische zum Vergleichen: ?tisch=lava | kalk | sand (Skript im Layout). Ohne Angabe: Leinen in Petrol. */
+html.tisch-lava {
+  --table: #1b1917; /* Basalt; Text 14.1:1, Nebentext 6.3:1 */
+  --table-deep: #121110;
+  --on-table: #ece6dc;
+  --on-table-2: #a39a8e;
+  --table-light: radial-gradient(ellipse 60% 55% at 50% 46%, rgb(255 236 210 / 0.075), transparent 72%);
+}
+html.tisch-kalk {
+  --table: #e8e4dc; /* gekalkte Wand; Text 12.6:1, Nebentext 5.7:1, Marke 4.5:1 */
+  --table-deep: #dbd5ca;
+  --on-table: #24211d;
+  --on-table-2: #5c574f;
+  --mark: #8a5e0f;
+  --table-light: radial-gradient(ellipse 70% 60% at 85% 0%, rgb(255 250 240 / 0.6), transparent 70%);
+}
+html.tisch-sand {
+  --table: #cdb594; /* Strandsand; Text 8:1, Nebentext 5.5:1, Marke 4.1:1 */
+  --table-deep: #bca27f;
+  --on-table: #2a2117;
+  --on-table-2: #46392a;
+  --mark: #6e4708;
+  --table-light: radial-gradient(ellipse 70% 60% at 85% 0%, rgb(255 244 222 / 0.45), transparent 70%);
+}
+.table-surface {
+  background-image: var(--table-light, none);
+}
+html[class*="tisch-"] .table-surface.linen::after {
+  /* feines Korn statt Gewebe; die Wolke nur als Hauch, sonst wirkt der Stein fleckig */
+  background-image: url("/textures/stone-grain.png");
+  opacity: 0.07;
+}
+html.tisch-lava .table-surface.linen::after {
+  background-image: url("/textures/stone-grain.png"), url("/textures/stone-cloud.png");
+  opacity: 0.09;
 }

@@ -13,10 +13,11 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { plates, singlePages, spreads, type Page } from "@/content/plates";
 import { INTRO_DONE } from "@/components/intro";
+import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
 import { PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
 import { SunAndShade } from "@/components/sun-and-shade";
@@ -75,105 +76,12 @@ function labelAt(mode: Mode, k: number, total: number): string {
 const backTone = (page: Page | undefined) =>
   page?.kind === "cover" ? "var(--cloth)" : page?.kind === "endpaper" ? "var(--cloth-deep)" : "var(--paper)";
 
+const noopSubscribe = () => () => {};
+
 // Ferne Blätter: nur der Farbton der Seite, ohne Bild und Text
 function Blank({ page }: { page: Page }) {
   const bg = page.kind === "cover" ? "bg-cloth" : page.kind === "endpaper" ? "bg-cloth-deep" : "bg-paper";
   return <div className={`absolute inset-0 ${bg}`} />;
-}
-
-// Gebogenes Blatt: so viele Streifen wie nötig, damit der Bogen rund wirkt
-const STRIPS = { spread: 12, single: 5 } as const;
-// wie stark sich das Papier mitten im Umblättern wölbt (Grad zwischen Bund und Kante)
-const BEND = 64;
-
-/** Winkel jedes Streifens: die freie Kante eilt voraus, der Bund folgt zuletzt */
-function stripAngles(tv: number, i: number, n: number, pv: number) {
-  const s = clamp01(tv - i);
-  let theta = 180 * turnEase(s);
-  if (i === 0 && tv < 0.02) theta -= pv;
-  const b = BEND * Math.sin(Math.PI * s);
-  const out: number[] = [];
-  for (let j = 0; j < n; j++) {
-    const u = (j + 0.5) / n;
-    out.push(Math.min(180, Math.max(0, theta + b * (2 * u - 1))));
-  }
-  return out;
-}
-
-function Strip({
-  j,
-  n,
-  leaf,
-  i,
-  t,
-  peek,
-  compact,
-  fadeBack,
-}: {
-  j: number;
-  n: number;
-  leaf: Leaf;
-  i: number;
-  t: MotionValue<number>;
-  peek: MotionValue<number>;
-  compact: boolean;
-  fadeBack: boolean;
-}) {
-  // Drehung relativ zum Streifen davor: zusammen ergibt die Kette den Bogen
-  const transform = useTransform<number, string>([t, peek], ([tv, pv]) => {
-    const a = stripAngles(tv, i, n, pv);
-    return `rotateY(${-(a[j] - (j > 0 ? a[j - 1] : 0))}deg)`;
-  });
-  const angle = useTransform<number, number>([t, peek], ([tv, pv]) => stripAngles(tv, i, n, pv)[j]);
-  // Licht: steht das Papier steil, wird es dunkler. Zwei Verläufe pro Streifen (links, rechts),
-  // nur ihre Deckkraft ändert sich; zusammen läuft das Licht fließend über den Bogen.
-  const shadeOf = (a: number, back: boolean) => {
-    const x = back ? (180 - a) / 90 : a / 90;
-    return 0.55 * Math.pow(Math.min(1, Math.max(0, x)), 1.5);
-  };
-  const edges = (tv: number, pv: number): [number, number] => {
-    const a = stripAngles(tv, i, n, pv);
-    const left = j > 0 ? (a[j - 1] + a[j]) / 2 : Math.max(0, a[0] - (a[1] - a[0]) / 2);
-    const right = j < n - 1 ? (a[j] + a[j + 1]) / 2 : Math.min(180, a[j] + (a[j] - a[j - 1]) / 2);
-    return [left, right];
-  };
-  const frontL = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[0], false));
-  const frontR = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[1], false));
-  // die Rückseite ist gespiegelt: ihre linke Bildkante ist die rechte Kante des Streifens
-  const backL = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[1], true));
-  const backR = useTransform<number, number>([t, peek], ([tv, pv]) => shadeOf(edges(tv, pv)[0], true));
-  // auf dem Telefon erst ganz am Ende ausblenden, sonst wirkt das Blatt milchig
-  const backOpacity = useTransform(angle, [172, 180], [1, fadeBack ? 0 : 1]);
-
-  return (
-    <motion.div
-      className="absolute inset-y-0 origin-left [transform-style:preserve-3d]"
-      style={{ transform, left: j === 0 ? 0 : "100%", width: j === 0 ? `${100 / n}%` : "100%" }}
-    >
-      {/* Vorderseite: dieser Streifen zeigt seinen Ausschnitt der Seite (leicht überlappend gegen Haarfugen) */}
-      <div className="absolute inset-y-0 left-0 w-[calc(100%+0.6px)] overflow-hidden [backface-visibility:hidden]">
-        <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-j * 100}%` }}>
-          <PageView page={leaf.front} side="right" compact={compact} />
-        </div>
-        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: frontL }} />
-        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: frontR }} />
-      </div>
-      {/* Rückseite: gespiegelt, also von der anderen Kante her geschnitten */}
-      <motion.div
-        className="absolute inset-y-0 left-0 w-[calc(100%+0.6px)] overflow-hidden [backface-visibility:hidden] [transform:rotateY(180deg)]"
-        style={{ opacity: backOpacity }}
-      >
-        <div className="absolute inset-y-0" style={{ width: `${n * 100}%`, left: `${-(n - 1 - j) * 100}%` }}>
-          <PageView page={leaf.back} side="left" compact={compact} />
-        </div>
-        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27),transparent)]" style={{ opacity: backL }} />
-        <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27),transparent)]" style={{ opacity: backR }} />
-      </motion.div>
-      {j < n - 1 && (
-        <Strip j={j + 1} n={n} leaf={leaf} i={i} t={t} peek={peek} compact={compact} fadeBack={fadeBack} />
-      )}
-    </motion.div>
-  );
 }
 
 function LeafView({
@@ -184,6 +92,7 @@ function LeafView({
   peek,
   mode,
   k,
+  curl,
 }: {
   leaf: Leaf;
   i: number;
@@ -192,6 +101,7 @@ function LeafView({
   peek: MotionValue<number>;
   mode: Mode;
   k: number;
+  curl: CurlStore;
 }) {
   const rot = useTransform<number, number>([t, peek], ([tv, pv]) => {
     let r = -180 * turnEase(clamp01(tv - i));
@@ -210,33 +120,28 @@ function LeafView({
   const compact = mode === "single";
   const near = Math.abs(i - k) <= WINDOW;
 
-  // Nur das Blatt, das sich gerade bewegt, biegt sich; liegende Blätter bleiben ein flaches Stück
+  // Bewegt sich das Blatt und hat WebGL seine Textur, zeichnet WebGL es gebogen; das HTML-Blatt tritt zurück
   const turningNow = (tv: number) => tv - i > 0.004 && tv - i < 0.996;
   const [turning, setTurning] = useState(() => turningNow(t.get()));
   useMotionValueEvent(t, "change", (tv) => {
     const on = turningNow(tv);
     if (on !== turning) setTurning(on);
   });
-  // ?ohne=biegung: flach umblättern wie früher
-  const noBend = typeof document !== "undefined" && document.documentElement.classList.contains("ohne-biegung");
-  const bent = turning && near && !noBend;
+  const glReady = useSyncExternalStore(curl.subscribe, () => curl.has(i), () => false);
+  const viaGL = turning && glReady;
 
   return (
     <motion.div
-      className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${bent ? "will-change-transform" : ""}`}
+      className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${turning && !viaGL ? "will-change-transform" : ""}`}
       style={{
-        transform: bent ? "perspective(2600px)" : transform,
+        transform,
+        visibility: viaGL ? "hidden" : undefined,
         zIndex,
         left: mode === "spread" ? "50%" : 0,
         width: mode === "spread" ? "50%" : "100%",
       }}
     >
-      {bent ? (
-        <div className="absolute inset-0 [transform-style:preserve-3d]" inert>
-          <Strip j={0} n={STRIPS[mode]} leaf={leaf} i={i} t={t} peek={peek} compact={compact} fadeBack={mode === "single"} />
-        </div>
-      ) : (
-        <>
+      <>
           {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
           <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
             {near ? <PageView page={leaf.front} side="right" compact={compact} /> : <Blank page={leaf.front} />}
@@ -258,8 +163,7 @@ function LeafView({
               style={{ opacity: backShade }}
             />
           </motion.div>
-        </>
-      )}
+      </>
     </motion.div>
   );
 }
@@ -323,7 +227,14 @@ function RollingLabel({ text, reduce }: { text: string; reduce: boolean }) {
 }
 
 export function Book({ mode, className = "" }: { mode: Mode; className?: string }) {
-  const { leaves, base } = buildLeaves(mode);
+  const { leaves, base } = useMemo(() => buildLeaves(mode), [mode]);
+  const curl = useMemo(() => createCurlStore(), []);
+  // ?ohne=biegung: flach umblättern wie früher (auf dem Server und beim Hydrieren immer aus)
+  const bend = useSyncExternalStore(
+    noopSubscribe,
+    () => !document.documentElement.classList.contains("ohne-biegung"),
+    () => false,
+  );
   const count = leaves.length;
   const swipe = mode === "single";
   const reduce = useReducedMotion() ?? false;
@@ -635,7 +546,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
 
       <motion.div
         data-stage
-        className={`linen sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
+        className={`linen table-surface sticky top-0 flex h-svh flex-col overflow-hidden bg-table select-none ${swipe ? "touch-none" : ""}`}
         inert={!!viewer}
       >
         <SunAndShade />
@@ -720,8 +631,12 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
               </div>
 
               {leaves.map((leaf, i) => (
-                <LeafView key={i} leaf={leaf} i={i} count={count} t={t} peek={peek} mode={mode} k={kt} />
+                <LeafView key={i} leaf={leaf} i={i} count={count} t={t} peek={peek} mode={mode} k={kt} curl={curl} />
               ))}
+
+              {bend && !reduce && (
+                <PageCurl leaves={leaves} t={t} k={kt} mode={mode} store={curl} bookRef={bookRef} />
+              )}
 
               <div
                 aria-hidden
@@ -792,7 +707,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
             />
             <motion.div
               aria-hidden
-              className="absolute top-1/2 h-px origin-left bg-cloth"
+              className="absolute top-1/2 h-px origin-left bg-mark"
               style={{ transform: fillT, left: `${50 / plates.length}%`, right: `${50 / plates.length}%` }}
             />
             <ol className="absolute inset-0 flex">
@@ -809,7 +724,7 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
                     >
                       <span
                         aria-hidden
-                        className={`stop block h-2.5 w-[3px] ${active ? "scale-y-[1.9] bg-cloth" : "bg-on-table-2 group-hover:scale-y-150 group-hover:bg-on-table"}`}
+                        className={`stop block h-2.5 w-[3px] ${active ? "scale-y-[1.9] bg-mark" : "bg-on-table-2 group-hover:scale-y-150 group-hover:bg-on-table"}`}
                       />
                     </button>
                     <span

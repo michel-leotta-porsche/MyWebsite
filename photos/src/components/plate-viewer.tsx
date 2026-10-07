@@ -168,7 +168,7 @@ export function PlateViewer({
       aria-label={`Tafel ${current}: ${p.title}`}
       className="fixed inset-0 z-[500]"
     >
-      <div ref={backdrop} className="linen absolute inset-0 bg-table-deep" onClick={close} />
+      <div ref={backdrop} className="linen table-surface absolute inset-0 bg-table-deep" onClick={close} />
       {box && (
         <>
           <div

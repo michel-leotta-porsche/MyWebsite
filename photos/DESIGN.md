@@ -180,7 +180,7 @@ Tiefe ist physisch, nicht ornamental. Es gibt genau ein Objekt über dem Tisch, 
 - **Eingeklebtes Bild** (`box-shadow: 1px 2px 3px rgb(58 39 6 / 0.35), 0 0 0 0.5px rgb(58 39 6 / 0.2)`): das Coverbild steht minimal vom Leinen ab.
 - **Bundwölbung** (Verlauf `rgb(4 24 27 / 0.16)` über `rgb(4 24 27 / 0.05)` bei 30 % zu transparent, 14cqw breit): jede Innenseite dunkelt zum Bund hin.
 - **Blattlicht** (Verlauf `rgb(4 24 27 / 0.55)` zu `rgb(4 24 27 / 0.15)`, Deckkraft 0 bis 0.42): die Vorderseite dunkelt beim Aufrichten, die Rückseite hellt beim Ablegen.
-- **Biegung** (Petrol `rgb(4 24 27)`, je Streifen zwei Verläufe, deren Deckkraft dem Winkel folgt, höchstens 0.55): beim Umblättern wölbt sich das Blatt, steile Stellen werden dunkler.
+- **Biegung** (WebGL-Beleuchtung aus der Flächennormale, flach = 1.0, Glanzlicht auf der Wölbung, Petrol-Schatten auf der Seite darunter): steile Stellen werden dunkler, ohne Kanten oder Fugen.
 - **Eselsohr-Loch** (Verlauf `rgb(4 24 27 / 0.28)` an der Falte zu `paper-shade`): die Seite unter der umgeklappten Ecke.
 - **Palmenschatten** (Wedel in `rgb(4 24 27)`, Deckkraft 0.12, auf ein Neuntel der Auflösung gezeichnet und hochskaliert): Schatten einer Palme über Tisch und Buch, wiegt sich langsam (9s und 3.1s, `cubic-bezier(0.77, 0, 0.175, 1)`). Liegt unter Kopfzeile und Bildfolge, nie auf Bedienelementen.
 - **Sonne** (`soft-light`: oben rechts `rgb(255 205 130 / 0.55)` zu transparent, unten links `rgb(4 24 27 / 0.35)`): Licht von draußen, gleiche Stelle wie der Ansatz der Palme.
@@ -224,7 +224,7 @@ Wortmarke links, rechts „Tafel 3 / 15 Tafeln“ (Abschnitt in `on-table`, Rest
 Ringelblumen-Leinen mit Falz am Rücken, eingeklebte Tafel (64cqw breit, 4:5, mit 1.6cqw Papierrand), Titel als flacher Druck in `cloth-ink` unten links. Beim ersten Laden hebt sich der Einband einmal um 28° an (1.8s, nach 0.9s), als Hinweis zum Blättern.
 
 ### Blatt und Eselsohr
-Jedes Blatt dreht um den Bund (`rotateY` 0 bis -180°, Perspektive 2600px) mit kubischem ease-in-out pro Blatt. Während es sich bewegt, besteht es aus einer Kette von Streifen (12 bei der Doppelseite, 7 auf dem Telefon), die sich als Bogen biegen: die freie Kante eilt bis zu 64° voraus und setzt zuerst auf. Liegende Blätter sind ein flaches Stück; nur zwei Blätter um die aufgeschlagene Seite tragen Bilder, und nur das bewegte Blatt bekommt `will-change`. Der statische Export liefert jedes Foto in 480, 960, 1440 und 1800px (`src/image-loader.ts`); nach dem Laden bleibt nur die passende Bindung im DOM. und einer Feder auf dem Scrollwert (Steifigkeit 150, Dämpfung 26, Masse 0.7). Bei Maus über dem ruhig liegenden Buch klappt die Ecke der Seite unter dem Zeiger um (24 % der Seitenbreite, höchstens 150px, Feder 420/30); darunter liegt die Farbe der nächsten Seite.
+Jedes Blatt dreht um den Bund (`rotateY` 0 bis -180°, Perspektive 2600px) mit kubischem ease-in-out pro Blatt. Während es sich bewegt, zeichnet eine WebGL-Fläche das Blatt (64 Segmente, Winkel pro Spalte φ = θ + 70°·sin(πs)·(2u−1)), Vorder- und Rückseite als Canvas-Texturen; das HTML-Blatt ist solange unsichtbar. Ohne WebGL oder mit `?ohne=biegung` dreht das HTML-Blatt flach.
 
 ### Vergrößerte Tafel
 Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`, nur `transform`) über einem Hintergrund aus `table-deep`-Leinen, darunter Nummer, Titel und Zurück/Weiter. Schließen fliegt sie zurück an ihre Stelle (480ms), die Bedienung blendet vorher in 120ms aus. Tafelwechsel im Vollbild: 260ms Einblenden aus 98.5 %.
@@ -247,3 +247,7 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 - **Don't** Schatten oder Verläufe auf Bedienelemente legen; Licht gehört dem Papier.
 - **Don't** Kameradaten, Brennweiten, Aufnahmedaten oder Fujifilm-Zeichen zeigen.
 - **Don't** eine zweite Schrift einführen.
+
+## Tische zum Vergleichen
+
+Neben dem Petrol-Leinen gibt es drei Tische über `?tisch=`: `lava` (Basalt #1b1917, Korn plus Hauch Wolke, warmer Lichtkegel), `kalk` (gekalkte Wand #e8e4dc, feines Korn, Licht von oben rechts) und `sand` (#cdb594). Auf hellen Tischen wird die Marke (Zeitleiste, Fokus) dunkler (`--mark`, ≥ 4.1:1). Einband und Vorsatz bleiben Leinen.

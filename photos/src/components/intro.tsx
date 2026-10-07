@@ -132,7 +132,7 @@ export function Intro() {
     <div
       ref={root}
       aria-hidden
-      className="intro-cover linen fixed inset-0 z-[600] overflow-hidden bg-table"
+      className="intro-cover linen table-surface fixed inset-0 z-[600] overflow-hidden bg-table"
     >
       <div className="absolute inset-0 flex items-center justify-center">
         {plates.map((p) => {

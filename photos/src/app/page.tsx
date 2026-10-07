@@ -6,7 +6,7 @@ export default function Home() {
     <main>
       <Intro />
       <Books />
-      <footer className="linen relative hidden bg-table-deep px-4 py-10 text-sm text-on-table-2 md:block md:px-8">
+      <footer className="linen table-surface relative hidden bg-table-deep px-4 py-10 text-sm text-on-table-2 md:block md:px-8">
         <p>
           <span className="font-semibold text-on-table">Fujiventura</span> · Fotografien von Michel Leotta,
           Fuerteventura

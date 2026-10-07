@@ -21,7 +21,8 @@ export const viewport: Viewport = {
 
 // Läuft vor dem ersten Bild: Einstieg nur einmal pro Sitzung und nie bei reduzierter Bewegung
 // ?ohne=intro,schatten,struktur,biegung schaltet Teile ab, um Probleme auf einem Gerät einzugrenzen
-const introScript = `try{var h=document.documentElement,o=(new URLSearchParams(location.search).get("ohne")||"").split(",");if(o.indexOf("alles")>-1)o=["intro","schatten","struktur","biegung"];o.forEach(function(x){if(x)h.classList.add("ohne-"+x)});if(o.indexOf("intro")<0&&!matchMedia("(prefers-reduced-motion: reduce)").matches&&!sessionStorage.getItem("intro"))h.classList.add("intro")}catch(e){}`;
+// ?tisch=lava|kalk|sand zeigt einen anderen Tisch zum Vergleichen
+const introScript = `try{var h=document.documentElement,o=(new URLSearchParams(location.search).get("ohne")||"").split(",");if(o.indexOf("alles")>-1)o=["intro","schatten","struktur","biegung"];o.forEach(function(x){if(x)h.classList.add("ohne-"+x)});var t=new URLSearchParams(location.search).get("tisch");if(t&&/^(lava|kalk|sand)$/.test(t))h.classList.add("tisch-"+t);if(o.indexOf("intro")<0&&!matchMedia("(prefers-reduced-motion: reduce)").matches&&!sessionStorage.getItem("intro"))h.classList.add("intro")}catch(e){}`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
