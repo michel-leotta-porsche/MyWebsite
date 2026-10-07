@@ -61,7 +61,7 @@ export type StoredPhoto = {
 };
 
 /** Schema der gespeicherten Bücher; ältere Stände werden beim Laden angehoben (migrate) */
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 export type StoredBook = {
   schema?: number;
@@ -76,7 +76,12 @@ export type StoredBook = {
   coverKey: string;
   photos: StoredPhoto[];
   spreads: SpreadDraft[];
+  /** gesetzt, sobald eine Doppelseite frei gestaltet ist: das Seitenformat ändert sich dann nicht mehr von selbst */
+  aspectLocked?: boolean;
 };
+
+/** Unterer Rand des Satzspiegels, wie in toBookData */
+export const bottomFor = (aspect: number) => (aspect > 1.4 ? 18 : 15);
 
 export type Share = {
   token: string;
@@ -145,7 +150,7 @@ export function toBookData(b: StoredBook): BookData {
     ],
     aspect: b.aspect,
     scale: 1,
-    bottom: b.aspect > 1.4 ? 18 : 15,
+    bottom: bottomFor(b.aspect),
     cloth: { base: cloth.base, deep: cloth.deep, ink: cloth.ink },
     light: cloth.light,
     coverKey: used.has(b.coverKey) ? b.coverKey : [...used][0],

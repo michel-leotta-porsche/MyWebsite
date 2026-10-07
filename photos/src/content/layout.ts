@@ -1,4 +1,4 @@
-import { colWidth, plateOf, typeArea, type BookData, type Page } from "@/content/books";
+import { colWidth, pageNos, plateOf, typeArea, type BookData, type FreeEl, type Page, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
 // (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
@@ -70,6 +70,85 @@ export const estimateLines = (text: string, size: number, width: number) =>
 
 /** Textseite: Größen der beiden Stile in cqw */
 export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh: 1.35 } } as const;
+
+/** Textrahmen auf freien Seiten: drei gesetzte Stile, keine Regler */
+export const TEXT_ROLE: Record<TextRole, { size: number; weight: 400 | 700; lh: number; tone: Tone; display?: boolean; label: string }> = {
+  heading: { size: 6, weight: 700, lh: 1.02, tone: "ink", display: true, label: "Überschrift" },
+  body: { size: 3.2, weight: 400, lh: 1.5, tone: "ink", label: "Absatz" },
+  note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: "Notiz" },
+};
+
+/** Höhe eines Textrahmens in cqw (dieselbe Schätzung setzt HTML und Textur) */
+export const textHeight = (text: string, role: TextRole, w: number) => {
+  const st = TEXT_ROLE[role];
+  return estimateLines(text || " ", st.size, w) * st.size * st.lh;
+};
+
+/**
+ * Raster einer Seite in cqw: 6 Spalten und 9 Zeilen im Satzspiegel, je 2cqw Fuge.
+ * xs/ys sind alle Linien, an denen eine Kante einrasten darf (Spaltenanfänge und -enden, Seitenkanten).
+ */
+export function gridLines(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
+  const ta = typeArea(book, side);
+  const H = book.aspect * 100;
+  const cw = (ta.w - 5 * 2) / 6;
+  const rh = (ta.h - 8 * 2) / 9;
+  const cols: number[] = [];
+  const rows: number[] = [];
+  for (let i = 0; i < 6; i++) cols.push(ta.x + i * (cw + 2), ta.x + i * (cw + 2) + cw);
+  for (let i = 0; i < 9; i++) rows.push(ta.y + i * (rh + 2), ta.y + i * (rh + 2) + rh);
+  return { ta, H, cw, rh, colPitch: cw + 2, rowPitch: rh + 2, xs: [0, ...cols, 100], ys: [0, ...rows, H] };
+}
+
+type CBox = { x: number; y: number; w: number; h: number };
+const hits = (a: CBox, b: CBox) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Unterschrift eines Fotos auf einer freien Seite: unter dem Bild an der Außenkante, sonst im Papierstreifen außen, sonst keine */
+function autoCaption(no: number, b: CBox, side: "left" | "right", book: BookData, others: CBox[]): El | null {
+  const ta = typeArea(book, side);
+  const H = book.aspect * 100;
+  const y = b.y + b.h + 3;
+  const left = Math.max(b.x, ta.x);
+  const right = Math.min(b.x + b.w, ta.x + ta.w);
+  const w = Math.max(30, Math.min(60, right - left));
+  const below: CBox = side === "left" ? { x: left, y, w, h: 7 } : { x: right - w, y, w, h: 7 };
+  if (y + 7 <= H - 3 && right - left > 8 && !others.some((o) => hits(o, below)))
+    return side === "left" ? { t: "caption", no, x: left, y, w, align: "left" } : { t: "caption", no, x: right, y, w, align: "right" };
+  const strip = side === "right" ? 100 - (b.x + b.w) : b.x;
+  if (strip >= 14) {
+    const sx = side === "right" ? b.x + b.w + 2.5 : 2.5;
+    const sy = Math.min(b.y + b.h, ta.y + ta.h) - 10;
+    const box: CBox = { x: sx, y: sy, w: strip - 5, h: 10 };
+    if (!others.some((o) => hits(o, box))) return { t: "caption", no, x: sx, y: sy, w: strip - 5, align: "left", stack: true };
+  }
+  return null;
+}
+
+function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El[] {
+  const H = book.aspect * 100;
+  const toC = (b: FreeEl["box"]): CBox => ({ x: b.x, w: b.w, y: (b.y / 100) * H, h: (b.h / 100) * H });
+  const boxes = items.map((it) => {
+    const c = toC(it.box);
+    // Textrahmen: Höhe folgt dem Text
+    return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w) } : c;
+  });
+  const els: El[] = [];
+  items.forEach((it, i) => {
+    const b = boxes[i];
+    if (it.t === "photo") {
+      els.push({ t: "img", no: it.no, ...b, ...(it.crop ?? view(book, it.no)), plate: true });
+      const visible = b.x < 100 && b.x + b.w > 0;
+      if (it.caption === "auto" && visible) {
+        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i));
+        if (cap) els.push(cap);
+      }
+    } else {
+      const st = TEXT_ROLE[it.role];
+      els.push({ t: "text", text: it.text, x: b.x, y: b.y, size: st.size, weight: st.weight, tone: st.tone, lh: st.lh, w: b.w, display: st.display, lines: true });
+    }
+  });
+  return els;
+}
 
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
   const H = book.aspect * 100;
@@ -206,10 +285,18 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       return paper(els);
     }
 
+    case "free":
+      return paper(layoutFree(book, page.items, side));
+
     case "index": {
       const n = book.plates.length;
-      const cols = n > 9 ? 6 : 4;
       const gap = 2;
+      // so viele Spalten, dass alle Abzüge in den Satzspiegel passen (bis 60 Fotos)
+      const fits = (c: number) => {
+        const w = (ta.w - (c - 1) * gap) / c;
+        return 7 + Math.ceil(n / c) * (w * book.aspect + 5) <= ta.h;
+      };
+      const cols = [n > 9 ? 6 : 4, 6, 8, 10, 12].find(fits) ?? 12;
       const cw = (ta.w - (cols - 1) * gap) / cols;
       const ch = cw * book.aspect;
       const els: El[] = [
@@ -244,3 +331,10 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
 
 /** Tafeln ohne Unterschrift auf der Seite: ihr Titel steht in der Kopfzeile */
 export const captionless = (page: Page) => page.kind === "full" || page.kind === "across";
+
+/** Tafelnummern einer Seite, deren Titel in die Kopfzeile gehört */
+export function headPlates(book: BookData, page: Page, side: "left" | "right"): number[] {
+  if (page.kind !== "free") return captionless(page) ? pageNos(page) : [];
+  const shown = new Set(layoutPage(book, page, side).els.flatMap((e) => (e.t === "caption" ? [e.no] : [])));
+  return pageNos(page).filter((no) => !shown.has(no));
+}

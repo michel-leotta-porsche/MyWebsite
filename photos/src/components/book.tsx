@@ -15,8 +15,8 @@ import {
 } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { plateOf, type BookData, type Page } from "@/content/books";
-import { captionless } from "@/content/layout";
+import { pageNos, plateOf, type BookData, type Page } from "@/content/books";
+import { headPlates } from "@/content/layout";
 import { hasSlip, recipeOf } from "@/content/recipes";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
 import { JumpContext, PageView } from "@/components/page-view";
@@ -70,9 +70,7 @@ function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
   const p = book.singlePages[k];
   return p ? [p] : [];
 }
-const platesOn = (pages: Page[]) => [
-  ...new Set(pages.flatMap((p) => ("no" in p && p.kind !== "blank" ? [p.no] : []))),
-];
+const platesOn = (pages: Page[]) => [...new Set(pages.flatMap(pageNos))];
 
 function labelAt(book: BookData, mode: Mode, k: number): string {
   if (k === 0) return "Einband";
@@ -88,7 +86,9 @@ function labelAt(book: BookData, mode: Mode, k: number): string {
 
 /** Titel der randlosen Tafeln: sie tragen keine Unterschrift auf der Seite */
 function headCaption(book: BookData, mode: Mode, k: number) {
-  const ps = platesOn(pagesAt(book, mode, k).filter(captionless));
+  const pages = pagesAt(book, mode, k);
+  const sides = pages.length === 2 ? (["left", "right"] as const) : (["right"] as const);
+  const ps = [...new Set(pages.flatMap((p, i) => headPlates(book, p, sides[i] ?? "right")))];
   return ps.map((no) => `${no} ${plateOf(book, no).title}`).join(" · ");
 }
 
@@ -661,7 +661,7 @@ export function Book({
   // Welche Seite trägt welche Tafel: links/rechts bei der Doppelseite, sonst die eine Seite
   const sidePlates = (() => {
     const pages = pagesAt(book, mode, kt);
-    const pick = (p?: Page) => (p && "no" in p && p.kind !== "blank" ? p.no : undefined);
+    const pick = (p?: Page) => (p ? pageNos(p)[0] : undefined);
     return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
   })();
   const label = labelAt(book, mode, k);
