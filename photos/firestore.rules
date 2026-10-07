@@ -28,18 +28,22 @@ service cloud.firestore {
         allow create: if exists(/databases/$(db)/documents/shares/$(token))
           && request.resource.data.keys().hasOnly(['kind', 'text', 'no', 'from', 'at'])
           && request.resource.data.kind in ['note', 'ear']
-          && (!('text' in request.resource.data) || request.resource.data.text.size() <= 280);
+          && (!('text' in request.resource.data) || (request.resource.data.text is string && request.resource.data.text.size() <= 280))
+          && (!('from' in request.resource.data) || (request.resource.data.from is string && request.resource.data.from.size() <= 80))
+          && (!('no' in request.resource.data) || request.resource.data.no is number)
+          && request.resource.data.at == request.time;
         allow read, delete: if signedIn()
           && get(/databases/$(db)/documents/shares/$(token)).data.owner == request.auth.uid;
       }
     }
 
-    // Kano-Fragebogen: anonyme Antworten, öffentlich lesbar für die Auswertung auf /qfd
+    // Kano-Fragebogen: anonyme Antworten, Auswertung auf /qfd (nur für Angemeldete lesbar, Seite ist intern)
     match /kano/{id} {
-      allow read: if true;
+      allow read: if signedIn();
       allow create: if request.resource.data.keys().hasOnly(['answers', 'camera', 'at'])
         && request.resource.data.answers is map
         && request.resource.data.answers.size() <= 30
+        && request.resource.data.at == request.time
         && (!('camera' in request.resource.data) || request.resource.data.camera in ['handy', 'kamera', 'beides']);
     }
 
