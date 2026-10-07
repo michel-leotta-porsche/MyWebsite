@@ -1,6 +1,7 @@
 {
   "hosting": {
     "public": "out",
+    "predeploy": ["npm --prefix \"$PROJECT_DIR\" run export", "node \"$PROJECT_DIR/scripts/check-export.mjs\""],
     "cleanUrls": true,
     "ignore": [
       "firebase.json",

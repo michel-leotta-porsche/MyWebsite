@@ -6,7 +6,7 @@ import sharp from "sharp";
 
 const WIDTHS = [480, 960, 1440, 1800];
 const dir = path.join(import.meta.dirname, "..", "out", "_next", "static", "media");
-const files = (await readdir(dir)).filter((f) => f.endsWith(".jpg") && !/\.w\d+\.jpg$/.test(f));
+const files = (await readdir(dir)).filter((f) => f.endsWith(".jpg") && !/-s\d+\.jpg$/.test(f));
 
 for (const f of files) {
   const file = path.join(dir, f);
@@ -14,7 +14,7 @@ for (const f of files) {
     await sharp(file)
       .resize({ width: w, height: w, fit: "inside", withoutEnlargement: true })
       .jpeg({ quality: w <= 960 ? 78 : 80, progressive: true, mozjpeg: true })
-      .toFile(file.replace(/\.jpg$/, `.w${w}.jpg`));
+      .toFile(file.replace(/\.jpg$/, `-s${w}.jpg`));
   }
   // das Original wird nicht mehr verlinkt
   await unlink(file);
