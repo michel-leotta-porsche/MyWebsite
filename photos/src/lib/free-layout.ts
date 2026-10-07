@@ -131,7 +131,7 @@ const overlap = (a: Box, b: Box) => a.x < b.x + b.w - 0.01 && b.x < a.x + a.w - 
 /** Box eines Elements mit Texthöhe (Text wächst mit dem Inhalt) */
 export function boxOf(it: SpreadItem, g: Geom): Box {
   if (it.t !== "text") return it.box;
-  return { ...it.box, h: (textHeight(it.text, it.role, it.box.w) / (g.aspect * 100)) * 100 };
+  return { ...it.box, h: (textHeight(it.text, it.role, it.box.w, it.look) / (g.aspect * 100)) * 100 };
 }
 
 /** Überlappt ein Element ein anderes? Fotos nie übereinander, Text nie auf einem Foto */

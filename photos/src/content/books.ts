@@ -138,13 +138,16 @@ export type Box = { x: number; y: number; w: number; h: number };
 /** Ausschnitt einer Platzierung */
 export type Crop = { focus: [number, number]; zoom: number; fit: "cover" | "contain" };
 export type TextRole = "heading" | "body" | "note";
+export type FontKey = "grotesk" | "serif" | "mono" | "hand";
+/** freie Gestaltung eines Textrahmens; was fehlt, kommt vom Stil (role) */
+export type TextLook = { font?: FontKey; size?: number; color?: string; align?: "left" | "center" | "right"; bold?: boolean; italic?: boolean };
 export type FreeEl =
   | { t: "photo"; no: number; box: Box; crop?: Crop; caption: "auto" | "off" }
-  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean };
+  | { t: "text"; text: string; role: TextRole; box: Box; light?: boolean; look?: TextLook };
 /** dasselbe mit Fotoschlüssel statt Nummer, so steht es im gespeicherten Buch */
 export type FreeItem =
   | { t: "photo"; id: string; key: string; box: Box; crop?: Crop; caption: "auto" | "off"; pairId?: string; /** Stapelung auf der Doppelseite */ z?: number }
-  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; z?: number };
+  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number };
 
 /** Tafelnummern auf einer Seite; die leere Seite zählt nicht */
 export const pageNos = (p: Page): number[] =>
@@ -251,7 +254,7 @@ export function build(spec: BookSpec): BookData {
           items: s.items.map((it): FreeEl =>
             it.t === "photo"
               ? { t: "photo", no: nos.get(it.key)!, box: it.box, crop: it.crop, caption: it.caption }
-              : { t: "text", text: it.text, role: it.role, box: it.box, light: it.light },
+              : { t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look },
           ),
         };
       }

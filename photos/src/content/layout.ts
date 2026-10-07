@@ -1,4 +1,4 @@
-import { colWidth, pageNos, plateOf, typeArea, type BookData, type FreeEl, type Page, type TextRole } from "@/content/books";
+import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
 // (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
@@ -36,6 +36,11 @@ export type El =
       display?: boolean;
       /** Zeilenumbrüche im Text bleiben stehen (Absätze) */
       lines?: boolean;
+      /** freie Textrahmen: Schrift, Farbe, Ausrichtung, kursiv */
+      font?: FontKey;
+      color?: string;
+      align?: "left" | "center" | "right";
+      italic?: boolean;
     }
   /** Abzug im Bildverzeichnis, ganz sichtbar (contain), springt zur Tafel */
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
@@ -78,10 +83,27 @@ export const TEXT_ROLE: Record<TextRole, { size: number; weight: 400 | 700; lh: 
   note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: "Notiz" },
 };
 
-/** Höhe eines Textrahmens in cqw (dieselbe Schätzung setzt HTML und Textur) */
-export const textHeight = (text: string, role: TextRole, w: number) => {
+/** Schriften der Textrahmen als CSS-Variablen (layout.tsx) */
+export const FONTS: Record<FontKey, { label: string; css: string; lh: number }> = {
+  grotesk: { label: "Grotesk", css: "var(--font-bricolage)", lh: 1 },
+  serif: { label: "Serif", css: "var(--font-serif)", lh: 1.05 },
+  mono: { label: "Schreibmaschine", css: "var(--font-mono)", lh: 1.05 },
+  hand: { label: "Handschrift", css: "var(--font-hand)", lh: 1 },
+};
+/** Schriftgröße, Stärke und Zeilenabstand eines Textrahmens: Stil plus freie Werte */
+export function textMetrics(role: TextRole, look?: TextLook) {
   const st = TEXT_ROLE[role];
-  return estimateLines(text || " ", st.size, w) * st.size * st.lh;
+  const size = look?.size ?? st.size;
+  const font = look?.font ?? "grotesk";
+  // Schreibmaschine läuft breiter, Handschrift schmaler
+  const width = font === "mono" ? 0.62 / 0.52 : font === "hand" ? 0.42 / 0.52 : 1;
+  return { size, weight: look?.bold === undefined ? st.weight : look.bold ? 700 : 400, lh: st.lh * FONTS[font].lh, font, width };
+}
+
+/** Höhe eines Textrahmens in cqw (dieselbe Schätzung setzt HTML und Textur) */
+export const textHeight = (text: string, role: TextRole, w: number, look?: TextLook) => {
+  const m = textMetrics(role, look);
+  return estimateLines(text || " ", m.size * m.width, w) * m.size * m.lh;
 };
 
 /**
@@ -130,7 +152,7 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
   const boxes = items.map((it) => {
     const c = toC(it.box);
     // Textrahmen: Höhe folgt dem Text
-    return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w) } : c;
+    return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w, it.look) } : c;
   });
   const els: El[] = [];
   items.forEach((it, i) => {
@@ -147,7 +169,25 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
       }
     } else {
       const st = TEXT_ROLE[it.role];
-      els.push({ t: "text", text: it.text, x: b.x, y: b.y, size: st.size, weight: st.weight, tone: it.light ? "paper" : st.tone, lh: st.lh, w: b.w, display: st.display, lines: true });
+      const m = textMetrics(it.role, it.look);
+      els.push({
+        t: "text",
+        text: it.text,
+        x: b.x,
+        y: b.y,
+        size: m.size,
+        weight: m.weight as 400 | 700,
+        tone: it.light ? "paper" : st.tone,
+        lh: m.lh,
+        w: b.w,
+        // die breite Display-Achse gilt nur für die Grotesk
+        display: st.display && m.font === "grotesk",
+        lines: true,
+        font: it.look?.font,
+        color: it.look?.color,
+        align: it.look?.align,
+        italic: it.look?.italic,
+      });
     }
   });
   return els;

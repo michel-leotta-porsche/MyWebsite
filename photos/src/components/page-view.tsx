@@ -4,7 +4,7 @@ import Image from "next/image";
 import { createContext, useContext, type CSSProperties } from "react";
 
 import { plateOf, type BookData, type Page } from "@/content/books";
-import { CAPTION, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
+import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
 
 // Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
@@ -127,12 +127,15 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
           style={{
             top: `${el.y}cqw`,
             left: `${el.x}cqw`,
-            maxWidth: el.w ? `${el.w}cqw` : undefined,
+            // mittig oder rechts braucht die volle Rahmenbreite
+            ...(el.align && el.align !== "left" && el.w ? { width: `${el.w}cqw`, textAlign: el.align } : { maxWidth: el.w ? `${el.w}cqw` : undefined }),
+            fontFamily: el.font ? FONTS[el.font].css : undefined,
+            fontStyle: el.italic ? "italic" : undefined,
             fontSize: el.size < 3.4 ? `max(${el.size < 2.4 ? 9 : 11}px, ${el.size}cqw)` : `${el.size}cqw`,
             fontWeight: el.weight,
             lineHeight: el.lh,
             whiteSpace: el.lines ? "pre-line" : el.w ? undefined : "nowrap",
-            color: el.tone === "clothInk" ? book.cloth.ink : undefined,
+            color: el.color ?? (el.tone === "clothInk" ? book.cloth.ink : undefined),
             fontVariationSettings: el.display ? '"wdth" 78, "opsz" 96' : undefined,
           }}
         >

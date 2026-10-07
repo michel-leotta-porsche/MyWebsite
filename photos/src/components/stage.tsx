@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { BookData, Box, FreeEl, FreeItem, TextRole } from "@/content/books";
-import { TEXT_ROLE } from "@/content/layout";
+import type { BookData, Box, FontKey, FreeEl, FreeItem, TextLook, TextRole } from "@/content/books";
+import { FONTS, TEXT_ROLE, textMetrics } from "@/content/layout";
 import { inputClass, TextButton } from "@/components/app-ui";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
@@ -158,7 +158,7 @@ export function Stage({
   const pages = fromSpread(shown).map((p) => ({
     kind: "free" as const,
     items: p.items.flatMap((it): FreeEl[] => {
-      if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light }];
+      if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look }];
       const no = noOf(it.key);
       if (it.id === cropping) return [];
       return no ? [{ t: "photo", no, box: it.box, crop: it.crop, caption: it.caption }] : [];
@@ -632,16 +632,35 @@ export function Stage({
   /** Schrift des Textfelds auf der Seite: genau wie im Buch gesetzt */
   const editFont = (it: Extract<FreeItem, { t: "text" }>): React.CSSProperties => {
     const st = TEXT_ROLE[it.role];
-    const px = (st.size * pageW) / 100;
+    const m = textMetrics(it.role, it.look);
+    const px = (m.size * pageW) / 100;
+    const display = st.display && m.font === "grotesk";
     return {
-      fontSize: st.size < 3.4 ? Math.max(11, px) : px,
-      fontWeight: st.weight,
-      lineHeight: st.lh,
-      letterSpacing: st.display ? "-0.035em" : undefined,
-      fontVariationSettings: st.display ? '"wdth" 78, "opsz" 96' : undefined,
-      color: it.light ? "var(--paper)" : st.tone === "ink2" ? "var(--ink-2, #5a5c56)" : "var(--ink)",
+      fontSize: m.size < 3.4 ? Math.max(11, px) : px,
+      fontWeight: m.weight,
+      lineHeight: m.lh,
+      fontFamily: FONTS[m.font].css,
+      fontStyle: it.look?.italic ? "italic" : undefined,
+      textAlign: it.look?.align ?? "left",
+      letterSpacing: display ? "-0.035em" : undefined,
+      fontVariationSettings: display ? '"wdth" 78, "opsz" 96' : undefined,
+      color: it.look?.color ?? (it.light ? "var(--paper)" : st.tone === "ink2" ? "#5a5c56" : "var(--ink)"),
     };
   };
+  /** Werkzeugkasten: freie Werte am Textrahmen; null löscht einen Wert (zurück zum Stil) */
+  const setLook = (id: string, patch: Partial<Record<keyof TextLook, TextLook[keyof TextLook] | null>>, tag?: string) =>
+    commit(
+      items.map((i) => {
+        if (i.id !== id || i.t !== "text") return i;
+        const look: TextLook = { ...i.look };
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === null || v === undefined) delete look[k as keyof TextLook];
+          else (look as Record<string, unknown>)[k] = v;
+        }
+        return { ...i, look: Object.keys(look).length ? look : undefined, light: patch.color !== undefined ? undefined : i.light };
+      }),
+      tag,
+    );
   const showGrid = gridOn || !!draft;
 
   return (
@@ -849,6 +868,15 @@ export function Stage({
                       </div>
                     );
                   })}
+                  {selected?.t === "text" && !draft && (
+                    <TextToolbar
+                      key={selected.id}
+                      item={selected}
+                      box={boxOf(selected, geom)}
+                      cloth={data.cloth.base}
+                      onLook={(patch, tag) => setLook(selected.id, patch, tag)}
+                    />
+                  )}
                   {/* Griffe des gewählten Elements liegen über allem, ohne das Darunter zu verdecken */}
                   {selected && selected.id !== editing && selected.id !== cropping && (
                     <div className="pointer-events-none absolute" style={pct(boxOf(selected, geom))}>
@@ -1427,6 +1455,141 @@ function CropMode({
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+const SWATCHES: { label: string; value: string | null }[] = [
+  { label: "Tinte", value: null },
+  { label: "Grau", value: "#5a5c56" },
+  { label: "Papier", value: "#eee9df" },
+  { label: "Schwarz", value: "#000000" },
+  { label: "Weiß", value: "#ffffff" },
+];
+/** cqw → Punkt bei einer gedruckten Seitenbreite von 15 cm */
+const PT = 4.25;
+
+/** Kleiner Werkzeugkasten über dem gewählten Textrahmen */
+function TextToolbar({
+  item,
+  box,
+  cloth,
+  onLook,
+}: {
+  item: Extract<FreeItem, { t: "text" }>;
+  box: Box;
+  cloth: string;
+  onLook: (patch: Partial<Record<keyof TextLook, TextLook[keyof TextLook] | null>>, tag?: string) => void;
+}) {
+  const m = textMetrics(item.role, item.look);
+  const look = item.look ?? {};
+  const pt = Math.round(m.size * PT);
+  const setPt = (v: number) => onLook({ size: Math.min(40, Math.max(1.6, v / PT)) }, `size-${item.id}`);
+  const above = box.y > 9;
+  const btn = "flex h-8 min-w-8 items-center justify-center px-1.5 text-sm hover:bg-ink/8";
+  const on = "bg-ink text-paper hover:bg-ink";
+  const colors = [...SWATCHES, { label: "Einband", value: cloth }];
+  return (
+    <div
+      role="toolbar"
+      aria-label="Text gestalten"
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      className="slip text-ink absolute z-[65] flex max-w-[min(560px,92vw)] flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
+      style={{ left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
+    >
+      <label className="sr-only" htmlFor={`font-${item.id}`}>
+        Schriftart
+      </label>
+      <select
+        id={`font-${item.id}`}
+        value={m.font}
+        onChange={(e) => onLook({ font: e.target.value === "grotesk" ? null : (e.target.value as FontKey) })}
+        className="h-8 border border-ink/25 bg-transparent px-1.5 text-sm"
+        style={{ fontFamily: FONTS[m.font].css }}
+      >
+        {(Object.keys(FONTS) as FontKey[]).map((f) => (
+          <option key={f} value={f} style={{ fontFamily: FONTS[f].css }}>
+            {FONTS[f].label}
+          </option>
+        ))}
+      </select>
+      <span className="mx-1 flex items-center" role="group" aria-label="Größe">
+        <button type="button" className={btn} aria-label="kleiner" onClick={() => setPt(pt - (pt > 24 ? 4 : 1))}>
+          −
+        </button>
+        <label className="sr-only" htmlFor={`size-${item.id}`}>
+          Größe in Punkt
+        </label>
+        <input
+          id={`size-${item.id}`}
+          type="number"
+          min={7}
+          max={170}
+          value={pt}
+          onChange={(e) => e.target.value && setPt(Number(e.target.value))}
+          className="h-8 w-12 border border-ink/25 bg-transparent text-center text-sm tabular-nums"
+        />
+        <button type="button" className={btn} aria-label="größer" onClick={() => setPt(pt + (pt >= 24 ? 4 : 1))}>
+          +
+        </button>
+        <span aria-hidden className="text-ink-2 ml-1 text-[11px]">
+          pt
+        </span>
+      </span>
+      <button type="button" aria-pressed={m.weight >= 700} aria-label="Fett" className={`${btn} font-bold ${m.weight >= 700 ? on : ""}`} onClick={() => onLook({ bold: m.weight < 700 })}>
+        F
+      </button>
+      <button type="button" aria-pressed={!!look.italic} aria-label="Kursiv" className={`${btn} italic ${look.italic ? on : ""}`} onClick={() => onLook({ italic: look.italic ? null : true })}>
+        K
+      </button>
+      <span className="mx-1 flex" role="group" aria-label="Ausrichtung">
+        {(["left", "center", "right"] as const).map((a) => (
+          <button
+            key={a}
+            type="button"
+            aria-pressed={(look.align ?? "left") === a}
+            aria-label={a === "left" ? "linksbündig" : a === "center" ? "mittig" : "rechtsbündig"}
+            className={`${btn} ${(look.align ?? "left") === a ? on : ""}`}
+            onClick={() => onLook({ align: a === "left" ? null : a })}
+          >
+            <svg aria-hidden viewBox="0 0 14 12" className="h-3 w-3.5">
+              {[0, 4, 8].map((y, i) => {
+                const w = i === 1 ? 8 : 14;
+                const x = a === "left" ? 0 : a === "center" ? (14 - w) / 2 : 14 - w;
+                return <rect key={y} x={x} y={y} width={w} height={1.6} className="fill-current" />;
+              })}
+            </svg>
+          </button>
+        ))}
+      </span>
+      <span className="flex items-center gap-1" role="group" aria-label="Farbe">
+        {colors.map((c) => {
+          const active = (look.color ?? null) === c.value && (c.value !== null || !item.light);
+          return (
+            <button
+              key={c.label}
+              type="button"
+              title={c.label}
+              aria-label={`Farbe ${c.label}`}
+              aria-pressed={active}
+              onClick={() => onLook({ color: c.value })}
+              className={`h-6 w-6 border ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
+              style={{ background: c.value ?? "var(--ink)" }}
+            />
+          );
+        })}
+        <label className="relative h-6 w-6 cursor-pointer border border-ink/30" title="Eigene Farbe">
+          <span className="sr-only">Eigene Farbe</span>
+          <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
+          <input
+            type="color"
+            value={look.color ?? "#1b1c1a"}
+            onChange={(e) => onLook({ color: e.target.value }, `color-${item.id}`)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+      </span>
     </div>
   );
 }
