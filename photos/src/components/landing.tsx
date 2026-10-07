@@ -520,7 +520,9 @@ function Closing() {
 
 export function Landing() {
   return (
-    <main>
+    // Safari zählt in 3D gedrehte Abzüge sonst zur Seitenhöhe mit, auch wenn ihr Abschnitt sie abschneidet;
+    // clip schneidet ab, ohne einen Scrollbereich zu bilden, das Kleben der Szenen bleibt erhalten
+    <main className="overflow-clip">
       <Hero />
       <Workbench />
       <Recipe />
