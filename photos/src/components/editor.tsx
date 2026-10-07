@@ -123,6 +123,7 @@ export function Editor() {
   const [history, setHistory] = useState(false);
   const [crop, setCrop] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
+  const lastClick = useRef<{ i: number; at: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
@@ -775,6 +776,16 @@ export function Editor() {
                       </div>
                       <div
                         onDoubleClick={() => openStage(i)}
+                        onClickCapture={() => {
+                          // eigene Erkennung: auf ziehbaren Fotos meldet Safari keinen Doppelklick
+                          const now = performance.now();
+                          const prev = lastClick.current;
+                          lastClick.current = { i, at: now };
+                          if (prev && prev.i === i && now - prev.at < 400) {
+                            lastClick.current = null;
+                            openStage(i);
+                          }
+                        }}
                         title="Doppelklick: gestalten"
                         className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}
                       >
