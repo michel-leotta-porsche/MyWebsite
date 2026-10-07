@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData, Box, FontKey, FreeEl, FreeItem, TextLook, TextRole } from "@/content/books";
 import { FONTS, TEXT_ROLE, textMetrics } from "@/content/layout";
@@ -155,15 +155,23 @@ export function Stage({
   const shown = items.map((i) => (draft && i.id === draft.id ? { ...i, box: draft.box } : i));
   const selected = shown.find((i) => i.id === sel) ?? null;
   const noOf = (key: string) => data.plates.find((p) => p.key === key)?.no;
-  const pages = fromSpread(shown).map((p) => ({
-    kind: "free" as const,
-    items: p.items.flatMap((it): FreeEl[] => {
-      if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look }];
-      const no = noOf(it.key);
-      if (it.id === cropping) return [];
-      return no ? [{ t: "photo", no, box: it.box, crop: it.crop, caption: it.caption }] : [];
-    }),
-  }));
+  // Seiten nur neu setzen, wenn sich wirklich etwas ändert; beim Ziehen fehlt das gezogene Element
+  // auf der Seite und bewegt sich als leichte Vorschau (DragGhost) darüber
+  const draftId = draft?.id ?? null;
+  const pages = useMemo(
+    () =>
+      fromSpread(items).map((p) => ({
+        kind: "free" as const,
+        items: p.items.flatMap((it): FreeEl[] => {
+          if (it.id === draftId) return [];
+          if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look }];
+          const no = data.plates.find((pl) => pl.key === it.key)?.no;
+          if (it.id === cropping) return [];
+          return no ? [{ t: "photo", no, box: it.box, crop: it.crop, caption: it.caption }] : [];
+        }),
+      })),
+    [items, draftId, editing, cropping, data],
+  );
 
   const commit = (next: SpreadItem[], tag?: string, message?: string, pulled?: string[]) => {
     onCommit(next, tag, pulled);
@@ -312,21 +320,31 @@ export function Stage({
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag.current = { id: it.id, edges, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey };
   };
+  const frame = useRef(0);
   const onMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    // höchstens einmal pro Bild rechnen
+    const { clientX, clientY, shiftKey, altKey } = e;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => moveTo(clientX, clientY, shiftKey, altKey));
+  };
+  const moveTo = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
     const d = drag.current;
     if (!d) return;
     const it = items.find((i) => i.id === d.id);
     if (!it) return;
-    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 3) return;
+    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < 3) return;
     d.moved = true;
     window.clearTimeout(press.current);
-    const u = toUnits(e.clientX - d.sx, e.clientY - d.sy);
-    const r = d.edges ? resizeBox(it, d.box0, d.edges, u.x, u.y, e.shiftKey) : moveBox(it, d.box0, u.x, u.y, e.altKey);
+    const u = toUnits(clientX - d.sx, clientY - d.sy);
+    const r = d.edges ? resizeBox(it, d.box0, d.edges, u.x, u.y, shiftKey) : moveBox(it, d.box0, u.x, u.y, altKey);
     const box = it.t === "text" ? { ...r.box, h: it.box.h } : r.box;
     setDraft({ id: it.id, box, original: r.original });
     setGuides({ xs: r.xs, ys: r.ys });
   };
   const onUp = () => {
+    cancelAnimationFrame(frame.current);
     window.clearTimeout(press.current);
     const d = drag.current;
     drag.current = null;
@@ -763,7 +781,7 @@ export function Stage({
               >
                 {(["left", "right"] as const).map((side, i) => (
                   <div key={side} className="absolute top-0" style={{ left: i * pageW, width: pageW, height: Hpx }}>
-                    <PageView book={data} page={pages[i]} side={side} eager />
+                    <MemoPage book={data} page={pages[i]} side={side} eager />
                   </div>
                 ))}
 
@@ -877,6 +895,11 @@ export function Stage({
                       onLook={(patch, tag) => setLook(selected.id, patch, tag)}
                     />
                   )}
+                  {draft &&
+                    (() => {
+                      const it = shown.find((i) => i.id === draft.id);
+                      return it ? <DragGhost item={it} box={boxOf(it, geom)} photo={it.t === "photo" ? photos.get(it.key) : undefined} font={it.t === "text" ? editFont(it) : undefined} /> : null;
+                    })()}
                   {/* Griffe des gewählten Elements liegen über allem, ohne das Darunter zu verdecken */}
                   {selected && selected.id !== editing && selected.id !== cropping && (
                     <div className="pointer-events-none absolute" style={pct(boxOf(selected, geom))}>
@@ -1592,4 +1615,37 @@ function TextToolbar({
       </span>
     </div>
   );
+}
+
+/** Seite nur neu zeichnen, wenn sich ihre Daten ändern (beim Ziehen bleibt sie stehen) */
+const MemoPage = memo(PageView);
+
+/** Leichte Vorschau des gezogenen Elements: ein Bild oder ein Textblock, ohne die Seite neu zu setzen */
+function DragGhost({ item, box, photo, font }: { item: SpreadItem; box: Box; photo?: StoredPhoto; font?: React.CSSProperties }) {
+  const style: React.CSSProperties = { left: `${box.x / 2}%`, top: `${box.y}%`, width: `${box.w / 2}%`, height: `${box.h}%` };
+  if (item.t === "photo" && photo) {
+    const c = item.crop ?? { focus: photo.focus ?? [0.5, 0.5], zoom: photo.zoom ?? 1, fit: photo.fit ?? "cover" };
+    return (
+      <div className="pointer-events-none absolute overflow-hidden" style={style}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Vorschau beim Ziehen, wie im Buch beschnitten */}
+        <img
+          src={photo.src}
+          alt=""
+          className={`absolute inset-0 h-full w-full ${c.fit === "contain" ? "object-contain" : "object-cover"}`}
+          style={{
+            objectPosition: `${c.focus[0] * 100}% ${c.focus[1] * 100}%`,
+            transform: c.fit !== "contain" && c.zoom !== 1 ? `scale(${c.zoom})` : undefined,
+            transformOrigin: `${c.focus[0] * 100}% ${c.focus[1] * 100}%`,
+          }}
+        />
+      </div>
+    );
+  }
+  if (item.t === "text")
+    return (
+      <div className="pointer-events-none absolute whitespace-pre-line" style={{ ...style, height: "auto", ...font }}>
+        {item.text}
+      </div>
+    );
+  return null;
 }
