@@ -2,44 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal";
+import { FrameButton, Wordmark } from "@/components/ui-base";
 import { signIn, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Textknöpfe mit Unterstrich, Rahmenknopf, Anmeldung.
 
-// Gelb ist Signal: der Unterstrich erscheint erst beim Zeigen oder mit dem Fokus
-export const linkClass =
-  "text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline focus-visible:underline disabled:opacity-50";
-
-export function TextButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button type="button" {...p} className={`${linkClass} ${className}`} />;
-}
-
-/** Der eine betonte Knopf einer Ansicht: Rahmen statt Fläche, das Gelb bleibt Signal */
-export function FrameButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type="button"
-      {...p}
-      className={`border-on-table text-on-table hover:bg-on-table hover:text-table border px-4 py-2 text-sm font-semibold transition-colors duration-150 disabled:opacity-50 ${className}`}
-    />
-  );
-}
-
-export function Wordmark({ href = "/" }: { href?: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-on-table text-lg font-bold tracking-[-0.02em]"
-      style={{ fontVariationSettings: '"wdth" 80' }}
-    >
-      Fujiventura
-    </Link>
-  );
-}
+export { FrameButton, linkClass, TextButton, Wordmark } from "@/components/ui-base";
 
 /** Kopf eines Raums: Wortmarke führt zur Landing Page, daneben der Raum als Überschrift der Seite */
 export function RoomTitle({ children }: { children: ReactNode }) {
