@@ -329,36 +329,40 @@ export function Stage({
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => moveTo(clientX, clientY, shiftKey, altKey));
   };
-  const moveTo = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
+  /** letzte Zeigerlage; beim Loslassen zählt sie, auch wenn ihr Bild noch nicht gezeichnet war */
+  const last = useRef<{ clientX: number; clientY: number; shiftKey: boolean; altKey: boolean } | null>(null);
+  const compute = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
     const d = drag.current;
-    if (!d) return;
+    if (!d) return null;
     const it = items.find((i) => i.id === d.id);
-    if (!it) return;
-    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < 3) return;
+    if (!it) return null;
+    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < 3) return null;
     d.moved = true;
     window.clearTimeout(press.current);
     const u = toUnits(clientX - d.sx, clientY - d.sy);
     const r = d.edges ? resizeBox(it, d.box0, d.edges, u.x, u.y, shiftKey) : moveBox(it, d.box0, u.x, u.y, altKey);
-    const box = it.t === "text" ? { ...r.box, h: it.box.h } : r.box;
-    setDraft({ id: it.id, box, original: r.original });
-    setGuides({ xs: r.xs, ys: r.ys });
+    return { it, r, box: it.t === "text" ? { ...r.box, h: it.box.h } : r.box };
   };
-  const onUp = () => {
+  const moveTo = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
+    last.current = { clientX, clientY, shiftKey, altKey };
+    const c = compute(clientX, clientY, shiftKey, altKey);
+    if (!c) return;
+    setDraft({ id: c.it.id, box: c.box, original: c.r.original });
+    setGuides({ xs: c.r.xs, ys: c.r.ys });
+  };
+  const onUp = (e?: React.PointerEvent) => {
     cancelAnimationFrame(frame.current);
     window.clearTimeout(press.current);
+    const pt = e ? { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey } : last.current;
+    const c = pt ? compute(pt.clientX, pt.clientY, pt.shiftKey, pt.altKey) : null;
     const d = drag.current;
     drag.current = null;
+    last.current = null;
     setGuides({ xs: [], ys: [] });
-    if (!d || !d.moved || !draft) {
-      setDraft(null);
-      return;
-    }
-    const it = items.find((i) => i.id === d.id);
-    if (it) {
-      const next = items.map((i) => (i.id === d.id ? { ...i, box: draft.box } : i));
-      commit(next, undefined, `${nameOf(it)}: ${where(draft.box)}`);
-    }
     setDraft(null);
+    if (!d || !d.moved || !c) return;
+    const next = items.map((i) => (i.id === d.id ? { ...i, box: c.box } : i));
+    commit(next, undefined, `${nameOf(c.it)}: ${where(c.box)}`);
   };
 
   // ---- Neues Element: Text aus der Palette, Foto aus der Ablage ----
@@ -448,7 +452,7 @@ export function Stage({
     const box = at
       ? { ...snapAt(pageAt(at.x), at, Math.min(b.w, 100), b.h), w: b.w, h: b.h }
       : { ...b, x: Math.max(0, b.x + dx), y: Math.max(0, b.y + dy) };
-    const copy = (src.t === "photo" ? { ...src, id, box, pairId: undefined } : { ...src, id, box }) as SpreadItem;
+    const copy = { ...src, id, box, pairId: undefined } as SpreadItem;
     commit([...items, copy], undefined, `${src.t === "photo" ? "Foto" : "Text"} eingefügt: ${where(box)}`);
     setSel(id);
   };
@@ -818,7 +822,7 @@ export function Stage({
                   className="absolute inset-0 z-50 cursor-text select-none"
                   onPointerMove={onMove}
                   onPointerUp={onUp}
-                  onPointerCancel={onUp}
+                  onPointerCancel={() => onUp()}
                   onPointerDown={(e) => {
                     if (e.target !== e.currentTarget) return;
                     setSel(null);

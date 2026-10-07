@@ -147,7 +147,7 @@ export type FreeEl =
 /** dasselbe mit Fotoschlüssel statt Nummer, so steht es im gespeicherten Buch */
 export type FreeItem =
   | { t: "photo"; id: string; key: string; box: Box; crop?: Crop; caption: "auto" | "off"; pairId?: string; /** Stapelung auf der Doppelseite */ z?: number }
-  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number };
+  | { t: "text"; id: string; text: string; role: TextRole; box: Box; /** helle Schrift, für Text auf dunklen Fotos */ light?: boolean; look?: TextLook; z?: number; /** Text über den Bund: beide Hälften gleich */ pairId?: string };
 
 /** Tafelnummern auf einer Seite; die leere Seite zählt nicht */
 export const pageNos = (p: Page): number[] =>

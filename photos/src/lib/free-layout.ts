@@ -5,7 +5,7 @@ import type { PageDraft, SpreadDraft } from "@/lib/auto-sequence";
 // Freie Doppelseiten (Editor V2, docs/editor-workshop.md):
 // Gespeichert wird pro Seite in Prozent der Seite. Bearbeitet wird auf der ganzen Doppelseite:
 // x läuft dort von 0 bis 200 (linke Seite 0–100, rechte 100–200), y bleibt in % der Seitenhöhe.
-// Ein Foto über den Bund wird beim Speichern zu zwei Hälften mit derselben pairId.
+// Ein Foto oder Text über den Bund wird beim Speichern zu zwei Hälften mit derselben pairId.
 
 export type Geom = Pick<BookData, "aspect" | "bottom">;
 /** Element auf der Doppelseite: x in 0..200 */
@@ -60,7 +60,7 @@ export function toSpread(pages: [PageDraft, PageDraft]): SpreadItem[] {
   const seenPair = new Set<string>();
   pages.forEach((p, pi) => {
     for (const it of p.items) {
-      if (it.t === "photo" && it.pairId) {
+      if (it.pairId) {
         if (seenPair.has(it.pairId)) continue;
         seenPair.add(it.pairId);
       }
@@ -82,16 +82,17 @@ export function fromSpread(items: SpreadItem[]): [PageDraft, PageDraft] {
   for (const [z, raw] of items.entries()) {
     const it = { ...raw, z } as SpreadItem;
     const { x, w } = it.box;
-    if (it.t === "photo" && x < 99.5 && x + w > 100.5) {
+    // über den Bund: jede Seite bekommt das ganze Element und zeigt ihre Hälfte
+    if (x < 99.5 && x + w > 100.5) {
       const pairId = it.pairId ?? itemId();
       pages[0].items.push({ ...it, pairId, box: { ...it.box } });
       pages[1].items.push({ ...it, id: `${it.id}-r`, pairId, box: { ...it.box, x: x - 100 } });
       continue;
     }
     const pi = x + w / 2 < 100 ? 0 : 1;
-    const { pairId: _drop, ...rest } = it as Extract<FreeItem, { t: "photo" }>;
+    const { pairId: _drop, ...rest } = it;
     void _drop;
-    const clean = (it.t === "photo" ? rest : it) as FreeItem;
+    const clean = rest as FreeItem;
     pages[pi].items.push({ ...clean, box: { ...it.box, x: x - pi * 100 } });
   }
   return pages;
