@@ -290,6 +290,19 @@ html.ohne-schatten [data-shade] {
   view-timeline: --hero block;
   height: calc(var(--leaves, 3) * 80svh + 100svh);
 }
+/* Passt der Kopf nicht in die Höhe (quer, große Schrift, Zoom), scrollt er normal und das Buch bleibt sichtbar */
+.hero-track[data-fixed] {
+  height: auto;
+}
+.hero-track[data-fixed] > .hero-stick {
+  position: relative;
+  min-height: 0;
+  overflow-x: clip;
+  overflow-y: visible;
+}
+.hero-track[data-fixed] .hero-hint {
+  display: none;
+}
 .bench-count-b {
   display: none;
 }

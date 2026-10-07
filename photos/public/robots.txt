@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /kritik
+Disallow: /qfd
+Disallow: /umfrage

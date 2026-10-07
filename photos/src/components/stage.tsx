@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { toEl, type BookData, type Box, type Corner, type FontKey, type FreeEl, type FreeItem, type ShapeKind, type ShapeLook, type TextLook, type TextRole } from "@/content/books";
 import { FONTS, TEXT_ROLE, textMetrics } from "@/content/layout";
@@ -83,6 +83,31 @@ const TOOL_KEYS: Record<string, Tool> = { v: "select", p: "pen", e: "eraser", l:
 
 const DEFAULT_TEXT: Record<TextRole, string> = { heading: "Überschrift", body: "Ein paar Sätze zu diesem Tag.", note: "Notiz" };
 
+/**
+ * Die Bühne ist ein Modal über der Werkbank: der Rest der Seite wird inert (weder Tab noch Klick erreichen ihn),
+ * der Fokus geht beim Öffnen hinein und beim Schließen zurück auf den Auslöser (Härtetest A1).
+ */
+function useModal(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const muted: HTMLElement[] = [];
+    for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+      for (const sib of Array.from(node.parentElement?.children ?? [])) {
+        if (sib === node || !(sib instanceof HTMLElement) || sib.inert || sib.tagName === "SCRIPT") continue;
+        sib.inert = true;
+        muted.push(sib);
+      }
+    }
+    el.querySelector<HTMLElement>("[data-stage-first]")?.focus({ preventScroll: true });
+    return () => {
+      for (const m of muted) m.inert = false;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [ref]);
+}
+
 export function Stage({
   data,
   geom,
@@ -156,6 +181,8 @@ export function Stage({
   const [width, setWidth] = useState(0);
   const [coarse, setCoarse] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
+  useModal(dialog);
   const layerEl = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
@@ -941,10 +968,12 @@ export function Stage({
   const showGrid = gridOn || !!draft;
 
   return (
-    <div className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
+    <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
-          <TextButton onClick={onClose}>← Zur Übersicht</TextButton>
+          <TextButton data-stage-first onClick={onClose}>
+            ← Zur Übersicht
+          </TextButton>
           <span className="text-on-table font-semibold">Doppelseite {index + 1}</span>
           <span className="text-on-table-2 hidden text-sm md:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
         </span>
