@@ -71,6 +71,32 @@ export const estimateLines = (text: string, size: number, width: number) =>
 /** Textseite: Größen der beiden Stile in cqw */
 export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh: 1.35 } } as const;
 
+/** Bildverzeichnis: Fuge zwischen den Daumen, Abstand Daumen zu Daumen darunter (Nummer + Luft) */
+const INDEX_GAP = 2;
+const INDEX_ROW = 5;
+/** Platz unter dem letzten Daumen für die Nummer: 0.8 Abstand plus eine Zeile, auch bei 9px auf schmalen Seiten */
+const INDEX_LABEL = 4.4;
+/**
+ * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
+ * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
+ */
+const INDEX_COLS = [4, 6, 8, 10, 12] as const;
+
+/** Die größten Daumen, bei denen alle Tafeln samt Nummern im Satzspiegel bleiben */
+export function indexGrid(book: BookData, ta: { y: number; w: number; h: number }) {
+  const n = book.plates.length;
+  const top = ta.y + 7;
+  const bottom = ta.y + ta.h;
+  const grid = (cols: number) => {
+    const cw = (ta.w - (cols - 1) * INDEX_GAP) / cols;
+    const ch = cw * book.aspect;
+    const rows = Math.max(1, Math.ceil(n / cols));
+    const end = top + (rows - 1) * (ch + INDEX_ROW) + ch + INDEX_LABEL;
+    return { cols, cw, ch, top, rows, end };
+  };
+  return INDEX_COLS.map(grid).find((g) => g.end <= bottom) ?? grid(INDEX_COLS[INDEX_COLS.length - 1]);
+}
+
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
   const H = book.aspect * 100;
   const ta = typeArea(book, side);
@@ -207,17 +233,13 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
     }
 
     case "index": {
-      const n = book.plates.length;
-      const cols = n > 9 ? 6 : 4;
-      const gap = 2;
-      const cw = (ta.w - (cols - 1) * gap) / cols;
-      const ch = cw * book.aspect;
+      const { cols, cw, ch, top } = indexGrid(book, ta);
       const els: El[] = [
         { t: "text", text: "Tafeln", x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
       ];
       book.plates.forEach((p, i) => {
-        const x = ta.x + (i % cols) * (cw + gap);
-        const y = ta.y + 7 + Math.floor(i / cols) * (ch + 5);
+        const x = ta.x + (i % cols) * (cw + INDEX_GAP);
+        const y = top + Math.floor(i / cols) * (ch + INDEX_ROW);
         els.push({ t: "thumb", no: p.no, x, y, w: cw, h: ch });
         els.push({ t: "text", text: String(p.no), x, y: y + ch + 0.8, size: 2.1, weight: 400, tone: "ink2", lh: 1.2 });
       });
