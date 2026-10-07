@@ -55,7 +55,7 @@ export default function Page() {
   const reqById = new Map(reqs.requirements.map((r) => [r.id, r]));
 
   return (
-    <main className="linen table-surface min-h-svh bg-table pb-24">
+    <main className="linen table-surface relative min-h-svh bg-table pb-24">
       <header className="sticky top-0 z-40 flex items-baseline justify-between gap-6 bg-table/95 px-4 py-4 md:px-8">
         <Link href="/" className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
           Fujiventura
@@ -87,7 +87,7 @@ export default function Page() {
                 <li key={s.id} className="bg-table">
                   <a href={`#${s.id}`} className="group block p-4">
                     <span className="text-on-table-2 text-sm tabular-nums">{s.n}</span>
-                    <span className="text-on-table mt-1 block font-semibold decoration-mark decoration-2 underline-offset-4 group-hover:underline">{s.title}</span>
+                    <span className="text-on-table mt-1 block font-semibold break-words hyphens-auto decoration-mark decoration-2 underline-offset-4 group-hover:underline">{s.title}</span>
                   </a>
                 </li>
               ))}
@@ -354,9 +354,9 @@ function CompetitorDots({ perception, goal }: { perception: Record<string, numbe
 
 function CompetitorLegend() {
   return (
-    <p className="text-on-table-2 mt-3 text-[13px]">
+    <p className="text-on-table-2 mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
       {Object.entries(MARKS).map(([k, v]) => (
-        <span key={k} className="mr-4 whitespace-nowrap">
+        <span key={k} className="whitespace-nowrap">
           <span className={k === "Fujiventura heute" ? "text-mark font-semibold" : "text-on-table font-semibold"}>{v}</span> {k}
         </span>
       ))}

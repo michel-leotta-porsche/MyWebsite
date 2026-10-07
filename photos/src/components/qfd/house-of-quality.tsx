@@ -34,7 +34,7 @@ export function HouseOfQuality({
   const n = characteristics.length;
   const idx = new Map(characteristics.map((c, i) => [c.id, i]));
   const roofH = (n * COL) / 2;
-  const headH = 190;
+  const headH = 236;
   const maxTech = Math.max(1, ...[...tech.values()].map((t) => t.rel));
 
   const hoverReq = requirements.find((r) => r.id === row);
@@ -92,8 +92,9 @@ export function HouseOfQuality({
                 style={{ width: COL }}
               >
                 <span
-                  className="absolute bottom-2 left-1/2 origin-bottom-left text-[12px] leading-tight whitespace-nowrap"
-                  style={{ transform: "rotate(-90deg) translateY(50%)", width: headH - 12 }}
+                  title={c.name}
+                  className="absolute bottom-2 left-1/2 origin-bottom-left overflow-hidden text-[12px] leading-tight text-ellipsis whitespace-nowrap"
+                  style={{ transform: "rotate(-90deg) translateY(50%)", width: headH - 14 }}
                 >
                   <span className="text-ink-2 mr-1 tabular-nums">{c.id}</span>
                   {c.name}

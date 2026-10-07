@@ -1,1 +1,2868 @@
-{"date":"","market":{"summary":"","painThemes":[],"mustHaves":[],"gaps":[],"competitors":[]},"voc":{"personas":[],"statements":[]},"reqs":{"groups":[],"requirements":[],"method":""},"hoq":{"characteristics":[],"relations":[],"roof":[],"notes":""},"features":{"features":[],"survey":[],"next":"","caveats":""}}
+{
+ "date": "Oktober 2026",
+ "market": {
+  "summary": "Durch alle drei Segmente (Massenmarkt, automatische Apps, Premium/Fotografen) ziehen sich dieselben Schmerzen. Ganz oben steht verlorene Arbeit: Projekte verschwinden durch Absturz, Update oder Löschung nach Inaktivität. Danach kommt Automatik, die man nicht überstimmen kann (falsche Reihenfolge, Layout springt um, starre Vorlagen). Dritter Punkt ist Text, der sich nicht vorhersehbar verhält, vierter eine Vorschau, die nicht dem Ergebnis entspricht. Gelobt wird überall dasselbe: einfach, schnell, ein automatischer Startentwurf und danach freie Bearbeitung (Mixbook, Pixum). Fujiventura hat schon Vorsprünge, die der Markt kaum bietet: Teilen ohne Konto, ein blätterbares 3D-Buch, Rückmeldung der Gäste ohne Likes und Rezepte am Foto. Die größten Lücken bei Fujiventura sind Versionen und geräteübergreifendes Speichern, Text, Bildausschnitt pro Feld und das freie Einfügen oder Verschieben einzelner Fotos. Zur Quellenlage: Bewertungen aus App Store und Trustpilot haben sich die Schreiber selbst ausgesucht, Häufigkeiten lassen sich daraus nicht ableiten. Reddit war für die Recherche nicht erreichbar.",
+  "painThemes": [
+   {
+    "id": "P1",
+    "theme": "Arbeit geht verloren",
+    "description": "Projekte verschwinden durch Absturz, Update, Zahlungsfehler oder Löschung nach Inaktivität. Eine Wiederherstellung gibt es nicht. Das ist der emotional stärkste Vertrauensbruch, und er kommt in allen Segmenten vor.",
+    "competitors": [
+     "Rossmann Fotowelt",
+     "Pixum",
+     "Mixbook",
+     "Apple Fotos/Mimeo",
+     "albelli",
+     "Saal Digital",
+     "Lightroom Buch-Modul"
+    ],
+    "evidence": [
+     {
+      "text": "\"Diese Woche habe ich fast 4 Stunden geopfert und mir ein fotobuch erstellt und was passiert ? Aufeinmal alles weg.\" (App Store, Kübibo)",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     },
+     {
+      "text": "\"37 pages gone.\" / \"they do not have any of the saves to restore it to an earlier point in the project\"",
+      "source": "https://forums.tomsguide.com/threads/mixbook-warning.549860/post-2057256"
+     },
+     {
+      "text": "\"Albelli deletes ongoing projects if you have an 18-month gap between orders.\"",
+      "source": "https://www.trustpilot.com/review/albelli.nl"
+     },
+     {
+      "text": "\"every single placed photo had been removed from the book.\" / \"Weeks of work gone. Very very frustrating.\"",
+      "source": "https://discussions.apple.com/thread/250720846?page=2"
+     }
+    ]
+   },
+   {
+    "id": "P2",
+    "theme": "Automatik wird zum Käfig",
+    "description": "Automatische Sortierung und Auto-Layout sind ein guter Start. Danach lassen sie sich aber kaum überstimmen, legen Fotos in eine unlogische Reihenfolge oder ändern das Layout ungefragt, etwa nach dem Löschen eines Fotos. Für Fujiventura ist das der kritischste Punkt, weil die Automatik dort der Kern ist.",
+    "competitors": [
+     "posterXXL",
+     "Popsa",
+     "Chatbooks",
+     "Shutterfly",
+     "Pixum",
+     "CEWE-App",
+     "dm Foto"
+    ],
+    "evidence": [
+     {
+      "text": "\"Früher lag alles in meiner Hand. … Jetzt wird es vorher gemacht und hat oft keine logische Reihenfolge.\" (Trustpilot)",
+      "source": "https://de.trustpilot.com/review/www.posterxxl.de?page=2"
+     },
+     {
+      "text": "\"Man bekommt relativ starr und schematisch vorgegeben, wie das Fotobuch auszusehen hat\" (App Store, ttbrex)",
+      "source": "https://apps.apple.com/de/app/id1319898516?see-all=reviews"
+     },
+     {
+      "text": "\"the auto-filled managed to pick the wrong photos to be big, so I ended up doing it manually.\"",
+      "source": "https://www.weddingwire.com/wedding-forums/shutterfly-and-photo-book-question-update-on-page-2-i-placed-an-order/48c59a486282cdfa.html"
+     },
+     {
+      "text": "\"Pictures uploaded completely out of order\" (App Store, Chatbooks)",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     }
+    ]
+   },
+   {
+    "id": "P3",
+    "theme": "Reihenfolge und Seiten nicht frei steuerbar",
+    "description": "Fotos lassen sich nicht zwischen Seiten verschieben, Seiten nicht umsortieren, nachträglich nichts einfügen und leere Seiten nicht löschen. Bei manchen Anbietern ist der Umfang nur in festen Stufen wählbar.",
+    "competitors": [
+     "CEWE-App",
+     "dm Foto",
+     "Popsa",
+     "ifolor"
+    ],
+    "evidence": [
+     {
+      "text": "\"die Reihenfolge der Bilder lässt sich nicht beeinflussen. Bei vielen Fotos ist das sehr lästig.\" (App Store, Buxibix)",
+      "source": "https://apps.apple.com/DE/app/id583713833?see-all=reviews"
+     },
+     {
+      "text": "\"Ich würde mir wünschen, dass man zwischendrin noch einzelne Seiten oder einzelne Fotos einfügen kann\"",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "text": "\"struggled to do was to reshuffle the actual pages around in the book\" / \"difficult to move pictures around from one page to the next\" (Trustpilot)",
+      "source": "https://uk.trustpilot.com/review/popsa.com"
+     },
+     {
+      "text": "\"Nachdem ich Bilder gelöscht hatte und somit eine leere Seite entstanden ist, konnte ich diese nicht löschen\" (App Store)",
+      "source": "https://apps.apple.com/DE/app/id583713833?see-all=reviews"
+     }
+    ]
+   },
+   {
+    "id": "P4",
+    "theme": "Bildausschnitt: abgeschnittene Köpfe, kein echtes Zuschneiden",
+    "description": "Automatische Zuschnitte schneiden Gesichter oder Ränder ab. Oft lässt sich nur hineinzoomen, nicht heraus. Verschieben und Einrasten sind mühsam oder ungenau.",
+    "competitors": [
+     "Chatbooks",
+     "Popsa",
+     "CEWE",
+     "ifolor",
+     "Zno",
+     "Pixum-App",
+     "Glass"
+    ],
+    "evidence": [
+     {
+      "text": "\"Photos are imported as squares and aren't always cropped how I would want them\" (App Store)",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     },
+     {
+      "text": "Sinngemäß: Bearbeitung nur als \"cropping by zooming in and out\", Platzierung nur per Vorlage",
+      "source": "https://www.photobookdeals.co.uk/blog/popsa-photo-book-review/"
+     },
+     {
+      "text": "\"Das vergrößern und verkleinern und Hin- und Herschieben von Fotos ist … oft mühsam\" (wegen fehlerhafter Hilfslinien)",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "text": "\"smart guides\" seien \"inaccurate and of little use\" (Martin Bailey)",
+      "source": "https://martinbaileyphotography.com/2016/06/13/zno-flush-mount-layflat-books-review-podcast-527/"
+     }
+    ]
+   },
+   {
+    "id": "P5",
+    "theme": "Text ist ein Albtraum",
+    "description": "Texte zu formatieren ist mühsam. Texte verschieben oder formatieren sich ungefragt, Bildunterschriften werden abgeschnitten oder springen auf eine Extraseite, Seitenzahlen und Inhaltsverzeichnis fehlen oder brechen ab.",
+    "competitors": [
+     "Saal Digital",
+     "ifolor",
+     "Popsa",
+     "Chatbooks",
+     "Blurb BookWright",
+     "Lightroom Buch-Modul",
+     "Google Fotos",
+     "Mixbook"
+    ],
+    "evidence": [
+     {
+      "text": "\"formatting the text was an absolute nightmare\" (Trustpilot)",
+      "source": "https://www.trustpilot.com/review/saal-digital.de"
+     },
+     {
+      "text": "\"Textzüge bearbeiten ist ausgesprochen mühsam\" (Mac App Store)",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "text": "\"A majority of the captions were cut off and unreadable\"",
+      "source": "https://justuseapp.com/en/app/936799728/popsa/reviews"
+     },
+     {
+      "text": "\"The page numbers stop after page 29. I have no idea why.\"",
+      "source": "https://www.penandglory.com/post/blurb-and-bookwright-double-review"
+     }
+    ]
+   },
+   {
+    "id": "P6",
+    "theme": "Vorschau entspricht nicht dem Ergebnis",
+    "description": "Das fertige Buch lässt sich vorher nicht realistisch ansehen. Die Qualitätsanzeige ist unzuverlässig, und Beschnitt, Farbe und Kontrast weichen im Druck von der Vorschau ab.",
+    "competitors": [
+     "Pixum",
+     "Saal Digital",
+     "Blurb",
+     "Zno",
+     "Artifact Uprising",
+     "albelli",
+     "Canva"
+    ],
+    "evidence": [
+     {
+      "text": "\"das man sich das fertige Buch nicht VORHER digital anschauen kann sondern erst nach der Bestellung.\" (Trustpilot)",
+      "source": "https://de.trustpilot.com/review/www.pixum.de?page=2"
+     },
+     {
+      "text": "Bildqualitäts-Bewertung \"nicht immer ein verlässlicher Indikator\" für das Druckergebnis",
+      "source": "https://www.fotobuchmagazin.de/saal-digital-fotobuch-test/"
+     },
+     {
+      "text": "Sinngemäß: Der Probedruck sah gut aus, die Auflage kam mit flachen, dunklen Farben und verschobenem Rücken",
+      "source": "https://www.trustpilot.com/review/www.blurb.com"
+     },
+     {
+      "text": "Sinngemäß: Fotos rechts über einen Zoll abgeschnitten, Cover anders beschnitten als in der Vorschau",
+      "source": "https://www.productreview.com.au/listings/zno?page=2"
+     }
+    ]
+   },
+   {
+    "id": "P7",
+    "theme": "Langsam, instabil, überladen",
+    "description": "Der Editor hängt bei großen Büchern, stürzt bei schneller Bedienung ab und braucht viele Klicks pro Aufgabe. Leisten verdecken Werkzeuge. Für Einsteiger ist er zu voll.",
+    "competitors": [
+     "CEWE",
+     "ifolor",
+     "Zno",
+     "Mixbook",
+     "Shutterfly",
+     "Mimeo",
+     "Saal Digital",
+     "Lightroom Buch-Modul"
+    ],
+    "evidence": [
+     {
+      "text": "\"je mehr Seiten ich hatte (ab ca. 60 Seiten) lädt mein Computer ohne Ende und stürzt dann oft ab\" (Forum; in einem anderen Fall lag die Ursache bei einer Antiviren-Software)",
+      "source": "https://www.vivien-und-erhard.de/forum/index.php?thread%2F4561-probleme-bei-cewe-fotobuch%2F="
+     },
+     {
+      "text": "\"Edit bars block other essential tools and are not moveable\" / \"Takes multiple clicks to accomplish one simple task.\"",
+      "source": "https://www.trustpilot.com/review/mixbook.com"
+     },
+     {
+      "text": "\"Every time I touch a picture it starts a full refresh...that takes precious seconds.\"",
+      "source": "https://discussions.apple.com/thread/250720846?page=2"
+     },
+     {
+      "text": "\"The template is clunky, overly complex and not user friendly at all.\" (Mumsnet)",
+      "source": "https://www.mumsnet.com/talk/_chat/4781031-anyone-used-cewe-photo-books"
+     }
+    ]
+   },
+   {
+    "id": "P8",
+    "theme": "Updates streichen Funktionen, alte Projekte brechen",
+    "description": "Bei Versionswechseln verschwinden Funktionen (Bildbearbeitung, Text pro Foto, Zwischenspeichern, Datumsstempel). Alte Projekte lassen sich nicht mehr öffnen, und einen Migrationspfad gibt es nicht.",
+    "competitors": [
+     "posterXXL",
+     "Blurb",
+     "Shutterfly",
+     "Rossmann Fotowelt",
+     "dm Foto",
+     "Zno",
+     "Pixum-App"
+    ],
+    "evidence": [
+     {
+      "text": "\"Nach einem Software-Update lassen sich die offline vorbereiteten Fotobücher nicht mehr öffnen.\" / \"Alle Arbeit von zwei Jahren umsonst.\"",
+      "source": "https://de.reclabox.com/firma/992-posterXXL-AG"
+     },
+     {
+      "text": "\"Blurb abandon it's Booksmart customers and expects them to follow them to BookWright but gives no migration path\"",
+      "source": "https://www.trustpilot.com/review/www.blurb.com"
+     },
+     {
+      "text": "\"Still prefer the 'old' program for designing photo books. Miss that there are no date stamps\" (Trustpilot)",
+      "source": "https://www.trustpilot.com/review/www.shutterfly.com"
+     },
+     {
+      "text": "\"Früher konnte man die Fotos hier noch mal bearbeiten, etwas drehen oder die Lichtverhältnisse anpassen\" (App Store)",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     }
+    ]
+   },
+   {
+    "id": "P9",
+    "theme": "Gebunden an Gerät, Plattform oder Konto",
+    "description": "Viele Editoren laufen nur auf dem Handy, nur auf dem Mac oder nur als Download. Ein Wechsel zwischen Geräten geht nicht. Geteilte Links verlangen ein Konto, Flipbooks zeigen Werbung oder Paywalls, und Plattformen stellen Buchfunktionen ein.",
+    "competitors": [
+     "ifolor",
+     "Popsa",
+     "Mimeo",
+     "Apple Fotos",
+     "Shutterfly",
+     "Issuu",
+     "Glass"
+    ],
+    "evidence": [
+     {
+      "text": "\"Shared Photo Album links will not load for anonymous users and will redirect the user to the sign-in page.\" (Shutterfly-Hilfe)",
+      "source": "https://support.shutterfly.com/s/article/sharing-photos"
+     },
+     {
+      "text": "\"If Mimeo Photos operated through a website, it would be an almost perfect service\"",
+      "source": "https://www.digitalcameraworld.com/reviews/mimeo-photos-photo-book-review"
+     },
+     {
+      "text": "Sinngemäß: In der Handy-App begonnene Bücher lassen sich am PC nicht weiterbearbeiten",
+      "source": "https://apps.apple.com/ch/app/ifolor-fotobuch-fotos-mehr/id480599198?see-all=reviews"
+     },
+     {
+      "text": "\"Readers may see ads sitting near your content, and some of those can be for competitors.\" (über Issuu)",
+      "source": "https://zipflipbook.com/blog/issuu-flipbook"
+     }
+    ]
+   },
+   {
+    "id": "P10",
+    "theme": "Fotoauswahl und Tauschen mühsam",
+    "description": "Ganze Alben lassen sich nicht auf einmal wählen, die Vorschaubilder sind winzig. Beim Tauschen eines Fotos landet man in der ganzen Bibliothek statt in der Buchauswahl.",
+    "competitors": [
+     "Rossmann Fotowelt",
+     "dm Foto",
+     "Popsa",
+     "Chatbooks",
+     "ifolor"
+    ],
+    "evidence": [
+     {
+      "text": "\"Leider hat die App keine Möglichkeit, schnell alle Fotos eines Albums auszuwählen\" (App Store)",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     },
+     {
+      "text": "\"Die Bilder auswählen ist schwierig, da sie nur sehr klein angezeigt werden\"",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "text": "\"When you swap it out it will take you back to your entire camera roll\"",
+      "source": "https://justuseapp.com/en/app/936799728/popsa/reviews"
+     },
+     {
+      "text": "\"You literally have to scroll through an entire year to get to what you're looking for\"",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     }
+    ]
+   }
+  ],
+  "mustHaves": [
+   {
+    "need": "Arbeit geht nie verloren: laufendes Autospeichern, Versionsverlauf, Rückgängig über Sitzungen hinweg, kein Löschen wegen Inaktivität, Projekt exportierbar",
+    "why": "P1 ist der stärkste Schmerz in allen Segmenten (Rossmann, Pixum, Mixbook, Mimeo, albelli)",
+    "fujiventuraToday": "teilweise: Der Entwurf wird laufend in IndexedDB gespeichert, aber nur lokal im Browser. Belegt sind weder ein Versionsverlauf noch ein Rückgängig über Sitzungen noch ein Projekt-Export."
+   },
+   {
+    "need": "Automatik als Vorschlag: jede Entscheidung (Reihenfolge, Größe, Layout, Seitentyp) einzeln überschreibbar, ohne dass der Rest neu gewürfelt wird; Regeln sichtbar",
+    "why": "P2: posterXXL, Popsa, Shutterfly und Chatbooks verlieren Vertrauen durch Automatik, die man nicht überstimmen kann. Gelobt wird Mixbook für \"KI-Start, dann frei\"",
+    "fujiventuraToday": "teilweise: Layoutvarianten wählbar, Doppelseiten umsortierbar, ein Regel-Prüfer weist leise hin. Ob andere Seiten beim Ändern stabil bleiben und ob einzelne Fotos frei platzierbar sind, ist nicht belegt; eine freie Anordnung gibt es nicht."
+   },
+   {
+    "need": "Volle Kontrolle über die Reihenfolge: Fotos zwischen Seiten verschieben, Seiten und Fotos zwischendrin einfügen, leere Seiten löschen, per Ziehen und per Tastatur",
+    "why": "P3: CEWE-App, dm, Popsa und ifolor",
+    "fujiventuraToday": "teilweise: Doppelseiten lassen sich per Ziehen oder Pfeiltasten tauschen und Fotos tauschen. Einzelne Fotos über Seitengrenzen verschieben und Seiten gezielt einfügen ist nicht belegt."
+   },
+   {
+    "need": "Bildausschnitt pro Feld: verschieben, hinein- und herauszoomen, Gesichter und Motiv als Vorschlag, Warnung bei abgeschnittenen Köpfen",
+    "why": "P4: Chatbooks, Popsa, CEWE und ifolor",
+    "fujiventuraToday": "teilweise: Ein Fokuspunkt lässt sich setzen. Es gibt keinen freien Zuschnitt oder Zoom pro Feld und keine Warnung vor abgeschnittenen Köpfen."
+   },
+   {
+    "need": "Text, der sich vorhersehbar verhält: inline tippen, wenige gute Stile, stabile Formatierung, Bildunterschriften (auch aus Metadaten), Seitentitel, sichtbare Grenzen",
+    "why": "P5: Saal, ifolor, Popsa, Chatbooks, Blurb und Lightroom",
+    "fujiventuraToday": "fehlt weitgehend: Es gibt nur Titel und Bildunterschriften, keine Texte darüber hinaus."
+   },
+   {
+    "need": "Ehrliche Vorschau: so sieht das Buch wirklich aus, mit Warnung bei geringer Auflösung, Beschnitt und Bundsteg (spätestens wenn Druck kommt)",
+    "why": "P6: Pixum, Saal, Blurb, Zno und Artifact Uprising",
+    "fujiventuraToday": "teilweise: Das 3D-Blätterbuch ist eine sehr realistische digitale Vorschau und ein Vorsprung. Weil es keinen Druck gibt, fehlen Auflösungs- und Beschnittwarnungen (laut Bauplan bräuchte es dafür Originale in voller Auflösung)."
+   },
+   {
+    "need": "Schnell und ruhig auch bei großen Büchern und Hunderten Fotos, wenige Klicks pro Aufgabe, keine verdeckenden Leisten",
+    "why": "P7: CEWE ab etwa 60 Seiten, Zno, Mixbook, Mimeo und Lightroom",
+    "fujiventuraToday": "unbekannt: Für große Bücher liegen keine Messungen vor. Die schlanke Oberfläche mit 7 Seitentypen spricht für wenige Klicks; WebGL auf schwachen Handys ist ein Risiko, das getestet werden muss."
+   },
+   {
+    "need": "Browser zuerst und geräteübergreifend: am Handy beginnen, am Rechner verfeinern, ohne Installation",
+    "why": "P9: ifolor, Popsa, Mimeo; Downloads bei CEWE und Saal werden als Nachteil genannt",
+    "fujiventuraToday": "teilweise: Fujiventura läuft im Browser und ohne Installation. Weil der Entwurf nur lokal in IndexedDB liegt, geht der Wechsel zwischen Geräten nach Stand der Unterlagen nicht."
+   },
+   {
+    "need": "Teilen per privatem Link ohne Konto, ohne Werbung, ohne Paywall für Betrachter und ohne Beschnitt von Querformaten",
+    "why": "P9: Shutterfly verlangt ein Konto, Issuu zeigt Werbung und nimmt Geld fürs Einbetten, Glass beschneidet Querformate",
+    "fujiventuraToday": "erfüllt: Persönlicher Link, Gäste brauchen kein Konto. Diesen Kernvorteil unbedingt halten."
+   },
+   {
+    "need": "Rückkanal für den Urheber ohne Like-Zahlen: sehen, dass Freunde das Buch angeschaut haben und wie sie reagieren",
+    "why": "Glass-Nutzer vermissen jede Rückmeldung, ob ihr Werk gesehen wird, schätzen aber den Verzicht auf Likes",
+    "fujiventuraToday": "erfüllt: Gäste setzen Eselsohren und Zettel."
+   },
+   {
+    "need": "Rezept am Foto: automatisch aus den Metadaten erkannt, verständlich dargestellt, mit einem Klick übernehmbar",
+    "why": "Fujifilm speichert keinen Rezeptnamen, Fuji X Weekly überträgt Rezepte fehleranfällig und geräteabhängig, VSCO-Recipes gelten als verwirrend und hängen am Abo",
+    "fujiventuraToday": "erfüllt bzw. im Bau: Animierter Rezeptzettel, Einstell-Ansicht zum Abhaken. Laut Bauplan kein Export in die Kamera, und die Lightroom-mobile-Metadaten sind noch nicht belegt."
+   },
+   {
+    "need": "Schnelle Fotoauswahl und passender Tausch-Dialog: ganze Ordner auf einmal, große Vorschaubilder, beim Tauschen die Buchauswahl bzw. ähnliche Fotos zeigen",
+    "why": "P10: Rossmann, dm, Popsa und Chatbooks",
+    "fujiventuraToday": "teilweise: Fotos werden per Ziehen hineingegeben, Tauschen ist möglich. Ob der Tausch-Dialog die Buchauswahl zeigt, ist nicht belegt."
+   },
+   {
+    "need": "Keine Funktion verschwindet: alte Projekte öffnen immer, Datenformat versioniert, Migrationspfad",
+    "why": "P8: posterXXL, Blurb, Shutterfly und Rossmann",
+    "fujiventuraToday": "offen: Beim heutigen kleinen Nutzerkreis kein Problem. Ein versioniertes Projektformat sollte aber vor dem Editor-Ausbau festgelegt werden."
+   },
+   {
+    "need": "Kuratierte Vielfalt statt Werkzeugkasten: mehrere Layouts pro Fotoanzahl, mehrere Formate, schlanke Grundansicht mit Tiefe bei Bedarf",
+    "why": "Google (1 Foto pro Seite, nur quadratisch) und Amazon (nur 8x8 Zoll) sind zu eng, CEWE und Saal zu voll. Gelobt werden \"einfach, intuitiv, schnell\"",
+    "fujiventuraToday": "teilweise: 7 Seitentypen in festem Raster mit Varianten pro Doppelseite, sechs Leinen. Eine Formatwahl ist nicht belegt."
+   }
+  ],
+  "gaps": [
+   "Die Mitte zwischen Automatik und Kontrolle: Kein Anbieter verbindet einen guten automatischen Erstentwurf mit Einzelentscheidungen, die man überschreiben kann, ohne dass der Rest neu gewürfelt wird, und dazu mit sichtbaren Regeln (\"warum steht das Foto hier?\"). Fujiventuras Regelwerk aus Zeit, Farbe und Rhythmus kann genau das erklären.",
+   "Digitales Buch als vollwertiges Ergebnis, nicht als Beigabe: Flipbooks sind sonst flach (Issuu, 2D), nur eine Zugabe zum Druck (MILK) oder brauchen ein Konto (Shutterfly). Ein 3D-Buch per privatem Link ohne Konto, Werbung und Paywall ist selten.",
+   "Leiser Rückkanal statt Likes: Glass-Nutzer vermissen die Rückmeldung, ob ihr Werk gesehen wird; Eselsohren und Zettel lösen das ohne Like-Zahlen.",
+   "Rezept und Bild zusammen: Kein Fotobuch-Editor zeigt Film-Simulation-Rezepte oder Lightroom-Werte am Foto. Die Rezeptwelt (Fuji X Weekly, VSCO) und die Fotobuchwelt sind bisher getrennt.",
+   "Vertrauen als Produktmerkmal: Versionsverlauf, Wiederherstellen und Export bewirbt kein Anbieter, obwohl Datenverlust der stärkste Schmerz ist.",
+   "Text für Fotografen: Bildunterschriften aus Metadaten (Ort, Kamera, Rezept) und automatische Seitenzahlen bzw. Inhaltsverzeichnis wurden bei BookWright jahrelang gewünscht und fehlen meist.",
+   "Echte Web-Lösung auf Mac und Mobil für ambitionierte Fotografen: Mimeo wäre laut Testbericht als Website \"almost perfect\"; Popsa ist nur am Handy nutzbar, das Lightroom-Modul wird kaum weiterentwickelt."
+  ],
+  "competitors": [
+   {
+    "name": "CEWE (auch Basis für Rossmann und dm)",
+    "segment": "Massenmarkt DACH, Desktop, Web und App",
+    "oneLine": "Beste Druckqualität und sehr viele Vorlagen, aber bei großen Büchern instabil, Updates verunsichern, und in der App lässt sich die Reihenfolge nicht steuern."
+   },
+   {
+    "name": "Rossmann Fotowelt",
+    "segment": "Drogerie-Massenmarkt, App",
+    "oneLine": "Günstig und einfach, aber Abstürze mit totalem Projektverlust und keine Albumauswahl."
+   },
+   {
+    "name": "dm Foto / Fotoparadies",
+    "segment": "Drogerie-Massenmarkt, App und Web",
+    "oneLine": "Gute Qualität, aber nichts zwischendrin einfügbar, winzige Vorschaubilder, Zwischenspeichern gestrichen."
+   },
+   {
+    "name": "Pixum",
+    "segment": "Online-Anbieter DACH",
+    "oneLine": "Viele Möglichkeiten im Web, in der App starr; Projektverlust, und das Buch ist erst nach der Bestellung ansehbar."
+   },
+   {
+    "name": "Saal Digital",
+    "segment": "Premium und ambitionierte Fotografen",
+    "oneLine": "Hohe Druckqualität und PDF-Upload, aber Text ist ein Albtraum, Abstürze, für Einsteiger überladen."
+   },
+   {
+    "name": "ifolor",
+    "segment": "Marktführer Schweiz, Desktop und App",
+    "oneLine": "App gut bewertet, aber Text und Bildschieben mühsam, kein Wechsel zwischen Geräten."
+   },
+   {
+    "name": "albelli",
+    "segment": "Europäischer Online-Anbieter",
+    "oneLine": "Einfach und angenehm, löscht aber Projekte nach 18 Monaten ohne Bestellung."
+   },
+   {
+    "name": "posterXXL",
+    "segment": "Online-Anbieter DACH",
+    "oneLine": "Selbsterklärend, aber nach dem Softwarewechsel Arbeit verloren und eine Automatik, die die Kontrolle nimmt."
+   },
+   {
+    "name": "Popsa",
+    "segment": "App-first, KI-Autolayout",
+    "oneLine": "Buch in Minuten, aber das Layout lässt sich kaum umwerfen, nur Zoom statt Zuschnitt, Bildunterschriften abgeschnitten, nur am Smartphone."
+   },
+   {
+    "name": "Chatbooks",
+    "segment": "App-first im Abo",
+    "oneLine": "Sehr schnell, aber der quadratische Auto-Zuschnitt schneidet Gesichter ab und die Reihenfolge stimmt nicht."
+   },
+   {
+    "name": "Mixbook",
+    "segment": "Web-Editor mit KI-Start und freier Gestaltung",
+    "oneLine": "Bestes Beispiel für \"KI-Start, dann frei\" und Teilen per Link, aber Datenverlust ohne Versionen und verdeckende Leisten."
+   },
+   {
+    "name": "Shutterfly",
+    "segment": "Großer US-Anbieter",
+    "oneLine": "Autofill wählt falsche Fotos, der neue Editor hat weniger Funktionen, geteilte Links nur mit Konto."
+   },
+   {
+    "name": "Google Fotos Fotobücher",
+    "segment": "Plattform-integriert, minimal",
+    "oneLine": "Schnell und schlicht, aber ein Foto pro Seite, nur quadratisch, Text nur auf dem Cover; der Betreiber wechselt zu Fujifilm."
+   },
+   {
+    "name": "Apple Fotos / Mimeo Photos",
+    "segment": "Mac-Erweiterung",
+    "oneLine": "Gute Vorlagen, aber nur Apple, nach OS-Update Wochen an Arbeit weg; Apple hat die eigene Funktion 2018 eingestellt."
+   },
+   {
+    "name": "Amazon Photos",
+    "segment": "Plattform-integriert",
+    "oneLine": "Einfach, mit Autospeichern und Rückgängig, aber nur 8x8 Zoll und kaum Gestaltung."
+   },
+   {
+    "name": "Blurb (BookWright)",
+    "segment": "Premium-Selbstverlag",
+    "oneLine": "Guter Druck und Layflat, aber fehlerhafte Software, schwacher Textsatz, kein Migrationspfad von BookSmart."
+   },
+   {
+    "name": "Lightroom Classic Buch-Modul",
+    "segment": "Fotografen im Adobe-Ökosystem",
+    "oneLine": "Direkt aus dem Katalog mit Bildunterschriften aus Metadaten, aber Fotos verschwinden, kaum Layoutkontrolle, wird kaum weiterentwickelt."
+   },
+   {
+    "name": "Artifact Uprising",
+    "segment": "Premium-Lifestyle",
+    "oneLine": "Ruhige, hochwertige Optik, aber feste Vorlagen, Druck weicht ab, teuer."
+   },
+   {
+    "name": "MILK Books",
+    "segment": "Premium und Hochzeit",
+    "oneLine": "Sehr gute Bindung und teilbares Flipbook, aber feste Layouts, und das Flipbook gibt es nur zum Kauf."
+   },
+   {
+    "name": "Zno",
+    "segment": "Profi-Hochzeitsalben",
+    "oneLine": "Schnelles Ziehen und Ablegen, aber ungenaue Hilfslinien, langsam, Beschnitt weicht ab."
+   },
+   {
+    "name": "Canva / Adobe Express",
+    "segment": "Allround-Gestaltung mit Vorlagen",
+    "oneLine": "Vertraut und günstig, aber Bildschirm- statt Drucklogik und stundenlange Handarbeit bei vielen Fotos."
+   },
+   {
+    "name": "Glass",
+    "segment": "Bezahl-Community für Fotografen",
+    "oneLine": "Ohne Likes und Werbung, aber Querformate beschnitten und keine Rückmeldung, ob das Werk gesehen wird."
+   },
+   {
+    "name": "VSCO",
+    "segment": "Mobile Bearbeitung, Looks im Abo",
+    "oneLine": "Recipes sparen Zeit, sind aber verwirrend und ans Abo gebunden."
+   },
+   {
+    "name": "Fuji X Weekly",
+    "segment": "Rezepte für Fujifilm-Filmsimulationen",
+    "oneLine": "Größte Rezeptsammlung mit Übertragung an die Kamera, aber geräteabhängig und fehleranfällig; die Kamera speichert keinen Rezeptnamen."
+   },
+   {
+    "name": "Issuu und Flipbook-Dienste",
+    "segment": "Digitales Blätter-Veröffentlichen",
+    "oneLine": "Reichweite, aber Werbung neben dem Werk, Einbetten nur gegen Geld, flacher 2D-Effekt."
+   }
+  ]
+ },
+ "voc": {
+  "personas": [
+   {
+    "id": "P-Michel",
+    "name": "Michel (simuliert)",
+    "profile": "Fuji-Fotograf, gestaltet nach jeder Reise ein Urlaubsbuch, sehr design-affin, Master mit QFD-Schwerpunkt, baut Fujiventura selbst. Hohe Ansprüche an Typografie und Raster, wenig Geduld mit Vorlagen-Kitsch.",
+    "devices": "Fujifilm X-Kamera, MacBook (Lightroom Classic), iPhone für Lightroom mobile und unterwegs",
+    "keyQuote": "Simuliert: Die Automatik soll mir einen guten ersten Wurf hinlegen, aber das letzte Wort will ich haben, bei jedem einzelnen Foto."
+   },
+   {
+    "id": "P-Lena",
+    "name": "Lena (simuliert)",
+    "profile": "Freundin von Michel, bekommt Bücher als Link aufs iPhone, fotografiert nur mit dem Handy, gestaltet selbst eher selten etwas. Schaut Bücher meist abends auf dem Sofa oder unterwegs an.",
+    "devices": "iPhone, kein Laptop im Alltag, Fotos in iCloud",
+    "keyQuote": "Simuliert: Ich will einfach draufdrücken und blättern, ohne dass ich mich irgendwo anmelden muss."
+   },
+   {
+    "id": "P-Jonas",
+    "name": "Jonas (simuliert)",
+    "profile": "Fuji-Enthusiast, sammelt und testet Film-Simulation-Rezepte, postet regelmäßig auf Instagram, tauscht sich in Foren aus. Hat noch nie ein Fotobuch gemacht, findet Fotobücher eher etwas für Eltern.",
+    "devices": "Fujifilm X100-Serie und X-T-Modell, Android-Handy, Desktop-PC, Instagram als Hauptkanal",
+    "keyQuote": "Simuliert: Wenn ich ein Bild sehe, will ich als Erstes wissen, mit welchem Rezept das gemacht ist."
+   },
+   {
+    "id": "P-Familie",
+    "name": "Sandra, Mutter von zwei Kindern (simuliert)",
+    "profile": "Macht nach jedem Urlaub ein CEWE-Buch am Laptop, oft erst Wochen später in mehreren kurzen Abendsitzungen. Wenig Zeit, will ein Ergebnis, das man verschenken kann (Großeltern). Druck ist für sie selbstverständlich.",
+    "devices": "Windows-Laptop mit CEWE-Software, Android-Handy mit tausenden Fotos, ab und zu Tablet der Kinder",
+    "keyQuote": "Simuliert: Am Ende will ich ein Buch in der Hand halten, das Oma ins Regal stellt. Ein Link ist für mich kein Fotobuch."
+   },
+   {
+    "id": "P-Reisepaar",
+    "name": "Jana und Tobi (simuliert)",
+    "profile": "Paar Anfang 30, reisen zwei- bis dreimal im Jahr, wollen nach jeder größeren Reise ein gemeinsames Buch. Jana macht die meisten Fotos mit der Fujifilm X100, Tobi mit dem Handy. Haben bisher zwei Bücher bei einem Drogerie-Anbieter gemacht, eins davon nie fertig bestellt.",
+    "devices": "Zwei Smartphones (iPhone und Android), eine Fujifilm X100VI, ein gemeinsamer Laptop (MacBook), Fotos teils in iCloud, teils in Google Fotos",
+    "keyQuote": "Wir haben 2.000 Fotos auf drei Geräten und am Ende macht einer das Buch allein, und der andere meckert. (simuliert)"
+   },
+   {
+    "id": "P-Lightroom",
+    "name": "Rainer (simuliert)",
+    "profile": "Hobbyfotograf Mitte 50, Ingenieur, fotografiert seit 15 Jahren, Lightroom Classic mit sauberem Katalog, Stichwörtern und eigenen Presets. Hat zwei Bücher im Lightroom-Buch-Modul gemacht und ist davon frustriert. Zeigt Bilder sonst im Fotoclub und auf Flickr.",
+    "devices": "Windows-PC mit kalibriertem Monitor, Fujifilm X-T5 und eine ältere Vollformatkamera, Handy nur für Schnappschüsse",
+    "keyQuote": "Ich hab Stunden in meine Presets gesteckt, und im Fotobuch sieht dann alles aus wie durch eine Milchglasscheibe. (simuliert)"
+   },
+   {
+    "id": "P-Oma",
+    "name": "Hildegard (simuliert)",
+    "profile": "Großmutter, 76, vier Enkel, bekommt von ihren Kindern regelmäßig Fotobücher geschenkt. Erstellt selbst keine Bücher. Hat ein Tablet von ihrem Sohn eingerichtet bekommen, nutzt WhatsApp und Fotos darauf. Hebt Bücher im Wohnzimmerregal auf und zeigt sie Besuch.",
+    "devices": "iPad (älteres Modell, große Schrift eingestellt), einfaches Smartphone, kein Computer",
+    "keyQuote": "Auf dem Tablet ist es schön, aber ein Buch, das man in die Hand nimmt, ist was anderes. (simuliert)"
+   },
+   {
+    "id": "P-Gestalterin",
+    "name": "Mira (simuliert)",
+    "profile": "Grafikdesignerin, 38, selbständig, arbeitet täglich in InDesign. Macht private Fotobücher als Hobbyprojekt und hat schon mehrere per PDF-Upload bei einem Premium-Anbieter drucken lassen. Hat hohe Ansprüche an Typografie, Weißraum und Raster und wenig Geduld mit Consumer-Editoren.",
+    "devices": "MacBook Pro mit großem Monitor, iPhone, Fujifilm X-E4",
+    "keyQuote": "Mich nervt nicht, dass es eine Automatik gibt. Mich nervt, wenn sie besser wissen will als ich, wo der Weißraum hingehört. (simuliert)"
+   }
+  ],
+  "statements": [
+   {
+    "id": "S1",
+    "persona": "P-Michel",
+    "text": "Beim letzten Japan-Buch habe ich die Automatik laufen lassen, und dann hab ich zwei Abende damit verbracht, Sachen wieder zurückzuschieben, die sie mir umgeworfen hat.",
+    "situation": "Rückblick aufs letzte Urlaubsbuch, am MacBook"
+   },
+   {
+    "id": "S2",
+    "persona": "P-Michel",
+    "text": "Wenn ich ein Foto auf einer Seite ändere, will ich nicht, dass sich drei Seiten weiter plötzlich was verschiebt. Das macht mich wahnsinnig.",
+    "situation": "Beim Feinschliff einer Doppelseite"
+   },
+   {
+    "id": "S3",
+    "persona": "P-Michel",
+    "text": "Ich will verstehen, warum ein Bild da steht, wo es steht. Wenn ich die Regel sehe, kann ich entscheiden, ob ich sie breche.",
+    "situation": "Beim Durchgehen des automatischen Entwurfs"
+   },
+   {
+    "id": "S4",
+    "persona": "P-Michel",
+    "text": "Der Ausschnitt ist mein größtes Problem: Der Fokuspunkt hilft, aber manchmal will ich einfach rauszoomen oder den Horizont genau auf die Linie legen.",
+    "situation": "Querformat in einem Hochformat-Feld"
+   },
+   {
+    "id": "S5",
+    "persona": "P-Michel",
+    "text": "Ich fange oft im Zug am Handy an, Fotos grob auswählen, und will dann zu Hause am Laptop weitermachen. Dass das nicht geht, ist echt ein Bruch.",
+    "situation": "Unterwegs nach der Reise, dann zu Hause"
+   },
+   {
+    "id": "S6",
+    "persona": "P-Michel",
+    "text": "Ich hätte gern ein paar wenige richtig gute Schriften, keinen Baukasten mit fünfzig Fonts. Text soll sich ins Raster setzen und da bleiben.",
+    "situation": "Beim Wunsch nach Einleitungstexten pro Kapitel"
+   },
+   {
+    "id": "S7",
+    "persona": "P-Michel",
+    "text": "Eigentlich mag ich das feste Raster ja, das ist der Grund, warum die Bücher ruhig aussehen. Und trotzdem will ich manchmal ein Foto einfach frei irgendwo hinsetzen. Ich weiß, das beißt sich.",
+    "situation": "Widerspruch: Raster vs. freie Anordnung"
+   },
+   {
+    "id": "S8",
+    "persona": "P-Michel",
+    "text": "Die Zettel von Freunden sind das Schönste daran. Ich sehe, welche Seite jemand mochte, ohne dass da eine Zahl drunter steht.",
+    "situation": "Nach dem Teilen eines Buches"
+   },
+   {
+    "id": "S9",
+    "persona": "P-Michel",
+    "text": "Ich hab Angst, dass mein Entwurf weg ist, wenn ich mal den Browser-Cache lösche. Ich würde gern wissen, dass es irgendwo sicher liegt, und auf einen alten Stand zurückkönnen.",
+    "situation": "Beim Gedanken an lange Projekte über Wochen"
+   },
+   {
+    "id": "S10",
+    "persona": "P-Michel",
+    "text": "Gedruckt brauche ich nicht jedes Buch, aber für ein, zwei im Jahr wäre es schon schön. Dann muss die Vorschau aber ehrlich sein, sonst bringt mir das 3D-Buch nichts.",
+    "situation": "Frage nach Druck"
+   },
+   {
+    "id": "S11",
+    "persona": "P-Michel",
+    "text": "Ich will nicht hundert Klicks für eine Doppelseite. Wenn ich zehn Varianten durchklicken muss, bis eine passt, stimmt was nicht.",
+    "situation": "Beim Wechseln der Layout-Varianten"
+   },
+   {
+    "id": "S12",
+    "persona": "P-Lena",
+    "text": "Das letzte Buch von Michel hab ich abends im Bett angeschaut, auf dem Handy. Das Blättern fühlt sich richtig wie ein Buch an, das fand ich toll.",
+    "situation": "Link per Messenger bekommen, iPhone"
+   },
+   {
+    "id": "S13",
+    "persona": "P-Lena",
+    "text": "Bei anderen Sachen, die man mir schickt, muss ich mich erst irgendwo registrieren. Da klicke ich dann meistens wieder weg.",
+    "situation": "Vergleich mit anderen geteilten Alben"
+   },
+   {
+    "id": "S14",
+    "persona": "P-Lena",
+    "text": "Ehrlich gesagt hab ich erst nicht kapiert, dass ich da was hinkleben kann. Das Eselsohr hab ich zufällig entdeckt.",
+    "situation": "Beim ersten Öffnen eines Buches"
+   },
+   {
+    "id": "S15",
+    "persona": "P-Lena",
+    "text": "Im Querformat wird mir manches zu klein, und wenn ich das Handy drehe, muss ich mich neu orientieren.",
+    "situation": "Buch auf dem iPhone, Hoch- vs. Querformat"
+   },
+   {
+    "id": "S16",
+    "persona": "P-Lena",
+    "text": "Die Rezepte interessieren mich null. Ich weiß nicht mal, was eine Film-Simulation ist. Solange das nicht im Weg ist, ist es okay.",
+    "situation": "Frage nach Rezeptzetteln"
+   },
+   {
+    "id": "S17",
+    "persona": "P-Lena",
+    "text": "Ich würde schon gern mal selbst so ein Buch machen, aus meinen Handyfotos. Aber nur, wenn das am Handy geht. Einen Laptop klapp ich dafür nicht auf.",
+    "situation": "Frage nach eigenem Buch"
+   },
+   {
+    "id": "S18",
+    "persona": "P-Lena",
+    "text": "Ich hab tausende Fotos in der Mediathek. Wenn ich da jedes einzeln antippen muss, gebe ich nach zehn auf.",
+    "situation": "Gedanke an eigene Fotoauswahl"
+   },
+   {
+    "id": "S19",
+    "persona": "P-Lena",
+    "text": "Ein Zettel ist schön, aber manchmal will ich einfach nur kurz sagen, dass ich es gesehen hab, ohne was Schlaues schreiben zu müssen.",
+    "situation": "Beim Reagieren auf ein Buch"
+   },
+   {
+    "id": "S20",
+    "persona": "P-Lena",
+    "text": "Wenn das Buch langsam lädt, im Zug oder so, dann ist es für mich halt nicht da. Ich warte da nicht lange.",
+    "situation": "Unterwegs mit schlechtem Netz"
+   },
+   {
+    "id": "S21",
+    "persona": "P-Lena",
+    "text": "Für meine Eltern würde ich so was eher drucken. Die schauen sich keinen Link an, die wollen was zum Anfassen.",
+    "situation": "Frage nach Geschenken"
+   },
+   {
+    "id": "S22",
+    "persona": "P-Jonas",
+    "text": "Ich hab einen Ordner mit über hundert Rezepten, Screenshots, Notizen, alles durcheinander. Welches Bild mit welchem gemacht ist, weiß ich oft selbst nicht mehr.",
+    "situation": "Beim Erzählen über die eigene Rezeptsammlung"
+   },
+   {
+    "id": "S23",
+    "persona": "P-Jonas",
+    "text": "Die Kamera speichert ja nicht, wie mein Rezept heißt, nur die Einzelwerte. Das nervt, weil ich dann rückwärts raten muss.",
+    "situation": "Nach dem Import ins Handy"
+   },
+   {
+    "id": "S24",
+    "persona": "P-Jonas",
+    "text": "Wenn ich auf Instagram ein krasses Bild sehe, frag ich in den Kommentaren nach dem Rezept, und die Hälfte antwortet nicht.",
+    "situation": "Beim Scrollen auf Instagram"
+   },
+   {
+    "id": "S25",
+    "persona": "P-Jonas",
+    "text": "Ein Fotobuch? Hab ich ehrlich nie gemacht. Klingt nach Oma-Geschenk. Aber so ein Buch mit Rezept am Bild, das würde ich mir vielleicht anschauen.",
+    "situation": "Frage nach dem letzten Fotobuch"
+   },
+   {
+    "id": "S26",
+    "persona": "P-Jonas",
+    "text": "Die Werte abtippen ist fehleranfällig. Ich hab schon Rezepte falsch eingestellt und mich gewundert, warum das nicht so aussieht.",
+    "situation": "Rezept in die Kamera übernehmen"
+   },
+   {
+    "id": "S27",
+    "persona": "P-Jonas",
+    "text": "Ich will nicht, dass jeder meine Rezepte einfach so mitnimmt, ohne dass mein Name dran ist. Andererseits teile ich sie ja gern. Schwierig.",
+    "situation": "Widerspruch: Teilen vs. Anerkennung"
+   },
+   {
+    "id": "S28",
+    "persona": "P-Jonas",
+    "text": "Likes sind mir eigentlich schon wichtig, ich will sehen, was ankommt. Ein Buch ohne jede Zahl fühlt sich für mich ein bisschen wie ins Leere posten an.",
+    "situation": "Frage nach Rückmeldung ohne Likes"
+   },
+   {
+    "id": "S29",
+    "persona": "P-Jonas",
+    "text": "Wenn das Buch meine Bilder quadratisch beschneidet, bin ich sofort raus. Ich komponier die Bilder ja nicht umsonst im 3:2.",
+    "situation": "Frage nach Bildausschnitt"
+   },
+   {
+    "id": "S30",
+    "persona": "P-Jonas",
+    "text": "Ich bearbeite am PC, aber anschauen und zeigen tu ich alles am Handy. Das muss da gut aussehen.",
+    "situation": "Frage nach Handy vs. Laptop"
+   },
+   {
+    "id": "S31",
+    "persona": "P-Jonas",
+    "text": "Eine Reihe nur mit einem Rezept, zum Beispiel alle Bilder mit Classic Chrome, das wäre für mich spannender als ein Urlaub nach Datum sortiert.",
+    "situation": "Frage nach Wünschen"
+   },
+   {
+    "id": "S32",
+    "persona": "P-Familie",
+    "text": "Das letzte Buch hab ich drei Monate nach dem Urlaub gemacht, immer abends eine halbe Stunde, wenn die Kinder im Bett waren.",
+    "situation": "Rückblick aufs letzte CEWE-Buch, Laptop am Küchentisch"
+   },
+   {
+    "id": "S33",
+    "persona": "P-Familie",
+    "text": "Einmal ist mir das Programm abgestürzt, und ein ganzer Abend Arbeit war weg. Seitdem speichere ich ständig von Hand, aus Angst.",
+    "situation": "Erinnerung an Datenverlust"
+   },
+   {
+    "id": "S34",
+    "persona": "P-Familie",
+    "text": "Die Fotos sind auf dem Handy, das Programm auf dem Laptop. Allein das Rüberschieben kostet mich schon einen Abend.",
+    "situation": "Fotos vom Android-Handy auf den Laptop holen"
+   },
+   {
+    "id": "S35",
+    "persona": "P-Familie",
+    "text": "Ich hab nicht die Zeit, jede Seite schön zu machen. Wenn das automatisch was Ordentliches macht, nehm ich das, auch wenn es nicht perfekt ist.",
+    "situation": "Frage nach Automatik"
+   },
+   {
+    "id": "S36",
+    "persona": "P-Familie",
+    "text": "Aber die Reihenfolge muss stimmen. Wenn der Geburtstag vom Kleinen zwischen den Strandfotos landet, merkt das die Oma sofort.",
+    "situation": "Widerspruch: Automatik ja, aber Reihenfolge muss stimmen"
+   },
+   {
+    "id": "S37",
+    "persona": "P-Familie",
+    "text": "Bei CEWE gibt es so viele Knöpfe, dass ich die Hälfte nie benutze. Ich find meistens das nicht, was ich gerade brauche.",
+    "situation": "Beim Bearbeiten in der CEWE-Software"
+   },
+   {
+    "id": "S38",
+    "persona": "P-Familie",
+    "text": "Ich schreib gern ein paar Zeilen dazu, was wir gemacht haben, damit die Kinder das später noch wissen. Ohne Text wäre es für mich nur ein Stapel Bilder.",
+    "situation": "Frage nach Text im Buch"
+   },
+   {
+    "id": "S39",
+    "persona": "P-Familie",
+    "text": "Von zweihundert Fotos sind fünfzig fast gleich, weil die Kinder nie stillhalten. Ich will nicht jedes einzeln vergleichen müssen.",
+    "situation": "Bei der Fotoauswahl"
+   },
+   {
+    "id": "S40",
+    "persona": "P-Familie",
+    "text": "Am Ende muss das gedruckt werden, das ist ein Geschenk für die Großeltern zu Weihnachten. Wenn das nicht geht, ist es für mich nichts.",
+    "situation": "Frage nach Druck und Geschenken"
+   },
+   {
+    "id": "S41",
+    "persona": "P-Familie",
+    "text": "Den Link würde ich vielleicht meiner Schwester schicken, die wohnt weit weg. Aber nur, wenn sie sich nicht anmelden muss, das macht sie nie.",
+    "situation": "Frage nach Teilen"
+   },
+   {
+    "id": "S42",
+    "persona": "P-Familie",
+    "text": "Was mich jedes Mal ärgert: Am Bildschirm sieht es hell aus, und gedruckt sind die Gesichter dunkel. Ich weiß vorher nie, was rauskommt.",
+    "situation": "Nach Erhalt des gedruckten Buches"
+   },
+   {
+    "id": "S43",
+    "persona": "P-Familie",
+    "text": "Mit Rezepten und Kameraeinstellungen kann ich nichts anfangen. Ich fotografier mit dem Handy, fertig.",
+    "situation": "Frage nach Rezepten und Bearbeitung"
+   },
+   {
+    "id": "S44",
+    "persona": "P-Reisepaar",
+    "text": "Das letzte Buch war Portugal. Das hat Jana an zwei Abenden auf dem Handy angefangen, und dann lag es ein halbes Jahr rum, weil am Handy die Seiten so winzig sind.",
+    "situation": "Frage nach dem letzten Fotobuch, zu Hause auf dem Sofa"
+   },
+   {
+    "id": "S45",
+    "persona": "P-Reisepaar",
+    "text": "Das Schlimmste ist das Zusammenkriegen. Meine Fotos sind auf der Kamera, Tobis auf seinem Handy, die von Freunden in WhatsApp. Bis das alles an einem Ort liegt, ist die Lust schon weg.",
+    "situation": "Was nervt am meisten, Jana"
+   },
+   {
+    "id": "S46",
+    "persona": "P-Reisepaar",
+    "text": "Und dann stimmt die Reihenfolge nicht, weil meine Kamera noch auf Winterzeit stand. Plötzlich ist der Sonnenuntergang vor dem Frühstück.",
+    "situation": "Was nervt, Jana über die Sortierung nach Zeit"
+   },
+   {
+    "id": "S47",
+    "persona": "P-Reisepaar",
+    "text": "Ich will eigentlich nur sagen können: diese zehn Bilder sind mir wichtig, die müssen rein, und gerne groß. Den Rest kann das Ding machen.",
+    "situation": "Wünsche, Tobi"
+   },
+   {
+    "id": "S48",
+    "persona": "P-Reisepaar",
+    "text": "Wenn ich was ändere, will ich nicht, dass Jana das am nächsten Tag nicht sieht oder es überschreibt. Beim letzten Mal hatten wir zwei Versionen und wussten nicht mehr, welche die richtige war.",
+    "situation": "Gemeinsam an einem Buch arbeiten, Tobi"
+   },
+   {
+    "id": "S49",
+    "persona": "P-Reisepaar",
+    "text": "Ehrlich gesagt will ich nicht zehn Layouts durchklicken. Ich will, dass es von Anfang an gut aussieht und ich nur noch kleine Sachen ändere.",
+    "situation": "Wünsche, Tobi, im Widerspruch zu Janas Kontrollwunsch"
+   },
+   {
+    "id": "S50",
+    "persona": "P-Reisepaar",
+    "text": "Doch, ich will schon entscheiden, ob das Bild vom Strand eine ganze Seite kriegt. Das ist ja unser Urlaub, nicht der vom Algorithmus.",
+    "situation": "Jana antwortet direkt auf Tobi"
+   },
+   {
+    "id": "S51",
+    "persona": "P-Reisepaar",
+    "text": "Ein paar Sätze bräuchte ich schon. Wo wir waren, was an dem Tag passiert ist. Nicht viel, aber nur Fotos sagen in fünf Jahren nichts mehr.",
+    "situation": "Frage nach Text, Jana"
+   },
+   {
+    "id": "S52",
+    "persona": "P-Reisepaar",
+    "text": "Geteilt haben wir das Buch bisher nicht, das lag ja nur als Projekt rum. Unseren Eltern würden wir es aber sofort schicken, die fragen ständig nach Bildern.",
+    "situation": "Frage nach Teilen"
+   },
+   {
+    "id": "S53",
+    "persona": "P-Reisepaar",
+    "text": "Gedruckt will ich es auf jeden Fall. Ein Link ist schön für unterwegs, aber im Regal soll am Ende ein echtes Buch stehen.",
+    "situation": "Frage nach Druck, Jana"
+   },
+   {
+    "id": "S54",
+    "persona": "P-Reisepaar",
+    "text": "Die Rezepte von der Fuji finde ich spannend, aber das ist eher mein Ding. Tobi ist das völlig egal, der fotografiert mit dem Standardfilter vom Handy.",
+    "situation": "Frage nach Rezepten und Bearbeitung, Jana"
+   },
+   {
+    "id": "S55",
+    "persona": "P-Lightroom",
+    "text": "Im Lightroom-Buch-Modul ist mir mal ein halbes Buch kaputtgegangen, nachdem ich Dateien im Katalog verschoben hatte. Plötzlich graue Felder statt Bilder. Seitdem traue ich dem nicht mehr.",
+    "situation": "Frage nach dem letzten Fotobuch, am PC im Arbeitszimmer"
+   },
+   {
+    "id": "S56",
+    "persona": "P-Lightroom",
+    "text": "Ich exportiere meine Bilder doch nicht dreimal, nur damit ein Fotobuch sie nimmt. Das muss mit dem gehen, was ich ohnehin rausgebe, und zwar in voller Auflösung.",
+    "situation": "Was nervt, Arbeitsablauf"
+   },
+   {
+    "id": "S57",
+    "persona": "P-Lightroom",
+    "text": "Ich will wissen, was mit meinen Farben passiert. Wenn das Buch die Bilder nachschärft oder aufhellt, will ich das abschalten können.",
+    "situation": "Frage nach Bearbeitung und Druck"
+   },
+   {
+    "id": "S58",
+    "persona": "P-Lightroom",
+    "text": "Die Bildunterschriften habe ich im Katalog schon gepflegt: Ort, Datum, Objektiv. Warum soll ich das im Fotobuch noch mal abtippen?",
+    "situation": "Frage nach Text und Bildunterschriften"
+   },
+   {
+    "id": "S59",
+    "persona": "P-Lightroom",
+    "text": "Dass man sieht, mit welchem Preset ein Bild gemacht ist, finde ich gut. Im Fotoclub fragen die Leute ständig danach. Aber meine eigenen Presets will ich nicht unbedingt jedem in die Hand drücken.",
+    "situation": "Frage nach Rezepten, Widerspruch zwischen Teilen und Schützen"
+   },
+   {
+    "id": "S60",
+    "persona": "P-Lightroom",
+    "text": "Eine automatische Reihenfolge nach Farbe kann ich mir für ein Urlaubsbuch vorstellen. Für eine Serie aus dem Fotoclub nie, da habe ich die Reihenfolge lange überlegt.",
+    "situation": "Frage nach Automatik"
+   },
+   {
+    "id": "S61",
+    "persona": "P-Lightroom",
+    "text": "Ich muss den Bildausschnitt bestimmen können. Bei einem Querformat im Hochformatfeld schneidet mir sonst jemand die Hälfte vom Motiv weg.",
+    "situation": "Was nervt, Zuschnitt"
+   },
+   {
+    "id": "S62",
+    "persona": "P-Lightroom",
+    "text": "So eine 3D-Blätteranimation ist nett, aber ich will die Bilder in groß und scharf sehen können, nicht schräg auf einer gewölbten Seite.",
+    "situation": "Frage nach Teilen und Ansehen"
+   },
+   {
+    "id": "S63",
+    "persona": "P-Lightroom",
+    "text": "Am Handy würde ich so etwas nie bauen. Das mache ich am großen Bildschirm, in Ruhe, über mehrere Abende.",
+    "situation": "Frage Handy oder Laptop"
+   },
+   {
+    "id": "S64",
+    "persona": "P-Lightroom",
+    "text": "Wenn ich da drei Abende reinstecke und das nur in meinem Browser liegt, ist das für mich kein Speichern. Ich will eine Datei, die ich sichern kann.",
+    "situation": "Frage nach Speichern und Verlässlichkeit"
+   },
+   {
+    "id": "S65",
+    "persona": "P-Oma",
+    "text": "Das letzte Buch war vom Geburtstag vom Leo. Das hat mir meine Tochter zu Weihnachten geschenkt, gedruckt, das liegt hier auf dem Tisch.",
+    "situation": "Frage nach dem letzten Fotobuch, im Wohnzimmer"
+   },
+   {
+    "id": "S66",
+    "persona": "P-Oma",
+    "text": "Wenn mir einer einen Link schickt, weiß ich oft nicht, ob ich da jetzt was bezahlen oder mich anmelden muss. Dann mache ich es lieber gar nicht auf.",
+    "situation": "Frage nach Teilen und Links"
+   },
+   {
+    "id": "S67",
+    "persona": "P-Oma",
+    "text": "Auf dem Tablet ist mir die Schrift unter den Bildern zu klein. Und wenn ich mit dem Finger größer machen will, blättert es manchmal um.",
+    "situation": "Was nervt beim Ansehen am Tablet"
+   },
+   {
+    "id": "S68",
+    "persona": "P-Oma",
+    "text": "Ich möchte gerne sehen, wer auf dem Bild ist und wo das war. Die Kinder wissen das, aber ich vergesse es, und in ein paar Jahren weiß es keiner mehr.",
+    "situation": "Wünsche, Text im Buch"
+   },
+   {
+    "id": "S69",
+    "persona": "P-Oma",
+    "text": "Dass das Buch umblättert wie ein richtiges, finde ich schön. Da hab ich gleich gewusst, wie das geht.",
+    "situation": "Reaktion auf das blätterbare Buch am Tablet"
+   },
+   {
+    "id": "S70",
+    "persona": "P-Oma",
+    "text": "Ich würde gern was dazuschreiben, so wie man früher hinten ins Album geschrieben hat. Aber nicht so, dass das dann alle im Internet lesen.",
+    "situation": "Frage nach Rückmeldung an den Urheber"
+   },
+   {
+    "id": "S71",
+    "persona": "P-Oma",
+    "text": "Was das mit diesem Rezept soll, verstehe ich nicht. Das brauche ich nicht. Das soll mich aber auch nicht stören beim Anschauen.",
+    "situation": "Frage nach Rezepten am Foto"
+   },
+   {
+    "id": "S72",
+    "persona": "P-Oma",
+    "text": "Wenn es das Buch schon auf dem Tablet gibt, dann hätte ich es gern auch gedruckt. Ich würde dafür auch zahlen, wenn mir einer sagt, wie das geht.",
+    "situation": "Frage nach Druck"
+   },
+   {
+    "id": "S73",
+    "persona": "P-Oma",
+    "text": "Selber so ein Buch machen würde ich nicht. Das ist was für die Jungen. Ich will es bekommen und anschauen.",
+    "situation": "Frage, ob sie selbst eins erstellen würde"
+   },
+   {
+    "id": "S74",
+    "persona": "P-Gestalterin",
+    "text": "Meine letzten Bücher habe ich komplett in InDesign gebaut und als PDF hochgeladen. Das dauert ewig, aber ich weiß dafür genau, was rauskommt.",
+    "situation": "Frage nach dem letzten Fotobuch, im Studio"
+   },
+   {
+    "id": "S75",
+    "persona": "P-Gestalterin",
+    "text": "Die Online-Editoren haben fast alle diese Kitsch-Vorlagen mit Schnörkelschrift und Rahmen. Das Erste, was ich mache, ist alles davon wieder löschen.",
+    "situation": "Was nervt an anderen Editoren"
+   },
+   {
+    "id": "S76",
+    "persona": "P-Gestalterin",
+    "text": "Text ist für mich der Punkt, an dem ich aufgebe. Wenn ich Zeilenabstand und Laufweite nicht einstellen kann und die Schrift nach dem Speichern anders umbricht, bin ich raus.",
+    "situation": "Frage nach Text und Typografie"
+   },
+   {
+    "id": "S77",
+    "persona": "P-Gestalterin",
+    "text": "Ein festes Raster finde ich eigentlich gut, ich arbeite selbst immer mit Raster. Aber dann muss ich das Raster auch verstehen und ab und zu bewusst brechen dürfen.",
+    "situation": "Reaktion auf das feste Raster, Widerspruch zwischen Ordnung und Freiheit"
+   },
+   {
+    "id": "S78",
+    "persona": "P-Gestalterin",
+    "text": "Für die Urlaubsbücher meiner Familie würde ich so eine Automatik sogar nehmen. Da will ich nicht zehn Stunden layouten, nur weil ich es kann.",
+    "situation": "Frage nach Automatik, private Bücher"
+   },
+   {
+    "id": "S79",
+    "persona": "P-Gestalterin",
+    "text": "Ich will das Ergebnis vor dem Druck so sehen, wie es wirklich wird: mit Beschnitt, mit Bundsteg. Sonst steht mir die Hälfte vom Gesicht im Falz.",
+    "situation": "Frage nach Vorschau und Druck"
+   },
+   {
+    "id": "S80",
+    "persona": "P-Gestalterin",
+    "text": "Wenn ich Druck bezahle, will ich Papier und Bindung wählen können. Glänzend dünnes Papier mit Klebebindung kommt mir nicht ins Haus.",
+    "situation": "Frage nach Druck"
+   },
+   {
+    "id": "S81",
+    "persona": "P-Gestalterin",
+    "text": "Am Handy layoute ich nicht. Aber Fotos aussortieren in der Bahn, das mache ich ständig. Wenn das danach am Laptop weitergeht, wäre das super.",
+    "situation": "Frage Handy oder Laptop"
+   },
+   {
+    "id": "S82",
+    "persona": "P-Gestalterin",
+    "text": "Das Teilen per Link ohne Konto finde ich stark. Meine Kunden haben auch nie Lust, sich irgendwo anzumelden, nur um was anzuschauen.",
+    "situation": "Frage nach Teilen"
+   },
+   {
+    "id": "S83",
+    "persona": "P-Gestalterin",
+    "text": "Den 3D-Effekt finde ich zwiespältig. Einmal wow, aber wenn ich ein Buch ernsthaft anschaue, will ich die Doppelseite flach und ruhig sehen.",
+    "situation": "Reaktion auf das blätterbare 3D-Buch"
+   },
+   {
+    "id": "S84",
+    "persona": "P-Gestalterin",
+    "text": "Als Geschenk mache ich so was eigentlich nur gedruckt. Ein Link fühlt sich für mich nicht wie ein Geschenk an, eher wie eine Vorschau.",
+    "situation": "Frage nach Geschenken"
+   }
+  ]
+ },
+ "reqs": {
+  "groups": [
+   {
+    "id": "G1",
+    "name": "Vertrauen: meine Arbeit ist sicher"
+   },
+   {
+    "id": "G2",
+    "name": "Automatik als Vorschlag, Kontrolle bei mir"
+   },
+   {
+    "id": "G3",
+    "name": "Bild bleibt mein Bild"
+   },
+   {
+    "id": "G4",
+    "name": "Text und Erinnerung"
+   },
+   {
+    "id": "G5",
+    "name": "Fotos sammeln und auswählen"
+   },
+   {
+    "id": "G6",
+    "name": "Geräte und gemeinsames Arbeiten"
+   },
+   {
+    "id": "G7",
+    "name": "Teilen, Anschauen, Rückmeldung"
+   },
+   {
+    "id": "G8",
+    "name": "Gedrucktes Buch"
+   },
+   {
+    "id": "G9",
+    "name": "Rezepte und Entstehung des Bildes"
+   }
+  ],
+  "requirements": [
+   {
+    "id": "K1",
+    "group": "G1",
+    "text": "Meine Arbeit geht nie verloren, auch nach einem Absturz, einem Update oder Wochen Pause.",
+    "kano": "M",
+    "importance": 5,
+    "rationale": "Niemand lobt sicheres Speichern, aber ein einziger Verlust zerstört das Vertrauen sofort (S33, S55). Im Marktbild ist P1 der stärkste Schmerz quer durch alle Segmente, also klar ein Basismerkmal. Fujiventura speichert laufend, aber nur lokal im Browser, und genau davor hat Michel Angst (S9).",
+    "statements": [
+     "S9",
+     "S33",
+     "S55",
+     "S64",
+     "S32"
+    ],
+    "painThemes": [
+     "P1",
+     "P8"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 3,
+     "Google Fotos": 4,
+     "Blurb": 2,
+     "Fujiventura heute": 2
+    },
+    "goal": 5,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K2",
+    "group": "G1",
+    "text": "Ich kann zu einem früheren Stand zurück und mein Projekt selbst als Datei sichern.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Je besser das geht, desto ruhiger arbeiten die Leute über mehrere Abende (S9, S64). Bei Tobi und Jana löst es den Streit, welche Version die richtige ist (S48). Kein Anbieter wirbt damit (Lücke 'Vertrauen als Produktmerkmal'). Deshalb Leistungsmerkmal mit Potenzial zum Verkaufsargument. Das Marktbild belegt für Fujiventura weder einen Versionsverlauf noch einen Export.",
+    "statements": [
+     "S9",
+     "S48",
+     "S64"
+    ],
+    "painThemes": [
+     "P1",
+     "P8"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 1,
+     "Google Fotos": 1,
+     "Blurb": 3,
+     "Fujiventura heute": 1
+    },
+    "goal": 5,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K3",
+    "group": "G2",
+    "text": "Der erste Entwurf sieht schon gut aus, ohne dass ich viel tun muss.",
+    "kano": "O",
+    "importance": 5,
+    "rationale": "Sandra, Tobi und für Familienbücher auch Mira wollen ein ordentliches Ergebnis mit wenig Aufwand (S35, S49, S78). Je besser der Wurf, desto zufriedener sind sie, also linear. Das ist Fujiventuras Kern und heute schon stark. Popsa ist hier der Maßstab.",
+    "statements": [
+     "S35",
+     "S49",
+     "S78",
+     "S1"
+    ],
+    "painThemes": [
+     "P2"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 4,
+     "Google Fotos": 3,
+     "Blurb": 1,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K4",
+    "group": "G2",
+    "text": "Was ich selbst entschieden habe, bleibt so. Nichts verschiebt sich ungefragt an anderer Stelle.",
+    "kano": "M",
+    "importance": 5,
+    "rationale": "Wenn das bricht, sind Michel und Jana sofort frustriert (S1, S2, S50). Ist es erfüllt, merkt es niemand. Im Marktbild verliert P2 bei posterXXL, Popsa und Shutterfly das Vertrauen. Für Fujiventura ist das der kritischste Punkt, weil die Automatik der Kern ist. Ob das heute stabil ist, ist nicht belegt, daher eine 3. Zusammen mit K5 ist das die Lücke 'Mitte zwischen Automatik und Kontrolle'.",
+    "statements": [
+     "S1",
+     "S2",
+     "S50",
+     "S11"
+    ],
+    "painThemes": [
+     "P2"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 2,
+     "Google Fotos": 2,
+     "Blurb": 4,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K5",
+    "group": "G2",
+    "text": "Ich verstehe, warum ein Foto dort steht, wo es steht, und kann bewusst anders entscheiden.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Danach fragt niemand ausdrücklich, aber Michel und Mira begeistert es (S3, S77). Wer es nicht bekommt, vermisst es nicht. Laut Marktbild bietet es kein Anbieter. Fujiventuras Regelwerk aus Zeit, Farbe und Rhythmus samt leisem Regel-Prüfer ist ein Ansatz dafür, aber noch kein sichtbares 'Warum'.",
+    "statements": [
+     "S3",
+     "S77",
+     "S7"
+    ],
+    "painThemes": [
+     "P2"
+    ],
+    "perception": {
+     "CEWE": 1,
+     "Popsa": 1,
+     "Google Fotos": 1,
+     "Blurb": 1,
+     "Fujiventura heute": 3
+    },
+    "goal": 4,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K6",
+    "group": "G2",
+    "text": "Ich bestimme, welche Fotos mir wichtig sind, dass sie reinkommen und groß werden.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Hier treffen Tobi ('diese zehn müssen rein') und Jana ('ganze Seite ja oder nein') zusammen (S47, S50). Shutterfly macht laut Marktbild die falschen Fotos groß. Je feiner man das steuern kann, desto zufriedener sind die Leute. Fujiventura hat heute Layoutvarianten, aber kein 'dieses Foto ist wichtig'.",
+    "statements": [
+     "S47",
+     "S50",
+     "S4"
+    ],
+    "painThemes": [
+     "P2"
+    ],
+    "perception": {
+     "CEWE": 4,
+     "Popsa": 2,
+     "Google Fotos": 1,
+     "Blurb": 4,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K7",
+    "group": "G2",
+    "text": "Die Reihenfolge stimmt mit dem überein, was wirklich passiert ist, auch bei mehreren Kameras mit falsch gestellter Uhr.",
+    "kano": "M",
+    "importance": 4,
+    "rationale": "Ein Fehler fällt sofort auf und blamiert (S36: 'merkt die Oma sofort', S46: Sonnenuntergang vor dem Frühstück). Stimmt die Reihenfolge, lobt das keiner, also ein Basismerkmal. Für Serien will Rainer die Reihenfolge ganz selbst festlegen (S60). Fujiventura sortiert nach Zeit. Ein Ausgleich falscher Kamerauhren ist nicht beschrieben.",
+    "statements": [
+     "S36",
+     "S46",
+     "S60"
+    ],
+    "painThemes": [
+     "P2",
+     "P3"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 3,
+     "Google Fotos": 3,
+     "Blurb": 3,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1
+   },
+   {
+    "id": "K8",
+    "group": "G2",
+    "text": "Ich kann einzelne Fotos und Seiten frei umstellen, zwischendrin einfügen und wieder entfernen.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "P3 ist im Marktbild stark belegt (CEWE-App, dm, Popsa). Je freier man umstellen kann, desto besser. Fujiventura tauscht Doppelseiten und Fotos. Fotos über Seitengrenzen verschieben und Seiten gezielt einfügen ist nicht belegt.",
+    "statements": [
+     "S50",
+     "S60",
+     "S1"
+    ],
+    "painThemes": [
+     "P3"
+    ],
+    "perception": {
+     "CEWE": 4,
+     "Popsa": 2,
+     "Google Fotos": 2,
+     "Blurb": 4,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1
+   },
+   {
+    "id": "K9",
+    "group": "G2",
+    "text": "Das Buch wirkt ruhig und geordnet, und ich darf diese Ordnung trotzdem bewusst brechen.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Michel und Mira benennen den Widerspruch selbst (S7, S77). Sie wollen ein Raster als Stärke und gelegentlich Freiheit. Mira lehnt Kitsch-Vorlagen ab (S75). Wer das erlebt, ist begeistert. Für Sandra und Tobi ist es eher egal. CEWE ist frei, aber ohne ruhige Ordnung. Fujiventura ist geordnet, aber ohne Freiheit.",
+    "statements": [
+     "S7",
+     "S77",
+     "S75"
+    ],
+    "painThemes": [
+     "P2"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 1,
+     "Google Fotos": 1,
+     "Blurb": 3,
+     "Fujiventura heute": 2
+    },
+    "goal": 4,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K10",
+    "group": "G2",
+    "text": "Jede Aufgabe geht mit wenigen Handgriffen, und ich finde sofort, was ich brauche.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Sandra verliert sich bei CEWE (S37). Michel und Tobi wollen keine zehn Varianten durchklicken (S11, S49). P7 nennt überladene, langsame Editoren. Je schlanker, desto besser, also linear. Fujiventura ist schlank. Für große Bücher fehlen Messungen.",
+    "statements": [
+     "S11",
+     "S37",
+     "S49"
+    ],
+    "painThemes": [
+     "P7"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 4,
+     "Google Fotos": 4,
+     "Blurb": 2,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1
+   },
+   {
+    "id": "K11",
+    "group": "G3",
+    "text": "Ich bestimme den Bildausschnitt selbst. Nichts Wichtiges wird abgeschnitten, und mein Seitenverhältnis bleibt respektiert.",
+    "kano": "M",
+    "importance": 5,
+    "rationale": "Abgeschnittene Köpfe oder ein erzwungenes Quadrat sind sofort ein Ausschlussgrund (S29: 'sofort raus', S61). Das ist ein Basismerkmal. P4 ist breit belegt (Chatbooks, Popsa, Google nur quadratisch). Fujiventura hat einen Fokuspunkt, aber keinen freien Zoom oder Zuschnitt pro Feld. Michel nennt das sein größtes Problem (S4).",
+    "statements": [
+     "S4",
+     "S29",
+     "S61"
+    ],
+    "painThemes": [
+     "P4"
+    ],
+    "perception": {
+     "CEWE": 4,
+     "Popsa": 2,
+     "Google Fotos": 2,
+     "Blurb": 4,
+     "Fujiventura heute": 2
+    },
+    "goal": 5,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K12",
+    "group": "G3",
+    "text": "Meine Bilder bleiben in Farbe und Schärfe so, wie ich sie bearbeitet habe, ohne ungefragte Nachbearbeitung und ohne extra Export.",
+    "kano": "O",
+    "importance": 3,
+    "rationale": "Rainer und Mira ist das sehr wichtig (S56, S57), Sandra spürt es erst im Druck (S42). Je treuer, desto besser. Für Gelegenheitsnutzer fällt es weniger auf, daher Bedeutung 3. Laut Bauplan braucht Fujiventura für die volle Auflösung die Originale. Wie heute mit den Bildern umgegangen wird, ist offen, daher die Mitte.",
+    "statements": [
+     "S56",
+     "S57",
+     "S42"
+    ],
+    "painThemes": [
+     "P6"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 2,
+     "Google Fotos": 3,
+     "Blurb": 3,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1
+   },
+   {
+    "id": "K13",
+    "group": "G4",
+    "text": "Ich kann ein paar Sätze zu unserer Geschichte schreiben, und sie stehen genau so da, wie ich sie gesetzt habe.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Ohne Text ist es für Sandra und Jana 'nur ein Stapel Bilder' (S38, S51). Michel will wenige gute Schriften im Raster (S6). Für Mira ist Text der Punkt, an dem sie aufgibt (S76). P5 ist breit belegt. Fujiventura hat heute nur Titel und Bildunterschriften.",
+    "statements": [
+     "S6",
+     "S38",
+     "S51",
+     "S76"
+    ],
+    "painThemes": [
+     "P5"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 2,
+     "Google Fotos": 1,
+     "Blurb": 3,
+     "Fujiventura heute": 1
+    },
+    "goal": 4,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K14",
+    "group": "G4",
+    "text": "Am Bild steht, wer, wo und wann, ohne dass ich es abtippen muss.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Rainer will die Pflege aus seinem Katalog nutzen (S58), Hildegard will in Jahren noch wissen, wer drauf ist (S68). Das erwartet niemand, und wer es bekommt, ist begeistert. Lücke 'Text für Fotografen' im Marktbild. Fujiventura hat Bildunterschriften. Ob sie aus Metadaten kommen, ist nicht belegt.",
+    "statements": [
+     "S58",
+     "S68"
+    ],
+    "painThemes": [
+     "P5"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 2,
+     "Google Fotos": 1,
+     "Blurb": 2,
+     "Fujiventura heute": 2
+    },
+    "goal": 4,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K15",
+    "group": "G5",
+    "text": "Ich bekomme die Fotos von allen Geräten und Personen schnell an einen Ort, und fast gleiche Bilder muss ich nicht einzeln vergleichen.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Das Zusammentragen kostet Jana und Sandra die Lust, bevor das Buch überhaupt beginnt (S34, S45). Lena gibt nach zehn Fotos auf (S18), Sandra hat viele fast gleiche Bilder (S39). P10 ist belegt. Fujiventura nimmt Fotos per Ziehen auf. Eine Sammlung über Geräte und Personen hinweg ist nicht beschrieben.",
+    "statements": [
+     "S18",
+     "S34",
+     "S39",
+     "S45"
+    ],
+    "painThemes": [
+     "P10"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 4,
+     "Google Fotos": 4,
+     "Blurb": 2,
+     "Fujiventura heute": 2
+    },
+    "goal": 4,
+    "salesPoint": 1
+   },
+   {
+    "id": "K16",
+    "group": "G6",
+    "text": "Ich kann am Handy anfangen und am Rechner weitermachen, ohne etwas zu installieren.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Michel und Mira sortieren in der Bahn aus und gestalten am Laptop (S5, S81). Jana ist am Handy gescheitert (S44), Lena will nur das Handy (S17), Rainer nur den großen Bildschirm (S63). Mehrere Geräte nutzen zu können, steigert die Zufriedenheit linear. P9 ist belegt. Fujiventura läuft im Browser, aber der Entwurf liegt nur lokal, ein Gerätewechsel geht also nicht.",
+    "statements": [
+     "S5",
+     "S17",
+     "S44",
+     "S63",
+     "S81"
+    ],
+    "painThemes": [
+     "P9"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 1,
+     "Google Fotos": 3,
+     "Blurb": 1,
+     "Fujiventura heute": 1
+    },
+    "goal": 4,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K17",
+    "group": "G6",
+    "text": "Wir können zu zweit an einem Buch arbeiten, ohne uns gegenseitig etwas zu überschreiben.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Bei Jana und Tobi entscheidet das darüber, ob das Buch fertig wird (S45, S48). Die meisten anderen Personas nennen es nicht. Wer es bekommt, ist begeistert. Wer allein arbeitet, vermisst es nicht. Fujiventura hat keine gemeinsame Bearbeitung.",
+    "statements": [
+     "S45",
+     "S48"
+    ],
+    "painThemes": [
+     "P9"
+    ],
+    "perception": {
+     "CEWE": 1,
+     "Popsa": 2,
+     "Google Fotos": 2,
+     "Blurb": 1,
+     "Fujiventura heute": 1
+    },
+    "goal": 4,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K18",
+    "group": "G7",
+    "text": "Wer das Buch bekommt, kann es sofort ansehen: ohne Anmeldung, ohne Zahlung und auch bei schwachem Netz.",
+    "kano": "M",
+    "importance": 5,
+    "rationale": "Lena, Sandras Schwester und Hildegard springen sofort ab, wenn sie sich anmelden müssen (S13, S41, S66). Mira schätzt das bei Kunden (S82). Für Empfänger ist das ein Basismerkmal. Fujiventura erfüllt es heute, das ist ein Kernvorteil, der unbedingt bleiben muss. Die Ladezeit im Zug (S20) ist ungemessen, daher eine 4 und keine 5.",
+    "statements": [
+     "S12",
+     "S13",
+     "S20",
+     "S41",
+     "S66",
+     "S82"
+    ],
+    "painThemes": [
+     "P9"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 3,
+     "Google Fotos": 2,
+     "Blurb": 3,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K19",
+    "group": "G7",
+    "text": "Das Anschauen fühlt sich an wie ein echtes Buch und bleibt trotzdem bequem: groß, ruhig, gut lesbar, auf jedem Gerät und in jeder Haltung.",
+    "kano": "A",
+    "importance": 4,
+    "rationale": "Lena und Hildegard begeistert das Blättern (S12, S69). Rainer und Mira wollen dazu eine flache, große Ansicht (S62, S83). Lena und Hildegard kämpfen mit kleiner Schrift, Drehen und Zoomen, bei dem versehentlich umgeblättert wird (S15, S67). Das Buchgefühl ist ein Begeisterungsmerkmal, die Lesbarkeit würde sonst schnell zum Basismerkmal. Fujiventura ist mit dem 3D-Buch klar vorn, die Lesbarkeit hat Lücken.",
+    "statements": [
+     "S12",
+     "S15",
+     "S62",
+     "S67",
+     "S69",
+     "S83"
+    ],
+    "painThemes": [
+     "P6"
+    ],
+    "perception": {
+     "CEWE": 2,
+     "Popsa": 2,
+     "Google Fotos": 1,
+     "Blurb": 2,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K20",
+    "group": "G7",
+    "text": "Ich erfahre leise und privat, dass und wie Freunde mein Buch angeschaut haben, und Gäste können mühelos antworten.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Für Michel ist das 'das Schönste daran' (S8), Hildegard will etwas hineinschreiben, aber nicht öffentlich (S70). Lena will auch nur kurz zeigen können, dass sie es gesehen hat (S19), und hat das Eselsohr erst zufällig entdeckt (S14). Jonas fehlt eine Zahl (S28), das ist ein ehrlicher Gegenpol. Die Lücke 'Leiser Rückkanal' kommt im Marktbild vor. Fujiventura ist hier stark, abzüglich der Auffindbarkeit.",
+    "statements": [
+     "S8",
+     "S14",
+     "S19",
+     "S28",
+     "S70"
+    ],
+    "painThemes": [],
+    "perception": {
+     "CEWE": 1,
+     "Popsa": 1,
+     "Google Fotos": 2,
+     "Blurb": 1,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K21",
+    "group": "G8",
+    "text": "Am Ende kann ich ein echtes Buch in der Hand halten und verschenken, auf Papier und in einer Bindung, die zu mir passt.",
+    "kano": "M",
+    "importance": 4,
+    "rationale": "Für Sandra, Jana, Hildegard und Mira ist Druck selbstverständlich und als Geschenk Voraussetzung (S40, S53, S72, S84). Für Michel ist er ein Leistungsmerkmal für ein, zwei Bücher im Jahr (S10), Lena braucht ihn nur für die Eltern (S21). Die Einordnung hängt also vom Segment ab. Der Kano-Fragebogen muss klären, ob das für die Kernzielgruppe ein Basismerkmal ist. Fujiventura hat heute keinen Druck. Der Planwert 3 ist bewusst ehrlich, weil Druck über einen Partner kommt und nicht Teil des Editor-Schritts ist.",
+    "statements": [
+     "S10",
+     "S21",
+     "S40",
+     "S53",
+     "S65",
+     "S72",
+     "S80",
+     "S84"
+    ],
+    "painThemes": [
+     "P6"
+    ],
+    "perception": {
+     "CEWE": 5,
+     "Popsa": 4,
+     "Google Fotos": 3,
+     "Blurb": 5,
+     "Fujiventura heute": 1
+    },
+    "goal": 3,
+    "salesPoint": 1
+   },
+   {
+    "id": "K22",
+    "group": "G8",
+    "text": "Ich sehe vorher ehrlich, wie das Buch wirklich wird: Ränder, Falz, Helligkeit und ob ein Bild scharf genug ist.",
+    "kano": "O",
+    "importance": 4,
+    "rationale": "Gesichter im Falz und dunkle Drucke sind wiederkehrende Enttäuschungen (S42, S79). Michel braucht eine ehrliche Vorschau, sonst bringt ihm das 3D-Buch nichts (S10). Je ehrlicher die Vorschau, desto zufriedener sind die Leute. P6 ist belegt. Fujiventuras 3D-Buch ist eine realistische digitale Vorschau, Warnungen zu Beschnitt und Auflösung fehlen aber.",
+    "statements": [
+     "S10",
+     "S42",
+     "S79"
+    ],
+    "painThemes": [
+     "P6"
+    ],
+    "perception": {
+     "CEWE": 3,
+     "Popsa": 3,
+     "Google Fotos": 2,
+     "Blurb": 3,
+     "Fujiventura heute": 3
+    },
+    "goal": 4,
+    "salesPoint": 1.2
+   },
+   {
+    "id": "K23",
+    "group": "G9",
+    "text": "Ich sehe, wie ein Bild entstanden ist, kann das Rezept fehlerfrei übernehmen, und mein Name bleibt dabei dran.",
+    "kano": "A",
+    "importance": 3,
+    "rationale": "Für Jonas und Rainer ist das ein klares Begeisterungsmerkmal (S22 bis S26, S31, S59). Für Lena, Sandra und Hildegard ist es egal (S16, S43, S71), daher nur Bedeutung 3 über alle Personas. Jonas und Rainer wollen teilen und zugleich Anerkennung bekommen oder ihre Rezepte schützen (S27, S59). Kein Fotobuch-Editor bietet das. Fujiventura bietet es heute schon, die Übertragung in die Kamera fehlt.",
+    "statements": [
+     "S22",
+     "S23",
+     "S24",
+     "S26",
+     "S27",
+     "S31",
+     "S59"
+    ],
+    "painThemes": [],
+    "perception": {
+     "CEWE": 1,
+     "Popsa": 1,
+     "Google Fotos": 1,
+     "Blurb": 1,
+     "Fujiventura heute": 4
+    },
+    "goal": 5,
+    "salesPoint": 1.5
+   },
+   {
+    "id": "K24",
+    "group": "G9",
+    "text": "Wer sich nicht für Kameratechnik interessiert, wird beim Anschauen nicht damit belästigt.",
+    "kano": "M",
+    "importance": 3,
+    "rationale": "Lena, Hildegard und Tobi sagen sinngemäß: egal, solange es nicht stört (S16, S54, S71). Ist das verletzt, ärgern sie sich, ist es erfüllt, merken sie es nicht. Deshalb ein Basismerkmal. Es ist der Gegenpol zu K23. Die Wettbewerber zeigen nichts dergleichen und erfüllen es daher automatisch. Ob Fujiventuras Rezeptzettel Gäste stören, ist nicht beobachtet, daher eine 3.",
+    "statements": [
+     "S16",
+     "S43",
+     "S54",
+     "S71"
+    ],
+    "painThemes": [],
+    "perception": {
+     "CEWE": 5,
+     "Popsa": 5,
+     "Google Fotos": 5,
+     "Blurb": 5,
+     "Fujiventura heute": 3
+    },
+    "goal": 5,
+    "salesPoint": 1
+   }
+  ],
+  "method": "Ablauf wie im klassischen House of Quality (Akao), Schritt 2, Stimme der Kunden. Wichtig vorweg: Alle 84 Aussagen stammen von simulierten Personas. Bedeutung, Kano-Einordnung und Kundensicht sind deshalb begründete Moderationsschätzungen und keine Messwerte. Sie müssen mit echten Interviews und dem geplanten Kano-Fragebogen überprüft werden.\n\n1) Affinitätsdiagramm: Jede Aussage S1 bis S84 wurde einzeln nach dem Bedürfnis dahinter gelesen und nicht nach der gewünschten Funktion. Daraus wurden Bedürfnisse wie 'nicht verlieren' oder 'Kontrolle behalten' von unten nach oben zu neun Gruppen (G1 bis G9) zusammengefasst. Danach wurden die Gruppen mit den zehn Schmerz-Themen P1 bis P10 aus dem Marktbild abgeglichen. Jedes Schmerz-Thema landet in mindestens einer Anforderung.\n\n2) Kundenanforderungen: 24 Anforderungen (K1 bis K24) in Kundensprache und lösungsneutral, also 'Ich bestimme den Ausschnitt selbst' statt 'Crop-Werkzeug'. Widersprüche wurden nicht weggeglättet, sondern als eigene Anforderung oder Gegenpol festgehalten: Raster gegen Freiheit (K9), Automatik gegen eigene Entscheidung (K3, K4, K6), Rezepte für Fans gegen Ruhe für alle anderen (K23, K24) sowie Teilen gegen Schutz eigener Rezepte (in K23).\n\n3) Kano: Eingeordnet nach der Reaktion in den Aussagen. Ärger bei Fehlen ohne Lob bei Vorhandensein heißt Basis (M). Lineare Zufriedenheit heißt Leistung (O). Freude über etwas Unerwartetes ohne Vermissen heißt Begeisterung (A). Wo die Segmente auseinandergehen, zum Beispiel beim Druck (K21) oder bei Rezepten (K23), steht das in der Begründung. Genau diese Punkte sollte der Kano-Fragebogen mit funktionalen und dysfunktionalen Fragen zuerst klären.\n\n4) Bedeutung 1 bis 5: Zusammengesetzt aus der Zahl der Personas, die das Thema nennen, der emotionalen Stärke der Aussagen und der Stärke im Marktbild. Basismerkmale mit Totalausfall-Risiko bekommen eine 5. Merkmale, die nur ein Segment betreffen, höchstens eine 3. Häufigkeiten aus App-Store- und Trustpilot-Bewertungen sind nicht repräsentativ und wurden nur qualitativ genutzt.\n\n5) Wettbewerbsvergleich aus Kundensicht (1 = erfüllt schlecht, 5 = erfüllt sehr gut): CEWE, Popsa, Google Fotos, Blurb und Fujiventura heute. Die Werte sind aus den Belegen und Kurzprofilen im Marktbild abgeleitet und nicht gemessen. Fujiventura heute wurde streng nach dem beschriebenen Stand bewertet: 'nicht belegt' ergibt höchstens eine 3, 'fehlt' eine 1.\n\n6) Planwert und Verkaufsschwerpunkt: Der Planwert ist das Zielniveau für den Editor-Schritt. Basismerkmale bekommen eine 5. Für Druck (K21) gilt bewusst nur eine 3, weil Druck nicht Kern dieses Schritts ist. Verbesserungsquote = Planwert / Fujiventura heute. Verkaufsschwerpunkt 1.5 bekommen die Anforderungen, mit denen Fujiventura eine Lücke im Markt besetzen oder einen bestehenden Vorsprung ausbauen kann: K1 (Vertrauen), K4 und K5 (Automatik mit Kontrolle), K14 (Text aus Metadaten), K18 (Ansehen ohne Konto), K20 (leiser Rückkanal) und K23 (Rezept am Bild). 1.2 bekommen deutliche Pluspunkte, 1 alles Übrige. Die gewichtete Bedeutung für Schritt 3 ergibt sich so: Bedeutung × Verbesserungsquote × Verkaufsschwerpunkt. Die größten Hebel daraus sind voraussichtlich K1, K2, K11, K13, K16 und K4."
+ },
+ "hoq": {
+  "characteristics": [
+   {
+    "id": "T1",
+    "name": "Bestandene Wiederherstellungs-Szenarien",
+    "unit": "% von 8 Szenarien",
+    "direction": "up",
+    "current": "ca. 25–38 % (Schätzung: Tab-Absturz und Browser-Neustart bestehen wahrscheinlich dank IndexedDB; Schema-Update ungeprüft; Pause von 30 Tagen auf iOS/Safari gefährdet, weil WebKit laut eigenem Blog (März 2020) skriptbeschreibbaren Speicher nach 7 Tagen ohne Nutzung löschen kann; gelöschte Browserdaten, Geräteverlust, früheren Stand zurückholen und Datei-Export/Import fehlen)",
+    "target": "100 % (8 von 8)",
+    "benchmark": {
+     "CEWE": "ca. 75 % (Schätzung: Projektdatei lokal bzw. Konto, kein Versionsverlauf belegt)",
+     "Popsa": "ca. 50 % (Schätzung: Entwurf im Konto, kein Export, keine Versionen)",
+     "Google Fotos": "ca. 50 % (Schätzung: Entwurf in der Cloud, kein Export, keine Versionen)",
+     "Blurb": "ca. 75 % (Schätzung: BookWright-Projektdatei lokal, Versionen nur über eigene Kopien)"
+    },
+    "measure": "Fester Testablauf mit einem Referenzprojekt von 100 Fotos und 20 Änderungen. Szenarien: (1) Tab während des Speicherns abschießen, (2) Browser-Update/Neustart, (3) App-Update mit geändertem Datenschema, (4) 30 Tage ohne Öffnen (Safari iOS), (5) Browserdaten löschen, (6) anderes Gerät nach Geräteverlust, (7) Stand von vor 24 h zurückholen, (8) Projekt als Datei exportieren und auf frischem Profil importieren. Bestanden = keine einzige Änderung fehlt (Diff des Projektzustands)."
+   },
+   {
+    "id": "T2",
+    "name": "Zeit vom Reinziehen bis zum fertigen Erstentwurf",
+    "unit": "s (100 Fotos, Median aus 5 Läufen)",
+    "direction": "down",
+    "current": "ca. 60 s (Schätzung; der Bauplan nennt 'nach einer Minute' als Zielbild, eine Messung liegt nicht vor)",
+    "target": "≤ 30 s auf Mittelklasse-Laptop, ≤ 45 s auf iPhone der Vorvorgeneration",
+    "benchmark": {
+     "CEWE": "mehrere Minuten mit Assistent (Schätzung)",
+     "Popsa": "unter 1 min (Schätzung)",
+     "Google Fotos": "ca. 1 min (Schätzung, Vorschlag aus vorhandener Mediathek)",
+     "Blurb": "> 10 min, kein vollautomatischer Entwurf (Schätzung)"
+    },
+    "measure": "Referenzkorpus 100 JPGs (gemischt Fuji, iPhone, Lightroom-Export). performance.mark beim Drop-Ereignis und wenn alle Doppelseiten gerendert und gespeichert sind. Für Wettbewerber Stoppuhr vom Ende der Fotoauswahl bis zur ersten bearbeitbaren Gesamtansicht."
+   },
+   {
+    "id": "T3",
+    "name": "Übernahmequote des Erstentwurfs",
+    "unit": "% der Doppelseiten ohne Änderung bis zum Teilen",
+    "direction": "up",
+    "current": "nicht gemessen (keine Protokollierung vorhanden)",
+    "target": "≥ 80 %",
+    "benchmark": {
+     "CEWE": "ca. 50 % (Schätzung, geringe Sicherheit)",
+     "Popsa": "ca. 70 % (Schätzung, geringe Sicherheit)",
+     "Google Fotos": "ca. 50 % (Schätzung, geringe Sicherheit)",
+     "Blurb": "nicht anwendbar, kein Automatik-Entwurf"
+    },
+    "measure": "Lokales, datensparsames Ereignisprotokoll im eigenen Editor: Doppelseiten-IDs des Erstentwurfs gegen den Stand beim ersten Teilen vergleichen. Wettbewerber nur im moderierten Test mit 5–8 Personen und demselben Fotosatz."
+   },
+   {
+    "id": "T4",
+    "name": "Ungefragte Änderungen an selbst entschiedenen Elementen",
+    "unit": "Anzahl je 100 Bearbeitungsschritte",
+    "direction": "down",
+    "current": "nicht gemessen; ein ausdrückliches Fixieren gibt es heute nicht, Neuberechnungen könnten frühere Entscheidungen verschieben (Schätzung: Risiko vorhanden, Größe unbekannt)",
+    "target": "0",
+    "benchmark": {
+     "CEWE": "nahe 0, weil weitgehend manuell (Schätzung)",
+     "Popsa": "> 0, im Marktbild als Vertrauensverlust belegt (P2), Höhe unbekannt (Schätzung)",
+     "Google Fotos": "> 0 (Schätzung)",
+     "Blurb": "0, rein manuell (Schätzung)"
+    },
+    "measure": "Automatisierter Eigenschaftstest: 20 Elemente setzen (Fotowahl, Ausschnitt, Layout, Reihenfolge, Text), danach 100 zufällige Bearbeitungen an anderer Stelle, dann Diff der 20 Elemente. Bei gemeinsamem Bearbeiten zusätzlich zwei Sitzungen parallel. Für Wettbewerber manueller Test mit 10 Schritten."
+   },
+   {
+    "id": "T5",
+    "name": "Begründungsabdeckung der Platzierung",
+    "unit": "% der automatisch platzierten Fotos mit abrufbarem 'Warum hier'",
+    "direction": "up",
+    "current": "ca. 0–10 % (Schätzung: der Regel-Prüfer meldet nur Verstöße, nicht die Begründung je Foto)",
+    "target": "≥ 90 %, abrufbar mit 1 Interaktion",
+    "benchmark": {
+     "CEWE": "0 % (Schätzung)",
+     "Popsa": "0 % (Schätzung)",
+     "Google Fotos": "0 % (Schätzung)",
+     "Blurb": "nicht anwendbar"
+    },
+    "measure": "Code-Prüfung plus Stichprobe: Für 100 automatisch platzierte Fotos prüfen, ob eine Begründung angezeigt wird, die eine der Regeln (Zeit, Farbe, Rhythmus, Seitentyp) benennt. Verständlichkeit im Test: Testperson gibt die Begründung mit eigenen Worten wieder (richtig/falsch)."
+   },
+   {
+    "id": "T6",
+    "name": "Steuerbare Gestaltungs-Freiheitsgrade pro Foto",
+    "unit": "Anzahl von 8 definierten Parametern",
+    "direction": "up",
+    "current": "3 von 8 (gezählt aus dem Bauplan: Seite über Foto- und Doppelseitentausch, Feld über Layoutvariante, Ausschnitt-Position über Fokuspunkt)",
+    "target": "7 von 8 (bewusst ohne pixelfreies Platzieren; die Raster-Ausnahme zählt als ein Parameter)",
+    "benchmark": {
+     "CEWE": "8 von 8 (Schätzung)",
+     "Popsa": "ca. 3 von 8 (Schätzung)",
+     "Google Fotos": "ca. 2 von 8 (Schätzung)",
+     "Blurb": "8 von 8 (Schätzung)"
+    },
+    "measure": "Checkliste je Foto: (1) Seite, (2) Feld auf der Seite, (3) Wichtigkeit/Größenrang, (4) Ausschnitt-Position, (5) Zoom, (6) Feldform/Seitenverhältnis, (7) Anschnitt über Rand oder Falz, (8) bewusste Raster-Ausnahme. Zählt nur, wenn direkt im Editor einstellbar."
+   },
+   {
+    "id": "T7",
+    "name": "Aufwand für 12 Standardaufgaben",
+    "unit": "Summe der Interaktionen (nicht lösbare Aufgabe = 20)",
+    "direction": "down",
+    "current": "ca. 130–150 (Schätzung: 5–6 von 12 Aufgaben heute lösbar mit je ca. 2 Interaktionen; Foto über Seitengrenze verschieben, Seite einfügen, Foto als wichtig markieren, Ausschnitt zoomen und Absatz schreiben sind nicht belegt)",
+    "target": "≤ 30, keine Aufgabe über 4 Interaktionen",
+    "benchmark": {
+     "CEWE": "ca. 45, alles lösbar, aber tief verschachtelt (Schätzung)",
+     "Popsa": "ca. 90 (Schätzung)",
+     "Google Fotos": "ca. 150 (Schätzung)",
+     "Blurb": "ca. 45 (Schätzung)"
+    },
+    "measure": "Fester Aufgabensatz: Doppelseiten tauschen, Layout wechseln, Foto tauschen, Foto auf andere Seite verschieben, Seite einfügen, Seite entfernen, Foto entfernen, Foto groß/wichtig machen, Ausschnitt zoomen, Titel setzen, Absatz schreiben, Leinen wählen. Ein geübter Tester zählt Klicks, Tipps, Ziehen und Tastendrücke. Zusätzlich die Suchzeit bis zum ersten Treffer mit 5 neuen Testpersonen."
+   },
+   {
+    "id": "T8",
+    "name": "Korrekte Zeitordnung bei mehreren Kameras",
+    "unit": "% richtig eingeordneter Fotos im Versatz-Testsatz",
+    "direction": "up",
+    "current": "ca. 50 % (Schätzung: Sortierung nur nach Aufnahmezeit, ein Uhrenabgleich steht im Bauplan unter 'später'; die Fotos der versetzten Kamera landen damit falsch)",
+    "target": "≥ 98 % automatisch, Rest mit 1 Korrektur pro Kamera",
+    "benchmark": {
+     "CEWE": "ca. 50 % (Schätzung, kein Uhrabgleich bekannt)",
+     "Popsa": "ca. 50 % (Schätzung, kein Uhrabgleich bekannt)",
+     "Google Fotos": "ca. 50–60 % (Schätzung)",
+     "Blurb": "nicht anwendbar, manuelle Reihenfolge"
+    },
+    "measure": "Testsatz: 200 Fotos eines Tages von 3 Geräten, eine Kamera +1 h, eine −7 min versetzt, Wahrheit über Ereignis-Annotation (z. B. Frühstück vor Sonnenuntergang). Kendall-Abstand zur Wahrheit und Anteil korrekt platzierter Fotos."
+   },
+   {
+    "id": "T9",
+    "name": "Motivschutz beim Zuschnitt",
+    "unit": "% Fotos ohne angeschnittene Gesichter/Hauptmotiv im Erstentwurf",
+    "direction": "up",
+    "current": "nicht gemessen; Fokuspunkt nur von Hand (Schätzung ca. 85 %)",
+    "target": "≥ 98 %, Original-Seitenverhältnis wählbar in jedem Feld",
+    "benchmark": {
+     "CEWE": "ca. 90 % (Schätzung)",
+     "Popsa": "ca. 80 % (Schätzung)",
+     "Google Fotos": "ca. 80 %, nur quadratisch laut Marktbild (Schätzung)",
+     "Blurb": "ca. 90 % (Schätzung)"
+    },
+    "measure": "Korpus 300 Fotos mit annotierten Gesichtern und Hauptmotiv-Boxen. Automatisch: Anteil der Boxen, die nach Zuschnitt und Falz-Zone vollständig sichtbar sind. Falz-Zone als Anschnitt werten."
+   },
+   {
+    "id": "T10",
+    "name": "Farbtreue zum Original",
+    "unit": "ΔE2000, Median (dazu Maximum)",
+    "direction": "down",
+    "current": "nicht gemessen; Risiko durch Neukodierung im Browser bei Display-P3- und AdobeRGB-Dateien (Schätzung: Abweichung möglich)",
+    "target": "Median ≤ 2, Maximum ≤ 5, keine automatische Nachschärfung oder Tonwertkorrektur",
+    "benchmark": {
+     "CEWE": "nicht gemessen; automatische Bildoptimierung je nach Einstellung (Schätzung)",
+     "Popsa": "nicht gemessen (Schätzung)",
+     "Google Fotos": "nicht gemessen; Neukomprimierung wahrscheinlich (Schätzung)",
+     "Blurb": "nicht gemessen; Farbprofil-Workflow vorhanden (Schätzung)"
+    },
+    "measure": "Testbilder mit Farbtafel in sRGB, Display P3 und AdobeRGB. Ausgelieferte Datei (Ansicht und später Druck-PDF) nach sRGB bzw. Druckprofil umrechnen und pixelweise gegen das Original vergleichen (z. B. mit colour-science). Dazu der Schärfevergleich über SSIM."
+   },
+   {
+    "id": "T11",
+    "name": "Zeit für Geschichte und Bildangaben",
+    "unit": "min für Standardaufgabe",
+    "direction": "down",
+    "current": "nicht lösbar (Fließtext fehlt); Bildunterschriften vorhanden, aber Zeit ungemessen",
+    "target": "≤ 5 min, davon Wer/Wann bei ≥ 60 % der Fotos vorbefüllt; Satz in Editor, 3D-Ansicht und Druck-PDF identisch",
+    "benchmark": {
+     "CEWE": "ca. 20 min, kaum Vorbefüllung (Schätzung)",
+     "Popsa": "ca. 15 min, Text eingeschränkt (Schätzung)",
+     "Google Fotos": "nicht lösbar (Schätzung)",
+     "Blurb": "ca. 20 min (Schätzung)"
+    },
+    "measure": "Aufgabe: einen Absatz von 80 Wörtern setzen und zu 20 Fotos Wer, Wo und Wann angeben (Testsatz mit Lightroom-Stichwörtern und Personen-Tags). Stoppuhr mit 5 Testpersonen. Ungültig, wenn der Zeilenumbruch zwischen Editor und Ansicht abweicht (Screenshot-Vergleich)."
+   },
+   {
+    "id": "T12",
+    "name": "Zeit zum Zusammentragen der Fotos",
+    "unit": "min für 300 Fotos aus 3 Quellen",
+    "direction": "down",
+    "current": "ca. 15–25 min (Schätzung: Fotos erst manuell auf ein Gerät bringen, dann ziehen; keine Dublettengruppierung)",
+    "target": "≤ 5 min, ≥ 90 % der fast gleichen Bilder automatisch gruppiert",
+    "benchmark": {
+     "CEWE": "ca. 15 min (Schätzung)",
+     "Popsa": "ca. 5 min (Schätzung, Kamerarolle direkt)",
+     "Google Fotos": "ca. 3 min (Schätzung, geteilte Alben)",
+     "Blurb": "ca. 20 min (Schätzung)"
+    },
+    "measure": "Szenario: 150 Fotos auf dem eigenen Handy, 100 auf einer Kamera-SD, 50 bei einer zweiten Person. Stoppuhr vom Entschluss bis alle 300 im Projekt sind. Dubletten-Recall gegen einen annotierten Satz von 40 Serien."
+   },
+   {
+    "id": "T13",
+    "name": "Synchronisationsverzug zwischen Geräten und Personen",
+    "unit": "s bis eine Änderung auf dem zweiten Gerät sichtbar ist (dazu verlorene Änderungen bei Parallelarbeit)",
+    "direction": "down",
+    "current": "nicht möglich, weil der Entwurf nur lokal in IndexedDB liegt (gezählt: unendlich)",
+    "target": "≤ 5 s, 0 verlorene Änderungen bei gleichzeitigem Bearbeiten, ohne Installation",
+    "benchmark": {
+     "CEWE": "teils nicht möglich zwischen App und Desktop (Schätzung)",
+     "Popsa": "Konto-Synchronisation, Verzug unbekannt (Schätzung)",
+     "Google Fotos": "wenige Sekunden (Schätzung)",
+     "Blurb": "nicht möglich, lokale Datei (Schätzung)"
+    },
+    "measure": "Zwei Browser (Handy und Laptop) im selben Projekt. Änderung mit Zeitstempel setzen, Zeit bis zur Anzeige drüben messen, Median aus 20. Parallelarbeit: beide ändern 2 min lang unterschiedliche Elemente, danach Diff."
+   },
+   {
+    "id": "T14",
+    "name": "Zeit vom Antippen des Links bis zur lesbaren ersten Doppelseite",
+    "unit": "s, mobil, gedrosseltes Netz",
+    "direction": "down",
+    "current": "ungemessen (Schätzung 3–5 s wegen WebGL und Bildern); 0 Anmeldeschritte ist erfüllt",
+    "target": "≤ 2,5 s (entspricht der Schwelle 'gut' für LCP laut web.dev), weiterhin 0 Anmelde- oder Zahlungsschritte",
+    "benchmark": {
+     "CEWE": "Ansicht teilen ist nicht Kern; ohne Anmeldung kaum möglich (Schätzung)",
+     "Popsa": "Link-Vorschau, Zeit unbekannt (Schätzung)",
+     "Google Fotos": "Ansicht meist an ein Konto oder die App gebunden (Schätzung)",
+     "Blurb": "Vorschau im Shop, Zeit unbekannt (Schätzung)"
+    },
+    "measure": "Lighthouse und WebPageTest, Profil 'Slow 4G', Moto-G-Klasse und iPhone: LCP und zusätzlich die Zeit, bis die erste Doppelseite fertig gekrümmt angezeigt wird (eigener performance.mark). Hürden zählen: jede Anmeldung, Zustimmung oder App-Aufforderung."
+   },
+   {
+    "id": "T15",
+    "name": "Störungen beim Anschauen",
+    "unit": "Anzahl je Ansichtssitzung",
+    "direction": "down",
+    "current": "nicht gemessen (aus simulierten Aussagen: versehentliches Umblättern beim Zoomen, kleine Schrift; ob Rezeptzettel Gäste stören, ist unbeobachtet)",
+    "target": "≤ 0,2 je Sitzung; keine Schrift unter 16 CSS-px; Technik-Angaben nur auf Wunsch",
+    "benchmark": {
+     "CEWE": "nicht gemessen",
+     "Popsa": "nicht gemessen",
+     "Google Fotos": "nicht gemessen",
+     "Blurb": "nicht gemessen"
+    },
+    "measure": "Moderierter Test mit 6–8 Gästen (darunter ältere Personen) auf Handy hoch, Handy quer und Tablet, 5 min frei blättern. Gezählt werden versehentliches Umblättern, ungefragte Einblendungen (z. B. Rezeptzettel), Zoom- und Dreh-Probleme sowie nicht lesbarer Text. Schriftgrößen automatisch per DOM-Prüfung."
+   },
+   {
+    "id": "T16",
+    "name": "Auffindbarkeit des Rückkanals",
+    "unit": "% der Gäste, die ohne Hinweis eine Rückmeldung setzen",
+    "direction": "up",
+    "current": "nicht gemessen; in den simulierten Aussagen wurde das Eselsohr zufällig entdeckt (Schätzung: unter 50 %)",
+    "target": "≥ 80 %, höchstens 2 Interaktionen; der Macher erfährt es privat innerhalb eines Tages",
+    "benchmark": {
+     "CEWE": "0 %, kein Rückkanal (Schätzung)",
+     "Popsa": "0 %, kein Rückkanal (Schätzung)",
+     "Google Fotos": "Kommentare/Likes in geteilten Alben, aber öffentlich im Album (Schätzung)",
+     "Blurb": "0 %, kein Rückkanal (Schätzung)"
+    },
+    "measure": "Im selben Gästetest wie T15 die Aufgabe 'Zeig Michel, dass du es gesehen hast' ohne weitere Erklärung stellen. Erfolgsquote und Zahl der Interaktionen erfassen. Benachrichtigungsverzug technisch messen."
+   },
+   {
+    "id": "T17",
+    "name": "Druckreife und ehrliche Vorschau",
+    "unit": "% erfüllter Prüfpunkte einer Druck-Preflight-Liste, die die Vorschau vorab anzeigt",
+    "direction": "up",
+    "current": "0 % (kein Druck; ausgelieferte Bilder höchstens 2560 px Langseite laut Bauplan, das reicht nicht für eine randlose Doppelseite bei 300 ppi)",
+    "target": "≥ 95 %; Warnung vor jedem eingebauten Fehler (Gesicht im Falz, Motiv im Beschnitt, unter 300 ppi, zu dunkel)",
+    "benchmark": {
+     "CEWE": "ca. 90–100 % (Schätzung)",
+     "Popsa": "ca. 80 % (Schätzung)",
+     "Google Fotos": "ca. 80 % (Schätzung)",
+     "Blurb": "ca. 90–100 % (Schätzung)"
+    },
+    "measure": "Testbuch mit 10 absichtlich eingebauten Druckfehlern. Zählen, wie viele die Vorschau vorab meldet. Danach das Druck-PDF mit einem Preflight-Werkzeug (z. B. callas pdfToolbox oder Acrobat Preflight) gegen die Vorgaben des Druckpartners prüfen (Beschnitt 3 mm, 300 ppi, Farbprofil, Schriften eingebettet)."
+   },
+   {
+    "id": "T18",
+    "name": "Korrekt erkannte und übertragbare Rezepte",
+    "unit": "% der Fotos mit Rezeptdaten in der Datei",
+    "direction": "up",
+    "current": "nicht gemessen; eigener Fuji-Leser, unbekannte Werte erscheinen als 'unbekannt'; die Übertragung in die Kamera fehlt",
+    "target": "≥ 98 % aller Werte korrekt; 100 % mit Urheberangabe; Übertragung ohne Abtippen",
+    "benchmark": {
+     "CEWE": "0 %, keine Funktion",
+     "Popsa": "0 %, keine Funktion",
+     "Google Fotos": "0 %, keine Funktion",
+     "Blurb": "0 %, keine Funktion"
+    },
+    "measure": "Referenzsatz: 50 Fuji-JPGs aus mindestens 3 Kameragenerationen, 30 Lightroom-Classic-Exporte, 10 Lightroom-mobile-Exporte. Wahrheit aus exiftool. Feldweise vergleichen. Übernahme prüfen: Preset in Lightroom importieren bzw. Einstellungen an der Kamera nachstellen und Testbild vergleichen."
+   }
+  ],
+  "relations": [
+   {
+    "req": "K1",
+    "tech": "T1",
+    "strength": 9
+   },
+   {
+    "req": "K1",
+    "tech": "T13",
+    "strength": 3
+   },
+   {
+    "req": "K2",
+    "tech": "T1",
+    "strength": 9
+   },
+   {
+    "req": "K2",
+    "tech": "T13",
+    "strength": 3
+   },
+   {
+    "req": "K3",
+    "tech": "T3",
+    "strength": 9
+   },
+   {
+    "req": "K3",
+    "tech": "T2",
+    "strength": 9
+   },
+   {
+    "req": "K3",
+    "tech": "T8",
+    "strength": 3
+   },
+   {
+    "req": "K3",
+    "tech": "T9",
+    "strength": 3
+   },
+   {
+    "req": "K3",
+    "tech": "T12",
+    "strength": 1
+   },
+   {
+    "req": "K4",
+    "tech": "T4",
+    "strength": 9
+   },
+   {
+    "req": "K4",
+    "tech": "T5",
+    "strength": 3
+   },
+   {
+    "req": "K4",
+    "tech": "T6",
+    "strength": 3
+   },
+   {
+    "req": "K5",
+    "tech": "T5",
+    "strength": 9
+   },
+   {
+    "req": "K5",
+    "tech": "T6",
+    "strength": 3
+   },
+   {
+    "req": "K5",
+    "tech": "T3",
+    "strength": 1
+   },
+   {
+    "req": "K6",
+    "tech": "T6",
+    "strength": 9
+   },
+   {
+    "req": "K6",
+    "tech": "T7",
+    "strength": 3
+   },
+   {
+    "req": "K6",
+    "tech": "T3",
+    "strength": 3
+   },
+   {
+    "req": "K7",
+    "tech": "T8",
+    "strength": 9
+   },
+   {
+    "req": "K7",
+    "tech": "T3",
+    "strength": 3
+   },
+   {
+    "req": "K8",
+    "tech": "T7",
+    "strength": 9
+   },
+   {
+    "req": "K8",
+    "tech": "T6",
+    "strength": 9
+   },
+   {
+    "req": "K8",
+    "tech": "T4",
+    "strength": 3
+   },
+   {
+    "req": "K9",
+    "tech": "T6",
+    "strength": 9
+   },
+   {
+    "req": "K9",
+    "tech": "T3",
+    "strength": 3
+   },
+   {
+    "req": "K9",
+    "tech": "T5",
+    "strength": 3
+   },
+   {
+    "req": "K10",
+    "tech": "T7",
+    "strength": 9
+   },
+   {
+    "req": "K10",
+    "tech": "T2",
+    "strength": 3
+   },
+   {
+    "req": "K11",
+    "tech": "T9",
+    "strength": 9
+   },
+   {
+    "req": "K11",
+    "tech": "T6",
+    "strength": 9
+   },
+   {
+    "req": "K11",
+    "tech": "T17",
+    "strength": 1
+   },
+   {
+    "req": "K12",
+    "tech": "T10",
+    "strength": 9
+   },
+   {
+    "req": "K12",
+    "tech": "T17",
+    "strength": 3
+   },
+   {
+    "req": "K13",
+    "tech": "T11",
+    "strength": 9
+   },
+   {
+    "req": "K13",
+    "tech": "T7",
+    "strength": 3
+   },
+   {
+    "req": "K14",
+    "tech": "T11",
+    "strength": 9
+   },
+   {
+    "req": "K15",
+    "tech": "T12",
+    "strength": 9
+   },
+   {
+    "req": "K15",
+    "tech": "T13",
+    "strength": 3
+   },
+   {
+    "req": "K16",
+    "tech": "T13",
+    "strength": 9
+   },
+   {
+    "req": "K16",
+    "tech": "T1",
+    "strength": 3
+   },
+   {
+    "req": "K17",
+    "tech": "T13",
+    "strength": 9
+   },
+   {
+    "req": "K17",
+    "tech": "T4",
+    "strength": 3
+   },
+   {
+    "req": "K18",
+    "tech": "T14",
+    "strength": 9
+   },
+   {
+    "req": "K19",
+    "tech": "T15",
+    "strength": 9
+   },
+   {
+    "req": "K19",
+    "tech": "T14",
+    "strength": 3
+   },
+   {
+    "req": "K20",
+    "tech": "T16",
+    "strength": 9
+   },
+   {
+    "req": "K20",
+    "tech": "T15",
+    "strength": 1
+   },
+   {
+    "req": "K21",
+    "tech": "T17",
+    "strength": 9
+   },
+   {
+    "req": "K21",
+    "tech": "T10",
+    "strength": 3
+   },
+   {
+    "req": "K22",
+    "tech": "T17",
+    "strength": 9
+   },
+   {
+    "req": "K22",
+    "tech": "T9",
+    "strength": 3
+   },
+   {
+    "req": "K22",
+    "tech": "T10",
+    "strength": 3
+   },
+   {
+    "req": "K23",
+    "tech": "T18",
+    "strength": 9
+   },
+   {
+    "req": "K24",
+    "tech": "T15",
+    "strength": 9
+   }
+  ],
+  "roof": [
+   {
+    "a": "T1",
+    "b": "T13",
+    "correlation": "++",
+    "note": "Eine serverseitige Projektablage mit Änderungsprotokoll löst beides zugleich: Wiederherstellung (Geräteverlust, gelöschter Browserspeicher, früherer Stand) und Synchronisation zwischen Geräten und Personen. Das ist der größte gemeinsame Hebel."
+   },
+   {
+    "a": "T12",
+    "b": "T13",
+    "correlation": "++",
+    "note": "Sobald das Projekt nicht mehr nur lokal liegt, können zweite Geräte und zweite Personen Fotos direkt einspielen. Das Zusammentragen wird dadurch erst schnell."
+   },
+   {
+    "a": "T3",
+    "b": "T4",
+    "correlation": "-",
+    "note": "Null ungefragte Änderungen heißt: Die Automatik darf um fixierte Elemente herum nicht mehr frei neu rechnen. Der Rest des Buches kann dadurch schlechter werden. Auflösen lässt sich das über lokale Neuberechnung nur der nicht fixierten Doppelseiten."
+   },
+   {
+    "a": "T6",
+    "b": "T4",
+    "correlation": "-",
+    "note": "Jeder neue Freiheitsgrad ist ein weiterer Zustand, den die Automatik respektieren muss. Das macht die Regel-Engine komplexer und fehleranfälliger."
+   },
+   {
+    "a": "T6",
+    "b": "T7",
+    "correlation": "-",
+    "note": "Mehr Parameter bedeuten mehr Bedienelemente und mehr Suchzeit. Gleichzeitig macht erst die Freiheit heute unlösbare Aufgaben lösbar und senkt damit die Strafwerte. Die Bilanz hängt also an der Gestaltung (Kontextmenü statt Werkzeugleiste)."
+   },
+   {
+    "a": "T6",
+    "b": "T9",
+    "correlation": "++",
+    "note": "Zoom, Feldform und freie Ausschnitt-Position sind genau die Freiheitsgrade, mit denen sich angeschnittene Motive vermeiden lassen."
+   },
+   {
+    "a": "T6",
+    "b": "T3",
+    "correlation": "-",
+    "note": "Raster-Ausnahmen und freie Feldformen lockern die ruhige Ordnung, auf der die Qualität des Erstentwurfs beruht. Die Ausnahme muss deshalb eine bewusste Handlung bleiben und darf kein Standard werden."
+   },
+   {
+    "a": "T3",
+    "b": "T5",
+    "correlation": "+",
+    "note": "Sichtbare Begründungen machen Regelfehler für Michel erkennbar. Die Regeln werden dadurch schneller besser, und mehr Doppelseiten bleiben unverändert."
+   },
+   {
+    "a": "T3",
+    "b": "T8",
+    "correlation": "+",
+    "note": "Eine falsche Zeitordnung ist ein häufiger Grund, Doppelseiten umzustellen. Wird sie korrekt, steigt die Übernahmequote."
+   },
+   {
+    "a": "T2",
+    "b": "T8",
+    "correlation": "-",
+    "note": "Ein Uhrenabgleich über mehrere Kameras (z. B. über Bildähnlichkeit oder ein gemeinsames Foto) kostet Rechenzeit beim Erstentwurf."
+   },
+   {
+    "a": "T2",
+    "b": "T17",
+    "correlation": "-",
+    "note": "Druckreife braucht die Originale in voller Auflösung. Das Hochladen und Verarbeiten großer Dateien verlängert die Zeit bis zum Erstentwurf, wenn es nicht im Hintergrund nach dem Entwurf passiert."
+   },
+   {
+    "a": "T14",
+    "b": "T17",
+    "correlation": "-",
+    "note": "Höhere Auflösung und Farbprofile für den Druck vergrößern die Dateien. Für die Ansicht müssen deshalb weiterhin getrennte, kleine Ableitungen ausgeliefert werden, sonst leidet die Ladezeit."
+   },
+   {
+    "a": "T10",
+    "b": "T17",
+    "correlation": "++",
+    "note": "Sauberes Farbmanagement (Profile erhalten, keine ungefragte Nachbearbeitung) ist die Voraussetzung für eine ehrliche Druckvorschau und eine bestandene Preflight-Prüfung."
+   },
+   {
+    "a": "T10",
+    "b": "T14",
+    "correlation": "-",
+    "note": "Verlustärmere Kodierung und eingebettete Profile erhöhen die Bytes je Bild und verlangsamen das erste Anzeigen leicht."
+   },
+   {
+    "a": "T15",
+    "b": "T18",
+    "correlation": "-",
+    "note": "Hier steckt der Konflikt K23 gegen K24. Je präsenter und animierter die Rezepte sind, desto eher stören sie Gäste ohne Technikinteresse. Auflösen lässt sich das über eine Rezeptansicht, die man selbst öffnet, statt einer automatischen Einblendung."
+   },
+   {
+    "a": "T16",
+    "b": "T15",
+    "correlation": "-",
+    "note": "Ein auffälligerer Rückkanal (Hinweis, Knopf) erhöht die Auffindbarkeit, kann aber das ruhige Anschauen stören. Ein dezenter einmaliger Hinweis ist der Kompromiss."
+   },
+   {
+    "a": "T11",
+    "b": "T18",
+    "correlation": "+",
+    "note": "Beide lesen dieselben Metadaten (XMP/EXIF). Ein besserer Leser verbessert also Rezepte und vorbefüllte Bildangaben zugleich. Achtung: Der Bauplan entfernt GPS absichtlich, deshalb kann 'Wo' nur aus Stichwörtern oder von Hand kommen."
+   },
+   {
+    "a": "T13",
+    "b": "T4",
+    "correlation": "-",
+    "note": "Gemeinsames Bearbeiten erzeugt eine neue Quelle ungefragter Änderungen (die andere Person). Konfliktfreie Zusammenführung, z. B. über CRDT oder Sperren je Doppelseite, ist nötig, um T4 bei 0 zu halten."
+   }
+  ],
+  "notes": "Schritt 3 House of Quality, Sicht Entwicklungsingenieur. 18 technische Merkmale, alle lösungsneutral und messbar. Jede der 24 Anforderungen hat mindestens eine starke Beziehung (9), jede Spalte ist belegt.\n\nEhrlichkeitshinweise: (1) Fast alle Ist-Werte sind Schätzungen oder 'nicht gemessen'. Gezählt oder aus dem Bauplan abgeleitet sind nur T6 (3 von 8 Freiheitsgraden), T13 (heute kein Gerätewechsel, weil nur IndexedDB), T17 (0 %, kein Druck; 2560 px Langseite) und T18 (keine Funktion bei den Wettbewerbern). (2) Alle Wettbewerbs-Benchmarks sind Schätzungen aus dem Marktbild und Produktkenntnis, nicht gemessen. Vor der Zielfestlegung sollten mindestens T2, T7, T14 und T17 bei CEWE und Popsa selbst nachgemessen werden. (3) Zwei externe Bezüge mit Quelle: Die LCP-Schwelle von 2,5 s für 'gut' stammt von web.dev (Core Web Vitals). Dass Safari/WebKit skriptbeschreibbaren Speicher wie IndexedDB nach 7 Tagen ohne Nutzung löschen kann, steht im WebKit-Blog vom März 2020 ('Full Third-Party Cookie Blocking and More'). Für installierte Home-Screen-Web-Apps gilt das laut demselben Beitrag nicht. Das ist ein konkretes Risiko für K1 und spricht für eine serverseitige Ablage.\n\nErwartete Schwerpunkte für die technische Gewichtung (vorläufig, ohne Rechnung): Am stärksten belegt sind T1 (K1 und K2, beide mit hoher Verbesserungsquote), T6 (starke Beziehung zu K6, K8, K9, K11), T13 (K16, K17, dazu indirekt K1, K2, K15), T7, T17 und T11. Die Rechnung mit Bedeutung × Verbesserungsquote × Verkaufsschwerpunkt aus Schritt 2 sollte das bestätigen oder widerlegen.\n\nWichtigste Zielkonflikte im Dach: (a) Automatik gegen Kontrolle (T3 gegen T4 und T6), aufzulösen über Fixieren plus lokale Neuberechnung. (b) Druckreife gegen Ladezeit und Tempo des Erstentwurfs (T17 gegen T14 und T2), aufzulösen über getrennte Ableitungen und Hochladen im Hintergrund. (c) Rezepte gegen Ruhe beim Anschauen (T18 gegen T15), aufzulösen über eine Rezeptansicht, die man selbst öffnet. (d) Datenschutz gegen Bildangaben: GPS wird bewusst entfernt, daher bleibt 'Wo' in T11 nur über Stichwörter möglich. Das ist eine Produktentscheidung, kein technischer Fehler.\n\nErste Maßnahme vor Schritt 4: eine Messgrundlage am bestehenden Fujiventura schaffen (T2, T14 mit Lighthouse/WebPageTest, T1-Szenarien 1 bis 4, T7-Aufgabensatz, T18-Referenzsatz mit exiftool). Das kostet ca. 1–2 Tage (Schätzung) und ersetzt die meisten Ist-Schätzungen durch Messwerte. T3, T15 und T16 brauchen echte Nutzer und lassen sich mit dem Kano-Fragebogen und einem kurzen Gästetest (6–8 Personen) verbinden."
+ },
+ "features": {
+  "features": [
+   {
+    "id": "F1",
+    "name": "Messgrundlage am heutigen Fujiventura",
+    "description": "Bevor gebaut wird: ein wiederholbarer Prüfstand. Dazu gehören die T1-Szenarien 1 bis 4 als automatisierter Test, performance.mark für T2 und T14, Lighthouse/WebPageTest mit Slow 4G, der 12-Aufgaben-Satz für T7 und ein exiftool-Referenzsatz für T18. Ergebnisse landen als Tabelle in der Workshop-Doku.",
+    "techs": [
+     "T1",
+     "T2",
+     "T4",
+     "T7",
+     "T14",
+     "T18"
+    ],
+    "reqs": [
+     "K1",
+     "K3",
+     "K4",
+     "K10",
+     "K18",
+     "K23"
+    ],
+    "kano": "M",
+    "effort": "S",
+    "phase": 1,
+    "why": "Grob nachgerechnet: Fast alle Ist-Werte im House of Quality sind Schätzungen. Die Verbesserungsquoten (Planwert / heute) treiben die Gewichtung aber stark. Ohne Messung kann die Rangfolge kippen, deshalb kommt das zuerst. Laut Schritt 3 kostet es ca. 1–2 Tage (Schätzung)."
+   },
+   {
+    "id": "F2",
+    "name": "Versioniertes Projektformat mit Ablage auf dem Server",
+    "description": "Das Projekt bekommt ein festes, versioniertes Schema mit Migrationspfad. Jede Änderung wird als Eintrag in einem Änderungsprotokoll gespeichert. IndexedDB bleibt als Zwischenspeicher für offline, die Quelle der Wahrheit liegt im Konto des Machers. Gäste brauchen weiterhin kein Konto.",
+    "techs": [
+     "T1",
+     "T13",
+     "T4"
+    ],
+    "reqs": [
+     "K1",
+     "K2",
+     "K16",
+     "K17"
+    ],
+    "kano": "M",
+    "effort": "L",
+    "phase": 1,
+    "why": "T13 (ca. 455 Punkte) und T1 (ca. 442) sind nach grober Rechnung die beiden schwersten Spalten, zusammen rund 28 % der technischen Bedeutung. Das Dach verbindet sie mit '++'. Eine einzige Ablage mit Änderungsprotokoll zahlt auf beide ein. Das WebKit-Risiko (Speicher wird nach 7 Tagen ohne Nutzung gelöscht) macht reines IndexedDB für K1 untragbar. P8 verlangt außerdem ein festes Format, bevor der Editor wächst."
+   },
+   {
+    "id": "F3",
+    "name": "Versionsverlauf und Projekt als Datei",
+    "description": "Benannte und automatische Zwischenstände (z. B. 'vor dem Umsortieren', 'Stand gestern'). Ein Klick führt zurück, Rückgängig funktioniert über Sitzungen hinweg. Das ganze Projekt lässt sich als eine Datei exportieren und importieren, optional mit den Originalfotos.",
+    "techs": [
+     "T1"
+    ],
+    "reqs": [
+     "K1",
+     "K2"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 1,
+    "why": "K2 hat mit ca. 24 das höchste Einzelgewicht aller Anforderungen (Bedeutung 4 × Quote 5 × 1,2). Das liegt daran, dass heute gar nichts davon existiert. Baut auf F2 auf und schließt die T1-Szenarien 7 und 8. Kein Wettbewerber wirbt damit, also besetzt das die Lücke 'Vertrauen als Produktmerkmal'."
+   },
+   {
+    "id": "F4",
+    "name": "Fixieren und lokale Neuberechnung",
+    "description": "Alles, was der Nutzer selbst entscheidet (Fotowahl, Ausschnitt, Layout, Reihenfolge, Text), wird automatisch als fixiert markiert und ist sichtbar gekennzeichnet. Lösen geht von Hand. Die Automatik rechnet nur nicht fixierte Doppelseiten neu und nie das ganze Buch. Abgesichert durch den Eigenschaftstest aus T4 (0 ungefragte Änderungen).",
+    "techs": [
+     "T4",
+     "T3"
+    ],
+    "reqs": [
+     "K4",
+     "K8",
+     "K3"
+    ],
+    "kano": "M",
+    "effort": "M",
+    "phase": 1,
+    "why": "K4 ist ein Basismerkmal mit Bedeutung 5 und Verkaufsschwerpunkt 1,5 (Gewicht ca. 12,5). T4 liegt bei ca. 176 Punkten. Das löst den Dachkonflikt T3 gegen T4. Für Fujiventura ist es der kritischste Punkt, weil die Automatik der Kern ist: Wenn sie Entscheidungen überschreibt, verliert das Produkt seinen Sinn."
+   },
+   {
+    "id": "F5",
+    "name": "Ausschnitt-Editor pro Feld mit Motivschutz",
+    "description": "Im Feld verschieben und zoomen. Feldform bzw. Original-Seitenverhältnis lassen sich im Raster wählen. Gesichter und Hauptmotiv werden lokal im Browser erkannt und als Startausschnitt vorgeschlagen. Eine Warnung erscheint, wenn ein Kopf angeschnitten ist oder im Falz liegt.",
+    "techs": [
+     "T6",
+     "T9",
+     "T17"
+    ],
+    "reqs": [
+     "K11",
+     "K22",
+     "K3"
+    ],
+    "kano": "M",
+    "effort": "M",
+    "phase": 1,
+    "why": "K11 hat ein Gewicht von ca. 15 (Basismerkmal, heute 2) und eine starke Beziehung zu T6 (ca. 387, Platz 3) und T9 (ca. 177). Michel nennt den Ausschnitt sein größtes Problem (S4). Dach T6/T9 '++': Dieselben Freiheitsgrade senken angeschnittene Motive. Bringt T6 von 3 auf etwa 5 von 8."
+   },
+   {
+    "id": "F6",
+    "name": "Textblöcke und Geschichten-Seite",
+    "description": "Ein neuer Seitentyp und ein Textfeld im Raster für kurze Absätze. Inline tippen, zwei bis drei kuratierte Schriftstile, sichtbare Grenzen. Der Satz ist in Editor, 3D-Ansicht und später im Druck-PDF identisch, weil alle drei denselben Satz-Code nutzen.",
+    "techs": [
+     "T11",
+     "T7"
+    ],
+    "reqs": [
+     "K13"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 1,
+    "why": "K13 hat ein Gewicht von ca. 19 (heute 1, Ziel 4). Damit ist T11 mit ca. 254 Punkten die viertwichtigste Spalte. 'Nur ein Stapel Bilder' (S38, S51) ist ein starkes Motiv. Das Risiko liegt im identischen Umbruch, deshalb gibt es einen gemeinsamen Satz-Code statt zwei Renderern."
+   },
+   {
+    "id": "F7",
+    "name": "Foto als wichtig markieren",
+    "description": "Ein Stern bzw. 'muss rein' pro Foto, optional mit 'groß'. Die Automatik garantiert, dass markierte Fotos aufgenommen werden, und gibt ihnen den höheren Größenrang. Funktioniert schon bei der Auswahl, vor dem Erstentwurf.",
+    "techs": [
+     "T6",
+     "T3",
+     "T7"
+    ],
+    "reqs": [
+     "K6"
+    ],
+    "kano": "O",
+    "effort": "S",
+    "phase": 1,
+    "why": "Wenig Aufwand für einen direkten Treffer bei T6 (Parameter 3: Wichtigkeit) und T3. Tobi und Jana nennen es (S47, S50). Damit wird die Automatik besser, statt sie zu umgehen."
+   },
+   {
+    "id": "F8",
+    "name": "Fotos über Seitengrenzen verschieben, Seiten einfügen und entfernen",
+    "description": "Ziehen eines Fotos auf eine andere Doppelseite, eine leere Doppelseite zwischendrin einfügen, Seite oder Foto entfernen. Gleiche Aktionen per Tastatur und Kontextmenü. Höchstens 4 Interaktionen pro Aufgabe.",
+    "techs": [
+     "T7",
+     "T6",
+     "T4"
+    ],
+    "reqs": [
+     "K8",
+     "K10"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 1,
+    "why": "T7 (ca. 187 Punkte) ist heute vor allem wegen unlösbarer Aufgaben teuer, die je 20 Strafpunkte zählen. Dieses Feature macht drei der zwölf Standardaufgaben lösbar. Kontextmenü statt Werkzeugleiste entschärft den Dachkonflikt T6 gegen T7."
+   },
+   {
+    "id": "F9",
+    "name": "'Warum hier?' pro Foto",
+    "description": "Mit einer Interaktion zeigt jedes automatisch platzierte Foto seine Begründung in Klartext, z. B. 'Zeitlich nach Bild 12, Farbe passt zur Nachbarseite, Ruhe-Seite nach drei vollen Seiten'. Von dort lässt sich die Entscheidung direkt überstimmen, was das Foto fixiert (F4).",
+    "techs": [
+     "T5",
+     "T3"
+    ],
+    "reqs": [
+     "K5",
+     "K4"
+    ],
+    "kano": "A",
+    "effort": "S",
+    "phase": 2,
+    "why": "T5 hat ca. 113 Punkte. Das Regelwerk existiert schon, es muss nur ausgeben, was es tut. Laut Marktbild bietet das kein Anbieter, und es hat einen Verkaufsschwerpunkt von 1,5. Dach T3/T5 '+': Michel erkennt Regelfehler schneller."
+   },
+   {
+    "id": "F10",
+    "name": "Gerätewechsel ohne Installation",
+    "description": "Am Handy anmelden (z. B. Magic Link), Fotos aussortieren und markieren, am Laptop weitermachen. Änderungen sind nach ≤ 5 s auf dem anderen Gerät sichtbar. Offline-Bearbeitung wird beim Wiederverbinden zusammengeführt.",
+    "techs": [
+     "T13",
+     "T1"
+    ],
+    "reqs": [
+     "K16",
+     "K1"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 2,
+    "why": "K16 hat ein Gewicht von ca. 19 und füllt das Kernstück von T13. Technisch ist es fast geschenkt, sobald F2 steht. Es ist eigene Arbeit an Oberfläche und Konfliktlogik, deshalb Phase 2 und nicht Teil von F2."
+   },
+   {
+    "id": "F11",
+    "name": "Ehrliche Druckvorschau mit Preflight-Warnungen",
+    "description": "Im 3D-Buch und in einer flachen Druckansicht: Beschnitt und Falz-Zone einblenden. Warnung bei unter 300 ppi, Motiv im Beschnitt, Gesicht im Falz und sehr dunklen Seiten. Funktioniert schon, bevor bestellt werden kann.",
+    "techs": [
+     "T17",
+     "T9",
+     "T10"
+    ],
+    "reqs": [
+     "K22",
+     "K11",
+     "K21"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 2,
+    "why": "T17 kommt auf ca. 196 Punkte (Platz 5). Die Warnungen sind auch ohne Druck nützlich und bereiten F18 vor. Laut Bauplan reichen 2560 px Langseite nicht für eine randlose Doppelseite, deshalb ist F12 Voraussetzung."
+   },
+   {
+    "id": "F12",
+    "name": "Originale im Hintergrund und Farbmanagement",
+    "description": "Nach dem Erstentwurf werden die Originale im Hintergrund hochgeladen bzw. vorgehalten. Farbprofile (Display P3, AdobeRGB) bleiben erhalten, es gibt keine automatische Nachschärfung. Für die Ansicht weiterhin kleine, getrennte Ableitungen.",
+    "techs": [
+     "T10",
+     "T17",
+     "T2",
+     "T14"
+    ],
+    "reqs": [
+     "K12",
+     "K21",
+     "K22"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 2,
+    "why": "T10 hat ca. 100 Punkte und ist mit T17 über '++' verbunden. Die getrennten Ableitungen und das Hochladen im Hintergrund lösen die Dachkonflikte T17 gegen T2 und T14, ohne Ladezeit und Erstentwurf zu verschlechtern."
+   },
+   {
+    "id": "F13",
+    "name": "Uhrenabgleich mehrerer Kameras",
+    "description": "Erkennt Geräte über EXIF (Modell und Seriennummer). Den Versatz schlägt das System über überlappende Szenen oder ein gemeinsames Foto vor. Korrektur mit einem Regler pro Kamera ('diese Kamera +1 h').",
+    "techs": [
+     "T8",
+     "T3"
+    ],
+    "reqs": [
+     "K7",
+     "K3"
+    ],
+    "kano": "M",
+    "effort": "M",
+    "phase": 2,
+    "why": "T8 ist mit ca. 83 Punkten nicht riesig, aber ein peinliches Basismerkmal (S36, S46). Steht im Bauplan schon unter 'später'. Die Rechenzeit (Dach T2/T8 '-') lässt sich mit dem manuellen Regler als Rückfall gering halten."
+   },
+   {
+    "id": "F14",
+    "name": "Bildangaben aus Metadaten vorbefüllen",
+    "description": "Wer und Wann werden aus Lightroom-Personen-Tags, Stichwörtern und Aufnahmezeit vorgeschlagen und lassen sich mit einem Klick als Bildunterschrift übernehmen. 'Wo' nur aus Stichwörtern, weil GPS bewusst entfernt wird.",
+    "techs": [
+     "T11",
+     "T18"
+    ],
+    "reqs": [
+     "K14",
+     "K13"
+    ],
+    "kano": "A",
+    "effort": "S",
+    "phase": 2,
+    "why": "Gleiche Spalte T11 wie F6, dazu Dach T11/T18 '+': Der vorhandene Metadaten-Leser wird nur erweitert. Lücke 'Text für Fotografen' mit Verkaufsschwerpunkt 1,5 bei kleinem Aufwand."
+   },
+   {
+    "id": "F15",
+    "name": "Fotos einsammeln per Link und Serien gruppieren",
+    "description": "Der Macher teilt einen Sammel-Link, Freunde laden ohne Konto Fotos ins Projekt. Fast gleiche Bilder werden lokal zu Serien gruppiert, das beste wird vorgeschlagen, der Rest ist eingeklappt.",
+    "techs": [
+     "T12",
+     "T13"
+    ],
+    "reqs": [
+     "K15"
+    ],
+    "kano": "O",
+    "effort": "M",
+    "phase": 2,
+    "why": "T12 hat nur ca. 80 Punkte, aber das Dach T12/T13 '++' macht es nach F2 günstig. Es setzt am Anfang der Kette an: Jana und Sandra verlieren die Lust, bevor das Buch überhaupt beginnt (S34, S45)."
+   },
+   {
+    "id": "F16",
+    "name": "Ruhige Ansicht: Lesemodus, Zoom und Ladezeit",
+    "description": "Erste Doppelseite in ≤ 2,5 s auf Slow 4G (kleine Ableitung zuerst, Krümmung danach). Flacher Lesemodus mit großer Ansicht für Fotografen. Zoom per Zwei-Finger-Geste blättert nicht um. Keine Schrift unter 16 CSS-px. Rezeptzettel nur auf Antippen.",
+    "techs": [
+     "T14",
+     "T15"
+    ],
+    "reqs": [
+     "K18",
+     "K19",
+     "K24"
+    ],
+    "kano": "M",
+    "effort": "M",
+    "phase": 2,
+    "why": "T15 und T14 liegen bei je ca. 100 Punkten. Hier verteidigt Fujiventura seinen bestehenden Vorsprung (Verkaufsschwerpunkt 1,5 bei K18). Löst gleichzeitig den Dachkonflikt T15 gegen T18 zugunsten der Gäste."
+   },
+   {
+    "id": "F17",
+    "name": "Rückkanal auffindbar machen und leise melden",
+    "description": "Ein einmaliger dezenter Hinweis auf Eselsohr und Zettel für Gäste, dazu ein 'Gesehen'-Zeichen mit einem Antippen. Der Macher bekommt eine private Zusammenfassung pro Tag statt Zahlen oder Likes.",
+    "techs": [
+     "T16",
+     "T15"
+    ],
+    "reqs": [
+     "K20"
+    ],
+    "kano": "A",
+    "effort": "S",
+    "phase": 2,
+    "why": "T16 hat nur ca. 51 Punkte, weil Fujiventura hier schon gut ist. Für Michel ist es aber 'das Schönste daran' (S8), der Aufwand ist klein und es ist ein Alleinstellungsmerkmal."
+   },
+   {
+    "id": "F18",
+    "name": "Druck über Partner",
+    "description": "Export eines druckfertigen PDF (3 mm Beschnitt, 300 ppi, eingebettete Schriften, Farbprofil) und Bestellung bei einem Druckpartner mit zwei bis drei Formaten und Bindungen. Automatische Preflight-Prüfung vor dem Absenden.",
+    "techs": [
+     "T17",
+     "T10"
+    ],
+    "reqs": [
+     "K21",
+     "K22"
+    ],
+    "kano": "M",
+    "effort": "L",
+    "phase": 3,
+    "why": "K21 hat ein Gewicht von ca. 12, der Planwert ist bewusst nur 3. Druck ist nicht Kern des Editor-Schritts, und der Kano-Fragebogen muss erst klären, ob er für die Kernzielgruppe Basis oder Leistung ist. F11 und F12 bereiten ihn vor, ohne sich festzulegen."
+   },
+   {
+    "id": "F19",
+    "name": "Gemeinsames Buch zu zweit",
+    "description": "Eine zweite Person einladen, beide bearbeiten gleichzeitig. Zusammenführung ohne Konflikte (CRDT oder Sperre je Doppelseite). Sichtbar ist, wer gerade wo arbeitet. Fixierungen des anderen bleiben unangetastet.",
+    "techs": [
+     "T13",
+     "T4"
+    ],
+    "reqs": [
+     "K17",
+     "K2"
+    ],
+    "kano": "A",
+    "effort": "L",
+    "phase": 3,
+    "why": "K17 hat ein Gewicht von ca. 14 wegen der Quote 4. Es betrifft aber nur ein Segment (Jana/Tobi). Dach T13/T4 '-': Es ist die riskanteste Quelle ungefragter Änderungen, deshalb erst nach F4 und F10. Das Änderungsprotokoll aus F2 ist die Grundlage."
+   },
+   {
+    "id": "F20",
+    "name": "Raster bewusst brechen",
+    "description": "Eine ausdrückliche Ausnahme pro Doppelseite: Foto über den Falz, Anschnitt über den Rand, ein Feld außerhalb des Rasters. Immer als bewusste Handlung, nie als Vorschlag der Automatik. Der Regel-Prüfer zeigt die Ausnahme an, ohne sie zu tadeln.",
+    "techs": [
+     "T6",
+     "T3",
+     "T5"
+    ],
+    "reqs": [
+     "K9",
+     "K11"
+    ],
+    "kano": "A",
+    "effort": "M",
+    "phase": 3,
+    "why": "Bringt T6 auf das Ziel von 7 von 8. K9 hat aber nur ca. 7 Gewicht, und das Dach T6/T3 '-' warnt, dass die ruhige Ordnung darunter leiden kann. Deshalb erst, wenn die Grundlagen stehen und der Fragebogen K9 als Begeisterung bestätigt."
+   },
+   {
+    "id": "F21",
+    "name": "Rezept mitnehmen mit Urheber",
+    "description": "Rezeptzettel mit Urheberangabe, die beim Übernehmen erhalten bleibt. Export als Lightroom-Preset (XMP) und als Kamera-Einstellungsliste. Optional sperrt der Urheber das Rezept. Gäste sehen die Technik nur, wenn sie sie selbst öffnen.",
+    "techs": [
+     "T18",
+     "T15"
+    ],
+    "reqs": [
+     "K23",
+     "K24"
+    ],
+    "kano": "A",
+    "effort": "M",
+    "phase": 3,
+    "why": "T18 hat nur ca. 51 Punkte, weil Fujiventura hier schon vorn ist. Das ist Pflege eines Alleinstellungsmerkmals für Jonas und Rainer, nicht der Hebel für den Editor-Schritt. Die direkte Übertragung in die Kamera hängt von Fujifilm-Schnittstellen ab und ist ungeprüft."
+   }
+  ],
+  "survey": [
+   {
+    "req": "K21",
+    "functional": "Wie fändest du es, wenn du dein Buch am Ende als echtes, gedrucktes Buch bestellen könntest?",
+    "dysfunctional": "Wie fändest du es, wenn es dein Buch nur digital gäbe und du es nicht drucken lassen könntest?"
+   },
+   {
+    "req": "K4",
+    "functional": "Wie fändest du es, wenn alles, was du selbst festgelegt hast, genau so bleibt, auch wenn du woanders etwas änderst?",
+    "dysfunctional": "Wie fändest du es, wenn sich beim Ändern einer Seite manchmal andere Seiten von selbst mit verschieben?"
+   },
+   {
+    "req": "K2",
+    "functional": "Wie fändest du es, wenn du jederzeit zu einem früheren Stand deines Buches zurückkönntest und es auch als Datei sichern könntest?",
+    "dysfunctional": "Wie fändest du es, wenn es immer nur den aktuellen Stand gäbe, ohne Zurück zu gestern und ohne eigene Sicherung?"
+   },
+   {
+    "req": "K16",
+    "functional": "Wie fändest du es, wenn du am Handy anfangen und am Laptop genau dort weitermachen könntest?",
+    "dysfunctional": "Wie fändest du es, wenn dein Buch nur auf dem Gerät liegt, auf dem du angefangen hast?"
+   },
+   {
+    "req": "K11",
+    "functional": "Wie fändest du es, wenn du in jedem Bildfeld selbst zoomen und den Ausschnitt verschieben könntest und gewarnt wirst, falls ein Kopf abgeschnitten ist?",
+    "dysfunctional": "Wie fändest du es, wenn der Ausschnitt automatisch gewählt wird und du ihn nur grob verschieben könntest?"
+   },
+   {
+    "req": "K13",
+    "functional": "Wie fändest du es, wenn du ein paar Sätze zu eurer Geschichte direkt ins Buch schreiben könntest?",
+    "dysfunctional": "Wie fändest du es, wenn im Buch außer Titel und kurzen Bildunterschriften kein Text möglich wäre?"
+   },
+   {
+    "req": "K5",
+    "functional": "Wie fändest du es, wenn du bei jedem Foto nachsehen könntest, warum es genau dort steht?",
+    "dysfunctional": "Wie fändest du es, wenn die Fotos einfach platziert werden, ohne dass du erfährst, warum?"
+   },
+   {
+    "req": "K9",
+    "functional": "Wie fändest du es, wenn das Buch ein ruhiges Raster hat und du es an einzelnen Stellen bewusst brechen könntest, zum Beispiel mit einem Foto über die Mitte?",
+    "dysfunctional": "Wie fändest du es, wenn alle Seiten immer streng im Raster bleiben müssen?"
+   },
+   {
+    "req": "K17",
+    "functional": "Wie fändest du es, wenn du mit einer zweiten Person gleichzeitig am selben Buch arbeiten könntest?",
+    "dysfunctional": "Wie fändest du es, wenn immer nur eine Person an einem Buch arbeiten kann?"
+   },
+   {
+    "req": "K14",
+    "functional": "Wie fändest du es, wenn bei deinen Fotos schon steht, wer drauf ist und wann es war, ohne dass du es abtippen musst?",
+    "dysfunctional": "Wie fändest du es, wenn du alle Angaben zu den Fotos selbst eintippen musst?"
+   },
+   {
+    "req": "K20",
+    "functional": "Wie fändest du es, wenn du leise und privat erfährst, dass Freunde dein Buch angeschaut haben, und sie dir mit einem Antippen antworten können?",
+    "dysfunctional": "Wie fändest du es, wenn du nach dem Teilen nie erfährst, ob jemand dein Buch angeschaut hat?"
+   },
+   {
+    "req": "K23",
+    "functional": "Wie fändest du es, wenn du bei einem Foto sehen könntest, mit welchen Kamera-Einstellungen es entstanden ist, und sie übernehmen könntest, wobei der Name des Fotografen dranbleibt?",
+    "dysfunctional": "Wie fändest du es, wenn es zu den Fotos keine Angaben gäbe, wie sie entstanden sind?"
+   },
+   {
+    "req": "K24",
+    "functional": "Wie fändest du es, wenn Kamera-Angaben beim Anschauen nur erscheinen, wenn du sie selbst öffnest?",
+    "dysfunctional": "Wie fändest du es, wenn beim Blättern immer wieder Kamera-Angaben von selbst eingeblendet werden?"
+   }
+  ],
+  "next": "Nach der groben Nachrechnung liegen vorne T13 Synchronisation (ca. 455), T1 Wiederherstellung (ca. 442) und T6 Gestaltungsfreiheit (ca. 387), danach T11 Text (ca. 254), T17 Druckreife (ca. 196), T7 Aufwand, T9 Motivschutz und T4 ungefragte Änderungen (je ca. 175–190). Michel sollte deshalb nicht mit sichtbaren Editor-Funktionen anfangen, sondern mit dem Fundament: erst ein bis zwei Tage Messgrundlage (F1), dann versioniertes Projektformat mit Ablage auf dem Server und Versionsverlauf (F2, F3). Das ist unsichtbar, schützt aber vor dem einen Fehler, der Vertrauen sofort zerstört, und macht Gerätewechsel, Sammeln und gemeinsames Arbeiten später fast gratis. Parallel oder direkt danach kommt der Kern des Editors: Fixieren mit lokaler Neuberechnung (F4), Ausschnitt-Editor (F5), Textblöcke (F6), dazu die kleinen Gewinne Wichtigkeits-Stern (F7) und Verschieben über Seitengrenzen (F8). Druck und das gemeinsame Buch sollten warten, bis der Kano-Fragebogen mit echten Leuten zeigt, ob sie für die Kernzielgruppe Basis- oder Begeisterungsmerkmale sind.",
+  "caveats": "Alle Kundenaussagen (S1–S84) stammen von simulierten Personas. Bedeutung, Kano-Typ, Kundensicht, Ist-Werte und Benchmarks sind Moderationsschätzungen und keine Messungen. Die technische Gewichtung ist grob im Kopf gerechnet (Gewicht = Bedeutung × Planwert/heute × Verkaufsschwerpunkt, dann Σ Gewicht × Beziehung 9/3/1) und reagiert stark auf die Ist-Werte. Wo Fujiventura heute mit 1 bewertet ist (K2, K13, K16, K17), vervierfacht oder verfünffacht sich das Gewicht. Eine einzige falsche Einschätzung kann so die Rangfolge verschieben. T13 steht auch deshalb ganz oben. Echte Interviews (5–8 Personen pro Segment: Macher, Gäste, Fotografen) und der Kano-Fragebogen müssen vor allem klären: (1) ob Druck (K21) für die Kernzielgruppe Basis oder Leistung ist, (2) ob Rezepte (K23) außerhalb der Fuji-Szene überhaupt zählen und ob sie Gäste stören (K24), (3) ob gemeinsames Arbeiten (K17) und Raster brechen (K9) wirklich begeistern oder egal sind, (4) wie groß das Risiko ungefragter Änderungen (T4) heute tatsächlich ist. Für die Auswertung empfiehlt sich die klassische Kano-Tabelle mit funktional und dysfunktional, dazu Better-/Worse-Koeffizienten (nach Berger u. a. 1993) und eine Frage zur Wichtigkeit (1–5). Bei wenigen Teilnehmenden sind die Ergebnisse als Tendenz zu lesen, nicht als Statistik. Aufwände S/M/L sind Schätzungen ohne Blick in den Code. Die Kosten für Server-Ablage und Datenschutz (Fotos von Gästen, Konto für Macher) und die Frage, ob Michels Freundeskreis ein Konto akzeptiert, sind offen. Druckpartner und die Übertragung in die Kamera hängen von Dritten ab und sind ungeprüft."
+ }
+}

@@ -1,0 +1,1069 @@
+[
+ {
+  "competitors": [
+   {
+    "name": "CEWE (CEWE Fotowelt Desktop, Web und App; auch Basis für Rossmann- und dm-Fotowelt)",
+    "segment": "Marktführer im Massenmarkt DACH, Desktop-Software plus App und Web; Stiftung Warentest 2020: beste Druckqualität, Gestaltung und Bestellung Note 2,0",
+    "strengths": [
+     "Sehr viele Gestaltungsmöglichkeiten und Vorlagen, Seite für Seite wählbar (Mumsnet-Nutzer: man wählt pro Seite Anzahl und Ausrichtung der Fotos und eine passende Vorlage)",
+     "Druckqualität laut Stiftung Warentest 2020 an der Spitze (test.de / cewe.de)",
+     "Viele Nutzer loben die 'einfache und intuitive Bedienung' (Trusted Shops CH, Zitat per Abruf)",
+     "App: 'die Handhabung ist kinderleicht und das Ergebnis wirklich umwerfend' (App Store, Santhor83, Zitat per Abruf)"
+    ],
+    "pains": [
+     {
+      "pain": "Desktop-Software wird bei großen Büchern langsam und stürzt ab",
+      "evidence": "Zitat (Forum, per Abruf): 'je mehr Seiten ich hatte (ab ca. 60 Seiten) lädt mein Computer ohne Ende und stürzt dann oft ab'. Ehrlicher Hinweis: In einem anderen Absturz-Thread der CEWE-Community lag die Ursache an einer Antiviren-Software (Acronis), nicht an CEWE.",
+      "source": "https://www.vivien-und-erhard.de/forum/index.php?thread%2F4561-probleme-bei-cewe-fotobuch%2F="
+     },
+     {
+      "pain": "Updates zerstören Vertrauen: Fehlermeldungen, Neustarts, Angst ums Projekt",
+      "evidence": "Zitate (Trusted Shops CH, per Abruf): 'Musste CEWE 4 mal starten. Pannen mit dem Laden der Fotos'; 'ein irreparabler Fehler sei entstanden' nach Update; 'Das war eine Zitterpartie während der ganzen Gestaltung'",
+      "source": "https://www.trustedshops.ch/bewertung/info_XA246759776EDBBCADB88DEA63E6E9032.html"
+     },
+     {
+      "pain": "Bedienung empfinden manche als umständlich und überladen",
+      "evidence": "Zitat (Mumsnet): 'The template is clunky, overly complex and not user friendly at all.' Außerdem sinngemäß: man muss Software auf PC/Mac herunterladen statt online zu arbeiten.",
+      "source": "https://www.mumsnet.com/talk/_chat/4781031-anyone-used-cewe-photo-books"
+     },
+     {
+      "pain": "Mobile App: Reihenfolge der Fotos nicht steuerbar bzw. nicht mehr chronologisch, starre Grenzen",
+      "evidence": "Zitate (App Store, per Abruf): 'die Reihenfolge der Bilder lässt sich nicht beeinflussen. Bei vielen Fotos ist das sehr lästig.' (Buxibix 2018); '…diese landen leider nicht mehr in der zeitlich richtigen Reihenfolge' (Asiul2012 2024); 'nur maximal 8 Fotos pro Seite'",
+      "source": "https://apps.apple.com/DE/app/id583713833?see-all=reviews"
+     },
+     {
+      "pain": "Kleine Bedienfehler bei Seitenverwaltung (leere Seite nicht löschbar)",
+      "evidence": "Zitat (App Store, Alex Landscaper 2018, per Abruf): 'Nachdem ich Bilder gelöscht hatte und somit eine leere Seite entstanden ist, konnte ich diese nicht löschen'",
+      "source": "https://apps.apple.com/DE/app/id583713833?see-all=reviews"
+     },
+     {
+      "pain": "Automatisches Zuschneiden schneidet Bildränder ab, Herauszoomen nicht möglich",
+      "evidence": "Sinngemäß (Suchzusammenfassung zu Forenbeiträgen): Bilder werden automatisch beschnitten, man kann nicht herauszoomen, weder im Web noch in der Software.",
+      "source": "https://www.talkphotography.co.uk/threads/anyone-got-a-clue-about-cewe.755565/"
+     }
+    ]
+   },
+   {
+    "name": "Rossmann Fotowelt (CEWE-Technik)",
+    "segment": "Drogerie-Massenmarkt, vor allem Mobile App und Web",
+    "strengths": [
+     "Günstig, schnell, gute Qualität: 'es geht schnell, die Qualität ist super und es ist günstig' (App Store, per Abruf)",
+     "App gilt als leicht zu bedienen ('Leicht zu bedienen, stürzt aber öfter mal ab')"
+    ],
+    "pains": [
+     {
+      "pain": "Totaler Projektverlust nach stundenlanger Arbeit",
+      "evidence": "Zitat (App Store, Kübibo, per Abruf): 'Diese Woche habe ich fast 4 Stunden geopfert und mir ein fotobuch erstellt und was passiert ? Aufeinmal alles weg.'",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     },
+     {
+      "pain": "Auswahl geht beim Schließen verloren, App stürzt ab",
+      "evidence": "Zitate (App Store, Miliz2803, per Abruf): 'sobald man sie schließt, man alles neu auswählen muss'; 'sie ständig abstürzt'",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     },
+     {
+      "pain": "Keine schnelle Massenauswahl eines Albums",
+      "evidence": "Zitat (App Store, MeckieMesser85, per Abruf): 'Leider hat die App keine Möglichkeit, schnell alle Fotos eines Albums auszuwählen'",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     },
+     {
+      "pain": "Funktionen werden gestrichen (Bildbearbeitung)",
+      "evidence": "Zitat (App Store, xjushja, per Abruf): 'Früher konnte man die Fotos hier noch mal bearbeiten, etwas drehen oder die Lichtverhältnisse anpassen'",
+      "source": "https://apps.apple.com/de/app/rossmann-fotowelt/id941118801?see-all=reviews&platform=iphone"
+     }
+    ]
+   },
+   {
+    "name": "dm Foto / Fotoparadies (CEWE-Technik)",
+    "segment": "Drogerie-Massenmarkt, App und Web; Stiftung Warentest 2020 Note 2,1",
+    "strengths": [
+     "Gute Qualität im Warentest 2020 (Note 2,1, laut dm-Seite)",
+     "Import aus Cloud-Diensten (CEWE MYPHOTOS, Dropbox)"
+    ],
+    "pains": [
+     {
+      "pain": "Seiten oder einzelne Fotos lassen sich nicht nachträglich zwischendrin einfügen",
+      "evidence": "Zitat (Nutzerbewertung, per Abruf): 'Ich würde mir wünschen, dass man zwischendrin noch einzelne Seiten oder einzelne Fotos einfügen kann'",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "pain": "Fotoauswahl zu klein, Qualität nicht beurteilbar",
+      "evidence": "Zitat (per Abruf): 'Die Bilder auswählen ist schwierig, da sie nur sehr klein angezeigt werden'",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "pain": "Zwischenspeichern entfernt, Buch muss in einem Rutsch fertig werden",
+      "evidence": "Zitat (per Abruf, abgeschnitten): 'Neuerdings gibt es diese Möglichkeit leider nicht mehr und ich muss das Fotobuch direkt nachdem …'",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "pain": "Bestellübertragung scheitert wiederholt",
+      "evidence": "Zitat (per Abruf): 'leider tritt bei der Übertragung der Bestellung ständig ein technischer Fehler auf, so dass ich 7 Anläufe gebraucht habe'",
+      "source": "https://justuseapp.com/de/app/1173960435/dm-foto/reviews"
+     },
+     {
+      "pain": "Layout ändert sich ungefragt, Titel fehlt in der Vorschau",
+      "evidence": "Sinngemäß (Suchzusammenfassung): Layout auf der rechten Seite ändert sich automatisch, eingegebener Titel wird in der Vorschau nicht angezeigt; App importiert teils nur die Hälfte der Fotos.",
+      "source": "https://play.google.com/store/apps/details?id=de.dm.fotoparadies&hl=en_US"
+     }
+    ]
+   },
+   {
+    "name": "Pixum",
+    "segment": "Großer Online-Anbieter DACH, Web, Desktop und App; Trustpilot ca. 4,5",
+    "strengths": [
+     "Vielfältige Gestaltung, leicht zu bedienen: 'Die Software zum Gestalten der Fotobücher ist leicht zu bedienen und bietet sehr viele Möglichkeiten.' (Trustpilot, per Abruf)",
+     "'Es geht schnell und die unterschiedlichen Varianten werden gut dargestellt.' (Trustpilot, per Abruf)"
+    ],
+    "pains": [
+     {
+      "pain": "App: starre, schematische Vorgaben, kaum Freiheit",
+      "evidence": "Zitate (App Store, per Abruf): 'Man bekommt relativ starr und schematisch vorgegeben, wie das Fotobuch auszusehen hat' (ttbrex 2021); 'viel zu wenige Möglichkeiten um sich wirklich auszutoben' (tkvkk 2022)",
+      "source": "https://apps.apple.com/de/app/id1319898516?see-all=reviews"
+     },
+     {
+      "pain": "Grundfunktionen fehlen in der App (Zuschneiden, Text pro Foto)",
+      "evidence": "Zitat (App Store, tkvkk 2022, per Abruf): 'Das zuschneiden von Bildern fehlt'; sinngemäß (ttbrex): individueller Text zu einzelnen Fotos ging früher, jetzt nicht mehr",
+      "source": "https://apps.apple.com/de/app/id1319898516?see-all=reviews"
+     },
+     {
+      "pain": "Projekt nach Zahlungsproblem komplett verschwunden, keine Sicherungskopie",
+      "evidence": "Zitat (App Store, 2023, per Abruf): '…wurde plötzlich weder die Bestellung noch das Projekt mehr gefunden. Alles weg'",
+      "source": "https://apps.apple.com/de/app/id1319898516?see-all=reviews"
+     },
+     {
+      "pain": "Texte verhalten sich unzuverlässig, Autospeichern greift nicht immer",
+      "evidence": "Sinngemäß (Suchzusammenfassung Trustpilot): Texte verschwinden oder verschieben sich, Schriftart ändert sich plötzlich; automatische Speicherung funktionierte nicht immer.",
+      "source": "https://at.trustpilot.com/review/www.pixum.de?page=4"
+     },
+     {
+      "pain": "Fertiges Buch vor der Bestellung nicht realistisch digital ansehbar",
+      "evidence": "Zitat (Trustpilot, per Abruf): 'das man sich das fertige Buch nicht VORHER digital anschauen kann sondern erst nach der Bestellung.'",
+      "source": "https://de.trustpilot.com/review/www.pixum.de?page=2"
+     }
+    ]
+   },
+   {
+    "name": "Saal Digital",
+    "segment": "Premium/ambitionierte Fotografen, Desktop-Software (Win/Mac), Online-Designer, App, PDF-Upload",
+    "strengths": [
+     "Hohe Druckqualität, schnelle Lieferung (mehrere Testberichte)",
+     "PDF-Upload: Buch im eigenen Programm gestalten (fotobuchmagazin.de)",
+     "Umfangreiche Bildbearbeitung inklusive Zuschnitt per Zentimeterangabe (fotobuchmagazin.de, per Abruf)",
+     "Trustpilot-Lob: 'Intuitive software', 'Simple and easy to understand interface' (per Abruf)"
+    ],
+    "pains": [
+     {
+      "pain": "Textformatierung sehr mühsam, Designer formatiert ungefragt um",
+      "evidence": "Zitate (Trustpilot, per Abruf): 'formatting the text was an absolute nightmare'; '…converting the into big headlines and rearranging my page'",
+      "source": "https://www.trustpilot.com/review/saal-digital.de"
+     },
+     {
+      "pain": "Abstürze mit Verlust der Arbeit, keine Wiederherstellung",
+      "evidence": "Sinngemäß (Suchzusammenfassung Trustpilot): Software stürzt ab, Arbeit geht verloren, kein Wiederherstellen; Zitat (per Abruf): 'the Software got stuck and \"lost\" the information about which icon did what'",
+      "source": "https://www.trustpilot.com/review/saal-digital.at"
+     },
+     {
+      "pain": "Zoomen und Navigation umständlich",
+      "evidence": "Zitat (Trustpilot, per Abruf): 'zooming was a bit annoying, as I had to use the +- scrollbar'",
+      "source": "https://www.trustpilot.com/review/saal-digital.de"
+     },
+     {
+      "pain": "Für Anfänger überladen, weniger übersichtlich als andere",
+      "evidence": "Sinngemäß (Testbericht-Zusammenfassung): Editor nicht so übersichtlich und intuitiv wie andere, viele Formate und Funktionen überfordern Anfänger trotz dreier Assistenten.",
+      "source": "https://trusted.de/saal-digital-fotobuch"
+     },
+     {
+      "pain": "Online-Designer langsam, Qualitätsanzeige unzuverlässig",
+      "evidence": "Zitate (fotobuchmagazin.de, per Abruf): Browser-Editor 'läuft phasenweise etwas langsam'; Bildqualitäts-Bewertung 'nicht immer ein verlässlicher Indikator' für das Druckergebnis",
+      "source": "https://www.fotobuchmagazin.de/saal-digital-fotobuch-test/"
+     }
+    ]
+   },
+   {
+    "name": "ifolor",
+    "segment": "Marktführer Schweiz, Desktop 'ifolor Designer' (Mac/Win) und App",
+    "strengths": [
+     "App sehr gut bewertet (laut Suchergebnis 4,7 im App Store)",
+     "'einfache Handhabung', 'problemloses Hochladen von Fotos' (App Store/Trustpilot, per Abruf)",
+     "Druckqualität wird gelobt"
+    ],
+    "pains": [
+     {
+      "pain": "Text bearbeiten mühsam, kaum Einstellungen",
+      "evidence": "Zitat (Mac App Store, per Abruf): 'Textzüge bearbeiten ist ausgesprochen mühsam'",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "pain": "Fotos vergrößern, verkleinern, verschieben mühsam wegen fehlerhafter Hilfslinien",
+      "evidence": "Zitat (per Abruf): 'Das vergrößern und verkleinern und Hin- und Herschieben von Fotos ist … oft mühsam' (wegen falscher 'grüner Linien')",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "pain": "Seitenzahl nur in festen Stufen, keine einzelnen Seiten hinzufügbar",
+      "evidence": "Sinngemäß/Zitat (per Abruf): man kann 'nicht nach Belieben einzelne Seiten hinzufügen', nur feste Umfänge wie 48 oder 72 Seiten",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "pain": "Instabil bei schneller Bedienung",
+      "evidence": "Zitat (per Abruf): die App 'schmiert recht häufig ab, wenn man zu schnell ist'",
+      "source": "https://apps.apple.com/de/app/446366603?see-all=reviews&platform=mac"
+     },
+     {
+      "pain": "Kein Übergang zwischen Geräten, Projekte vermischen sich",
+      "evidence": "Sinngemäß (Suchzusammenfassung App-Store-Bewertungen): in der Handy-App begonnene Bücher lassen sich am PC nicht weiterbearbeiten; Fotos aus Projekt 1 erscheinen in Projekt 2; kein 'alle Fotos löschen'.",
+      "source": "https://apps.apple.com/ch/app/ifolor-fotobuch-fotos-mehr/id480599198?see-all=reviews"
+     }
+    ]
+   },
+   {
+    "name": "albelli (NL/BE, in DE früher fotoalbum.de; UK)",
+    "segment": "Europäischer Online-Anbieter, Desktop 'albelli Studio' und Online-Editor; Trustpilot ca. 4,5",
+    "strengths": [
+     "'The program is easy to use and offers several options to make a very nice photobook' (Trustpilot, per Abruf)",
+     "'creating them was so easy and fun. The whole process was quick, simple, and enjoyable' (Trustpilot, per Abruf)"
+    ],
+    "pains": [
+     {
+      "pain": "Projekte werden nach Inaktivität gelöscht",
+      "evidence": "Zitate (Trustpilot, per Abruf): 'Albelli deletes ongoing projects if you have an 18-month gap between orders.'; 'I spent days on that project'",
+      "source": "https://www.trustpilot.com/review/albelli.nl"
+     },
+     {
+      "pain": "Format lässt sich online nachträglich nicht ändern (nur offline)",
+      "evidence": "Zitat (Trustpilot UK, per Abruf): 'It is a pity that it's not possible to change the format of the book (from S to M) afterwards using the online programm.'",
+      "source": "https://www.trustpilot.com/review/www.albelli.com"
+     },
+     {
+      "pain": "Neue Version bricht Kopieren und Einfügen von Text",
+      "evidence": "Sinngemäß (Suchzusammenfassung Trustpilot): neue Programmversion verhinderte Copy & Paste von Text aus Word, Firma lieferte Workaround.",
+      "source": "https://uk.trustpilot.com/review/albelli.nl?page=3"
+     },
+     {
+      "pain": "Druckergebnis weicht von Bildschirm ab (flach, wenig Kontrast)",
+      "evidence": "Sinngemäß (Suchzusammenfassung Trustpilot): Fotos wirkten flach mit wenig Kontrast, teils Rauschen und verfälschte Farben.",
+      "source": "https://nz.trustpilot.com/review/albelli.nl"
+     }
+    ]
+   },
+   {
+    "name": "posterXXL",
+    "segment": "Online-Anbieter DACH, Web-Editor, App, früher Desktop 'posterXXL Designer'; Trustpilot ca. 4,5",
+    "strengths": [
+     "'Das Programm ist selbsterklärend und darum gut und schnell anwendbar' (Trustpilot, per Abruf)",
+     "'Die Erstellung eines Fotobuches ist kinderleicht. Man bekommt immer Tipps bzw. Rückmeldung.' (Trustpilot, per Abruf)"
+    ],
+    "pains": [
+     {
+      "pain": "Softwarewechsel: alte Projekte nicht mehr öffenbar, Arbeit verloren",
+      "evidence": "Zitate (Reclabox, per Abruf): 'Nach einem Software-Update lassen sich die offline vorbereiteten Fotobücher nicht mehr öffnen.'; 'Alle Arbeit von zwei Jahren umsonst.'",
+      "source": "https://de.reclabox.com/firma/992-posterXXL-AG"
+     },
+     {
+      "pain": "Neue Software hat Funktionen der alten verloren, Anbieter reaktivierte die alte",
+      "evidence": "Sinngemäß: posterXXL selbst hat einen Hilfeartikel 'Alte Fotobuch-Software wieder aktiv'; laut Suchzusammenfassung vermissten Stammkunden Funktionen, beide Versionen sind nicht kompatibel (Seite beim Abruf nicht erreichbar, 503).",
+      "source": "https://service.posterxxl.com/hc/de/articles/360012793098-Alte-Fotobuch-Software-wieder-aktiv"
+     },
+     {
+      "pain": "Automatische Sortierung ohne logische Reihenfolge, Kontrollverlust",
+      "evidence": "Zitat (Trustpilot, per Abruf): 'Früher lag alles in meiner Hand. … Jetzt wird es vorher gemacht und hat oft keine logische Reihenfolge.'",
+      "source": "https://de.trustpilot.com/review/www.posterxxl.de?page=2"
+     },
+     {
+      "pain": "Ungefragte Korrekturen nerven",
+      "evidence": "Zitat (Trustpilot, per Abruf): 'Laufende Korrektionen bei der Erstellung nach eigenen Wünschen nerven'",
+      "source": "https://at.trustpilot.com/review/www.posterxxl.de?page=9"
+     },
+     {
+      "pain": "Bilder verrutschen, Hintergründe neu setzen, weiße Linien im Druck",
+      "evidence": "Sinngemäß (Suchzusammenfassung Trustpilot): neue Version stürzt häufig ab, Hintergrundbilder müssen neu eingefügt werden, Rechtsklick 'als Hintergrund' fehlt, trotz genauer Platzierung weiße Linien zwischen Bildern im Druck.",
+      "source": "https://ch.trustpilot.com/review/www.posterxxl.de?page=3"
+     }
+    ]
+   }
+  ],
+  "mustHaves": [
+   {
+    "need": "Arbeit geht nie verloren: laufendes Autospeichern, Versionsverlauf/Rückgängig über Sitzungen hinweg, kein Löschen nach Inaktivität, Export/Import des Projekts",
+    "why": "Projektverlust ist der häufigste und emotionalste Schmerz quer über alle Anbieter (Rossmann 'Aufeinmal alles weg', Pixum 'Alles weg', albelli löscht nach 18 Monaten, posterXXL 'Arbeit von zwei Jahren umsonst', Saal Abstürze ohne Wiederherstellung)."
+   },
+   {
+    "need": "Stabil und schnell auch bei großen Büchern (60+ Seiten, viele hochauflösende Fotos), mit Vorschaubildern statt Originalen beim Bearbeiten",
+    "why": "CEWE-Nutzer berichten Hänger ab ca. 60 Seiten, Saal-Online-Designer 'phasenweise langsam', ifolor stürzt bei schneller Bedienung ab."
+   },
+   {
+    "need": "Updates rückwärtskompatibel: alte Projekte öffnen immer, keine Funktion verschwindet ohne Ersatz",
+    "why": "posterXXL musste die alte Software reaktivieren; Rossmann, Pixum, dm und CEWE-Nutzer klagen über gestrichene Funktionen (Bildbearbeitung, Text pro Foto, Zwischenspeichern)."
+   },
+   {
+    "need": "Automatik als Vorschlag, nicht als Zwang: Auto-Layout und Auto-Sortierung jederzeit überschreibbar, keine ungefragten Umformatierungen",
+    "why": "posterXXL: 'Früher lag alles in meiner Hand', 'Laufende Korrektionen … nerven'; Pixum 'starr und schematisch'; Saal und dm ordnen Seiten bzw. Text ungefragt um. Wichtig für Fujiventura, dessen Kern die Automatik ist."
+   },
+   {
+    "need": "Volle Kontrolle über Reihenfolge: Fotos und Seiten frei umsortieren, einzelne Seiten/Fotos zwischendrin einfügen und leere Seiten löschen",
+    "why": "CEWE-App: Reihenfolge nicht beeinflussbar, nicht mehr chronologisch, leere Seite nicht löschbar; dm: nichts zwischendrin einfügbar; ifolor: Seiten nur in festen Stufen."
+   },
+   {
+    "need": "Direktes, präzises Bildhandling: Zuschnitt und Zoom im Rahmen per Ziehen, Herauszoomen, verlässliches Einrasten, Kein ungefragtes Abschneiden",
+    "why": "ifolor 'Hin- und Herschieben … mühsam' wegen falscher Hilfslinien; CEWE schneidet automatisch Ränder ab; Saal Zoom nur über +/- Leiste; Pixum-App ohne Zuschnitt."
+   },
+   {
+    "need": "Text, der einfach funktioniert: inline tippen, Stil bleibt stabil, Kopieren/Einfügen, wenige gute Stile statt vieler Regler",
+    "why": "Text ist bei Saal 'an absolute nightmare', bei ifolor 'ausgesprochen mühsam', bei Pixum verschwinden/verschieben sich Texte, bei albelli brach Copy & Paste. Fujiventura hat bisher nur Bildunterschriften."
+   },
+   {
+    "need": "Ehrliche, realistische Vorschau des fertigen Buchs inkl. verlässlicher Warnung bei zu geringer Auflösung, Beschnitt und Bundsteg",
+    "why": "Pixum: Buch erst nach Bestellung ansehbar; Saal: Qualitätsanzeige unzuverlässig; albelli/posterXXL: Druck flacher bzw. weiße Linien trotz korrekter Vorschau. Fujiventuras 3D-Blätterbuch ist hier ein echter Vorsprung."
+   },
+   {
+    "need": "Ein Projekt über alle Geräte: am Handy beginnen, am Rechner verfeinern, ohne Installation (Browser zuerst)",
+    "why": "ifolor: Handy-Projekte am PC nicht weiterbearbeitbar; CEWE und Saal verlangen für den vollen Funktionsumfang einen Download; Mumsnet-Nutzer nennt den Download als Nachteil."
+   },
+   {
+    "need": "Schnelle Fotoauswahl: ganze Alben auf einmal, große Vorschaubilder, Mehrfachauswahl, alle entfernen",
+    "why": "Rossmann: keine Albumauswahl; dm: Vorschau 'nur sehr klein'; ifolor: kein 'alle löschen'; dm-App importiert teils nur die Hälfte."
+   },
+   {
+    "need": "Einsteigerfreundlich trotz Tiefe: schlanke Grundansicht, fortgeschrittene Funktionen erst bei Bedarf",
+    "why": "Saal und CEWE werden für Funktionsfülle gelobt, aber als überladen bzw. 'clunky, overly complex' kritisiert; Lob geht bei allen an 'einfach, intuitiv, schnell'."
+   }
+  ],
+  "key": "klassisch"
+ },
+ {
+  "competitors": [
+   {
+    "name": "Popsa",
+    "segment": "App-first (iOS/Android), KI-Autolayout aus Kamerarolle, Fokus auf schnelle Fotobücher und Prints; nur Smartphone",
+    "strengths": [
+     "Sehr einfacher Einstieg, Buch in Minuten (Trustpilot-Grundton, Gadgeteer: \"The AI assist was very slick and helped set a good starting point\")",
+     "Autolayout nach Ort, Ausrichtung und Gesichtserkennung als guter Startpunkt",
+     "Gute Druckqualität laut Mehrheit der Bewertungen"
+    ],
+    "pains": [
+     {
+      "pain": "Automatisches Layout lässt sich kaum umwerfen, Seiten und Fotos schwer zwischen Seiten verschieben",
+      "evidence": "Zitat Claire Morris (Trustpilot): \"struggled to do was to reshuffle the actual pages around in the book\"; Zitat Lisa Egan: \"difficult to move pictures around from one page to the next\"",
+      "source": "https://uk.trustpilot.com/review/popsa.com"
+     },
+     {
+      "pain": "Reihenfolge der Fotos wird von der KI falsch gesetzt, obwohl Dateien sequenziell benannt sind",
+      "evidence": "Sinngemäß (Zusammenfassung mehrerer Bewertungen): KI legt Fotos in zufälliger Reihenfolge an, Umsortieren des ganzen Buchs ist mühsam",
+      "source": "https://www.trustpilot.com/review/popsa.com?page=8"
+     },
+     {
+      "pain": "Nur vordefinierte Layouts und Platzierungen, kein echtes Zuschneiden, nur Zoomen; Köpfe werden abgeschnitten",
+      "evidence": "Sinngemäß: Editor erlaubt nur Zoom statt Crop, Platzierung nur per Preset; einzelne Kunden berichten abgeschnittene Köpfe im Druck. Testbericht: Bearbeitung nur \"cropping by zooming in and out\"",
+      "source": "https://www.photobookdeals.co.uk/blog/popsa-photo-book-review/"
+     },
+     {
+      "pain": "Texte/Bildunterschriften: abgeschnitten im Druck, keine Seitentitel",
+      "evidence": "Zitat App-Store-Nutzer Jdicjskic: \"A majority of the captions were cut off and unreadable\"; Yo!yo!yooo! wünscht, sie \"could of added titles to each page\"",
+      "source": "https://justuseapp.com/en/app/936799728/popsa/reviews"
+     },
+     {
+      "pain": "Foto tauschen führt zurück in die ganze Kamerarolle statt in die gewählte Auswahl",
+      "evidence": "Zitat Julasurfergirl: \"When you swap it out it will take you back to your entire camera roll\"",
+      "source": "https://justuseapp.com/en/app/936799728/popsa/reviews"
+     },
+     {
+      "pain": "Nur auf dem Smartphone nutzbar, unattraktiv für Fotografen",
+      "evidence": "Zitat Testbericht: \"its only accessible on smartphones app. This might be unappealing to professionals like photographers\"",
+      "source": "https://www.photobookdeals.co.uk/blog/popsa-photo-book-review/"
+     }
+    ]
+   },
+   {
+    "name": "Chatbooks",
+    "segment": "App-first Abo-Modell (Monthbooks), Auto-Auswahl und Auto-Zuschnitt, quadratische Bücher, Instagram-Import",
+    "strengths": [
+     "Sehr schnell (Monthbook in ca. 10 Minuten laut Langzeit-Review)",
+     "Robuste, dicke Seiten, Farben treu",
+     "Abo schafft Routine; App-Store-Lob: \"Ease of use is fantastic\""
+    ],
+    "pains": [
+     {
+      "pain": "Auto-Zuschnitt aufs Quadrat schneidet ungünstig, auch Gesichter",
+      "evidence": "Zitat App-Store: \"Photos are imported as squares and aren't always cropped how I would want them\"; sinngemäß (Vergleichsartikel): Auto-Layout schnitt das Gesicht der Tochter vom Cover ab",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     },
+     {
+      "pain": "Layout ändern ist unintuitiv, Mehrfoto-Seiten unklar",
+      "evidence": "Zitat: \"Changing layouts feels harder than it should be. I still don't really know how to format multiple photos\"",
+      "source": "https://terilynadams.com/honest-chatbooks-review/"
+     },
+     {
+      "pain": "Bildunterschriften verhalten sich unvorhersehbar (landen auf Extraseite)",
+      "evidence": "Zitat App-Store: \"captions say they're within the allotted space, but then when I save it, it goes to a caption page\"",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     },
+     {
+      "pain": "Auto-Auswahl/Import: falsche Reihenfolge, Duplikate, Fotos landen in bereits gesperrten Büchern",
+      "evidence": "Zitate App-Store: \"Pictures uploaded completely out of order\"; \"new pictures are being added to a previous, locked, book\"",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     },
+     {
+      "pain": "Navigation in großen Bibliotheken mühsam, kein Duplizieren eines Buchs",
+      "evidence": "Zitate: \"You literally have to scroll through an entire year to get to what you're looking for\"; \"I can't find an option to copy the book\"",
+      "source": "https://justuseapp.com/en/app/734887606/chatbooks-family-photo-books/reviews"
+     }
+    ]
+   },
+   {
+    "name": "Mixbook",
+    "segment": "Web-Editor plus App, viele Themes, freie Gestaltung mit KI-Startlayout, Zusammenarbeit/Teilen per Link",
+    "strengths": [
+     "KI-Startlayout, danach frei editierbar (Trustpilot Anjie: \"The AI component made it easy to initially create layouts...easily able to change and edit.\")",
+     "Pro Seite anpassbar (Kim: \"I prefer to customize each page, which most publishing outlets don't allow.\")",
+     "Projekt-Vorschau per Link teilbar, auch außerhalb der Plattform, Kollaboration"
+    ],
+    "pains": [
+     {
+      "pain": "Datenverlust: Autosave versagt, keine Versionshistorie",
+      "evidence": "Zitat Forum-Nutzer: \"37 pages gone.\" und \"they do not have any of the saves to restore it to an earlier point in the project\"",
+      "source": "https://forums.tomsguide.com/threads/mixbook-warning.549860/post-2057256"
+     },
+     {
+      "pain": "Werkzeugleisten und Chat-Fenster verdecken Layouts und Werkzeuge",
+      "evidence": "Zitat Gillian Hause (Trustpilot, 25.09.2026): \"Edit bars block other essential tools and are not moveable\"; \"Chat box blocks all the page layouts\"",
+      "source": "https://www.trustpilot.com/review/mixbook.com"
+     },
+     {
+      "pain": "Zu viele Klicks für einfache Aufgaben, Typo und Rahmen mühsam",
+      "evidence": "Zitat Gillian Hause: \"Takes multiple clicks to accomplish one simple task.\"; \"Changing fonts and colors of fonts, adding borders...is a nightmare.\"",
+      "source": "https://www.trustpilot.com/review/mixbook.com"
+     },
+     {
+      "pain": "Zoom und Ausrichtungs-Snapping im Editor enttäuschend",
+      "evidence": "Sinngemäß (TechRadar-Test laut Suchauszug): Funktionen wie Zoom und Snapping zur Ausrichtung waren enttäuschend, manche Studio-Funktionen nicht intuitiv; Seite selbst nicht abrufbar",
+      "source": "https://www.techradar.com/reviews/mixbook-photo-book"
+     },
+     {
+      "pain": "Nach Bestellung nur kurzes Korrekturfenster",
+      "evidence": "Zitat Cathy (Trustpilot, 05.10.2026): \"Only 30 minutes are allowed to edit\"",
+      "source": "https://www.trustpilot.com/review/mixbook.com"
+     }
+    ]
+   },
+   {
+    "name": "Shutterfly",
+    "segment": "Großer US-Anbieter, Web-Editor plus App mit Autofill (Best/Most/All photos), Editor 2026 umgebaut",
+    "strengths": [
+     "Autofill als Schnellstart mit wählbarer Menge",
+     "Großes Produktsortiment",
+     "Teilen von Projekten per Link möglich"
+    ],
+    "pains": [
+     {
+      "pain": "Autofill wählt falsche Fotos für große Felder, man macht es doch manuell",
+      "evidence": "Zitat Forum: \"the auto-filled managed to pick the wrong photos to be big, so I ended up doing it manually.\"",
+      "source": "https://www.weddingwire.com/wedding-forums/shutterfly-and-photo-book-question-update-on-page-2-i-placed-an-order/48c59a486282cdfa.html"
+     },
+     {
+      "pain": "Neuer Editor (2026) schlechter als alter, Funktionen fehlen (Datumsstempel)",
+      "evidence": "Zitat Monica (Trustpilot, 28.09.2026): \"Still prefer the 'old' program for designing photo books. Miss that there are no date stamps\"",
+      "source": "https://www.trustpilot.com/review/www.shutterfly.com"
+     },
+     {
+      "pain": "Editor friert ein, Bilder nicht anpassbar, Text nicht formatierbar",
+      "evidence": "Zitate: \"the « personalize » button ... would freeze, each time I tried\"; Arthur Frank: \"could not make adjustments to pictures used\"; Sue Everets: \"Shutterfly doesn't allow for text format editing\"",
+      "source": "https://www.trustpilot.com/review/www.shutterfly.com"
+     },
+     {
+      "pain": "Layout springt automatisch um, wenn man ein Foto löscht",
+      "evidence": "Sinngemäß (Suchauszug aus Bewertungsseiten): beim Löschen eines Fotos ändert die Seite das Layout automatisch passend zur Fotoanzahl",
+      "source": "https://www.justanswer.com/software/te35o-shutterfly-photo-album-arrangement-help.html"
+     },
+     {
+      "pain": "Geteilte Links funktionieren nur mit Konto",
+      "evidence": "Zitat Shutterfly-Hilfe: \"Shared Photo Album links will not load for anonymous users and will redirect the user to the sign-in page.\"",
+      "source": "https://support.shutterfly.com/s/article/sharing-photos"
+     }
+    ]
+   },
+   {
+    "name": "Google Fotos Fotobücher",
+    "segment": "In Google Fotos integriert, Buchvorschläge aus Alben, minimalistisch; Print Store seit 2026 als 'Fujifilm for Google Photos Print Store' von Fujifilm betrieben (Europa-Rollout ab Oktober 2026)",
+    "strengths": [
+     "Sehr schnell, wenige Minuten (\"make photo books in a hurry\")",
+     "Günstig",
+     "Saubere, minimalistische Optik, Vorschläge direkt aus der Bibliothek"
+    ],
+    "pains": [
+     {
+      "pain": "Kaum Layoutkontrolle, ein Foto pro Seite mit drei Größen",
+      "evidence": "Zitat: \"Layouts are limited to one photo per page, then 3 size options on the page.\"",
+      "source": "https://www.geeklawblog.com/2018/01/who-did-it-better-google-photo-books-or.html"
+     },
+     {
+      "pain": "Texte nur auf dem Cover, keine Bildunterschriften",
+      "evidence": "Zitat: \"Text captions are only available on the cover.\" Autorin schrieb Notizen deshalb mit Stift ins Buch (sinngemäß)",
+      "source": "https://www.geeklawblog.com/2018/01/who-did-it-better-google-photo-books-or.html"
+     },
+     {
+      "pain": "Nur quadratisch, keine Premium-Optionen",
+      "evidence": "Zitat: \"no landscape or portrait covers as square is the only option\"",
+      "source": "https://www.toptenreviews.com/photo-books-google-photo-review"
+     },
+     {
+      "pain": "Begrenzungen frustrieren, Druck teils körnig",
+      "evidence": "Zitate: \"can be a bit frustrating due to its limitations\"; \"some images came out a bit grainy\"",
+      "source": "https://www.toptenreviews.com/photo-books-google-photo-review"
+     },
+     {
+      "pain": "Plattform-Unsicherheit: Betreiber wechselt (Fujifilm übernimmt Print Store)",
+      "evidence": "Sinngemäß: Fujifilm übernimmt Betrieb, Support und Sortiment des Print Store (Meldung vom 31.08.2026); Auswirkungen auf den Bucheditor noch offen",
+      "source": "https://www.fujifilm.com/ch/en/news/Fujifilm-for-Google-Photos-Print-Store"
+     }
+    ]
+   },
+   {
+    "name": "Apple Fotos (eingestellte Fotobuch-Funktion) / Mimeo Photos als Nachfolger",
+    "segment": "Apple bot Bücher seit iPhoto (2002) an und stellte Print Products zum 30.09.2018 ein; seither Projekt-Erweiterungen von Drittanbietern, v. a. Mimeo Photos (Mac-Erweiterung, iPad-App) mit Apple-Vorlagen. Ein Einstellungsschritt 2023 ließ sich nicht belegen.",
+    "strengths": [
+     "Apple-Bücher galten als Referenz für schlichte, gute Vorlagen; Mimeo übernimmt sie",
+     "Mimeo: sehr scharfer Druck, Schutzumschlag (Digital Camera World)",
+     "Jason Snell (via TidBITS) nennt Mimeo und Motif die besten Erweiterungen"
+    ],
+    "pains": [
+     {
+      "pain": "Abhängigkeit von Plattform: Funktion verschwindet einfach",
+      "evidence": "Zitat: \"Apple quietly announced that it would no longer offer Photos Print Products after September 30, 2018.\"",
+      "source": "https://eshop.macsales.com/blog/45217-apple-photos-print-products-unavailable-after-sept-30-here-are-alternatives/"
+     },
+     {
+      "pain": "Nach OS-Update verschwinden alle platzierten Fotos, wochenlange Arbeit weg",
+      "evidence": "Zitate Apple Community: \"every single placed photo had been removed from the book.\"; \"Weeks of work gone. Very very frustrating.\"",
+      "source": "https://discussions.apple.com/thread/250720846?page=2"
+     },
+     {
+      "pain": "Abstürze und langsame Reaktion bei jeder Berührung",
+      "evidence": "Zitate: \"Project extension 'Mimeo Photos' terminated unexpectedly.\"; \"Every time I touch a picture it starts a full refresh...that takes precious seconds.\"",
+      "source": "https://discussions.apple.com/thread/250720846?page=2"
+     },
+     {
+      "pain": "Nur Apple, nur per App, nicht im Web",
+      "evidence": "Zitat Testbericht: \"If Mimeo Photos operated through a website, it would be an almost perfect service\"",
+      "source": "https://www.digitalcameraworld.com/reviews/mimeo-photos-photo-book-review"
+     },
+     {
+      "pain": "Viele andere Erweiterungen unbrauchbar",
+      "evidence": "Zitat TidBITS: \"many of the other print project extensions proved truly abysmal, with horrid interfaces and frequent crashes.\"",
+      "source": "https://tidbits.com/2018/11/29/jason-snell-compares-mimeo-and-motif-photos-project-extensions/"
+     }
+    ]
+   },
+   {
+    "name": "Amazon Photos (Fotobücher)",
+    "segment": "In Amazon Photos/Prints integriert, einfacher Editor, eingeschränktes Format",
+    "strengths": [
+     "Einfacher Editor mit Autosave und Undo (Testberichte laut Suchauszug)",
+     "Teil des Prime-Ökosystems"
+    ],
+    "pains": [
+     {
+      "pain": "Nur ein Format (8x8 Zoll), wenig Gestaltung",
+      "evidence": "Sinngemäß (Testbericht-Auszug): nur eine Größe 8x8 Zoll mit begrenzten Designoptionen",
+      "source": "https://www.toptenreviews.com/photo-books-amazon-prints-review"
+     },
+     {
+      "pain": "Editor schwer zu finden, Anleitung passt nicht zur Oberfläche",
+      "evidence": "Sinngemäß (Suchauszug, Tom's Guide-Test titelt \"Don't bother using it for photo books\"): Editor kaum auffindbar, Anleitung stimmt nicht mit den Optionen überein; Seite nicht vollständig abrufbar",
+      "source": "https://www.tomsguide.com/reviews/amazon-prints"
+     },
+     {
+      "pain": "Cover schwer anpassbar",
+      "evidence": "Sinngemäß (Bewertungsübersicht): schwierige Cover-Gestaltung als Nachteil",
+      "source": "https://bestreviews.net/amazon-photo-books-reviews/"
+     }
+    ]
+   },
+   {
+    "name": "Hinweis zur Quellenlage",
+    "segment": "Reddit (r/photography, r/AskPhotography, r/Fujifilm) war für das Recherche-Werkzeug gesperrt; keine Reddit-Belege enthalten. Mehrere Testberichte (TechRadar, Tom's Guide, ConsumerAffairs) waren nur über Suchauszüge lesbar, dort ist 'sinngemäß' markiert. Trustpilot/App-Store sind selbstselektiert, keine Häufigkeiten ableitbar.",
+    "strengths": [],
+    "pains": []
+   }
+  ],
+  "mustHaves": [
+   {
+    "need": "Automatik als Vorschlag, nie als Käfig: jede Entscheidung (Reihenfolge, Größe, Layout) einzeln überschreibbar, ohne dass der Rest neu gewürfelt wird",
+    "why": "Häufigster Schmerz quer durch Popsa, Chatbooks, Shutterfly: Autolayout ist ein guter Start, aber nicht umwerfbar oder springt nach Löschen um. Gelobt wird dort, wo nach dem KI-Start frei editiert werden kann (Mixbook)."
+   },
+   {
+    "need": "Bildausschnitt mit Gesichts-/Motiverkennung plus manuellem Ausschnitt (verschieben und zoomen pro Feld), Warnung bei abgeschnittenen Köpfen",
+    "why": "Abgeschnittene Gesichter/Köpfe (Chatbooks-Cover, Popsa) und 'nur Zoom statt Crop' sind konkrete, emotional starke Beschwerden."
+   },
+   {
+    "need": "Verlässliche, nachvollziehbare Chronologie mit sichtbarer Regel und einfachem Umsortieren von Fotos zwischen Seiten und von Doppelseiten (Drag and Drop, Tastatur)",
+    "why": "'Pictures uploaded completely out of order', KI-Zufallsreihenfolge trotz Dateinamen, Fotos nicht zwischen Seiten verschiebbar."
+   },
+   {
+    "need": "Kein Datenverlust: robuster Autosave, Versionsverlauf/Rückgängig über Sitzungen, Wiederherstellen früherer Stände",
+    "why": "Mixbook '37 pages gone', Mimeo 'Weeks of work gone' nach OS-Update; das ist der härteste Vertrauensbruch."
+   },
+   {
+    "need": "Texte, die sich vorhersehbar verhalten: Bildunterschriften und Seitentitel mit sichtbarer Druckgrenze, kein Abschneiden",
+    "why": "Popsa-Captions im Druck abgeschnitten, Chatbooks-Captions springen auf Extraseite, Google nur Text auf Cover, Wunsch nach Seitentiteln."
+   },
+   {
+    "need": "Schneller, ruhiger Editor ohne verdeckende Leisten, wenige Klicks pro Aufgabe, keine Hänger",
+    "why": "Mixbook: Leisten/Chat verdecken Layouts, 'multiple clicks'; Shutterfly friert ein; Mimeo lädt bei jeder Berührung neu."
+   },
+   {
+    "need": "Web-basiert und geräteübergreifend (Handy und Desktop), nicht an ein Ökosystem gebunden",
+    "why": "Popsa nur Smartphone, Mimeo nur Apple und App; Apple und Google zeigen, dass plattforminterne Buchfunktionen eingestellt oder ausgelagert werden."
+   },
+   {
+    "need": "Teilen per Link ohne Konto für Betrachter, inklusive Vorschau vor dem Druck",
+    "why": "Shutterfly-Links verlangen Anmeldung; Mixbook wird für teilbare Vorschau/Kollaboration gelobt. Fujiventura erfüllt das schon und sollte es als Kernvorteil halten."
+   },
+   {
+    "need": "Passender Tausch-Dialog: beim Foto-Tausch die Buch-Auswahl bzw. ähnliche Fotos zeigen, nicht die ganze Bibliothek",
+    "why": "Popsa-Nutzer landet beim Tauschen in der gesamten Kamerarolle; Chatbooks: durch ein ganzes Jahr scrollen."
+   },
+   {
+    "need": "Mehr als ein Layout pro Fotoanzahl, aber kuratiert (Varianten wechseln statt Freiform-Chaos), plus Formatwahl über Quadrat hinaus",
+    "why": "'Some more layout options would be nice' (Popsa), Google nur 1 Foto/Seite und nur quadratisch, Amazon nur 8x8. Gleichzeitig wird die Einfachheit gelobt, also Auswahl statt Werkzeugkasten."
+   },
+   {
+    "need": "Bilder-/Farbqualität vor dem Druck prüfbar (Auflösungswarnung, farbtreue Vorschau), falls Druck kommt",
+    "why": "Beschwerden über körnige Drucke (Google, Popsa) und übersättigte Hauttöne (Mimeo-Cover)."
+   }
+  ],
+  "key": "automatisch"
+ },
+ {
+  "competitors": [
+   {
+    "name": "Blurb (BookWright + Blurb-Druck)",
+    "segment": "Premium-Selbstverlag, Fotobücher und Magazine für ambitionierte Fotografen",
+    "strengths": [
+     "Druck wird von Vielbestellern gelobt; ein Nutzer berichtet von über 30 Büchern ohne Reklamation (lightroomqueen.com)",
+     "Layflat für Doppelseiten-Motive",
+     "Vorlagen für viele Buchgattungen, Innenlayout gelobt (penandglory.com)",
+     "Direkte Anbindung aus Lightroom Classic"
+    ],
+    "pains": [
+     {
+      "pain": "Software fehlerhaft und frustrierend",
+      "evidence": "Echtes Zitat (Trustpilot-Review): \"interface will make throw your computer out of your window!!!! Riddled with bugs\"",
+      "source": "https://www.trustpilot.com/review/www.blurb.com"
+     },
+     {
+      "pain": "Werkzeugwechsel ohne Migrationspfad: BookSmart eingestellt, unfertige Bücher müssen mühsam umgezogen werden",
+      "evidence": "Echtes Zitat (Trustpilot): \"Blurb abandon it's Booksmart customers and expects them to follow them to BookWright but gives no migration path\"",
+      "source": "https://www.trustpilot.com/review/www.blurb.com"
+     },
+     {
+      "pain": "Typografie und Textsatz schwach: Einzüge, Blocksatz-Lücken, Seitenzahlen brechen ab",
+      "evidence": "Echtes Zitat: \"The page numbers stop after page 29. I have no idea why.\" und \"some paragraphs look more indented than others, making the whole book look amateurish\"",
+      "source": "https://www.penandglory.com/post/blurb-and-bookwright-double-review"
+     },
+     {
+      "pain": "Seitenzahlen aktualisieren sich nicht automatisch, wenn Seiten eingefügt/entfernt werden",
+      "evidence": "Sinngemäß (Forennutzer prbimages): Beim Hinzufügen oder Entfernen von Seiten müsse man die Nummern von Hand anpassen",
+      "source": "https://www.lightroomqueen.com/community/threads/lr-c-book-module-vs-bookwright.46007/"
+     },
+     {
+      "pain": "Vorschau stimmt nicht mit Druck überein (Farbe, Beschnitt, Rücken)",
+      "evidence": "Sinngemäß (Trustpilot): Proof sah gut aus, die Auflage kam mit flachen, dunklen Farben und verschobenen Rücken; nur 4 von 30 Büchern brauchbar",
+      "source": "https://www.trustpilot.com/review/www.blurb.com"
+     },
+     {
+      "pain": "BookWright braucht vorher exportierte Bilder und übernimmt Metadaten-Bildunterschriften nicht",
+      "evidence": "Sinngemäß (Forennutzer bakubo): automatische Bildunterschriften aus Metadaten fehlen in BookWright, Wunsch sei vor 4 Jahren eingereicht worden",
+      "source": "https://www.lightroomqueen.com/community/threads/is-blurb-as-bad-as-the-reviews.48079/"
+     }
+    ]
+   },
+   {
+    "name": "Lightroom Classic Buch-Modul",
+    "segment": "Fotografen im Adobe-Ökosystem, Buch direkt aus dem Katalog",
+    "strengths": [
+     "Ein Werkzeug für alles: Bearbeitung in Develop aktualisiert das Buch automatisch (jaredplatt.com)",
+     "Bildunterschriften aus Metadaten automatisch",
+     "Layout-Vorgaben speicherbar, Upload an Blurb ohne Export"
+    ],
+    "pains": [
+     {
+      "pain": "Arbeit geht verloren: Fotos verschwinden aus dem Buch nach Wechsel ins Develop-Modul",
+      "evidence": "Sinngemäß/teilweise wörtlich (Adobe Community): Änderungen würden gelöscht, sobald man das Buch verlässt; Workaround war Rückkehr zu älteren Versionen",
+      "source": "https://community.adobe.com/t5/lightroom-classic-discussions/lightroom-book-module-problems-in-cc-classic-version-8/td-p/10209660"
+     },
+     {
+      "pain": "Kaum Kontrolle über Layout, eigene Raster mühsam",
+      "evidence": "Echtes Zitat (prbimages): \"The Book Module has failed me for even the slightest level of control over page layout.\"",
+      "source": "https://www.lightroomqueen.com/community/threads/lr-c-book-module-vs-bookwright.46007/"
+     },
+     {
+      "pain": "Alte Buchinhalte geistern in neue Bücher (\"Unsaved Book\")",
+      "evidence": "Echtes Zitat (jdannixon): \"I've always managed to remove those older photos after hours of struggling.\"",
+      "source": "https://www.lightroomqueen.com/community/threads/lightroom-classic-book-module.54350/"
+     },
+     {
+      "pain": "Textarbeit umständlich, kein Inhaltsverzeichnis",
+      "evidence": "Sinngemäß (Jared Platt): Text im Buch-Modul sei umständlich und klobig; Forennutzer johnbeardy druckte ein Buch ohne Inhaltsverzeichnis, weil es zu schwer anzulegen war",
+      "source": "https://jaredplatt.com/creating-a-blurb-photo-book-with-lightroom-and-bookwright/"
+     },
+     {
+      "pain": "Langsam, hängt bei \"Collecting Information\", Uploads stocken bei ca. 80 %",
+      "evidence": "Sinngemäß (Adobe Community): Uploads an Blurb bleiben bei rund 80 % hängen",
+      "source": "https://community.adobe.com/t5/lightroom-classic-discussions/lightroom-book-module-problems-in-cc-classic-version-8/td-p/10209660"
+     },
+     {
+      "pain": "Modul wird kaum weiterentwickelt, wenige Formate (z. B. kein A4), nur Blurb als Drucker",
+      "evidence": "Sinngemäß (Rob_Cullen): Buchgröße A4 nicht verfügbar; Forum: Modul seit Jahren kaum aktualisiert",
+      "source": "https://www.lightroomqueen.com/community/threads/is-blurb-as-bad-as-the-reviews.48079/"
+     }
+    ]
+   },
+   {
+    "name": "Artifact Uprising",
+    "segment": "Premium-Lifestyle-Fotobücher, kuratierte minimalistische Optik",
+    "strengths": [
+     "Hochwertige Materialien, ruhige Gestaltung",
+     "Editor als nahtlos gelobt: manuelle Platzierung oder automatisches Befüllen (bylaurencermak.com)",
+     "Hilfsbereites Design-Team (Trustpilot, sinngemäß)"
+    ],
+    "pains": [
+     {
+      "pain": "Feste Vorlagen, kaum persönlicher Gestaltungsspielraum",
+      "evidence": "Sinngemäß (Tom's Guide): Die einfache Software lasse keinen Raum für persönliche Kreativität, alle Elemente fix",
+      "source": "https://www.tomsguide.com/reviews/artifact-uprising"
+     },
+     {
+      "pain": "Einzelne Produkte ohne Text oder Bildunterschriften",
+      "evidence": "Sinngemäß (Hilfeseite/Review): Everyday Photo Book nur ein Bild pro Seite, keine Texte oder Captions",
+      "source": "https://help.artifactuprising.com/hc/en-us/articles/360000322411-Add-Edit-Delete-Text-in-the-Editor-for-Photo-Books"
+     },
+     {
+      "pain": "Unklar, ob Helligkeit/Farbe am Bildschirm zum Druck passt",
+      "evidence": "Sinngemäß (Trustpilot): Man könne im Editor aufhellen, wisse aber nicht, ob es für den Druck reicht",
+      "source": "https://www.trustpilot.com/review/www.artifactuprising.com"
+     },
+     {
+      "pain": "Druck weicht von Vorschau ab (Kontrast, Hauttöne, Vignetten)",
+      "evidence": "Sinngemäß (Trustpilot): professionelle Hochzeitsfotos mit harten Kontrasten, abgesoffenen Schwarztönen und falschen Hauttönen",
+      "source": "https://www.trustpilot.com/review/www.artifactuprising.com"
+     },
+     {
+      "pain": "Teuer",
+      "evidence": "Sinngemäß (Titel Tom's Guide): \"Lovely But Expensive Photo Books\"",
+      "source": "https://www.tomsguide.com/reviews/artifact-uprising"
+     }
+    ]
+   },
+   {
+    "name": "MILK Books",
+    "segment": "Premium-Fotobücher und Hochzeitsalben, online gestaltet",
+    "strengths": [
+     "Sehr gute Druck- und Bindequalität, fadengeheftet, liegt fast flach",
+     "Editor als intuitiv bewertet",
+     "Kostenloses Online-Flipbook mit teilbarem Link zu jedem Kauf"
+    ],
+    "pains": [
+     {
+      "pain": "Layouts fest, nur ca. 50 Seitenlayouts, 5 Schriften, 8 Farbpaletten",
+      "evidence": "Sinngemäß (photobookgirl.com): Layouts sind fix und nicht veränderbar",
+      "source": "https://www.photobookgirl.com/blog/milk-books-photo-album-review-and-giveaway/"
+     },
+     {
+      "pain": "Editor nur online, ohne Internet kein Arbeiten",
+      "evidence": "Sinngemäß (photobookgirl.com): Software liegt komplett online, Verbindung nötig",
+      "source": "https://www.photobookgirl.com/blog/milk-books-photo-album-review-and-giveaway/"
+     },
+     {
+      "pain": "Seitenvorlagen und Hintergründe wirken einschränkend",
+      "evidence": "Sinngemäß (Trustpilot-Übersicht): Bearbeitungswerkzeuge mitunter einschränkend bei Hintergründen und Seitenvorlagen",
+      "source": "https://www.trustpilot.com/review/www.milkbooks.com?page=3"
+     },
+     {
+      "pain": "Online-Flipbook nur als Beigabe zum gekauften Druck, keine Hinweise zu Privatsphäre oder Reaktionen der Betrachter",
+      "evidence": "Sinngemäß (Produktseite): Flipbook gibt es zu jedem Kauf, über Kommentare oder Zugriffsrechte steht nichts",
+      "source": "https://www.milkbooks.com/photo-books/online-photo-flip-books/"
+     }
+    ]
+   },
+   {
+    "name": "Zno",
+    "segment": "Profi-Hochzeitsfotografen, Flush-Mount-Layflat-Alben",
+    "strengths": [
+     "Drag-and-drop schnell, gute Balance aus Flexibilität und Bequemlichkeit (Martin Bailey)",
+     "Gut als Startpunkt statt Layout in Illustrator"
+    ],
+    "pains": [
+     {
+      "pain": "Ausrichtungshilfen ungenau, exakte Zahlen nicht eintippbar",
+      "evidence": "Echtes Zitat (Martin Bailey): \"smart guides\" seien \"inaccurate and of little use\"",
+      "source": "https://martinbaileyphotography.com/2016/06/13/zno-flush-mount-layflat-books-review-podcast-527/"
+     },
+     {
+      "pain": "Eigene Layouts zu zeitaufwendig",
+      "evidence": "Echtes Zitat (Martin Bailey): \"more time consuming than it needed to be\"",
+      "source": "https://martinbaileyphotography.com/2016/06/13/zno-flush-mount-layflat-books-review-podcast-527/"
+     },
+     {
+      "pain": "Langsamer Editor, Speichern schlägt fehl",
+      "evidence": "Echtes Zitat (Trustpilot): \"Terribly slow website! Stay away if you don't have 5 hours to wait for each page to load.\"",
+      "source": "https://www.trustpilot.com/review/zno.com?page=2"
+     },
+     {
+      "pain": "Druck-Beschnitt weicht von Vorschau ab",
+      "evidence": "Sinngemäß (Suchergebnis zu Reviews): Fotos rechts über einen Zoll abgeschnitten, Covermotiv anders beschnitten als in der Vorschau",
+      "source": "https://www.productreview.com.au/listings/zno?page=2"
+     },
+     {
+      "pain": "Software-Updates bauen Funktionen ab",
+      "evidence": "Sinngemäß (Profi-Reviews): Albumdesigner sei rückschrittig, frei einstellbare Abstände wurden entfernt",
+      "source": "https://au.trustpilot.com/review/zno.com?page=3"
+     }
+    ]
+   },
+   {
+    "name": "Canva (Fotobuch-Vorlagen, Canva Print)",
+    "segment": "Einsteiger und Allround-Gestalter, Vorlagen statt Fotografen-Workflow",
+    "strengths": [
+     "Riesige Vorlagenbibliothek, vertraute Oberfläche",
+     "Magic Autofill / Magic Design schlagen Layouts vor",
+     "Günstig"
+    ],
+    "pains": [
+     {
+      "pain": "Bildschirmlogik statt Drucklogik: Beschnitt fehlt, Schriften verrutschen",
+      "evidence": "Sinngemäß (Druckerei-Blog): häufigste Ablehnung ist fehlender Beschnitt, weißer Streifen nach dem Schnitt",
+      "source": "https://wttb.co.uk/blog/canva-print-mistakes-to-avoid"
+     },
+     {
+      "pain": "Bei vielen Fotos sehr viel Handarbeit",
+      "evidence": "Echtes Zitat (Anbieter-Blog mysocialbook, nicht neutral): \"Designing a 100-page book manually can take 5-10 hours.\"",
+      "source": "https://www.mysocialbook.com/blogs/ideas/how-to-select-the-perfect-photo-book-maker-for-you"
+     },
+     {
+      "pain": "Druckqualität schwankt, wenige Formate",
+      "evidence": "Echtes Zitat (gleiche Quelle): \"Print quality inconsistent (third-party fulfillment), limited book size options\"",
+      "source": "https://www.mysocialbook.com/blogs/ideas/how-to-select-the-perfect-photo-book-maker-for-you"
+     },
+     {
+      "pain": "Buch liegt nicht flach, Doppelseiten-Motive leiden",
+      "evidence": "Echtes Zitat: \"This photo book does not lay flat, it has a curve in the book bound area.\"",
+      "source": "https://www.cityofcreativedreams.com/canva-photo-book-review/"
+     },
+     {
+      "pain": "Editor gelegentlich fehlerhaft (Fotos lassen sich nicht in Rahmen setzen, Neuladen nötig)",
+      "evidence": "Sinngemäß (PrestoPhoto-Hilfe): Fotos lassen sich nicht in Rahmen ziehen, ein harter Browser-Refresh helfe",
+      "source": "https://www.prestophoto.com/help/Canva+PDF+Printing"
+     }
+    ]
+   },
+   {
+    "name": "Adobe Express (Fotobuch-Vorlagen)",
+    "segment": "Schnelle Social-Grafik, Fotobuch nur über Vorlagen, kein eigener Buchdruck",
+    "strengths": [
+     "Einfach, Adobe-Integration",
+     "Vorlagen und KI-Funktionen"
+    ],
+    "pains": [
+     {
+      "pain": "Wenig Feinkontrolle (Kerning, Ebenen, Effekte)",
+      "evidence": "Sinngemäß (Designer-Review): Oberfläche ohne granulare Kontrolle, wenige Ebenen erschweren komplexe Kompositionen",
+      "source": "https://www.fastfrigate.com/resources/adobe-express-review-a-veteran-designers-perspective/"
+     },
+     {
+      "pain": "Kein CMYK, für Druck ungeeignet",
+      "evidence": "Sinngemäß (Suchergebnis-Reviews): keine CMYK-Unterstützung, schließt Druckprofis aus",
+      "source": "https://www.g2.com/products/adobe-express/reviews?qs=pros-and-cons"
+     },
+     {
+      "pain": "Wasserzeichen und Vorlagengrenze in der Gratisversion",
+      "evidence": "Sinngemäß (G2/Capterra): Gratisversion versieht alles mit Wasserzeichen; man stößt schnell an die Vorlagengrenze",
+      "source": "https://www.capterra.com/p/174232/adobe-express/reviews/"
+     },
+     {
+      "pain": "Uploads langsam",
+      "evidence": "Sinngemäß (Capterra): Hochladen von Fotos dauert, Funktionen laden langsam",
+      "source": "https://www.capterra.com/p/174232/adobe-express/reviews/"
+     }
+    ]
+   },
+   {
+    "name": "Glass",
+    "segment": "Bezahl-Community für Fotografen, werbe- und algorithmusfrei",
+    "strengths": [
+     "Keine Likes, keine Follower-Zahlen, keine Werbung",
+     "Gute Vollbild-Darstellung, freundliche Community (markmoran.co.uk)"
+    ],
+    "pains": [
+     {
+      "pain": "Querformate werden beschnitten",
+      "evidence": "Echtes Zitat (Mark Moran): \"Images with landscape format automatically zoom in, hiding half of the image\"",
+      "source": "https://www.markmoran.co.uk/blog/my-thoughts-on-glass"
+     },
+     {
+      "pain": "Keine Suche, keine Struktur",
+      "evidence": "Echtes Zitat: \"there is no search facility you are limited to scrolling though endless uncategorised photos\"",
+      "source": "https://www.markmoran.co.uk/blog/my-thoughts-on-glass"
+     },
+     {
+      "pain": "Kein Rückkanal, ob das Werk gesehen wird",
+      "evidence": "Echtes Zitat: \"with no view stats there's no way of knowing if your work is even being seen\"",
+      "source": "https://www.markmoran.co.uk/blog/my-thoughts-on-glass"
+     },
+     {
+      "pain": "Geschlossener Garten, wenig Aktivität, Nutzer bleiben nicht",
+      "evidence": "Echtes Zitat (benc98): \"I don't think the people stuck around.\"",
+      "source": "https://www.talkphotography.co.uk/threads/glass-photo-does-anyone-use-it.754379/"
+     },
+     {
+      "pain": "Abo wirkt für den Umfang zu teuer",
+      "evidence": "Sinngemäß (Mark Moran): Abo nicht gerechtfertigt, nur um Werke anderen Fotografen zu zeigen",
+      "source": "https://www.markmoran.co.uk/blog/my-thoughts-on-glass"
+     }
+    ]
+   },
+   {
+    "name": "VSCO (Recipes, Presets)",
+    "segment": "Mobile Bearbeitung und Community, Looks per Abo",
+    "strengths": [
+     "Recipes sparen Zeit: ein Look auf viele Fotos (sinngemäß, Nutzerreview)",
+     "Hochwertige Filter, langjährige Bindung (mobilesyrup.com)"
+    ],
+    "pains": [
+     {
+      "pain": "Recipes verwirrend zu setzen und zu ändern",
+      "evidence": "Sinngemäß (justuseapp-Reviews): Nutzer wissen nicht, wie man Recipes setzt, bearbeiten am Ende doch von Hand",
+      "source": "https://justuseapp.com/en/app/588013838/vsco-photo-video-editor/reviews"
+     },
+     {
+      "pain": "Oberfläche minimalistisch bis zur Verwirrung, Social-Funktionen ohne Zusammenhang",
+      "evidence": "Echtes Zitat: \"the app is still highly minimalist to the point of being confusing\"",
+      "source": "https://mobilesyrup.com/2023/07/30/vsco-mobile-photo-editing-app-review-2023-ios-apple-android/"
+     },
+     {
+      "pain": "Paywall und Preissprünge, Recipes nur im Abo unbegrenzt",
+      "evidence": "Sinngemäß (Reviews): Wechsel von 19,99 auf gestufte Abos empfunden als Verdopplung bei weniger Leistung; Trial verlangt Kreditkarte",
+      "source": "https://checkthat.ai/brands/vsco/reviews"
+     },
+     {
+      "pain": "Einstellungen kopieren durch Abo-Pop-ups blockiert",
+      "evidence": "Sinngemäß (Trustpilot): \"copy edits\" funktioniere erst nach Klick auf Mitgliedschaft",
+      "source": "https://www.trustpilot.com/review/vsco.co"
+     }
+    ]
+   },
+   {
+    "name": "Fuji X Weekly (App und Rezepte)",
+    "segment": "Fujifilm-Film-Simulation-Rezepte, größte Rezeptsammlung",
+    "strengths": [
+     "Riesige kuratierte Rezeptsammlung, Community",
+     "Echtes Zitat (App Store): \"It also serves unintentionally as an in-phone textbook on what all the color settings on Fujifilm cameras do\"",
+     "Neu: Rezepte per USB-C direkt an die Kamera"
+    ],
+    "pains": [
+     {
+      "pain": "Übertragung an die Kamera hängt von Kabel, Gerät und Kamerageneration ab",
+      "evidence": "Echtes Zitat: \"Lightning cable iPhones and iPads are not compatible with the App-to-Camera Recipe Transfer feature\"; Android braucht USB-OTG, teils Entwickleroptionen",
+      "source": "https://fujixweekly.com/2026/09/13/fxw-app-recipe-transfer-feature-issues-for-apple-and-android/"
+     },
+     {
+      "pain": "Fehlerhafte Übertragung einzelner Werte (DR-Auto, falsche Grain-Warnung), ISO/Belichtung nicht übertragen",
+      "evidence": "Echtes Zitat: \"DR-Auto Recipes set Dynamic Range in the camera to DR100 instead of DR-Auto.\"",
+      "source": "https://fujixweekly.com/2026/08/22/some-app-to-camera-recipe-transfer-protocol-issues-instagram-really-sucks/"
+     },
+     {
+      "pain": "Grundfilter (z. B. nach Sensor) hinter Abo",
+      "evidence": "Sinngemäß (Store-Reviews): Filtern nach X-Trans I nur im Abo, als \"dirty move\" bezeichnet; Einmalkauf gewünscht",
+      "source": "https://play.google.com/store/apps/details?id=com.fujixweekly.FujiXWeekly"
+     },
+     {
+      "pain": "Kamera speichert keinen Rezeptnamen, man muss sich merken, welches Rezept man nutzte",
+      "evidence": "Sinngemäß: Fujifilm schreibt Einstellungen in MakerNote, aber nicht den Namen; Drittwerkzeuge (Recipe Tagger, Recipe Matcher) füllen die Lücke",
+      "source": "https://github.com/adrian-gadient/fuji-recipe-tagger"
+     },
+     {
+      "pain": "Teilen über Instagram unzuverlässig (Beitrag fälschlich entfernt)",
+      "evidence": "Echtes Zitat (Ritchie Roesch): \"Instagram really sucks, and I'm not happy with their platform right now.\"",
+      "source": "https://fujixweekly.com/2026/08/22/some-app-to-camera-recipe-transfer-protocol-issues-instagram-really-sucks/"
+     }
+    ]
+   },
+   {
+    "name": "Issuu und Flipbook-Dienste",
+    "segment": "Digitales Veröffentlichen von PDFs als blätterbares Heft, Portfolios und Zines",
+    "strengths": [
+     "Öffentliche Reichweite, einfacher Einstieg",
+     "Gratisstufe vorhanden"
+    ],
+    "pains": [
+     {
+      "pain": "Gratisplan ist nur eine Demo",
+      "evidence": "Echtes Zitat: \"The free plan is a demo, not a workable setup.\"",
+      "source": "https://zipflipbook.com/blog/issuu-flipbook"
+     },
+     {
+      "pain": "Werbung neben dem eigenen Werk, teils von Konkurrenz",
+      "evidence": "Echtes Zitat: \"Readers may see ads sitting near your content, and some of those can be for competitors.\"",
+      "source": "https://zipflipbook.com/blog/issuu-flipbook"
+     },
+     {
+      "pain": "Einbetten auf eigener Seite nur gegen Geld, Inhalt bleibt auf der Plattform",
+      "evidence": "Echtes Zitat: \"Embedding sits on the paid plans\"",
+      "source": "https://zipflipbook.com/blog/issuu-flipbook"
+     },
+     {
+      "pain": "Blättereffekt wirkt flach (2D), wenig Interaktion",
+      "evidence": "Sinngemäß (Vergleich Publitas, Anbieter-Blog): Issuu nutze einfachen 2D-Flip, weniger immersiv als 3D",
+      "source": "https://www.publitas.com/blog/flippingbook-vs-issuu/"
+     }
+    ]
+   }
+  ],
+  "mustHaves": [
+   {
+    "need": "Schneller automatischer Erstentwurf, danach volle Kontrolle (Layout-Varianten, eigenes Raster, exakte Werte, Ausrichtungshilfen, die stimmen)",
+    "why": "Feste Vorlagen werden bei Artifact Uprising und MILK als einschränkend kritisiert; freie Werkzeuge (Canva, LR) kosten bei vielen Fotos Stunden; Zno-Guides gelten als ungenau. Lücke liegt zwischen Automatik und Kontrolle."
+   },
+   {
+    "need": "Kein Datenverlust: Autosave, Versionen, Rückgängig, kein Übernehmen alter Buchinhalte",
+    "why": "Größter emotionaler Schmerz im LR-Buch-Modul (verschwundene Fotos, Altlasten aus 'Unsaved Book'), bei Blurb (Fotos weg nach Upload) und Zno (Speichern schlägt fehl)."
+   },
+   {
+    "need": "Vorschau, der man trauen kann: Beschnitt, Rücken, sichere Zonen und Farbe sichtbar, Hinweis auf zu geringe Auflösung",
+    "why": "Abweichung Vorschau zu Druck ist der häufigste Punkt bei Blurb, Artifact Uprising, Zno und Canva. Auch ohne Druck heute: wer später druckt, braucht das von Anfang an im Modell."
+   },
+   {
+    "need": "Text und Typografie, die mitwachsen: Titel, Kapitel, Bildunterschriften aus Metadaten, automatische Seitenzahlen und Inhaltsverzeichnis",
+    "why": "BookWright bricht Seitenzahlen ab, Einzüge falsch; LR macht Text umständlich, kein Inhaltsverzeichnis; Metadaten-Captions in BookWright jahrelang gewünscht."
+   },
+   {
+    "need": "Flüssig und schnell auch bei Hunderten Fotos, direkt aus dem Foto-Bestand ohne Exportumweg",
+    "why": "Zno und LR werden als langsam beschrieben, BookWright verlangt vorherigen Export. Die nahtlose Bearbeitung im LR-Katalog ist das, was Nutzer am LR-Modul loben."
+   },
+   {
+    "need": "Teilen per privatem Link, ohne Konto, ohne Werbung, ohne Paywall für Betrachter, mit vollständiger Darstellung (kein Beschnitt von Querformaten)",
+    "why": "Issuu: Werbung, Einbetten nur bezahlt; Glass: Querformate beschnitten, geschlossener Garten, Abo; MILK-Flipbook nur als Beigabe. Fujiventura erfüllt das heute schon und sollte es nicht verlieren."
+   },
+   {
+    "need": "Rückkanal für den Urheber: sehen, dass und wie Freunde das Buch angeschaut und darauf reagiert haben, aber ohne Like-Zahlen",
+    "why": "Glass-Nutzer vermissen jede Rückmeldung, ob ihr Werk gesehen wird, schätzen aber den Verzicht auf Likes. Eselsohren und Zettel treffen genau diese Lücke."
+   },
+   {
+    "need": "Blätter-Erlebnis, das auf dem Handy funktioniert und sich nach Buch anfühlt (Seitenkrümmung, Doppelseite, Wischen)",
+    "why": "Flache 2D-Flips gelten als wenig immersiv; Flipbooks werden als Ersatz für das gedruckte Gefühl beworben. Ein Vorteil, der nur zählt, wenn er auch mobil trägt."
+   },
+   {
+    "need": "Rezept am Foto, automatisch aus den Metadaten erkannt und mit Namen versehen, mit einem Klick übernehmbar (Text, Kamera-Einstellungen, Preset-Datei)",
+    "why": "Fujifilm speichert keinen Rezeptnamen, Nutzer behelfen sich mit Drittwerkzeugen; die Übertragung an die Kamera ist geräteabhängig und fehleranfällig; VSCO-Recipes gelten als verwirrend und sind ans Abo gebunden."
+   },
+   {
+    "need": "Ehrliches, einfaches Preismodell ohne versteckte Grundfunktionen",
+    "why": "Wiederkehrender Ärger bei VSCO (Preissprung, Trial mit Kreditkarte), Fuji X Weekly (Filter hinter Abo), Issuu (Gratis nur Demo), Adobe Express (Wasserzeichen)."
+   },
+   {
+    "need": "Stabile Zukunft der Projekte: Export (PDF/Bilder), offenes Format, Migrationspfad bei Versionswechseln",
+    "why": "Blurb ließ BookSmart-Nutzer ohne Migration zurück; Issuu hält Inhalte auf der Plattform fest; das LR-Modul wird kaum weiterentwickelt."
+   }
+  ],
+  "key": "premium"
+ }
+]

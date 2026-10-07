@@ -70,6 +70,8 @@ body {
 @layer components {
 /* Gewebe: zwei Fadenrichtungen, als kleine PNG-Kacheln vorgerendert (SVG-Filter zur Laufzeit sind in WebKit teuer) */
 .linen {
+  /* Bezugsrahmen für das Gewebe; absolute, sticky und fixed aus den Utilities gehen vor */
+  position: relative;
   isolation: isolate;
 }
 .linen::after {
