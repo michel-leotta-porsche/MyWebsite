@@ -17,7 +17,7 @@ function drawPalm(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const ax = w * 1.04;
   const ay = -h * 0.12;
   ctx.clearRect(0, 0, w, h);
-  ctx.strokeStyle = "rgb(4 24 27)"; // Schatten aus Petrol, nie Neutralschwarz
+  ctx.strokeStyle = "rgb(12 10 8)"; // Schatten aus Basalt, nie Neutralschwarz
   ctx.lineCap = "round";
   const fronds = 11;
   for (let f = 0; f < fronds; f++) {
@@ -86,7 +86,7 @@ export function SunAndShade() {
 
   return (
     <>
-      {/* Schatten: Petrol mit wenig Deckkraft, damit Text auf dem Papier lesbar bleibt (≥ 4.5:1) */}
+      {/* Schatten: Basalt mit wenig Deckkraft, damit Text auf dem Papier lesbar bleibt (≥ 4.5:1) */}
       <div aria-hidden data-shade className="pointer-events-none absolute inset-0 z-10 overflow-hidden opacity-[0.12]">
         <div className="sway absolute -inset-[6%] origin-top-right">
           <canvas ref={canvas} className="h-full w-full" />

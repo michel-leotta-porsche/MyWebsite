@@ -141,7 +141,7 @@ export function Intro() {
             <div
               key={p.no}
               data-print
-              className="absolute bg-paper p-[5px] opacity-0 shadow-[0_18px_30px_-12px_rgb(4_24_27/0.6),0_2px_4px_rgb(4_24_27/0.25)]"
+              className="absolute bg-paper p-[5px] opacity-0 shadow-[0_18px_30px_-12px_rgb(12_10_8/0.6),0_2px_4px_rgb(12_10_8/0.25)]"
               style={{ width: landscape ? "min(46vw, 330px)" : "min(32vw, 220px)" }}
             >
               <Image

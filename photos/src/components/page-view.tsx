@@ -15,7 +15,7 @@ function Gutter({ side }: { side: "left" | "right" }) {
       className="pointer-events-none absolute inset-y-0 z-20 w-[14cqw]"
       style={{
         [side === "left" ? "right" : "left"]: 0,
-        background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(4 24 27 / 0.16), rgb(4 24 27 / 0.05) 30%, transparent)`,
+        background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(12 10 8 / 0.16), rgb(12 10 8 / 0.05) 30%, transparent)`,
       }}
     />
   );

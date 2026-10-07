@@ -80,7 +80,7 @@ void main() {
   if (uShadow > 0.0) {
     // Schatten auf der Seite darunter: am stärksten am Bund, läuft zur Kante aus
     float a = uShadow * pow(1.0 - vUV.x, 1.4);
-    gl_FragColor = vec4(0.016 * a, 0.094 * a, 0.106 * a, a);
+    gl_FragColor = vec4(0.047 * a, 0.039 * a, 0.031 * a, a);
     return;
   }
   vec3 N = normalize(gl_FrontFacing ? vN : -vN);

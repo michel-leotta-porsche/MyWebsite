@@ -147,7 +147,7 @@ function LeafView({
             {near ? <PageView page={leaf.front} side="right" compact={compact} /> : <Blank page={leaf.front} />}
             <motion.div
               aria-hidden
-              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"
+              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
               style={{ opacity: frontShade }}
             />
           </div>
@@ -159,7 +159,7 @@ function LeafView({
             {near ? <PageView page={leaf.back} side="left" compact={compact} /> : <Blank page={leaf.back} />}
             <motion.div
               aria-hidden
-              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(4_24_27/0.55),rgb(4_24_27/0.15))]"
+              className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
               style={{ opacity: backShade }}
             />
           </motion.div>
@@ -189,16 +189,16 @@ function Curl({ side, amount, flap }: { side: "left" | "right"; amount: MotionVa
         className="absolute inset-0"
         style={{
           clipPath: right ? "polygon(100% 0, 100% 100%, 0 100%)" : "polygon(0 0, 100% 100%, 0 100%)",
-          background: `linear-gradient(${dir}, rgb(4 24 27 / 0.28) 50%, var(--paper-shade) 66%, var(--paper) 100%)`,
+          background: `linear-gradient(${dir}, rgb(12 10 8 / 0.28) 50%, var(--paper-shade) 66%, var(--paper) 100%)`,
         }}
       />
       {/* Lasche: Rückseite des Blatts, zur Falte hin aufgehellt */}
-      <div className="absolute inset-0 [filter:drop-shadow(-3px_-3px_5px_rgb(4_24_27/0.28))]">
+      <div className="absolute inset-0 [filter:drop-shadow(-3px_-3px_5px_rgb(12_10_8/0.28))]">
         <div
           className="absolute inset-0"
           style={{
             clipPath: right ? "polygon(0 0, 100% 0, 0 100%)" : "polygon(0 0, 100% 0, 100% 100%)",
-            background: `linear-gradient(${dir}, color-mix(in oklab, var(--flap) 82%, rgb(4 24 27)) 0%, var(--flap) 34%, color-mix(in oklab, var(--flap) 70%, white) 49%, var(--flap) 50%)`,
+            background: `linear-gradient(${dir}, color-mix(in oklab, var(--flap) 82%, rgb(12 10 8)) 0%, var(--flap) 34%, color-mix(in oklab, var(--flap) 70%, white) 49%, var(--flap) 50%)`,
           }}
         />
       </div>
@@ -594,12 +594,12 @@ export function Book({ mode, className = "" }: { mode: Mode; className?: string 
               {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
               <div
                 aria-hidden
-                className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(4_24_27/0.75),0_6px_14px_-6px_rgb(4_24_27/0.5)]"
+                className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
                 style={{ left: mode === "spread" ? "50%" : 0 }}
               />
               <motion.div
                 aria-hidden
-                className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(4_24_27/0.75)]"
+                className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75)]"
                 style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
               />
 

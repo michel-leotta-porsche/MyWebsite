@@ -96,9 +96,9 @@ function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number
   const x0 = side === "left" ? W : 0;
   const x1 = side === "left" ? W - w : w;
   const g = ctx.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, "rgb(4 24 27 / 0.16)");
-  g.addColorStop(0.3, "rgb(4 24 27 / 0.05)");
-  g.addColorStop(1, "rgb(4 24 27 / 0)");
+  g.addColorStop(0, "rgb(12 10 8 / 0.16)");
+  g.addColorStop(0.3, "rgb(12 10 8 / 0.05)");
+  g.addColorStop(1, "rgb(12 10 8 / 0)");
   ctx.fillStyle = g;
   ctx.fillRect(Math.min(x0, x1), 0, w, H);
 }
