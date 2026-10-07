@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import type { BookData } from "@/content/books";
+import { books as sampleBooks, type BookData } from "@/content/books";
 import { linkClass, RequireUser, RoomNav, RoomTitle, TextButton, UndoToast } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import type { User } from "@/lib/firebase";
 import { dropFromInbox, inbox, keepInInbox, myBooks, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { friendlyError } from "@/lib/errors";
+
+/** Google-Konten, unter denen Michel angemeldet ist. Kein Schutz: die Fotos liegen ohnehin öffentlich unter /photos */
+const OWNER_EMAILS = ["michel.julian.leotta@gmail.com"];
+const isOwner = (u: User) => !!u.email && OWNER_EMAILS.includes(u.email.toLowerCase());
 
 /** Bücherzimmer: alles zum Lesen, die eigenen Bücher und die, die Freunde hingelegt haben */
 export function BookRoom() {
@@ -42,6 +46,8 @@ function Room({ user }: { user: User }) {
   // geteilte Bücher bekommen eine eigene Kennung, damit sie neben gleichnamigen eigenen liegen können
   const data = useMemo(() => {
     const list: { book: BookData; stored?: StoredBook; gift?: Share }[] = [];
+    // Michels eigene Bände (Fuerteventura, Japan) lagen früher auf der Landing Page; jetzt nur noch hier, für ihn
+    if (isOwner(user)) for (const b of sampleBooks) list.push({ book: b });
     for (const b of (own ?? []).filter((b) => !b.trashed)) {
       try {
         list.push({ book: toBookData(b), stored: b });
@@ -53,7 +59,7 @@ function Room({ user }: { user: User }) {
       } catch {}
     }
     return list;
-  }, [own, gifts]);
+  }, [own, gifts, user]);
 
   const byId = (id: string) => data.find((d) => d.book.id === id);
   const loaded = own !== null && gifts !== null;

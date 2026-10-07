@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { type BookData } from "@/content/books";
-import { INTRO_DONE } from "@/components/intro";
 import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -124,7 +123,7 @@ export function Table({ books, onOpen, headerRight, extra, note, tiles, label, t
     root.current?.querySelector<HTMLElement>(`[data-table-book="${CSS.escape(focusId)}"] button`)?.focus({ preventScroll: true });
   }, [focusId]);
 
-  // Nach dem Einstieg hebt sich jedes Buch einmal kurz an: hier lässt sich etwas aufschlagen
+  // Kurz nach dem Laden hebt sich jedes Buch einmal kurz an: hier lässt sich etwas aufschlagen
   useEffect(() => {
     if (reduce || !root.current) return;
     const lifts = Array.from(root.current.querySelectorAll<HTMLElement>(".lift"));
@@ -139,10 +138,6 @@ export function Table({ books, onOpen, headerRight, extra, note, tiles, label, t
           }),
         ),
       );
-    if (document.documentElement.classList.contains("intro")) {
-      window.addEventListener(INTRO_DONE, nudge, { once: true });
-      return () => window.removeEventListener(INTRO_DONE, nudge);
-    }
     const id = window.setTimeout(nudge, 400);
     return () => {
       window.clearTimeout(id);

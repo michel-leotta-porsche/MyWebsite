@@ -189,21 +189,6 @@ body {
   }
 }
 
-/* Einstieg: nur sichtbar, wenn das Startskript html.intro gesetzt hat; blendet sich zur Not selbst aus */
-.intro-cover {
-  display: none;
-}
-html.intro .intro-cover {
-  display: block;
-  animation: intro-failsafe 0.01s linear 7s forwards;
-}
-@keyframes intro-failsafe {
-  to {
-    opacity: 0;
-    visibility: hidden;
-  }
-}
-
 /* Buch vom Tisch nehmen und zurücklegen: der Einband fliegt, alles andere blendet kurz */
 ::view-transition-group(*) {
   animation-duration: 900ms;
@@ -226,7 +211,7 @@ html.intro .intro-cover {
   }
 }
 
-/* Schalter zum Eingrenzen auf Geräten: ?ohne=intro,schatten,struktur,biegung (Skript im Layout) */
+/* Schalter zum Eingrenzen auf Geräten: ?ohne=schatten,struktur,biegung (Skript im Layout) */
 html.ohne-struktur .linen::after,
 html.ohne-struktur .paper::before {
   display: none;
@@ -244,8 +229,61 @@ html.ohne-schatten [data-shade] {
   opacity: 0.09;
 }
 
-/* Foto zum gezeigten oder offenen Rezeptzettel: Rahmen in der Signalfarbe, damit klar ist, welches Bild gemeint ist */
-[data-plate-box][data-marked] {
-  outline: 3px solid var(--mark);
-  outline-offset: -3px;
+/* Landing: Bilder zu „So geht’s“. Der Ausgangszustand ist sichtbar; nur der aktive Schritt spielt seinen Weg einmal ab */
+.fig {
+  transition:
+    opacity 500ms var(--ease-out),
+    translate 500ms var(--ease-out);
+}
+.fig[data-on="false"] {
+  opacity: 0;
+  translate: 0 16px;
+}
+.fig-drop[data-on="true"] {
+  animation: fig-drop 760ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes fig-drop {
+  from {
+    transform: translateY(-40%) rotate(-10deg) scale(1.08);
+    opacity: 0;
+  }
+}
+/* Blatt schlägt von rechts über den Bund nach links und verschwindet dabei */
+.fig-leaf {
+  transform: rotateY(-180deg);
+  opacity: 0;
+  backface-visibility: hidden;
+}
+.fig-leaf[data-on="true"] {
+  animation: fig-leaf 1300ms var(--ease-in-out) 200ms both;
+}
+@keyframes fig-leaf {
+  from {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+  99% {
+    opacity: 1;
+  }
+  to {
+    transform: rotateY(-180deg);
+    opacity: 0;
+  }
+}
+.fig-return:has(.fig-in[data-on="true"]) {
+  animation: fig-return 900ms var(--ease-out) 300ms both;
+}
+@keyframes fig-return {
+  from {
+    transform: translate(18%, 30%) rotate(6deg);
+    opacity: 0;
+  }
+}
+/* Einband im Kopf hebt sich beim Zeigen leicht, wie auf dem Tisch */
+.hero-lift {
+  transition: translate 500ms var(--ease-out);
+}
+.hero-lift:hover {
+  translate: 0 -8px;
 }
