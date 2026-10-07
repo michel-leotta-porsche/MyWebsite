@@ -175,7 +175,8 @@ export function PageView({
   const bg = layout.bg === "paper" ? undefined : layout.bg === "cloth" ? book.cloth.base : book.cloth.deep;
   return (
     <div
-      className={`absolute inset-0 overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
+      // isolate: die Stapel-Nummern der Elemente gelten nur innerhalb dieser Seite, nie über andere Blätter hinweg
+      className={`absolute inset-0 isolate overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
       style={{ backgroundColor: bg }}
     >
       {layout.els.map((el, i) => (
