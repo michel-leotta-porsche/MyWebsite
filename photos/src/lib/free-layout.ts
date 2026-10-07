@@ -138,8 +138,10 @@ export function boxOf(it: SpreadItem, g: Geom): Box {
 /** Überlappt ein Element ein anderes? Fotos nie übereinander, Text nie auf einem Foto */
 export function collides(items: SpreadItem[], id: string, box: Box, g: Geom) {
   const me = items.find((i) => i.id === id);
+  // Formen und Zeichnungen dürfen überall liegen, auch auf Fotos (Klebestreifen, Pfeil auf ein Detail)
+  if (me && (me.t === "shape" || me.t === "ink")) return false;
   return items.some((o) => {
-    if (o.id === id) return false;
+    if (o.id === id || o.t === "shape" || o.t === "ink") return false;
     const b = boxOf(o, g);
     if (!overlap(box, b)) return false;
     // Text auf Text ist genauso verboten wie Foto auf Foto

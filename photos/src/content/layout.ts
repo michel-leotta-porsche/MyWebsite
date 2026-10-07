@@ -1,3 +1,4 @@
+import { inkPaths, shapePaths, type PathEl } from "@/content/shapes";
 import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
@@ -46,7 +47,9 @@ export type El =
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
   | { t: "rect"; x: number; y: number; w: number; h: number; color: string }
   /** Prägemulde: Linie innen um das eingelassene Bild */
-  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number };
+  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number }
+  /** Form oder Handschrift als Pfad in cqw (shapes.ts) */
+  | PathEl;
 
 export type Layout = {
   bg: "paper" | "cloth" | "clothDeep";
@@ -154,6 +157,8 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
     // Textrahmen: Höhe folgt dem Text
     return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w, it.look) } : c;
   });
+  // Formen und Zeichnungen stören keine Bildunterschrift: sie liegen bewusst auf der Seite
+  const solid = items.map((it) => it.t === "photo" || it.t === "text");
   const els: El[] = [];
   items.forEach((it, i) => {
     const b = boxes[i];
@@ -164,9 +169,13 @@ function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El
       const there = b.x < 0 ? -b.x : Math.max(0, b.x + b.w - 100);
       const visible = here > 0 && (b.x < 0 ? here > there : here >= there);
       if (it.caption === "auto" && visible) {
-        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i));
+        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i && solid[n]));
         if (cap) els.push(cap);
       }
+    } else if (it.t === "shape") {
+      els.push(...shapePaths(it.kind, it.box, it.look, it.from, H));
+    } else if (it.t === "ink") {
+      els.push(...inkPaths(it.strokes, it.box, H));
     } else {
       const st = TEXT_ROLE[it.role];
       const m = textMetrics(it.role, it.look);
