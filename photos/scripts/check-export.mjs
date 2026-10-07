@@ -21,10 +21,6 @@ for (const f of ["impressum.html", "datenschutz.html"]) if (!html.includes(f)) p
 for (const f of ["kritik.html", "qfd.html", "umfrage.html"]) if (html.includes(f)) problems.push(`${f} darf nicht live gehen`);
 if (html.includes("impressum.html") && (await readFile(path.join(out, "impressum.html"), "utf8")).includes("ANSCHRIFT FEHLT"))
   problems.push("Impressum ohne Anschrift: FUJI_IMPRESSUM_ADRESSE in photos/.env.local setzen (Zeilen mit | trennen)");
-// App Check: ohne Site-Schlüssel ginge die Seite ungeschützt raus, und bei erzwungenem App Check schlüge jede Anfrage fehl
-const envLocal = await readFile(path.join(import.meta.dirname, "..", ".env.local"), "utf8").catch(() => "");
-if (!process.env.NEXT_PUBLIC_FUJI_APPCHECK_KEY && !/^NEXT_PUBLIC_FUJI_APPCHECK_KEY=\S/m.test(envLocal))
-  problems.push("App Check ohne Schlüssel: NEXT_PUBLIC_FUJI_APPCHECK_KEY (reCAPTCHA-v3-Site-Schlüssel) in photos/.env.local setzen");
 if (problems.length) {
   console.error(problems.join("\n"));
   process.exit(1);

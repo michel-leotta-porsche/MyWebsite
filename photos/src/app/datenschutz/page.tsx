@@ -16,7 +16,7 @@ export default function Page() {
       <LegalSection title="Kurz gesagt">
         <p>
           Deine Fotos liegen bei Google Firebase und sind nur für dich und für die Menschen sichtbar, denen du einen Link gibst. Ortsdaten entferne
-          ich vor dem Hochladen. Es gibt kein Tracking, keine Werbung und keine Cookies zu Analysezwecken; ein Cookie von Google reCAPTCHA dient nur dem Schutz vor Missbrauch. Löschen kannst du jederzeit selbst.
+          ich vor dem Hochladen. Es gibt kein Tracking, keine Werbung und keine Cookies zu Analysezwecken. Löschen kannst du jederzeit selbst.
         </p>
       </LegalSection>
 
@@ -64,15 +64,6 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Schutz vor Missbrauch">
-        <p>
-          Sobald die Seite auf Bücher, Fotos oder Zettel zugreift, prüft Firebase App Check mit Google reCAPTCHA v3, dass die Anfrage von dieser
-          Seite kommt und nicht von einem Programm, das massenhaft Daten abruft oder Gästebücher vollschreibt. Dafür lädt die Seite ein Skript von
-          Google, das Merkmale deines Browsers und deiner Nutzung auswertet und ein Cookie setzt. Ein Rätsel musst du nicht lösen. Rechtsgrundlage
-          ist Art. 6 Abs. 1 lit. f DSGVO, das berechtigte Interesse ist der Schutz der Seite und deiner Daten vor Missbrauch.
-        </p>
-      </LegalSection>
-
       <LegalSection title="Speicher im Browser">
         <p>
           Die Seite merkt sich ein paar Einstellungen in deinem Browser, etwa ob das Raster beim Gestalten an ist oder welche Schritte eines
@@ -83,7 +74,7 @@ export default function Page() {
 
       <LegalSection title="Google als Auftragsverarbeiter">
         <p>
-          Hosting, Anmeldung, Speicher und Missbrauchsschutz stellt Google bereit (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland) auf
+          Hosting, Anmeldung und Speicher stellt Google bereit (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland) auf
           Grundlage der Datenverarbeitungsbedingungen von Google Cloud. Dabei können Daten auch an Google LLC in den USA übermittelt werden.
           Google LLC ist unter dem EU-US Data Privacy Framework zertifiziert, zusätzlich gelten Standardvertragsklauseln.
         </p>
