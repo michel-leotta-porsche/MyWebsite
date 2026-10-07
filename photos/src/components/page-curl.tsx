@@ -152,6 +152,11 @@ function init(canvas: HTMLCanvasElement): GLState | null {
   };
 }
 
+/** Gibt den Speicher einer Zeichenfläche sofort frei; WebKit wartet sonst auf die Speicherbereinigung */
+function release(...canvases: HTMLCanvasElement[]) {
+  for (const c of canvases) c.width = c.height = 0;
+}
+
 function texture(gl: WebGLRenderingContext, source: HTMLCanvasElement) {
   const tex = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -225,6 +230,7 @@ export function PageCurl({
     }
     if (!st) return;
     state.current = st;
+    const tex = textures.current;
     const verts = new Float32Array((SEGMENTS + 1) * 14);
 
     render.current = () => {
@@ -334,6 +340,15 @@ export function PageCurl({
       c.removeEventListener("webglcontextlost", lost);
       cancelAnimationFrame(frame.current);
       store.clear();
+      // Grafikspeicher beim Schließen des Buchs sofort zurückgeben, nicht erst bei der Speicherbereinigung:
+      // Texturen löschen und den Zeichenpuffer auf null setzen (measure stellt ihn beim nächsten Mal wieder her)
+      tex.forEach((tx) => {
+        st!.gl.deleteTexture(tx.front);
+        st!.gl.deleteTexture(tx.back);
+      });
+      tex.clear();
+      release(c);
+      size.current = { W: 0, H: 0, dpr: 1 };
       state.current = null;
     };
   }, [bookRef, mode, store, t]);
@@ -366,10 +381,13 @@ export function PageCurl({
             drawPage(book, leaves[i].back, "left", W, H, dpr),
           ]);
           const s = state.current;
-          if (!s || gen !== generation.current) continue;
-          textures.current.set(i, { front: texture(s.gl, front), back: texture(s.gl, back) });
-          store.add(i);
-          render.current();
+          if (s && gen === generation.current) {
+            textures.current.set(i, { front: texture(s.gl, front), back: texture(s.gl, back) });
+            store.add(i);
+            render.current();
+          }
+          // die Pixel liegen jetzt in der Textur (oder werden nicht mehr gebraucht)
+          release(front, back);
         } catch {
           // ohne Textur blättert das HTML-Blatt flach weiter
         } finally {

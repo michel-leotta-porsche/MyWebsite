@@ -14,10 +14,17 @@ const C = {
   ink2: "#5a5c56",
 };
 
+// Nur die zuletzt gezeichneten Fotos bleiben im Speicher. Ohne Grenze hielt jede besuchte Seite ihr
+// entpacktes Foto fest (etwa 5 MB bei 960px), und WebKit beendete auf dem iPhone nach einigen Seiten den Tab.
+const MAX_IMAGES = 8;
 const images = new Map<string, Promise<HTMLImageElement>>();
 function loadImage(url: string) {
   let p = images.get(url);
-  if (!p) {
+  if (p) {
+    // zuletzt benutzt: ans Ende der Reihenfolge
+    images.delete(url);
+    images.set(url, p);
+  } else {
     p = new Promise((resolve, reject) => {
       const img = new Image();
       // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
@@ -28,6 +35,7 @@ function loadImage(url: string) {
       img.src = url;
     });
     images.set(url, p);
+    while (images.size > MAX_IMAGES) images.delete(images.keys().next().value!);
   }
   return p;
 }
