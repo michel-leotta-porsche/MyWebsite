@@ -10,9 +10,9 @@ const pick = (...keys: string[]) =>
 
 export const landingBook = build({
   id: "landing",
-  title: "Sommer",
-  subtitle: "Fuerteventura, fünf Fotografien",
-  author: "Dein Name",
+  title: "Fuerteventura",
+  subtitle: "Fünf Fotografien",
+  author: "Michel Leotta",
   colophon: [],
   aspect: source.aspect,
   scale: 1,

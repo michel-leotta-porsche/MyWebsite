@@ -64,8 +64,9 @@ function fontFamilyOf(font: FontKey) {
 }
 
 function setFont(ctx: CanvasRenderingContext2D, weight: number, px: number, family: string, condensed = false) {
-  ctx.font = `${weight} ${px}px ${family}`;
-  // Breitenachse wie im CSS (wdth 75–78), soweit der Browser sie im Canvas kennt
+  // Breitenachse wie im CSS (wdth 75–78): Safari kennt ctx.fontStretch nicht, versteht sie aber in der Kurzschreibweise;
+  // ohne sie setzte Safari den Titel breit, und die Schrift sprang beim Umblättern
+  ctx.font = `${weight} ${condensed ? "condensed " : ""}${px}px ${family}`;
   if ("fontStretch" in ctx) (ctx as CanvasRenderingContext2D & { fontStretch: string }).fontStretch = condensed ? "condensed" : "normal";
 }
 

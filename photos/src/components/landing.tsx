@@ -271,21 +271,25 @@ const SLOTS = [
 // So viele Streifen je Hälfte: der Abzug biegt sich an ihren Kanten wie Fotopapier im Luftzug
 const STRIPS = 5;
 
-/** Ein Streifen des Abzugs; hängt am Nachbarn zur Mitte hin, damit sich die Winkel nach außen aufaddieren */
+/**
+ * Ein Streifen des Abzugs. Alle Streifen liegen nebeneinander im Abzug (keine Verschachtelung, die Safari nicht zeichnet);
+ * jeder dreht sich um seine Kante zur Mitte und rückt so weit vor, dass er an den inneren Nachbarn anschließt (globals.css).
+ */
 function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; side: "l" | "r"; j: number }) {
-  if (j >= STRIPS) return null;
-  const root = j === 0;
-  const outer = j === STRIPS - 1;
-  // Lage des Streifens im ganzen Bild, in Streifenbreiten von links
-  const at = side === "r" ? STRIPS + j : STRIPS - 1 - j;
+  const outer = j === STRIPS;
+  // Lage im ganzen Bild, in Streifenbreiten von links
+  const at = side === "r" ? STRIPS + j - 1 : STRIPS - j;
   return (
     <div
-      className={`bench-hinge-${side} absolute inset-y-0 [transform-style:preserve-3d]`}
+      className={`bench-hinge-${side} absolute inset-y-0`}
       style={{
-        width: root ? `${50 / STRIPS}%` : "100%",
-        [side === "r" ? "left" : "right"]: root ? "50%" : "100%",
+        left: `${(at * 100) / (2 * STRIPS)}%`,
+        width: `${100 / (2 * STRIPS)}%`,
         transformOrigin: side === "r" ? "left center" : "right center",
-        ["--j" as string]: j + 1,
+        ["--j" as string]: j,
+        // Summen über die inneren Nachbarn: 1 + 2 + … und 1² + 2² + … bis j − 1
+        ["--s1" as string]: ((j - 1) * j) / 2,
+        ["--s2" as string]: ((j - 1) * j * (2 * j - 1)) / 6,
       }}
     >
       {/* Papierrand, solange der Abzug lose ist: nur oben, unten und außen, damit zwischen den Streifen kein Weiß durchblitzt */}
@@ -297,23 +301,28 @@ function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; s
       {/* die Streifen überlappen um einen Pixel, damit keine Fuge blitzt */}
       <div className="absolute inset-y-0 -right-px -left-px overflow-hidden">
         <div className="absolute inset-y-0" style={{ width: `${2 * STRIPS * 100}%`, left: `${-at * 100}%` }}>
-          <Image src={src} alt="" fill sizes={sizes} className="object-cover" />
+          {/* sofort laden: Safari lädt Bilder in gedrehten, verschobenen Ebenen sonst nicht zuverlässig nach */}
+          <Image src={src} alt="" fill sizes={sizes} loading="eager" className="object-cover" />
         </div>
       </div>
       {/* Licht von links oben: rechts aufgebogene Streifen glänzen, links aufgebogene liegen im Schatten */}
       <div aria-hidden className={`bench-light-${side} absolute inset-0 opacity-0 ${side === "r" ? "bg-paper" : "bg-[rgb(12_10_8)]"}`} />
-      <Strip src={src} sizes={sizes} side={side} j={j + 1} />
     </div>
   );
 }
 
-/** Der Abzug als biegsames Blatt: zwei Ketten von der Mitte nach außen */
+/** Der Abzug als biegsames Blatt: je Hälfte STRIPS Streifen, von der Mitte nach außen gezählt */
 function Sheet({ src, sizes }: { src: StaticImageData; sizes: string }) {
+  const js = Array.from({ length: STRIPS }, (_, i) => i + 1);
   return (
-    <div className="absolute inset-0 [transform-style:preserve-3d]">
-      <Strip src={src} sizes={sizes} side="l" j={0} />
-      <Strip src={src} sizes={sizes} side="r" j={0} />
-    </div>
+    <>
+      {js.map((j) => (
+        <Strip key={`l${j}`} src={src} sizes={sizes} side="l" j={j} />
+      ))}
+      {js.map((j) => (
+        <Strip key={`r${j}`} src={src} sizes={sizes} side="r" j={j} />
+      ))}
+    </>
   );
 }
 
@@ -334,7 +343,7 @@ function Workbench() {
             </p>
           </div>
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
-          <div className="relative aspect-[4/3] w-full [perspective:1400px]">
+          <div className="relative aspect-[4/3] w-full [container-type:inline-size] [perspective:1400px]">
             {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
             <div className={`bench-paper absolute inset-0 grid grid-cols-2 ${lifted}`}>
               <div className="relative">
@@ -366,6 +375,8 @@ function Workbench() {
                   ["--pr" as string]: s.phone[2],
                   ["--i" as string]: i,
                   ["--b" as string]: s.bend,
+                  // Breite eines Streifens: ein Zehntel des Abzugs (cqw misst die Bühne)
+                  ["--w" as string]: `${s.box[2] / (2 * STRIPS)}cqw`,
                 }}
               >
                 <div aria-hidden className="bench-shadow absolute inset-0 opacity-0 shadow-[0_60px_80px_-20px_rgb(12_10_8/0.6)]" />
