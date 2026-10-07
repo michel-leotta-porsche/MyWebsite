@@ -136,7 +136,7 @@ export function GuestBook() {
             </p>
           }
         >
-          <Shelf books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
+          <Shelf feature books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
         </Table>
       </Library>
       {writing && (

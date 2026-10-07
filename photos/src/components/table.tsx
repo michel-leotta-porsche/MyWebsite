@@ -21,6 +21,14 @@ const coverSizes = (book: BookData) => (w: number) => {
 
 const coverWidth = (book: BookData) => `calc(var(--tw) * ${book.scale})`;
 
+// Ein einzelnes Buch für den Gast: groß und mittig, aber so, dass Zettel, Titel und Knopf noch auf den Schirm passen
+// --reserve: Höhe für Kopf, Zettel und Knopf; quer stehen Zettel und Knopf neben dem Buch
+const featureWidth = (book: BookData) => `max(7rem, min(64vw, 380px, calc((100svh - var(--reserve)) / ${book.aspect})))`;
+const featureSizes = (book: BookData) => (w: number) => {
+  const f = (book.scale * w) / 100;
+  return `(min-width: 768px) ${Math.ceil(380 * f)}px, ${Math.ceil(64 * f)}vw`;
+};
+
 // Beim ersten Erscheinen in diesem Tab werden die Bücher einmal hingelegt; danach (z. B. nach dem Zuklappen) liegen sie einfach da
 let laidOnce = false;
 
@@ -30,12 +38,15 @@ function ClosedBook({
   actions,
   note,
   meta,
+  feature = false,
 }: {
   book: BookData;
   index: number;
   actions?: ReactNode;
   note?: string;
   meta?: ReactNode;
+  /** einzeln und groß, mit Knopf zum Aufschlagen (Gastlink) */
+  feature?: boolean;
 }) {
   const { open, focusId } = useContext(OpenBook);
   const button = useRef<HTMLButtonElement>(null);
@@ -53,8 +64,14 @@ function ClosedBook({
 
   return (
     <li
-      className={`table-book relative ${arrive ? "arrive" : ""}`}
-      style={{ ["--rot" as string]: `${ROT[index % ROT.length]}deg`, ["--i" as string]: index } as CSSProperties}
+      className={`table-book relative ${arrive ? "arrive" : ""} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
+      style={
+        {
+          ["--rot" as string]: `${ROT[index % ROT.length]}deg`,
+          ["--i" as string]: index,
+          ...(feature && { ["--tw" as string]: featureWidth(book) }),
+        } as CSSProperties
+      }
     >
       <button
         ref={button}
@@ -65,11 +82,21 @@ function ClosedBook({
       >
         <div className="lift relative" style={{ width: coverWidth(book), aspectRatio: `1 / ${book.aspect}` }}>
           {/* Zettel unter dem Einband: von wem das Buch kommt */}
-          {note && (
-            <span aria-hidden className="slip text-ink absolute -top-[12%] -right-[8%] w-[64%] rotate-[5deg] px-2 pt-1 pb-8 text-[11px] md:text-[12px] leading-tight font-semibold shadow-[2px_4px_10px_-4px_rgb(12_10_8/0.7)]">
-              {note}
-            </span>
-          )}
+          {note &&
+            (feature ? (
+              // Am Unterrand festgemacht: der Zettel steckt immer gleich tief unter dem Einband, der Text bleibt darüber frei
+              <span
+                aria-hidden
+                className="slip text-ink absolute right-[-6%] bottom-[calc(100%-2.25rem)] w-[max(72%,min(15rem,72vw))] rotate-[4deg] px-3 pt-2 pb-10 font-semibold shadow-[2px_4px_10px_-4px_rgb(12_10_8/0.7)] flat:top-[10%] flat:right-auto flat:bottom-auto flat:left-[calc(100%-2.25rem)] flat:w-[min(12rem,30vw)] flat:pt-3 flat:pb-4 flat:pl-12"
+                style={{ fontFamily: "var(--font-hand), cursive", fontSize: "1.375rem", lineHeight: 1.1 }}
+              >
+                {note}
+              </span>
+            ) : (
+              <span aria-hidden className="slip text-ink absolute -top-[12%] -right-[8%] w-[64%] rotate-[5deg] px-2 pt-1 pb-8 text-[11px] md:text-[12px] leading-tight font-semibold shadow-[2px_4px_10px_-4px_rgb(12_10_8/0.7)]">
+                {note}
+              </span>
+            ))}
           {/* Schatten auf dem Tisch, das Licht kommt von oben rechts; beim Anheben blendet ein weicherer dazu */}
           <div aria-hidden className="absolute inset-0 shadow-[-10px_20px_34px_-16px_rgb(12_10_8/0.85),-2px_4px_8px_-3px_rgb(12_10_8/0.55)]" />
           <div
@@ -83,15 +110,41 @@ function ClosedBook({
             style={{ width: edge }}
           />
           <div aria-hidden className="absolute inset-0" style={{ viewTransitionName: `cover-${book.id}` }}>
-            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={coverSizes(book)} />
+            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={feature ? featureSizes(book) : coverSizes(book)} />
           </div>
         </div>
       </button>
-      <div className="mt-4 grid gap-0.5 text-sm" style={{ width: coverWidth(book) }}>
-        <p className="text-on-table text-base leading-snug font-semibold tracking-[-0.01em]">{book.title}</p>
-        <p className="text-on-table-2">{meta ?? `${book.plates.length} Tafeln`}</p>
-        {actions && <div className="book-actions mt-1.5 flex flex-wrap gap-x-4 gap-y-1">{actions}</div>}
-      </div>
+      {feature ? (
+        <div
+          className="mt-6 grid w-[min(var(--info-w),calc(100vw-2rem))] justify-items-center gap-3 text-center text-sm flat:mt-0 flat:ml-[min(12rem,30vw)] flat:w-[min(var(--info-w),34vw)] flat:justify-items-start flat:text-left"
+          style={{ ["--info-w" as string]: `max(${coverWidth(book)}, 16rem)` }}
+        >
+          <p className="text-on-table-2">
+            <span className="text-on-table text-base font-semibold">{book.title}</span>
+            <span aria-hidden className="mx-2">
+              ·
+            </span>
+            {meta ?? `${book.plates.length} Tafeln`}
+          </p>
+          {/* Der eine betonte Knopf der Ansicht: sagt, was man mit dem Buch tun kann */}
+          <button
+            type="button"
+            onClick={() => open(book.id)}
+            className="group/cta border-on-table text-on-table hover:bg-on-table hover:text-table border px-5 py-2.5 text-base font-semibold transition-colors duration-150"
+          >
+            Buch aufschlagen
+            <span aria-hidden className="ml-2 inline-block transition-transform duration-500 ease-out group-hover/cta:translate-x-1">
+              →
+            </span>
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-0.5 text-sm" style={{ width: coverWidth(book) }}>
+          <p className="text-on-table text-base leading-snug font-semibold tracking-[-0.01em]">{book.title}</p>
+          <p className="text-on-table-2">{meta ?? `${book.plates.length} Tafeln`}</p>
+          {actions && <div className="book-actions mt-1.5 flex flex-wrap gap-x-4 gap-y-1">{actions}</div>}
+        </div>
+      )}
     </li>
   );
 }
@@ -108,6 +161,7 @@ export function Shelf({
   meta,
   actions,
   tiles,
+  feature = false,
   children,
 }: {
   id?: string;
@@ -117,11 +171,13 @@ export function Shelf({
   meta?: (book: BookData) => ReactNode;
   actions?: (book: BookData) => ReactNode;
   tiles?: ReactNode;
+  /** ein einzelnes Buch groß und mittig, mit Knopf zum Aufschlagen (Gastlink) */
+  feature?: boolean;
   /** unter der Reihe, z. B. ein Fehler mit „Nochmal versuchen“ */
   children?: ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={heading && id ? `${id}-h` : undefined} className="grid gap-8 scroll-mt-6">
+    <section id={id} aria-labelledby={heading && id ? `${id}-h` : undefined} className={`grid gap-8 scroll-mt-6 ${feature ? "my-auto" : ""}`}>
       {heading && (
         <div className="border-on-table-2/60 flex items-baseline gap-3 border-t pt-3">
           <h2 id={id ? `${id}-h` : undefined} className="text-on-table text-[22px] font-bold tracking-[-0.015em]" style={{ fontVariationSettings: '"wdth" 80' }}>
@@ -131,9 +187,9 @@ export function Shelf({
         </div>
       )}
       {(books.length > 0 || tiles) && (
-        <ul className="shelf">
+        <ul className={feature ? "flex justify-center pt-24 flat:pt-0" : "shelf"}>
           {books.map((b, i) => (
-            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} />
+            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} feature={feature} />
           ))}
           {tiles}
         </ul>
@@ -168,7 +224,7 @@ export function Table({
         )}
         {headerRight}
       </header>
-      <div className="table-spread relative z-0 flex flex-1 flex-col gap-14 px-4 pt-10 pb-20 md:gap-16 md:px-16 md:pt-14 md:pb-28">{children}</div>
+      <div className="table-spread relative z-0 flex flex-1 flex-col gap-14 px-4 pt-10 pb-20 md:gap-16 md:px-16 md:pt-14 md:pb-28 flat:pt-4 flat:pb-6">{children}</div>
     </section>
   );
 }

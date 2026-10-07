@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Caveat, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+import { shareMeta, SITE_URL } from "@/lib/share-meta";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -12,9 +13,14 @@ const serif = Newsreader({ variable: "--font-serif", subsets: ["latin"], style: 
 const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], preload: false });
 const hand = Caveat({ variable: "--font-hand", subsets: ["latin"], preload: false });
 
+const title = "Fujiventura · Fotobücher zum Blättern";
+const description = "Deine Fotos als Buch zum Umblättern. Gestalten, Freunden hinlegen, Zettel zurückbekommen.";
+
 export const metadata: Metadata = {
-  title: "Fujiventura · Fotobücher zum Blättern",
-  description: "Deine Fotos als Buch zum Umblättern. Gestalten, Freunden hinlegen, Zettel zurückbekommen.",
+  metadataBase: new URL(SITE_URL),
+  title,
+  description,
+  ...shareMeta(title, description),
 };
 
 export const viewport: Viewport = {
