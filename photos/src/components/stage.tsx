@@ -933,7 +933,7 @@ export function Stage({
                       }}
                       onBlur={() => setEditing(null)}
                       spellCheck
-                      className="absolute m-0 resize-none overflow-hidden border-0 bg-transparent p-0 outline-2 outline-mark [caret-color:var(--mark)]"
+                      className="absolute m-0 resize-none overflow-hidden border-0 bg-transparent p-0 outline-2 outline-mark select-text [caret-color:var(--mark)] [-webkit-user-select:text]"
                       style={{ ...pct(boxOf(editItem, geom)), minHeight: "1.2em", ...editFont(editItem) }}
                     />
                   )}
@@ -1495,7 +1495,7 @@ function TextToolbar({
       aria-label="Text gestalten"
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="slip text-ink absolute z-[65] flex max-w-[min(560px,92vw)] flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
+      className="slip text-ink absolute z-[65] flex max-w-[min(560px,92vw)] select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
       style={{ left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
     >
       <label className="sr-only" htmlFor={`font-${item.id}`}>
