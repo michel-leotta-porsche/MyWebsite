@@ -358,6 +358,50 @@ html.ohne-schatten [data-shade] {
       62% { opacity: 0.7; }
       100% { opacity: 0; }
     }
+    /* Das Papier biegt sich im Fall: die Ränder hängen nach oben zurück und flattern, beim Aufsetzen liegt es flach.
+       Jeder Streifen dreht um seine Kante zur Mitte hin; die Winkel addieren sich nach außen zu einer Wölbung. */
+    .bench-hinge-r,
+    .bench-hinge-l,
+    .bench-light-r,
+    .bench-light-l {
+      animation: linear both;
+      animation-timeline: --bench;
+      animation-range: contain calc(4% + var(--i) * 9%) contain calc(52% + var(--i) * 9%);
+    }
+    .bench-hinge-r { animation-name: bend-r; }
+    .bench-hinge-l { animation-name: bend-l; }
+    .bench-light-r { animation-name: light-r; }
+    .bench-light-l { animation-name: light-l; }
+    /* rechts und links leicht versetzt, damit das Blatt nicht wie ein Scharnier klappt */
+    @keyframes bend-r {
+      0% { transform: rotateY(calc(var(--b) * -1deg)); }
+      30% { transform: rotateY(calc(var(--b) * -0.45deg)); }
+      55% { transform: rotateY(calc(var(--b) * -0.75deg)); }
+      82% { transform: rotateY(calc(var(--b) * -0.12deg)); }
+      100% { transform: none; }
+    }
+    @keyframes bend-l {
+      0% { transform: rotateY(calc(var(--b) * 0.7deg)); }
+      22% { transform: rotateY(calc(var(--b) * 1deg)); }
+      48% { transform: rotateY(calc(var(--b) * 0.35deg)); }
+      74% { transform: rotateY(calc(var(--b) * 0.5deg)); }
+      100% { transform: none; }
+    }
+    /* Licht folgt der Neigung: je weiter außen, desto steiler, desto heller oder dunkler */
+    @keyframes light-r {
+      0% { opacity: calc(var(--j) * var(--b) * 0.007); }
+      30% { opacity: calc(var(--j) * var(--b) * 0.003); }
+      55% { opacity: calc(var(--j) * var(--b) * 0.005); }
+      82% { opacity: calc(var(--j) * var(--b) * 0.001); }
+      100% { opacity: 0; }
+    }
+    @keyframes light-l {
+      0% { opacity: calc(var(--j) * var(--b) * 0.007); }
+      22% { opacity: calc(var(--j) * var(--b) * 0.01); }
+      48% { opacity: calc(var(--j) * var(--b) * 0.0035); }
+      74% { opacity: calc(var(--j) * var(--b) * 0.005); }
+      100% { opacity: 0; }
+    }
     /* Bildunterschriften erst, wenn alle Abzüge liegen */
     .bench-caps {
       animation: caps-in linear both;

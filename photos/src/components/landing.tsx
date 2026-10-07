@@ -23,7 +23,7 @@ import torii from "../../public/photos/japan/torii.jpg";
 
 // Landing Page. Das Produkt führt sich selbst vor, ohne Bildschirmfotos:
 // 1. Kopf: ein Buch auf dem Basalttisch, Scrollen schlägt es auf und blättert, wie in der Leseansicht (Feder, WebGL-Biegung).
-// 2. Werkbank: vier lose Abzüge fliegen beim Scrollen an ihren Platz auf einer Doppelseite.
+// 2. Werkbank: vier lose Abzüge fliegen beim Scrollen an ihren Platz auf einer Doppelseite und biegen sich dabei wie Fotopapier.
 // 3. Rezept: ein großes Foto, der Zettel schiebt sich darunter hervor.
 // 4. Hinlegen: der Band mit Zettel für eine Person, ein Zettel kommt zurück.
 // Die übrige Bewegung hängt am Scrollen (CSS scroll-driven animations, kein JavaScript dafür) und nutzt nur
@@ -259,11 +259,60 @@ function Hero() {
 // Platz auf der Doppelseite in % (Breite 2 Seiten, Höhe 1.5 Seiten) und Startlage als loser Abzug auf dem Tisch.
 // Auf dem Telefon liegt der Text über dem Buch: dort gleiten die Abzüge von links und rechts herein (phone), nicht von oben
 const SLOTS = [
-  { src: drachenbaum, box: [0, 0, 50, 100], from: ["6vw", "-58svh", "-9deg"], phone: ["-75vw", "3svh", "-8deg"], sizes: "(min-width: 768px) 30vw, 50vw" },
-  { src: mittagsblume, box: [56, 6, 38, 33.8], from: ["-14vw", "-46svh", "8deg"], phone: ["70vw", "-2svh", "7deg"], sizes: "(min-width: 768px) 22vw, 40vw" },
-  { src: markisen, box: [56, 48, 18, 36], from: ["-30vw", "40svh", "-7deg"], phone: ["80vw", "4svh", "-6deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
-  { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], phone: ["70vw", "6svh", "9deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
+  { src: drachenbaum, box: [0, 0, 50, 100], from: ["6vw", "-58svh", "-9deg"], bend: 6, phone: ["-75vw", "3svh", "-8deg"], sizes: "(min-width: 768px) 30vw, 50vw" },
+  { src: mittagsblume, box: [56, 6, 38, 33.8], from: ["-14vw", "-46svh", "8deg"], bend: 8, phone: ["70vw", "-2svh", "7deg"], sizes: "(min-width: 768px) 22vw, 40vw" },
+  { src: markisen, box: [56, 48, 18, 36], from: ["-30vw", "40svh", "-7deg"], bend: 9, phone: ["80vw", "4svh", "-6deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
+  { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], bend: 8, phone: ["70vw", "6svh", "9deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
 ] as const;
+
+// So viele Streifen je Hälfte: der Abzug biegt sich an ihren Kanten wie Fotopapier im Luftzug
+const STRIPS = 5;
+
+/** Ein Streifen des Abzugs; hängt am Nachbarn zur Mitte hin, damit sich die Winkel nach außen aufaddieren */
+function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; side: "l" | "r"; j: number }) {
+  if (j >= STRIPS) return null;
+  const root = j === 0;
+  const outer = j === STRIPS - 1;
+  // Lage des Streifens im ganzen Bild, in Streifenbreiten von links
+  const at = side === "r" ? STRIPS + j : STRIPS - 1 - j;
+  return (
+    <div
+      className={`bench-hinge-${side} absolute inset-y-0 [transform-style:preserve-3d]`}
+      style={{
+        width: root ? `${50 / STRIPS}%` : "100%",
+        [side === "r" ? "left" : "right"]: root ? "50%" : "100%",
+        transformOrigin: side === "r" ? "left center" : "right center",
+        ["--j" as string]: j + 1,
+      }}
+    >
+      {/* Papierrand, solange der Abzug lose ist: nur oben, unten und außen, damit zwischen den Streifen kein Weiß durchblitzt */}
+      <div aria-hidden className="bench-border absolute -inset-y-[5px]" style={{ left: side === "l" && outer ? -5 : -1, right: side === "r" && outer ? -5 : -1 }}>
+        <div className="bg-paper absolute inset-x-0 top-0 h-[6px]" />
+        <div className="bg-paper absolute inset-x-0 bottom-0 h-[6px]" />
+        {outer && <div className={`bg-paper absolute inset-y-0 w-[6px] ${side === "l" ? "left-0" : "right-0"}`} />}
+      </div>
+      {/* die Streifen überlappen um einen Pixel, damit keine Fuge blitzt */}
+      <div className="absolute inset-y-0 -right-px -left-px overflow-hidden">
+        <div className="absolute inset-y-0" style={{ width: `${2 * STRIPS * 100}%`, left: `${-at * 100}%` }}>
+          <Image src={src} alt="" fill sizes={sizes} className="object-cover" />
+        </div>
+      </div>
+      {/* Licht von links oben: rechts aufgebogene Streifen glänzen, links aufgebogene liegen im Schatten */}
+      <div aria-hidden className={`bench-light-${side} absolute inset-0 opacity-0 ${side === "r" ? "bg-paper" : "bg-[rgb(12_10_8)]"}`} />
+      <Strip src={src} sizes={sizes} side={side} j={j + 1} />
+    </div>
+  );
+}
+
+/** Der Abzug als biegsames Blatt: zwei Ketten von der Mitte nach außen */
+function Sheet({ src, sizes }: { src: StaticImageData; sizes: string }) {
+  return (
+    <div className="absolute inset-0 [transform-style:preserve-3d]">
+      <Strip src={src} sizes={sizes} side="l" j={0} />
+      <Strip src={src} sizes={sizes} side="r" j={0} />
+    </div>
+  );
+}
 
 function Workbench() {
   return (
@@ -300,7 +349,7 @@ function Workbench() {
             {SLOTS.map((s, i) => (
               <div
                 key={i}
-                className="bench-print absolute"
+                className="bench-print absolute [transform-style:preserve-3d]"
                 style={{
                   left: `${s.box[0]}%`,
                   top: `${s.box[1]}%`,
@@ -313,13 +362,12 @@ function Workbench() {
                   ["--py" as string]: s.phone[1],
                   ["--pr" as string]: s.phone[2],
                   ["--i" as string]: i,
+                  ["--b" as string]: s.bend,
                 }}
               >
                 <div aria-hidden className="bench-shadow absolute inset-0 opacity-0 shadow-[0_60px_80px_-20px_rgb(12_10_8/0.6)]" />
-                <div aria-hidden className="bench-border bg-paper absolute -inset-[5px] shadow-[0_18px_30px_-12px_rgb(12_10_8/0.6)]" />
-                <div className="absolute inset-0">
-                  <Image src={s.src} alt="" fill sizes={s.sizes} className="object-cover" />
-                </div>
+                <div aria-hidden className="bench-border absolute -inset-[5px] shadow-[0_18px_30px_-12px_rgb(12_10_8/0.6)]" />
+                <Sheet src={s.src} sizes={s.sizes} />
               </div>
             ))}
           </div>
