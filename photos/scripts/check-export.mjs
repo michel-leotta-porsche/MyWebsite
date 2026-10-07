@@ -15,6 +15,17 @@ for (const f of html) {
     await access(path.join(out, target)).catch(() => missing.add(target));
   }
 }
+// Pflichtseiten müssen da sein, interne Arbeitsstände dürfen nicht live gehen
+const problems = [];
+for (const f of ["impressum.html", "datenschutz.html"]) if (!html.includes(f)) problems.push(`${f} fehlt`);
+for (const f of ["kritik.html", "qfd.html", "umfrage.html"]) if (html.includes(f)) problems.push(`${f} darf nicht live gehen`);
+if (html.includes("impressum.html") && (await readFile(path.join(out, "impressum.html"), "utf8")).includes("ANSCHRIFT FEHLT"))
+  problems.push("Impressum ohne Anschrift (OPERATOR.address in src/components/legal.tsx)");
+if (problems.length) {
+  console.error(problems.join("\n"));
+  process.exit(1);
+}
+
 if (missing.size) {
   console.error(`${missing.size} Dateien fehlen, z. B.:\n${[...missing].slice(0, 5).join("\n")}`);
   process.exit(1);

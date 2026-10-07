@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { FrameButton, linkClass, TextButton } from "@/components/app-ui";
+import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
@@ -181,7 +182,13 @@ function Hero() {
             <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
               <EnterButton />
             </div>
-            <p className="text-on-table-2 mt-5 text-sm">Lesen geht ohne Konto.</p>
+            <p className="text-on-table-2 mt-5 text-sm">
+              Lesen geht ohne Konto. Anmeldung über Google, siehe{" "}
+              <Link href="/datenschutz" className={linkClass}>
+                Datenschutz
+              </Link>
+              .
+            </p>
           </div>
           <div className="md:col-span-8 md:col-start-5 md:pl-[4vw]">
             <ScrollBook
@@ -379,7 +386,12 @@ function Closing() {
           </h2>
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
             <EnterButton label="Erstes Buch anlegen" />
-            <p className="text-on-table-2 text-sm">Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.</p>
+            <p className="text-on-table-2 text-sm">
+              Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              <Link href="/datenschutz" className={linkClass}>
+                Datenschutz
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -388,11 +400,14 @@ function Closing() {
           <p>
             <span className="text-on-table font-semibold">Fujiventura</span> · Beispielfotos von Michel Leotta
           </p>
-          <nav aria-label="Räume" className="flex gap-x-5">
-            <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
-              Bücherzimmer
-            </Link>
-          </nav>
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <nav aria-label="Räume" className="flex gap-x-5">
+              <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
+                Bücherzimmer
+              </Link>
+            </nav>
+            <LegalLinks />
+          </div>
         </div>
       </footer>
     </>

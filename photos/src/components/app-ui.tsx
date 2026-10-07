@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
+import { LegalLinks } from "@/components/legal";
 import { signIn, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
 
@@ -109,6 +110,7 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
         <div className="mt-8">
           <FrameButton onClick={() => signIn().catch(() => {})}>Mit Google anmelden</FrameButton>
         </div>
+        <LegalLinks className="mt-6" />
       </div>
     </main>
   );
