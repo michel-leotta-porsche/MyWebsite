@@ -288,7 +288,7 @@ html.ohne-schatten [data-shade] {
 /* Kopf: jedes Blatt hat ein Stück Scrollweg, das Buch bleibt dabei stehen (auch bei reduzierter Bewegung, dann ohne Feder) */
 .hero-track {
   view-timeline: --hero block;
-  height: calc(var(--leaves, 5) * 65svh + 100svh);
+  height: calc(var(--leaves, 3) * 80svh + 100svh);
 }
 .bench-count-b {
   display: none;

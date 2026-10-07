@@ -1,7 +1,8 @@
-import { across, bookById, build, ENDPAPER, framed, full, landscape, small, TITLE, type Photo } from "@/content/books";
+import { across, bookById, build, framed, full, type Photo } from "@/content/books";
 
-// Vorführbuch für die Landing: ein kurzer Band aus Fotos des Fuerteventura-Buchs,
-// gesetzt mit denselben Seitentypen wie jedes echte Buch.
+// Vorführbuch für die Landing: drei Doppelseiten aus den stärksten Fotos des Fuerteventura-Buchs,
+// gesetzt mit denselben Seitentypen wie jedes echte Buch. Am Ende ein Bild über den Bund:
+// beim letzten Umblättern biegt sich das Blatt darüber, das zeigt die Biegung am schönsten.
 const source = bookById("fuerteventura")!;
 const pick = (...keys: string[]) =>
   // Nummer und Schlüssel der Tafel vergibt build() neu
@@ -10,7 +11,7 @@ const pick = (...keys: string[]) =>
 export const landingBook = build({
   id: "landing",
   title: "Sommer",
-  subtitle: "Fuerteventura, sieben Fotografien",
+  subtitle: "Fuerteventura, fünf Fotografien",
   author: "Dein Name",
   colophon: [],
   aspect: source.aspect,
@@ -19,12 +20,10 @@ export const landingBook = build({
   cloth: source.cloth,
   light: "sun",
   coverKey: "rettungsturm",
-  photos: pick("palme", "rettungsturm", "sonnenschirm", "bougainvillea", "felsbogen", "strand", "markisen"),
+  photos: pick("schild", "drachenbaum", "palme", "rettungsturm", "felsbogen"),
   sequence: [
-    [ENDPAPER, TITLE],
+    [full("schild"), full("drachenbaum")],
     [full("palme"), framed("rettungsturm")],
-    [small("sonnenschirm", 3, "top", "outer"), full("bougainvillea")],
     [across("felsbogen")],
-    [landscape("strand"), full("markisen")],
   ],
 });
