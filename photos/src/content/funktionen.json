@@ -1,0 +1,933 @@
+{
+  "summary": "Der Editor hat die hohe Decke erreicht: freie Lage, Griffe mit Raster, Zuschneiden auf der Seite, Ebenen, vier Schriften, Größe in Punkt, Farben, Kopieren und Einfügen. Auch der Boden ist niedrig: Fotos reinziehen, nach 1,6 Sekunden steht ein Buch, ohne dass man irgendetwas anfassen muss. Was fehlt, ist der Weg dazwischen. Viele Funktionen sind nur über Doppelklick, Alt, Rechtsklick oder langes Drücken erreichbar und werden nur in einem Hilfetext unter der Seite erklärt. Mehrere Funktionen gibt es drei- oder viermal (helle Schrift, Ebenen, Ausschnitt), und an einigen Stellen hat die Fehlertoleranz Lücken: Die Bühne verschwindet bei „Rückgängig“ und bei „Auf Vorschlag zurücksetzen“ ohne Hinweis, Entf auf einer Kopie nimmt alle Kopien vom Blatt, und auf der Bühne zeigt nichts an, ob gespeichert ist. Fast alles davon lässt sich mit kleinem Aufwand beheben.",
+  "verdict": "Anpassbar: 4,5 von 5. Einfach: 3 von 5. Das Ziel „super einfach, voll anpassbar“ ist zu etwa drei Vierteln erreicht. Die Anpassbarkeit ist da. Einfach wird es, wenn Doppelungen wegfallen, der Werkzeugkasten nach Progressive Disclosure gestuft wird und die Bühne nie überraschend verschwindet.",
+  "saveDiscussion": {
+    "question": "Auf der Bühne gibt es keinen Speichern-Knopf, nur „Zur Übersicht“. Gespeichert wird bei jeder Geste von selbst. Reicht das?",
+    "answer": "Das Modell ist richtig, die Rückmeldung reicht aber nicht. Automatisches Speichern ist heute Standard: Google Docs, Figma, Keynote seit OS X Lion und Microsoft 365 speichern laufend, ohne dass man etwas tun muss. Alle diese Programme zeigen den Zustand aber sichtbar an: Google Docs neben dem Dokumentnamen, auch offline, Figma mit einem Hinweis bei ungesicherten Änderungen, Microsoft mit einem AutoSave-Schalter. Auf der Bühne fehlt diese Anzeige ganz. Die Bühne liegt als eigene Ebene über dem Editor und verdeckt dessen Zeile „Gespeichert“. Im Test stand beim Verlassen per Esc in der Übersicht noch „Speichert …“. Ein Fehler oder Offline-Zustand wäre auf der Bühne unsichtbar. Das verletzt Nielsens Heuristik 1 (Sichtbarkeit des Systemzustands). NN/g (Harley 2015) zeigt außerdem, dass das mentale Modell „ich muss speichern“ fest sitzt und dass Autosave und Speichern nebeneinander bestehen dürfen. Für Michel kommt Safari dazu: Wer aus Gewohnheit ⌘S drückt, bekommt Safaris eigenen Dialog „Sichern unter“ für die Webseite, weil der Editor ⌘S nicht abfängt.",
+    "recommendation": "Kein Speichern-Knopf als Pflicht, aber vier kleine Ergänzungen (zusammen Aufwand S): 1. In der Kopfzeile der Bühne eine Statuszeile wie in der Übersicht, mit vier Zuständen: „Gespeichert“, „Speichert …“, „Offline, im Browser gesichert“ und „Nicht gespeichert · Erneut versuchen“. 2. ⌘S abfangen: Es speichert sofort und zeigt kurz „Alles gespeichert“. Mit ⇧⌘S öffnet sich „Stand sichern“ aus dem Verlauf, so wird aus der Gewohnheit ein echter Nutzen. 3. Beim Schließen des Tabs oder bei „Zum Tisch“ mit ungesicherten oder fehlgeschlagenen Änderungen erscheint die Rückfrage des Browsers (beforeunload). 4. „← Zur Übersicht“ bleibt der Name, denn er beschreibt das Ziel. Ein Knopf „Fertig“ würde eine Speicherhandlung versprechen, die es nicht gibt.",
+    "sources": [
+      "nielsen-h1",
+      "nng-autosave",
+      "gdocs-status",
+      "figma-offline",
+      "figma-versions",
+      "apple-lion-2011",
+      "apple-versions",
+      "ms-autosave",
+      "nng-floppy",
+      "safari-save"
+    ]
+  },
+  "features": [
+    {
+      "id": "U01",
+      "area": "Übersicht",
+      "name": "Fotos reinziehen (JPEG, HEIC, DNG) mit Fortschritt",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 3,
+      "observation": "Ich habe 10 JPEG, eine DNG mit eingebettetem JPEG, eine kaputte .heic und eine .txt auf den Kopf gezogen. Die Anzeige läuft pro Datei („liest …“, „lädt hoch …“, „fertig“) und die DNG kommt sauber an. Danach steht aber dauerhaft „0 von 1 Fotos im Buch“, weil die fertigen Einträge verschwinden und nur die Fehler bleiben. Die Fehler lassen sich nicht wegklicken, und „Erstentwurf nach … s“ erscheint deshalb nie. Einen Hinweis auf doppelte Fotos gibt es nicht. Echte HEIC-Dateien konnte ich nicht erzeugen, deshalb ist nur der Fehlerweg geprüft.",
+      "principle": "Sichtbarkeit des Systemzustands: Die Rückmeldung muss stimmen, auch am Ende.",
+      "source": "nielsen-h1",
+      "fix": "Am Ende „10 Fotos im Buch, 2 nicht lesbar“ anzeigen. Fehler mit „Ausblenden“ und einer kurzen Erklärung versehen (z. B. „HEIC aus Messenger? Bitte als JPEG sichern“). Doppelte Dateien gleich beim Einlesen erkennen und melden.",
+      "effort": "S"
+    },
+    {
+      "id": "U02",
+      "area": "Übersicht",
+      "name": "Erstentwurf",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 3,
+      "forgiveness": 4,
+      "observation": "10 Fotos ergeben in 1,6 s fünf Doppelseiten mit gemischten Typen. Man muss nichts wählen. Wer danach alles bis zum Anfang rückgängig macht, entfernt auch den Upload: Nach 14 Schritten war das Buch leer, und erst „Wiederholen“ holt es zurück.",
+      "principle": "Gute Voreinstellungen tragen die meisten Nutzer, denn die meisten ändern sie nie. Niedrige Einstiegsschwelle.",
+      "source": "nielsen-defaults",
+      "fix": "Den Upload nicht in den Rückgängig-Stapel legen, oder als Grenze („Fotos hinzugefügt“) markieren, die man nicht unbemerkt überschreitet.",
+      "effort": "S"
+    },
+    {
+      "id": "U03",
+      "area": "Übersicht",
+      "name": "Doppelklick auf eine Doppelseite öffnet die Bühne",
+      "findability": 3,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Ein Doppelklick auf ein Foto der zweiten Doppelseite öffnet die Bühne sofort. Esc schließt sie wieder. Daneben gibt es den Link „Gestalten“, und ein Klick auf eine frei gestaltete Seite öffnet die Bühne ebenfalls. Der Doppelklick selbst wird nur im Hilfetext rechts und im Tooltip erklärt. Beim Öffnen bleibt der Fokus hinter der Bühne auf „Gestalten“, und Tab läuft durch die Übersicht im Hintergrund.",
+      "principle": "Das Muster ist von Keynote bekannt (Doppelklick öffnet die Bearbeitung). Ein modaler Bereich muss aber den Fokus übernehmen.",
+      "source": "wcag-apg-dialog",
+      "fix": "Beim Öffnen den Fokus auf „Zur Übersicht“ oder das erste Element setzen und die Übersicht dahinter mit „inert“ sperren. Beim Schließen den Fokus auf die Doppelseite zurückgeben.",
+      "effort": "S"
+    },
+    {
+      "id": "U04",
+      "area": "Übersicht",
+      "name": "Layout (durchschalten)",
+      "findability": 4,
+      "simplicity": 2,
+      "flexibility": 3,
+      "forgiveness": 4,
+      "observation": "Ich habe „Layout“ an der zweiten Doppelseite 7-mal geklickt. Es gab 6 Varianten, ohne Anzahl und ohne Vorschau, danach beginnt alles von vorn. Jeder Klick fixiert die Doppelseite. Das ist Befund K8 aus der ersten Kritik und weiterhin offen. Bei frei gestalteten Doppelseiten fehlt der Knopf ganz, dort gibt es nur „Auf Vorschlag zurücksetzen“.",
+      "principle": "Wiedererkennen statt Erinnern. Wenige sichtbare Optionen sind schneller gewählt als blindes Durchschalten.",
+      "source": "nielsen-10",
+      "fix": "Den Knopf ersetzen durch eine Reihe kleiner Vorschläge auf der Bühne (Paket 5 im Workshop), mit der aktuellen Variante markiert.",
+      "effort": "M"
+    },
+    {
+      "id": "U05",
+      "area": "Übersicht",
+      "name": "Fixieren (Schloss)",
+      "findability": 3,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Das Schloss fixiert und löst eine Doppelseite, und jede Handarbeit fixiert sie von selbst. Ein Satz unter der Überschrift erklärt das gut. Die Klickfläche ist aber nur 12 × 16 px groß.",
+      "principle": "Die Automatik bleibt unter Kontrolle des Nutzers. Klickflächen sollten mindestens 24 × 24 px groß sein.",
+      "source": "wcag22",
+      "fix": "Die Klickfläche auf 24 × 24 px vergrößern, auf Touch 44 px. Den Zustand zusätzlich als Wort zeigen („fixiert“).",
+      "effort": "S"
+    },
+    {
+      "id": "U06",
+      "area": "Übersicht",
+      "name": "Sortieren (Pfeile, Ziehen)",
+      "findability": 3,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "„→“ an Doppelseite 1 schiebt sie an Stelle 2, das funktioniert. Die Pfeile sind 11 × 16 px groß, und gleich daneben steht das Entfernen-Kreuz mit 6 × 16 px. Ziehen geht nur mit HTML-Drag-and-drop, das auf Touch nicht verlässlich funktioniert.",
+      "principle": "Je kleiner und näher ein Ziel liegt, desto mehr Fehltreffer gibt es (Fitts). Für jedes Ziehen braucht es einen Weg ohne Ziehen.",
+      "source": "fitts-1954",
+      "fix": "Pfeile und Entfernen in ein Menü „…“ pro Doppelseite legen oder mindestens auf 24 px vergrößern und das × absetzen (K3).",
+      "effort": "S"
+    },
+    {
+      "id": "U07",
+      "area": "Übersicht",
+      "name": "Doppelseite entfernen (×)",
+      "findability": 3,
+      "simplicity": 4,
+      "flexibility": 3,
+      "forgiveness": 3,
+      "observation": "× an Doppelseite 2 entfernt sie sofort, legt einen Zwischenstand an und schiebt die Fotos in die Ablage. Es gibt keinen Hinweis an der Stelle, und die Ablage liegt bei 900 px Höhe unter dem sichtbaren Bereich (y = 952). Rückgängig funktioniert.",
+      "principle": "Lieber Rückgängig anbieten als warnen, aber die Rückmeldung muss am Ort der Handlung sichtbar sein.",
+      "source": "raskin-2007",
+      "fix": "Einen Hinweis „Doppelseite entfernt, 2 Fotos in der Ablage · Rückgängig“ zeigen, wie auf dem Tisch.",
+      "effort": "S"
+    },
+    {
+      "id": "U08",
+      "area": "Übersicht",
+      "name": "Textseite hinzufügen",
+      "findability": 4,
+      "simplicity": 3,
+      "flexibility": 2,
+      "forgiveness": 2,
+      "observation": "Ich habe eine Textseite angelegt und 760 Zeichen eingetippt. Das Panel meldet „Passt auf die Seite“, die Vorschau schneidet den Text aber unten ab. Befund K1 ist also weiterhin offen. Die Textseite ist ein zweiter, älterer Textweg neben den Textrahmen auf der Bühne. Sie hat nur „Absatz“ und „Groß“ und zeigt trotzdem einen Knopf „Layout“.",
+      "principle": "Eine Rückmeldung, die nicht stimmt, ist schlimmer als keine. Sie kostet Vertrauen in alle anderen Hinweise.",
+      "source": "nielsen-h1",
+      "fix": "Durch „Leere Doppelseite“ ersetzen, die direkt die Bühne mit Textleiste öffnet. Dann gibt es nur noch einen Textweg und eine Überlaufmessung.",
+      "effort": "M"
+    },
+    {
+      "id": "U09",
+      "area": "Übersicht",
+      "name": "Automatisch gestalten",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Vorher wird ein Zwischenstand angelegt, fixierte Doppelseiten bleiben, und ein Tooltip erklärt das. Im Test wurden aus 6 Doppelseiten 5. Was sich geändert hat, sieht man nicht.",
+      "principle": "Die Automatik bleibt überstimmbar, und große Schritte sind umkehrbar.",
+      "source": "shneiderman-golden",
+      "fix": "Danach kurz anzeigen: „3 Doppelseiten neu geordnet, 2 fixierte unverändert · Rückgängig“.",
+      "effort": "S"
+    },
+    {
+      "id": "U10",
+      "area": "Übersicht",
+      "name": "Foto-Panel (Stern, Titel, Zusatz, Beschreibung, Ausschnitt, Einband, Ablage)",
+      "findability": 4,
+      "simplicity": 3,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Ein Klick auf ein Foto öffnet rechts das Panel. Der Stern „Als wichtig markieren“ macht aus 5 Doppelseiten sofort 6, ohne Hinweis. „Ausschnitt …“ öffnet den Dialog, Esc schließt ihn nicht, und der Fokus bleibt dahinter (K2 offen). Auf 375 px liegt das Panel weit unter dem Foto (K4).",
+      "principle": "Ein Werkzeug gehört nahe an sein Objekt. Modale Dialoge brauchen Fokusführung und Esc.",
+      "source": "wcag-apg-dialog",
+      "fix": "SlipDialog auf <dialog> mit showModal() umstellen (K2). Beim Stern zeigen, was er bewirkt hat („kommt groß, Doppelseite 4 neu“).",
+      "effort": "S"
+    },
+    {
+      "id": "U11",
+      "area": "Übersicht",
+      "name": "Ablage (Entf, Ins Buch)",
+      "findability": 2,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Foto wählen und Entf legt es ab. Die Ablage erscheint unter allen Doppelseiten, im Test unter dem sichtbaren Bereich. Auf der Doppelseite bleibt eine Lücke ohne Hinweis (K9 offen). Auf der Bühne ist die Ablage dagegen gut gelöst: als Teil der Leiste „Alle Fotos“.",
+      "principle": "Informative Rückmeldung am Ort der Handlung.",
+      "source": "shneiderman-golden",
+      "fix": "Hinweis „In die Ablage gelegt · Rückgängig“ zeigen. Die Ablage in der Übersicht als feste Leiste unten, wie auf der Bühne.",
+      "effort": "S"
+    },
+    {
+      "id": "U12",
+      "area": "Übersicht",
+      "name": "Rückgängig und Wiederholen (Kopf, ⌘Z)",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Es gibt 60 Schritte, Tippen wird zusammengefasst, und jede Geste ist ein Schritt. Das ist vorbildlich. Der Stapel kennt aber keine Grenzen: Er reicht bis vor den Upload (U02) und läuft auf der Bühne in Änderungen außerhalb der Bühne hinein (B26).",
+      "principle": "Leicht umkehrbare Handlungen ermutigen zum Ausprobieren. Das gilt aber nur, wenn man sieht, was zurückgenommen wurde.",
+      "source": "nng-h3",
+      "fix": "Den Namen des Schritts im Tooltip zeigen („Rückgängig: Foto verschoben“) und den Upload als Grenze behandeln.",
+      "effort": "S"
+    },
+    {
+      "id": "U13",
+      "area": "Kopfzeile",
+      "name": "Verlauf (Zwischenstände, Stand sichern, Datei)",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Die Einträge tragen jetzt ihren Anlass („vor „Automatisch gestalten““, „vor dem Entfernen einer Doppelseite“), dazu Zeit und Seitenzahl. Das hilft. Es gibt weiterhin keine Miniatur, und der automatische Eintrag heißt nur „Zwischenstand“.",
+      "principle": "Wiedererkennen statt Erinnern. Ein Bild der ersten Doppelseite erkennt man schneller als eine Uhrzeit.",
+      "source": "nielsen-10",
+      "fix": "Eine Miniatur der zuletzt geänderten Doppelseite pro Eintrag. Mit ⇧⌘S direkt „Stand sichern“ öffnen.",
+      "effort": "M"
+    },
+    {
+      "id": "U14",
+      "area": "Kopfzeile",
+      "name": "Ansehen",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 3,
+      "forgiveness": 5,
+      "observation": "Das Buch öffnet sich wie beim Lesen, und Esc führt zurück in den Editor. Der einzige sichtbare Ausgang ist die Wortmarke mit dem Namen „Fujiventura, zurück zum Tisch“. Dabei führt sie hier zurück in den Editor. Wer sie liest, erwartet, den Editor zu verlassen.",
+      "principle": "Ein Knopf muss sagen, wohin er führt (Konsistenz, Erwartung).",
+      "source": "nielsen-10",
+      "fix": "Im Vorschaumodus einen sichtbaren Knopf „Zurück zum Gestalten“ zeigen.",
+      "effort": "S"
+    },
+    {
+      "id": "U15",
+      "area": "Kopfzeile",
+      "name": "Hinlegen für …",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 3,
+      "observation": "Ich trage den Namen „Lena“ ein und bekomme sofort einen Link mit „Link kopieren“ und „Zurückziehen“. Das ist schnell. „Zurückziehen“ wirkt sofort und ohne Rückgängig (K13 offen). Solange gespeichert wird, ist der Knopf gesperrt, ohne dass gesagt wird, warum.",
+      "principle": "Fehlervermeidung und Umkehrbarkeit.",
+      "source": "raskin-2007",
+      "fix": "„Zurückziehen“ mit 5 Sekunden Rückgängig. Am gesperrten Knopf erklären: „Speichert noch …“.",
+      "effort": "S"
+    },
+    {
+      "id": "T01",
+      "area": "Tisch",
+      "name": "Entfernen mit Rückgängig",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "„Entfernen“ legt das Buch weg, und unten rechts steht 10 Sekunden lang „„Kyoto“ liegt nicht mehr auf dem Tisch · Rückgängig“. Rückgängig holt es zurück. Der Hinweis sagt aber nicht, wohin das Buch gegangen ist (Papierkorb) und dass geteilte Links jetzt ruhen.",
+      "principle": "Rückgängig statt Warnung ist hier genau richtig umgesetzt.",
+      "source": "raskin-2007",
+      "fix": "Text ergänzen: „liegt im Papierkorb. Geteilte Links ruhen.“ Die 10 Sekunden reichen. Beim Hover auf den Hinweis soll der Ablauf pausieren.",
+      "effort": "S"
+    },
+    {
+      "id": "T02",
+      "area": "Tisch",
+      "name": "Papierkorb (zurücklegen)",
+      "findability": 2,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "„Papierkorb (1)“ steht erst unter dem Tisch, nur wenn er etwas enthält, und ist eingeklappt. „Zurück auf den Tisch“ funktioniert.",
+      "principle": "Was man wiederfinden muss, braucht einen festen, sichtbaren Ort.",
+      "source": "nielsen-10",
+      "fix": "In der Kopfzeile neben „Aus Datei öffnen“ einen Eintrag „Papierkorb (1)“ zeigen. Im Hinweis von T01 darauf verlinken.",
+      "effort": "S"
+    },
+    {
+      "id": "T03",
+      "area": "Tisch",
+      "name": "Papierkorb leeren mit Rückfrage",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 3,
+      "forgiveness": 4,
+      "observation": "Die Rückfrage nennt die Folgen genau (Fotos, Zwischenstände, Links, Zettel der Gäste) und listet die Bücher auf. Der Text ist gut. Der Fokus bleibt aber auf „Papierkorb leeren …“ hinter dem Dialog (K2).",
+      "principle": "Eine Rückfrage passt hier, weil der Schritt endgültig ist. Sie soll selten sein, damit man sie liest.",
+      "source": "nng-confirm",
+      "fix": "Fokus auf „Abbrechen“ setzen, Esc schließt den Dialog, der Hintergrund wird inert.",
+      "effort": "S"
+    },
+    {
+      "id": "T04",
+      "area": "Tisch",
+      "name": "Links ruhen im Papierkorb",
+      "findability": 2,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Den Satz „ihre geteilten Links zeigen nichts mehr“ sieht man erst, wenn man den Papierkorb aufklappt. Beim Entfernen steht er nicht da. Das Verhalten selbst ist sehr fehlertolerant: Zurücklegen weckt die Links wieder.",
+      "principle": "Den Systemzustand zeigen, wenn er sich ändert, nicht erst auf Nachfrage.",
+      "source": "nielsen-h1",
+      "fix": "Beim Entfernen eines geteilten Buchs: „2 Links ruhen, bis du es zurücklegst“.",
+      "effort": "S"
+    },
+    {
+      "id": "B01",
+      "area": "Bühne",
+      "name": "Verschieben",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Ich habe Foto 1 in der Mitte gegriffen und um 83 × 61 px gezogen. Die Vorschau folgt flüssig, eine Einrastlinie erscheint, und die Kante landet auf einer Spalte. Die Live-Region meldet „Foto 1: linke Seite“. Der erste Handgriff macht die Doppelseite frei und fixiert sie, das zeigt die Kopfzeile.",
+      "principle": "Direkte Manipulation: sichtbare Objekte, schnelle, umkehrbare Schritte.",
+      "source": "shneiderman-1983",
+      "fix": "Nichts Grundsätzliches. Die Fotonummern im Namen („Foto 1“) wechseln, sobald sich die Lesereihenfolge ändert. Für Screenreader und Gespräche besser den Titel oder einen festen Namen verwenden.",
+      "effort": "S"
+    },
+    {
+      "id": "B02",
+      "area": "Bühne",
+      "name": "Griffe (Größe ändern)",
+      "findability": 5,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Es gibt 8 Griffe, 24 px groß mit der Maus und 44 px bei Touch. Eine Ecke ändert beide Seiten, eine Kante nur eine. Ein Foto in voller Seitenhöhe lässt sich nach unten nicht größer ziehen. Das ist richtig, aber man bekommt keinen Hinweis darauf. Shift hält das Seitenverhältnis. Das kennt man aus Office.",
+      "principle": "Konventionen der Plattform übernehmen. Die Griffe kennt jeder aus Office.",
+      "source": "ms-crop",
+      "fix": "An der Seitenkante kurz einen Anschlag zeigen (Kante in signal). Ansonsten so lassen.",
+      "effort": "S"
+    },
+    {
+      "id": "B03",
+      "area": "Bühne",
+      "name": "Einrasten am Raster und Einrastlinien",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Beim Ziehen erscheinen das Raster und genau eine gelbe Linie, an der die Kante einrastet. Es gibt keine falschen Linien. Die Schwelle von 8 px ist spürbar stark: Wer eine Kante um 50 px zieht, bekommt nur 9 px Änderung, weil sie zurück auf die Spalte springt. Gleiche Abstände zwischen drei Elementen werden nicht angezeigt.",
+      "principle": "Snap-dragging senkt die nötige Genauigkeit. Hilfslinien müssen ehrlich sein.",
+      "source": "bier-stone-1986",
+      "fix": "Marken für gleiche Abstände ergänzen, wie die Smart Guides in PowerPoint (Workshop 2.6).",
+      "effort": "M"
+    },
+    {
+      "id": "B04",
+      "area": "Bühne",
+      "name": "Originalformat-Magnet",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Wenn ich an einer Ecke ziehe, erscheint die Marke „Originalformat“ in der Box, und die Form rastet ein. Die Marke ist schwarz auf dem Foto und gut lesbar. Sie verschwindet beim Loslassen, danach sieht man nicht mehr, ob das Foto im Originalformat steht.",
+      "principle": "Eine gute Voreinstellung, die man erst merkt, wenn man sie braucht.",
+      "source": "nielsen-defaults",
+      "fix": "Im Foto-Panel „Format: Original 2:3“ oder „beschnitten“ anzeigen, mit einem Knopf „Originalformat“.",
+      "effort": "S"
+    },
+    {
+      "id": "B05",
+      "area": "Bühne",
+      "name": "Alt für frei setzen",
+      "findability": 1,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Mit gedrückter Alt-Taste zeigt das Ziehen keine Einrastlinien, und das Foto landet um 7 px versetzt. Danach weist nichts darauf hin, dass es außerhalb des Rasters steht. Das Zeichen dafür war im Workshop versprochen. Die Funktion steht nur im Hilfetext unter der Seite. Am Telefon gibt es keinen Weg dorthin.",
+      "principle": "Versteckte Modifikatortasten werden kaum gefunden. Was nur für Fortgeschrittene ist, darf versteckt sein, braucht aber eine sichtbare Spur.",
+      "source": "norman-nielsen-2010",
+      "fix": "Ein kleines Zeichen „frei“ am Element und im Panel „Aufs Raster setzen“. Im Kontextmenü „Frei setzen“ als Weg für Touch.",
+      "effort": "S"
+    },
+    {
+      "id": "B06",
+      "area": "Bühne",
+      "name": "Zuschneiden: Doppelklick öffnet den Modus, Bild ziehen",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Ein Doppelklick auf das Foto öffnet den Modus, so wie die Maske in Keynote. Oben steht eine Leiste mit „Fertig“, „Abbrechen“ und „Mehr …“, das ganze Bild ist blass dahinter. Ziehen in der Mitte verschiebt das Bild nicht, solange Bild und Rahmen gleich groß sind. Erst nach dem Vergrößern bewegt sich etwas, und es gibt keinen Hinweis darauf. Mausrad und Pinch zoomen nicht, obwohl der Workshop beides vorsieht. Die Tasten + und − gehen.",
+      "principle": "Doppelklick zum Bearbeiten der Maske ist Konvention in Keynote. Die Modi müssen klar getrennt und sichtbar sein.",
+      "source": "keynote-mask",
+      "fix": "Beim Öffnen das Bild leicht vergrößert zeigen (z. B. 110 %), damit Ziehen sofort wirkt, oder den Hinweis „erst vergrößern“ geben. Mausrad und Pinch für den Zoom ergänzen.",
+      "effort": "M"
+    },
+    {
+      "id": "B07",
+      "area": "Bühne",
+      "name": "Zuschneiden: Ecken am Bild und Griffe am Rahmen",
+      "findability": 3,
+      "simplicity": 2,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Am Anfang liegen Bild und Rahmen aufeinander. Die Ecke unten rechts trifft dann immer den Bildgriff (helles Quadrat), nie den Rahmengriff. Wer den Rahmen über die Ecke beschneiden will, vergrößert stattdessen das Bild. Nach dem Vergrößern lag die untere Bildecke unter der Seite und außerhalb des Bildschirms. Das blasse Bild überdeckt mit 40 % das Nachbarfoto, und man sieht schwer, was wozu gehört.",
+      "principle": "Zwei Griffarten am selben Punkt sind ein Modusfehler mit Ansage. PowerPoint zeigt zum Zuschneiden eigene, schwarze Beschnittgriffe.",
+      "source": "norman-1981",
+      "fix": "Die Rahmengriffe als schwarze Winkel außen zeigen und die Bildgriffe als runde Punkte mit Abstand nach außen versetzen. Bei Gleichstand gewinnt der Rahmen. Die Nachbarelemente während des Zuschneidens abdunkeln.",
+      "effort": "M"
+    },
+    {
+      "id": "B08",
+      "area": "Bühne",
+      "name": "Zuschneiden beenden: Fertig, Abbrechen, Mehr, Esc, Klick daneben",
+      "findability": 5,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "„Fertig“ übernimmt den Ausschnitt, „Abbrechen“ und Esc verwerfen ihn, „Mehr …“ öffnet den alten Dialog mit Motivpunkt. Ein Klick neben die Doppelseite, z. B. auf den Tisch links, beendet den Modus nicht. Nur ein Klick auf das Papier tut es.",
+      "principle": "Mehrere Wege, die alle gleich enden, sind gut. Die Grenze des Modus muss aber eindeutig sein.",
+      "source": "nng-h3",
+      "fix": "Jeder Klick außerhalb des Bildes beendet den Modus mit „Fertig“, auch auf dem Tisch neben der Doppelseite.",
+      "effort": "S"
+    },
+    {
+      "id": "B09",
+      "area": "Bühne",
+      "name": "Textleiste (+ Überschrift, + Absatz, + Notiz)",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "„+ Überschrift“ legt einen Rahmen an der ersten freien Stelle an, öffnet sofort das Schreibfeld mit markiertem Platzhalter und meldet die Lage. Ich habe direkt „Kyoto im Regen“ getippt. Ziehen an eine Stelle geht auch. Das ist der beste Teil der Bühne.",
+      "principle": "Sichtbare, benannte Werkzeuge mit guter Voreinstellung. Wiedererkennen statt Erinnern.",
+      "source": "nielsen-10",
+      "fix": "So lassen.",
+      "effort": "S"
+    },
+    {
+      "id": "B10",
+      "area": "Bühne",
+      "name": "Doppelklick aufs Papier legt Text an",
+      "findability": 3,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Ein Doppelklick auf leeres Papier links unten legt einen Absatz an genau der Stelle an, zum Schreiben bereit. Auf einem randlosen Foto gibt es kein Papier, dort startet der Doppelklick das Zuschneiden. Wer Text auf ein Foto setzen will, muss die Leiste nehmen. Der Rahmen landete bei 85 % Höhe, der Text lief später aus dem Satzspiegel.",
+      "principle": "Ein schneller Weg für Geübte neben dem sichtbaren Weg (Heuristik 7).",
+      "source": "nielsen-10",
+      "fix": "Den Rahmen nach oben verschieben, wenn er unten nicht passt. Im Hilfetext sagen, dass Text auf Fotos über die Leiste geht.",
+      "effort": "S"
+    },
+    {
+      "id": "B11",
+      "area": "Bühne",
+      "name": "Doppelklick auf Text schreibt direkt",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 2,
+      "observation": "Ein Doppelklick auf „Kyoto im Regen“ öffnet das Schreibfeld in derselben Schrift, aber der ganze Text ist markiert (Auswahl 0–14 von 14). Wer einen Tippfehler korrigieren will und gleich tippt, ersetzt den ganzen Text. In Textprogrammen markiert ein Doppelklick üblicherweise nur das Wort unter dem Zeiger.",
+      "principle": "Konsistenz mit Plattform-Konventionen. Hier bricht die Bühne die Erwartung, die Michel aus PowerPoint mitbringt.",
+      "source": "nielsen-10",
+      "fix": "Nur bei neuem Platzhaltertext alles markieren. Sonst den Cursor an die Klickstelle setzen (caretPositionFromPoint bzw. caretRangeFromPoint in Safari).",
+      "effort": "S"
+    },
+    {
+      "id": "B12",
+      "area": "Bühne",
+      "name": "Werkzeugkasten: Schriftart",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Es gibt vier Schriften (Grotesk, Serif, Schreibmaschine, Handschrift), jede in der Liste in ihrer eigenen Schrift gezeigt. Der Wechsel wirkt sofort, Rückgängig geht.",
+      "principle": "Wenige, kuratierte Optionen statt einer langen Liste. Iyengar und Lepper zeigen, dass zu viel Auswahl lähmen kann. Die Studie ist allerdings nicht unumstritten.",
+      "source": "iyengar-lepper-2000",
+      "fix": "So lassen. Nicht mehr Schriften hinzufügen.",
+      "effort": "S"
+    },
+    {
+      "id": "B13",
+      "area": "Bühne",
+      "name": "Werkzeugkasten: Größe in pt",
+      "findability": 5,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Die Größe startet bei 26 pt. „+“ springt auf 30 und dann auf 34 (Schritte von 4 ab 24 pt, darunter 1). Eingetippte 9 pt werden übernommen. Die Umrechnung bezieht sich auf 15 cm Seitenbreite und stimmt nur, wenn das Buch auch so gedruckt wird.",
+      "principle": "Bekannte Einheit (pt wie in Office) senkt die Schwelle. Freie Eingabe ist die hohe Decke.",
+      "source": "resnick-2005",
+      "fix": "Gewohnte Stufen (9, 10, 11, 12, 14, 18, 24, 36, 48 …). Die Druckgröße im Tooltip nennen.",
+      "effort": "S"
+    },
+    {
+      "id": "B14",
+      "area": "Bühne",
+      "name": "Werkzeugkasten: Fett und Kursiv",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "„F“ und „K“ als Umschalter mit aria-pressed, 32 × 32 px groß. Sie wirken auf den ganzen Rahmen, nicht auf einzelne Wörter. Das ist für ein Fotobuch vernünftig. ⌘B und ⌘I gibt es nicht.",
+      "principle": "Konventionen der Plattform (deutsche Office-Beschriftung F und K).",
+      "source": "nielsen-10",
+      "fix": "⌘B und ⌘I ergänzen.",
+      "effort": "S"
+    },
+    {
+      "id": "B15",
+      "area": "Bühne",
+      "name": "Werkzeugkasten: Ausrichtung",
+      "findability": 5,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "Drei Knöpfe (links, mittig, rechts) mit Symbol und Namen für Screenreader. Mittig widerspricht Maras Regel aus dem Workshop, ist aber Michels Wunsch nach voller Anpassbarkeit. Die Voreinstellung bleibt links.",
+      "principle": "Die gute Voreinstellung trägt, die Freiheit bleibt.",
+      "source": "nielsen-defaults",
+      "fix": "So lassen.",
+      "effort": "S"
+    },
+    {
+      "id": "B16",
+      "area": "Bühne",
+      "name": "Werkzeugkasten: Farben",
+      "findability": 5,
+      "simplicity": 3,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Es gibt 6 Felder (Tinte, Grau, Papier, Schwarz, Weiß, Einband) und einen freien Farbwähler mit Regenbogenfeld. Die Felder sind 24 × 24 px. Der freie Farbwähler widerspricht der Workshop-Entscheidung „keine freie Farbwahl“. Das Regenbogenfeld fällt im ruhigen Werkzeugkasten am stärksten auf. Wer „Weiß“ auf Papier wählt, bekommt keine Warnung zum Kontrast.",
+      "principle": "Progressive Disclosure: Wenige wichtige Optionen zuerst, Spezielles auf Nachfrage.",
+      "source": "nielsen-pd",
+      "fix": "Den freien Farbwähler hinter „Weitere …“ legen. Bei geringem Kontrast zum Untergrund einen kleinen Hinweis zeigen.",
+      "effort": "S"
+    },
+    {
+      "id": "B17",
+      "area": "Bühne",
+      "name": "Helle Schrift",
+      "findability": 3,
+      "simplicity": 2,
+      "flexibility": 3,
+      "forgiveness": 4,
+      "observation": "„Helle Schrift“ gibt es dreimal: als Haken im Panel, als Eintrag im Kontextmenü und indirekt als Farbe „Papier“ im Werkzeugkasten. Ich habe erst die Farbe „Einband“ gewählt und dann den Haken gesetzt. Der Haken ist dann an, aber nichts ändert sich, weil die gewählte Farbe Vorrang hat.",
+      "principle": "Ein Bedienelement, das scheinbar nichts tut, zerstört das Vertrauen. Ästhetisch-minimalistisches Design: jede Doppelung schwächt die anderen.",
+      "source": "nielsen-10",
+      "fix": "Den Haken und den Menüeintrag streichen. „Papier“ im Werkzeugkasten ist die helle Schrift.",
+      "effort": "S"
+    },
+    {
+      "id": "B18",
+      "area": "Bühne",
+      "name": "Text und Fotos über den Bund",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Ich habe die Überschrift auf die Mitte gezogen. Sie liegt dann über beiden Seiten, und die Falz-Zone bleibt sichtbar. Auch Foto 1 ließ sich über den Bund schieben. Dabei hat es das Nachbarfoto überlappt, ohne Hinweis. Das Element heißt danach nur „rechte Seite“, obwohl es über beiden liegt.",
+      "principle": "Ehrliche Vorschau (QFD K22): Was im Falz verschwindet, muss die Bühne sagen.",
+      "source": "nielsen-h1",
+      "fix": "Im Namen „über den Bund“ sagen. Eine Warnung, wenn Text oder ein Gesicht im Falz liegt (wie im Ausschnitt-Dialog).",
+      "effort": "S"
+    },
+    {
+      "id": "B19",
+      "area": "Bühne",
+      "name": "Ebenen-Liste, nach vorn und hinten",
+      "findability": 4,
+      "simplicity": 3,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Die Liste zeigt „Überschrift: Kyoto im Regen und Sonne · Foto 4 · Foto 3“ mit ↑ und ↓, und nicht mögliche Richtungen sind gesperrt. Antippen wählt auch Verdecktes. Die Funktion gibt es aber viermal: Liste, Knöpfe „Ganz nach vorn/hinten“ im Panel, vier Einträge im Kontextmenü, ⌘[ und ⌘]. ↑ und ↓ sind 32 px groß und ohne sichtbaren Namen.",
+      "principle": "Jede zusätzliche Information schwächt die Sichtbarkeit der übrigen (Heuristik 8).",
+      "source": "nielsen-10",
+      "fix": "Die Knöpfe im Panel streichen. Es bleiben Liste, Kontextmenü und Tastatur. Die Liste erst ab 2 überlappenden Elementen zeigen.",
+      "effort": "S"
+    },
+    {
+      "id": "B20",
+      "area": "Bühne",
+      "name": "Rechtsklick-Menü",
+      "findability": 3,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Ein Rechtsklick auf ein Foto zeigt 14 Einträge mit Kurzbefehlen, in Gruppen mit Trennlinien. Auf dem Papier gibt es „Hier einfügen“ und „Überschrift/Absatz/Notiz hier“. Pfeiltasten, Enter und Esc funktionieren. Bei Fotos stehen „Zuschneiden“ und „Ausschnitt-Dialog …“ nebeneinander, das ist für Laien unklar.",
+      "principle": "Kontextmenüs sind versteckt. Alles darin muss auch in der normalen Oberfläche erreichbar sein (Apple HIG).",
+      "source": "apple-hig-context",
+      "fix": "„Ausschnitt-Dialog …“ streichen, denn er ist über „Mehr …“ im Zuschneiden erreichbar. „Frei setzen“ ergänzen (B05).",
+      "effort": "S"
+    },
+    {
+      "id": "B21",
+      "area": "Bühne",
+      "name": "⌘C, ⌘X, ⌘V, ⌘D",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 5,
+      "forgiveness": 3,
+      "observation": "⌘D und ⌘C/⌘V legen eine Kopie eine Rasterzelle versetzt ab und melden die Lage. Dasselbe Foto steht danach dreimal auf der Seite, ohne Hinweis. Siehe B23 für die Folge.",
+      "principle": "Plattform-Konventionen. Kopien eines Fotos sind im Buch selten gewollt und sollten erkennbar sein.",
+      "source": "nielsen-10",
+      "fix": "Kopien eines Fotos im Namen kennzeichnen („Foto 3, Kopie“). Entfernen wirkt nur auf das gewählte Element (B23).",
+      "effort": "S"
+    },
+    {
+      "id": "B22",
+      "area": "Bühne",
+      "name": "Text aus anderen Apps einfügen",
+      "findability": 3,
+      "simplicity": 5,
+      "flexibility": 5,
+      "forgiveness": 5,
+      "observation": "Text aus der Zwischenablage („Text aus Notizen:“ mit Zeilenumbruch) wird beim Einfügen zu einem neuen Absatz, die Zeilen bleiben. Formatierung kommt nicht mit, so wie im Workshop gewünscht.",
+      "principle": "Direkte Manipulation mit erwartbarem Ergebnis. Reiner Text vermeidet den albelli-Schmerz.",
+      "source": "hutchins-1985",
+      "fix": "So lassen. Im leeren Zustand „⌘V fügt Text ein“ als Hinweis an der Textleiste zeigen.",
+      "effort": "S"
+    },
+    {
+      "id": "B23",
+      "area": "Bühne",
+      "name": "Entf (Element entfernen)",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 3,
+      "forgiveness": 2,
+      "observation": "Ich hatte drei Kopien von Foto 3 und habe eine davon mit Entf entfernt. Alle drei verschwanden, weil Entf das Foto in die Ablage legt und damit jede Platzierung entfernt. Die Live-Region meldet nichts Neues, und auf der Bühne erscheint kein sichtbarer Hinweis. Rückgängig holt alles zurück.",
+      "principle": "Eine Handlung muss genau das betreffen, was gewählt ist. Rückmeldung nach jeder Handlung.",
+      "source": "shneiderman-golden",
+      "fix": "Entf entfernt nur das gewählte Element. In die Ablage geht das Foto erst, wenn keine Platzierung mehr übrig ist. Ein kurzer Hinweis „Entfernt · Rückgängig“.",
+      "effort": "S"
+    },
+    {
+      "id": "B24",
+      "area": "Bühne",
+      "name": "Leiste „Alle Fotos“",
+      "findability": 3,
+      "simplicity": 5,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Unter der Doppelseite stehen 9 Fotos mit Herkunft („Ablage“, „Doppelseite 4“). Antippen legt das Foto in die erste freie Stelle und meldet sie. Die Leiste beginnt bei 1440 × 900 bei y = 858 und ist damit fast ganz unter dem sichtbaren Bereich. Dass das Foto seine alte Doppelseite verlässt, sagt nur der Hilfetext.",
+      "principle": "Was man oft braucht, gehört in den sichtbaren Bereich (Gesetz der Nähe, Fitts).",
+      "source": "nielsen-10",
+      "fix": "Die Leiste als feste Leiste unten an den Bildschirmrand. Nach dem Hereinholen melden: „von Doppelseite 4 hierher verschoben · Rückgängig“.",
+      "effort": "S"
+    },
+    {
+      "id": "B25",
+      "area": "Bühne",
+      "name": "Raster (G)",
+      "findability": 4,
+      "simplicity": 5,
+      "flexibility": 4,
+      "forgiveness": 5,
+      "observation": "G und der Knopf schalten 47 Linien ein und aus, das Gerät merkt sich die Wahl. Der Knopf heißt „Raster an“, wenn es aus ist. Er beschriftet also die Handlung, meldet aber mit aria-pressed den Zustand. Ein Screenreader liest dann „Raster an, nicht gedrückt“.",
+      "principle": "Beschriftung und Zustand müssen dasselbe sagen.",
+      "source": "wcag22",
+      "fix": "Der Knopf heißt immer „Raster“ und zeigt den Zustand über aria-pressed und einen Haken.",
+      "effort": "S"
+    },
+    {
+      "id": "B26",
+      "area": "Bühne",
+      "name": "Rückgängig auf der Bühne",
+      "findability": 5,
+      "simplicity": 4,
+      "flexibility": 4,
+      "forgiveness": 2,
+      "observation": "Ich habe auf der Bühne einen Absatz angelegt und getippt, dann 3-mal „Rückgängig“ geklickt. Der dritte Schritt hat den Upload rückgängig gemacht: Die Bühne verschwand, und die Übersicht war leer. Der Stapel kennt keine Bühne. Er nimmt auch Änderungen aus der Übersicht zurück, die man von der Bühne aus nicht sieht.",
+      "principle": "Rückgängig nimmt nur zurück, was man sieht. Sonst wird es selbst zur Fehlerquelle (Modusfehler).",
+      "source": "nng-h3",
+      "fix": "Auf der Bühne nur Schritte dieser Doppelseite zurücknehmen. Am ersten Schritt den Knopf sperren mit dem Hinweis „Weiter zurück in der Übersicht“. Die Bühne schließt nie durch Rückgängig.",
+      "effort": "M"
+    },
+    {
+      "id": "B27",
+      "area": "Bühne",
+      "name": "Auf Vorschlag zurücksetzen",
+      "findability": 4,
+      "simplicity": 4,
+      "flexibility": 3,
+      "forgiveness": 2,
+      "observation": "Ich habe Foto 3 verschoben und dann „Auf Vorschlag zurücksetzen“ geklickt. Die Bühne verschwindet sofort und ohne Hinweis, man landet in der Übersicht. Der Grund: Die Automatik baut die Doppelseite neu, mit neuer Kennung. Ein Zwischenstand wird angelegt, Rückgängig ist aber nur in der Übersicht erreichbar.",
+      "principle": "Keine Überraschungen: Eine Handlung ändert den Inhalt, nicht den Ort.",
+      "source": "nielsen-h1",
+      "fix": "Die Kennung der Doppelseite behalten und die Bühne offen lassen, dazu „Zurückgesetzt · Rückgängig“ zeigen.",
+      "effort": "S"
+    },
+    {
+      "id": "B28",
+      "area": "Bühne",
+      "name": "Handy 375 px: eine Seite, Ziehen, langes Drücken",
+      "findability": 2,
+      "simplicity": 3,
+      "flexibility": 4,
+      "forgiveness": 3,
+      "observation": "Die Bühne zeigt eine Seite, und „Linke Seite“/„Rechte Seite“ wechseln. Es gibt kein horizontales Scrollen. Wischen ohne Auswahl verschiebt nichts, nach Antippen verschiebt Ziehen, die Griffe sind 44 px groß. Doppeltippen öffnet das Zuschneiden. Langes Drücken auf ein Foto öffnet das Menü nach 550 ms direkt unter dem Finger. In einem von drei Versuchen war es nach dem Loslassen wieder weg, vermutlich hat das Loslassen einen Eintrag getroffen. Langes Drücken auf Papier öffnet nichts. Der Werkzeugkasten für Text ist 345 px breit und läuft rechts aus dem Bildschirm, Fett und zwei Farben sind abgeschnitten. Panel und Ebenen beginnen erst bei y = 1018.",
+      "principle": "Gesten sind versteckt und schwer zu merken. Auf Touch braucht jede Geste einen sichtbaren Weg.",
+      "source": "nng-mobile-gestures",
+      "fix": "Das Menü versetzt über dem Finger öffnen und das erste Loslassen ignorieren. Den Werkzeugkasten auf dem Handy als Leiste unten (Bottom Sheet), das Panel ebenfalls. Einen Knopf „…“ am gewählten Element als sichtbaren Weg zum Menü.",
+      "effort": "M"
+    },
+    {
+      "id": "B29",
+      "area": "Bühne",
+      "name": "Tastatur und Screenreader auf der Bühne",
+      "findability": 3,
+      "simplicity": 4,
+      "flexibility": 5,
+      "forgiveness": 4,
+      "observation": "Pfeile verschieben um eine Spalte, Shift + Pfeil ändert die Größe, Enter schneidet zu bzw. schreibt, Esc hebt erst die Auswahl auf und schließt dann die Bühne. Jedes Element hat einen Namen mit Lage. Die Bühne übernimmt aber den Fokus nicht (siehe U03), und nach dem Schließen landet er auf body.",
+      "principle": "Alle Funktionen per Tastatur (WCAG 2.1.1). Die Fokusreihenfolge muss stimmen (2.4.3).",
+      "source": "wcag22",
+      "fix": "Fokus beim Öffnen in die Bühne, Hintergrund inert, beim Schließen Fokus zurück auf die Doppelseite.",
+      "effort": "S"
+    },
+    {
+      "id": "B30",
+      "area": "Bühne",
+      "name": "Speichern-Rückmeldung (nur „Zur Übersicht“)",
+      "findability": 1,
+      "simplicity": 5,
+      "flexibility": 3,
+      "forgiveness": 3,
+      "observation": "Die Kopfzeile der Bühne zeigt keinen Speicherstatus, weil sie die Zeile „Gespeichert“ des Editors verdeckt. Nach Esc stand in der Übersicht noch „Speichert …“. ⌘S wird nicht abgefangen, in Safari öffnet sich dann der Dialog „Sichern unter“ für die Webseite. Ein Hinweis beim Schließen des Tabs fehlt.",
+      "principle": "Sichtbarkeit des Systemzustands. Autosave ohne Anzeige lässt das mentale Modell „Speichern“ ins Leere laufen.",
+      "source": "nng-autosave",
+      "fix": "Siehe die Speichern-Diskussion: Status in der Kopfzeile der Bühne, ⌘S abfangen, beforeunload bei ungesicherten Änderungen.",
+      "effort": "S"
+    },
+    {
+      "id": "B31",
+      "area": "Bühne",
+      "name": "Seitenpanel Foto und Textrahmen",
+      "findability": 4,
+      "simplicity": 3,
+      "flexibility": 4,
+      "forgiveness": 4,
+      "observation": "Das Foto-Panel bietet Titel, „Unterschrift auf der Seite“, „Ausschnitt …“ (startet das Zuschneiden), Löschen, Duplizieren und Ebenen. Das Text-Panel bietet Stil, ein zweites Textfeld, Helle Schrift, Duplizieren und Ebenen. Es gibt also zwei Orte, um denselben Text zu schreiben (auf der Seite und im Panel), und zwei Orte für Stil und Format (Panel und Werkzeugkasten). Die Warnung „Der Text läuft unten aus dem Satzspiegel“ steht nur im Panel.",
+      "principle": "Ein Ort pro Aufgabe. Doppelte Wege kosten Aufmerksamkeit (Heuristik 8, Hick).",
+      "source": "hick-1952",
+      "fix": "Stil (Überschrift/Absatz/Notiz) in den Werkzeugkasten holen, das Textfeld im Panel streichen. Die Überlaufwarnung als Marke am Rahmen selbst zeigen.",
+      "effort": "M"
+    }
+  ],
+  "cut": [
+    "„Helle Schrift“ als Haken im Panel und als Menüeintrag: Die Farbe „Papier“ im Werkzeugkasten macht dasselbe, und der Haken wirkt nicht, sobald eine Farbe gewählt ist (B17).",
+    "Das zweite Textfeld im Text-Panel der Bühne: Geschrieben wird direkt auf der Seite (B31).",
+    "Die Knöpfe „Ganz nach vorn/hinten“ im Panel: Ebenen-Liste, Kontextmenü und ⌘[ ⌘] reichen (B19).",
+    "„Ausschnitt-Dialog …“ im Kontextmenü: Er ist über „Mehr …“ im Zuschneiden erreichbar (B20).",
+    "Der Knopf „Layout“ mit blindem Durchschalten: ersetzen durch sichtbare Vorschläge (U04).",
+    "„Textseite hinzufügen“ als eigener Seitentyp: ersetzen durch „Leere Doppelseite“, die die Bühne mit Textleiste öffnet. Damit ist auch K1 erledigt (U08).",
+    "Der freie Farbwähler in der ersten Ebene des Werkzeugkastens: hinter „Weitere …“ legen, nicht streichen (B16).",
+    "Die langen Hilfetexte unter der Bühne: nur noch ein Satz plus „Tastenkürzel (?)“. Gelesen wird solcher Text kaum, die Tooltips an den Knöpfen tragen mehr."
+  ],
+  "nextSteps": [
+    "Speichern sichtbar machen (S): Status in der Kopfzeile der Bühne, ⌘S abfangen mit „Alles gespeichert“, ⇧⌘S für „Stand sichern“, beforeunload bei ungesicherten Änderungen (B30).",
+    "Die Bühne darf nie verschwinden (S–M): „Auf Vorschlag zurücksetzen“ behält die Kennung der Doppelseite, und Rückgängig nimmt auf der Bühne nur Schritte dieser Doppelseite zurück. Der Upload ist eine Grenze (B26, B27, U02).",
+    "Fehlertoleranz im Kleinen (S): Entf entfernt nur das gewählte Element, Doppelklick auf Text setzt den Cursor statt alles zu markieren, und nach Entfernen, Zurücksetzen und Hereinholen erscheint ein Hinweis „· Rückgängig“ wie auf dem Tisch (B23, B11, B24).",
+    "Zuschneiden entwirren (M): Rahmen- und Bildgriffe räumlich trennen, Klick außerhalb beendet den Modus, Mausrad und Pinch zoomen, das Bild startet leicht vergrößert (B06–B08).",
+    "Progressive Disclosure und Handy (M): Doppelungen streichen (siehe „Was weg kann“), Werkzeugkasten einzeilig mit „Weitere …“, auf 375 px Werkzeugkasten und Panel als Leiste unten, Menü nicht unter dem Finger. Dabei die offenen Altbefunde K1 bis K3 mit erledigen (B28, B31)."
+  ],
+  "sources": [
+    {
+      "key": "nielsen-h1",
+      "citation": "Harley, A. (2018). Visibility of System Status (Usability Heuristic #1). Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/visibility-system-status/"
+    },
+    {
+      "key": "nielsen-10",
+      "citation": "Nielsen, J. (1994, aktualisiert 2024). 10 Usability Heuristics for User Interface Design. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/ten-usability-heuristics/"
+    },
+    {
+      "key": "nng-autosave",
+      "citation": "Harley, A. (2015). Don't Prioritize Efficiency Over Expectations: The Case of Autosave. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/efficiency-vs-expectations/"
+    },
+    {
+      "key": "gdocs-status",
+      "citation": "Google Workspace Updates (2020). New document save status and offline indicator for Docs, Sheets, and Slides.",
+      "url": "https://workspaceupdates.googleblog.com/2020/06/new-save-status-online-offline-google-docs.html"
+    },
+    {
+      "key": "figma-versions",
+      "citation": "Figma Help Center. View a file's version history.",
+      "url": "https://help.figma.com/hc/en-us/articles/360038006754"
+    },
+    {
+      "key": "figma-offline",
+      "citation": "Figma Help Center. What can you do offline in Figma?",
+      "url": "https://help.figma.com/hc/en-us/articles/360040328553"
+    },
+    {
+      "key": "figma-autosave-blog",
+      "citation": "Chen, R. (2020). Behind the feature: The hidden challenges of autosave. Figma Blog.",
+      "url": "https://www.figma.com/blog/behind-the-feature-autosave/"
+    },
+    {
+      "key": "apple-lion-2011",
+      "citation": "Apple Newsroom (2011). Mac OS X Lion Available Today From the Mac App Store (Auto Save, Versions).",
+      "url": "https://www.apple.com/newsroom/2011/07/20Mac-OS-X-Lion-Available-Today-From-the-Mac-App-Store/"
+    },
+    {
+      "key": "apple-versions",
+      "citation": "Apple. Mac User Guide: View and restore past versions of documents.",
+      "url": "https://support.apple.com/guide/mac-help/mh40710/mac"
+    },
+    {
+      "key": "keynote-mask",
+      "citation": "Apple. Keynote User Guide for Mac: Mask (crop) images („double-click the image. The mask controls appear“).",
+      "url": "https://support.apple.com/guide/keynote/tan811faceea/mac"
+    },
+    {
+      "key": "ms-autosave",
+      "citation": "Microsoft Support. What is AutoSave?",
+      "url": "https://support.microsoft.com/en-us/office/what-is-autosave-6d6bd723-ebfd-4e40-b5f6-ae6e8088f7a5"
+    },
+    {
+      "key": "ms-crop",
+      "citation": "Microsoft Support. Crop a picture in Office („Black crop handles appear on the edges and corners“).",
+      "url": "https://support.microsoft.com/en-us/Office/graphics-visuals/crop-a-picture-in-office"
+    },
+    {
+      "key": "safari-save",
+      "citation": "Apple. Safari User Guide for Mac: Save webpages (Ablage > Sichern unter).",
+      "url": "https://support.apple.com/guide/safari/ibrw1089/mac"
+    },
+    {
+      "key": "nng-floppy",
+      "citation": "Kaplan, K. (2025). The Floppy Disk Icon as „Save“: Still Appropriate Today? Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/floppy-disk-icon-understandability/"
+    },
+    {
+      "key": "nielsen-pd",
+      "citation": "Nielsen, J. (2006). Progressive Disclosure. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/progressive-disclosure/"
+    },
+    {
+      "key": "resnick-2005",
+      "citation": "Resnick, M., Myers, B., Nakakoji, K., Shneiderman, B., Pausch, R., Selker, T., & Eisenberg, M. (2005). Design Principles for Tools to Support Creative Thinking. NSF Workshop Report on Creativity Support Tools.",
+      "url": "https://www.cs.umd.edu/hcil/CST/Papers/designprinciples.htm"
+    },
+    {
+      "key": "myers-2000",
+      "citation": "Myers, B., Hudson, S. E., & Pausch, R. (2000). Past, present, and future of user interface software tools. ACM TOCHI, 7(1), 3–28.",
+      "url": "https://doi.org/10.1145/344949.344959"
+    },
+    {
+      "key": "nielsen-defaults",
+      "citation": "Nielsen, J. (2005). The Power of Defaults. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/the-power-of-defaults/"
+    },
+    {
+      "key": "shneiderman-1983",
+      "citation": "Shneiderman, B. (1983). Direct Manipulation: A Step Beyond Programming Languages. IEEE Computer, 16(8), 57–69.",
+      "url": "https://doi.org/10.1109/MC.1983.1654471"
+    },
+    {
+      "key": "hutchins-1985",
+      "citation": "Hutchins, E. L., Hollan, J. D., & Norman, D. A. (1985). Direct manipulation interfaces. Human-Computer Interaction, 1(4), 311–338.",
+      "url": "https://doi.org/10.1207/s15327051hci0104_2"
+    },
+    {
+      "key": "shneiderman-golden",
+      "citation": "Shneiderman, B., Plaisant, C., Cohen, M., Jacobs, S., Elmqvist, N., & Diakopoulos, N. (2016). Designing the User Interface (6. Aufl.), Abschn. 3.3.4: Eight Golden Rules. Pearson.",
+      "url": "https://www.cs.umd.edu/~ben/goldenrules.html"
+    },
+    {
+      "key": "nng-h3",
+      "citation": "Rosala, M. (2020). User Control and Freedom (Usability Heuristic #3). Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/user-control-and-freedom/"
+    },
+    {
+      "key": "norman-1981",
+      "citation": "Norman, D. A. (1981). Categorization of action slips. Psychological Review, 88(1), 1–15.",
+      "url": "https://doi.org/10.1037/0033-295X.88.1.1"
+    },
+    {
+      "key": "norman-nielsen-2010",
+      "citation": "Norman, D. A., & Nielsen, J. (2010). Gestural interfaces: a step backwards in usability. interactions, 17(5).",
+      "url": "https://jnd.org/gestural-interfaces-a-step-backwards-in-usability/"
+    },
+    {
+      "key": "nng-contextual-menus",
+      "citation": "Kaley, A. (2019). Contextual Menus: Delivering Relevant Tools for Tasks. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/contextual-menus/"
+    },
+    {
+      "key": "nng-mobile-gestures",
+      "citation": "Budiu, R. (2015). Mobile User Experience: Limitations and Strengths. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/mobile-ux/"
+    },
+    {
+      "key": "apple-hig-context",
+      "citation": "Apple. Human Interface Guidelines: Context menus („Always make context menu items available in the main interface, too.“).",
+      "url": "https://developer.apple.com/design/human-interface-guidelines/context-menus"
+    },
+    {
+      "key": "wcag22",
+      "citation": "W3C (2023). Web Content Accessibility Guidelines (WCAG) 2.2, insbesondere 2.1.1, 2.4.3, 2.5.7, 2.5.8.",
+      "url": "https://www.w3.org/TR/WCAG22/"
+    },
+    {
+      "key": "wcag-apg-dialog",
+      "citation": "W3C WAI. ARIA Authoring Practices Guide: Dialog (Modal) Pattern.",
+      "url": "https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/"
+    },
+    {
+      "key": "bier-stone-1986",
+      "citation": "Bier, E. A., & Stone, M. C. (1986). Snap-dragging. Computer Graphics (SIGGRAPH '86), 20(4), 233–240."
+    },
+    {
+      "key": "ppt-smart-guides",
+      "citation": "Microsoft Support. Guides for arranging things on a slide (Smart Guides).",
+      "url": "https://support.microsoft.com/en-us/office/guides-for-arranging-things-on-a-slide-33854dfa-e0d1-43ff-8971-667b19512de3"
+    },
+    {
+      "key": "raskin-2007",
+      "citation": "Raskin, A. (2007). Never Use a Warning When You Mean Undo. A List Apart.",
+      "url": "https://alistapart.com/article/neveruseawarning/"
+    },
+    {
+      "key": "nng-confirm",
+      "citation": "Nielsen Norman Group (2018). Confirmation Dialogs Can Prevent User Errors — If Not Overused.",
+      "url": "https://www.nngroup.com/articles/confirmation-dialog/"
+    },
+    {
+      "key": "hick-1952",
+      "citation": "Hick, W. E. (1952). On the rate of gain of information. Quarterly Journal of Experimental Psychology, 4(1), 11–26.",
+      "url": "https://doi.org/10.1080/17470215208416600"
+    },
+    {
+      "key": "iyengar-lepper-2000",
+      "citation": "Iyengar, S. S., & Lepper, M. R. (2000). When choice is demotivating. Journal of Personality and Social Psychology, 79(6), 995–1006. Replizierbarkeit umstritten.",
+      "url": "https://doi.org/10.1037/0022-3514.79.6.995"
+    },
+    {
+      "key": "fitts-1954",
+      "citation": "Fitts, P. M. (1954). The information capacity of the human motor system in controlling the amplitude of movement. Journal of Experimental Psychology, 47(6), 381–391."
+    },
+    {
+      "key": "nielsen-1997",
+      "citation": "Nielsen, J. (1997). How Users Read on the Web. Nielsen Norman Group.",
+      "url": "https://www.nngroup.com/articles/how-users-read-on-the-web/"
+    },
+    {
+      "key": "raskin-2000",
+      "citation": "Raskin, J. (2000). The Humane Interface. Addison-Wesley (Kapitel zu Modi)."
+    },
+    {
+      "key": "nielsen-landauer-1993",
+      "citation": "Nielsen, J., & Landauer, T. K. (1993). A mathematical model of the finding of usability problems. Proceedings of INTERCHI '93, 206–213."
+    }
+  ]
+}
