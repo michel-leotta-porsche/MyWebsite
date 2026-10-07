@@ -8,8 +8,12 @@ import { Wordmark } from "@/components/app-ui";
 /** Wer die Seite betreibt. Steht an einer Stelle, Impressum und Datenschutz lesen von hier */
 export const OPERATOR = {
   name: "Michel Leotta",
-  // Ladungsfähige Anschrift (§ 5 DDG, § 18 MStV); Zeilen werden untereinander gesetzt
-  address: ["ANSCHRIFT FEHLT"],
+  // Ladungsfähige Anschrift (§ 5 DDG, § 18 MStV). Steht nicht im öffentlichen Repo, sondern beim Build in
+  // FUJI_IMPRESSUM_ADRESSE (z. B. photos/.env.local), Zeilen mit „|“ getrennt. Ohne sie bricht check-export den Deploy ab.
+  address: (process.env.FUJI_IMPRESSUM_ADRESSE ?? "ANSCHRIFT FEHLT")
+    .split("|")
+    .map((l) => l.trim())
+    .filter(Boolean),
   email: "michel.leotta@hotmail.com",
 };
 
