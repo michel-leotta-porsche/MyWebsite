@@ -207,6 +207,9 @@ function averageColor(canvas: HTMLCanvasElement): [number, number, number] {
   return toLab(r / n, g / n, b / n);
 }
 
+/** EXIF-Zahl nur übernehmen, wenn sie wirklich eine ist (manche Programme schreiben Brüche als Paar) */
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
 const pick = ["Make", "Model", "LensModel", "FocalLengthIn35mmFormat", "FocalLength", "FNumber", "ExposureTime", "ISO", "ExposureCompensation", "DateTimeOriginal"];
 
 export async function ingest(file: File, key: string): Promise<Ingested> {
@@ -214,8 +217,8 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
   try {
     meta = (await exifr.parse(file, { pick })) ?? {};
   } catch {}
-  const iso = meta.ISO as number | undefined;
-  const ev = meta.ExposureCompensation as number | undefined;
+  const iso = num(meta.ISO);
+  const ev = num(meta.ExposureCompensation);
   const make = String(meta.Make ?? "");
   const taken = meta.DateTimeOriginal instanceof Date ? meta.DateTimeOriginal.toISOString() : undefined;
 
@@ -237,9 +240,9 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
   const camera: CameraInfo | undefined = meta.Model
     ? {
         device: [/apple/i.test(make) ? "" : make.replace(/\s*CORPORATION/i, ""), String(meta.Model)].filter(Boolean).join(" "),
-        focal35: (meta.FocalLengthIn35mmFormat as number) ?? (meta.FocalLength as number),
-        aperture: meta.FNumber as number,
-        shutter: meta.ExposureTime as number,
+        focal35: num(meta.FocalLengthIn35mmFormat) ?? num(meta.FocalLength),
+        aperture: num(meta.FNumber),
+        shutter: num(meta.ExposureTime),
         iso,
         ev,
         date: taken?.slice(0, 10),

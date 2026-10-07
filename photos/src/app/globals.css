@@ -243,3 +243,9 @@ html.ohne-schatten [data-shade] {
   background-image: url("/textures/stone-grain.webp"), url("/textures/stone-cloud.webp");
   opacity: 0.09;
 }
+
+/* Foto zum gezeigten oder offenen Rezeptzettel: Rahmen in der Signalfarbe, damit klar ist, welches Bild gemeint ist */
+[data-plate-box][data-marked] {
+  outline: 3px solid var(--mark);
+  outline-offset: -3px;
+}
