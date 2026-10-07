@@ -670,6 +670,9 @@ export function Book({
     const pick = (p?: Page) => (p ? pageNos(p)[0] : undefined);
     return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
   })();
+  // Zettel auf die Gegenseite seines Fotos; über den Bund oder als Einzelseite bleibt er rechts
+  const slipSide =
+    mode === "spread" && slipPlate && sidePlates.right === slipPlate.no && sidePlates.left !== slipPlate.no ? "left" : "right";
   const label = labelAt(book, mode, k);
   const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
@@ -958,7 +961,7 @@ export function Book({
       </motion.div>
 
       <AnimatePresence>
-        {slipPlate && !viewer && <RecipeSlip key={slipPlate.no} plate={slipPlate} onClose={closeSlip} />}
+        {slipPlate && !viewer && <RecipeSlip key={slipPlate.no} plate={slipPlate} onClose={closeSlip} side={slipSide} />}
       </AnimatePresence>
 
       {viewer && (
@@ -995,6 +998,7 @@ function SlipButtons({
           key={no}
           type="button"
           aria-expanded={slip === no}
+          aria-label={`${label} zu Tafel ${no}`}
           onClick={() => onOpen(slip === no ? null : { no, k })}
           className="text-on-table underline decoration-mark decoration-2 underline-offset-4"
         >
