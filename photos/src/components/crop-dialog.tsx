@@ -91,45 +91,76 @@ export function CropDialog({
 
   return (
     <SlipDialog label="Ausschnitt" onClose={onClose} wide={wide}>
-      <div
-        ref={frame}
-        className="relative mx-auto touch-none overflow-hidden bg-paper select-none"
-        style={{ width: FW, height: FH, cursor: view.fit === "cover" ? "grab" : "default" }}
-        onPointerDown={(e) => {
-          if (view.fit !== "cover") return;
-          e.currentTarget.setPointerCapture(e.pointerId);
-          drag.current = { x: e.clientX, y: e.clientY, f: view.focus };
-        }}
-        onPointerMove={(e) => {
-          const d = drag.current;
-          if (!d) return;
-          const fx = W === FW ? d.f[0] : clamp(d.f[0] + (e.clientX - d.x) / (FW - W));
-          const fy = H === FH ? d.f[1] : clamp(d.f[1] + (e.clientY - d.y) / (FH - H));
-          set({ ...view, focus: [fx, fy] });
-        }}
-        onPointerUp={() => (drag.current = null)}
-        onPointerCancel={() => (drag.current = null)}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element -- exakte Lage wie im Buch, ohne next/image */}
-        <img
-          src={photo.src}
-          alt={photo.alt || "Foto"}
-          draggable={false}
-          className="pointer-events-none absolute max-w-none"
-          style={{ left, top, width: shownW, height: shownH }}
-        />
-        {gutter && <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-[rgb(12_10_8/0.35)]" />}
-        {subject && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-paper bg-mark"
-            style={{ left: left + subject[0] * shownW, top: top + subject[1] * shownH, borderRadius: 9999 }}
-          />
-        )}
+      {/* Band über die ganze Zettelbreite: was außerhalb des Felds liegt, bleibt blass sichtbar (UX-Kritik K7) */}
+      <div className="relative -mx-5 overflow-hidden bg-paper-shade py-4">
+        <div className="relative mx-auto" style={{ width: FW, height: FH }}>
+          {view.fit === "cover" && (
+            // eslint-disable-next-line @next/next/no-img-element -- dieselbe Lage wie das Bild im Feld
+            <img
+              src={photo.src}
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="pointer-events-none absolute max-w-none opacity-30"
+              style={{ left, top, width: shownW, height: shownH }}
+            />
+          )}
+          <div
+            ref={frame}
+            role="group"
+            tabIndex={view.fit === "cover" ? 0 : -1}
+            aria-label="Ausschnitt verschieben: Pfeiltasten, mit Umschalt in großen Schritten"
+            className="absolute inset-0 touch-none overflow-hidden bg-paper outline-offset-4 select-none"
+            style={{ cursor: view.fit === "cover" ? "grab" : "default" }}
+            onKeyDown={(e) => {
+              if (view.fit !== "cover") return;
+              const step = e.shiftKey ? 32 : 8;
+              const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+              const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+              if (!dx && !dy) return;
+              e.preventDefault();
+              // wie Ziehen um dx/dy Pixel
+              const fx = W === FW ? view.focus[0] : clamp(view.focus[0] + dx / (FW - W));
+              const fy = H === FH ? view.focus[1] : clamp(view.focus[1] + dy / (FH - H));
+              set({ ...view, focus: [fx, fy] });
+            }}
+            onPointerDown={(e) => {
+              if (view.fit !== "cover") return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              drag.current = { x: e.clientX, y: e.clientY, f: view.focus };
+            }}
+            onPointerMove={(e) => {
+              const d = drag.current;
+              if (!d) return;
+              const fx = W === FW ? d.f[0] : clamp(d.f[0] + (e.clientX - d.x) / (FW - W));
+              const fy = H === FH ? d.f[1] : clamp(d.f[1] + (e.clientY - d.y) / (FH - H));
+              set({ ...view, focus: [fx, fy] });
+            }}
+            onPointerUp={() => (drag.current = null)}
+            onPointerCancel={() => (drag.current = null)}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- exakte Lage wie im Buch, ohne next/image */}
+            <img
+              src={photo.src}
+              alt={photo.alt || "Foto"}
+              draggable={false}
+              className="pointer-events-none absolute max-w-none"
+              style={{ left, top, width: shownW, height: shownH }}
+            />
+            {gutter && <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-[rgb(12_10_8/0.35)]" />}
+            {subject && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-paper bg-mark"
+                style={{ left: left + subject[0] * shownW, top: top + subject[1] * shownH, borderRadius: 9999 }}
+              />
+            )}
+          </div>
+        </div>
       </div>
 
       <p className={`mt-3 min-h-5 text-[13px] ${warning ? "text-ink font-semibold" : "text-ink-2"}`} role={warning ? "alert" : undefined}>
-        {warning ?? (subject ? `Punkt: ${face ? "erkanntes Gesicht" : "geschätztes Hauptmotiv"}. Ziehen verschiebt den Ausschnitt.` : "Ziehen verschiebt den Ausschnitt.")}
+        {warning ?? (subject ? `Punkt: ${face ? "erkanntes Gesicht" : "geschätztes Hauptmotiv"}. Ziehen oder Pfeiltasten verschieben den Ausschnitt.` : "Ziehen oder Pfeiltasten verschieben den Ausschnitt.")}
       </p>
 
       <label className="mt-4 block text-[13px]">

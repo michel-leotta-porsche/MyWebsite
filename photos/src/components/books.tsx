@@ -136,7 +136,7 @@ export function Library({
 
   return (
     <>
-      <Table {...table} books={books} onOpen={(id) => change({ id, auto: true })} />
+      <Table {...table} books={books} focusId={returnTo} onOpen={(id) => change({ id, auto: true })} />
       {footer}
     </>
   );

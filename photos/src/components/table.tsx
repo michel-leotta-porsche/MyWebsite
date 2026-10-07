@@ -46,7 +46,7 @@ function ClosedBook({
     <div
       className="table-book relative"
       style={{ ["--rot" as string]: `${pose.rot}deg`, ["--dy" as string]: `${pose.y}px` }}
-      data-table-book
+      data-table-book={book.id}
     >
       <button
         type="button"
@@ -109,11 +109,18 @@ export type TableProps = {
   /** Weitere Dinge auf dem Tisch, z. B. ein leeres Buch zum Anlegen */
   tiles?: ReactNode;
   label?: string;
+  /** Band, der beim Erscheinen den Fokus bekommt (das Buch, das gerade zugeklappt wurde) */
+  focusId?: string | null;
 };
 
-export function Table({ books, onOpen, headerRight, extra, note, tiles, label }: TableProps) {
+export function Table({ books, onOpen, headerRight, extra, note, tiles, label, focusId }: TableProps) {
   const root = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
+
+  useEffect(() => {
+    if (!focusId) return;
+    root.current?.querySelector<HTMLElement>(`[data-table-book="${CSS.escape(focusId)}"] button`)?.focus({ preventScroll: true });
+  }, [focusId]);
 
   // Nach dem Einstieg hebt sich jedes Buch einmal kurz an: hier lässt sich etwas aufschlagen
   useEffect(() => {

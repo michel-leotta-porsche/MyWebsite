@@ -270,6 +270,27 @@ async function drawLayout(
         ctx.lineWidth = el.width * cq;
         ctx.strokeRect((el.x + el.width / 2) * cq, (el.y + el.width / 2) * cq, (el.w - el.width) * cq, (el.h - el.width) * cq);
         return;
+      case "path": {
+        // dieselben Pfade wie im SVG der Seite, in cqw
+        ctx.save();
+        ctx.scale(cq, cq);
+        const path = new Path2D(el.d);
+        if (el.opacity !== undefined) ctx.globalAlpha = el.opacity;
+        if (el.fill) {
+          ctx.fillStyle = el.fill;
+          ctx.fill(path);
+        }
+        if (el.stroke && el.width) {
+          ctx.strokeStyle = el.stroke;
+          ctx.lineWidth = el.width;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          if (el.dash) ctx.setLineDash(el.dash);
+          ctx.stroke(path);
+        }
+        ctx.restore();
+        return;
+      }
       case "text": {
         const min = el.size < 2.4 ? 9 : 11;
         const px = el.size < 3.4 ? Math.max(min, el.size * cq) : el.size * cq;

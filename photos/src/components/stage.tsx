@@ -3,8 +3,24 @@
 import Image from "next/image";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
-import type { BookData, Box, FontKey, FreeEl, FreeItem, TextLook, TextRole } from "@/content/books";
+import { toEl, type BookData, type Box, type Corner, type FontKey, type FreeEl, type FreeItem, type ShapeKind, type ShapeLook, type TextLook, type TextRole } from "@/content/books";
 import { FONTS, TEXT_ROLE, textMetrics } from "@/content/layout";
+import {
+  absToStrokes,
+  distToStroke,
+  endpoints,
+  inkPaths,
+  isLinear,
+  lineBox,
+  PEN_SIZES,
+  SHAPES,
+  shapePaths,
+  simplify,
+  strokePath,
+  strokesToAbs,
+  type AbsStroke,
+  type PathEl,
+} from "@/content/shapes";
 import { inputClass, TextButton } from "@/components/app-ui";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
@@ -34,7 +50,13 @@ type Drag = {
   box0: Box;
   moved: boolean;
   shift: boolean;
+  /** Endpunkt einer Linie (0 Anfang, 1 Ende) statt Rahmengriff */
+  end?: 0 | 1;
 };
+
+/** Werkzeug der Bühne: Auswahl, Stift, Radierer oder eine Form zum Aufziehen */
+type Tool = "select" | "pen" | "eraser" | ShapeKind;
+type Pt = { x: number; y: number };
 
 const HANDLES: { e: Edges; cls: string; cursor: string; name: string }[] = [
   { e: { t: true, l: true }, cls: "left-0 top-0", cursor: "nwse-resize", name: "oben links" },
@@ -49,12 +71,15 @@ const HANDLES: { e: Edges; cls: string; cursor: string; name: string }[] = [
 
 /** Zwischenablage der Bühne; bleibt über Doppelseiten hinweg, gilt für jede Art von Element */
 let clipboard: { item: SpreadItem; marker: string } | null = null;
-const markerOf = (it: SpreadItem) => (it.t === "text" ? it.text : `[Fujiventura: Foto ${it.key}]`);
+const markerOf = (it: SpreadItem) =>
+  it.t === "text" ? it.text : it.t === "photo" ? `[Fujiventura: Foto ${it.key}]` : it.t === "shape" ? `[Fujiventura: ${SHAPES[it.kind].label}]` : "[Fujiventura: Zeichnung]";
 /** Element in die Zwischenablage legen; gibt den Text zurück, der in die Zwischenablage des Systems geht */
 function remember(it: SpreadItem) {
   clipboard = { item: structuredClone(it), marker: markerOf(it) };
   return clipboard.marker;
 }
+
+const TOOL_KEYS: Record<string, Tool> = { v: "select", p: "pen", e: "eraser", l: "line", a: "arrow", r: "rect", o: "ellipse", k: "tape" };
 
 const DEFAULT_TEXT: Record<TextRole, string> = { heading: "Überschrift", body: "Ein paar Sätze zu diesem Tag.", note: "Notiz" };
 
@@ -100,7 +125,14 @@ export function Stage({
 }) {
   const grid = useMemo(() => spreadGrid(geom), [geom]);
   const [sel, setSel] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ id: string; box: Box; original: boolean } | null>(null);
+  const [draft, setDraft] = useState<{ id: string; box: Box; original: boolean; from?: Corner } | null>(null);
+  const [tool, setToolState] = useState<Tool>("select");
+  /** Stift: Farbe und Breite bleiben, bis man sie ändert */
+  const [pen, setPen] = useState<{ c: string; s: number }>({ c: "#1b1c1a", s: PEN_SIZES[1].s });
+  /** Aussehen der nächsten Form */
+  const [shapeLook, setShapeLook] = useState<ShapeLook>({ color: "#1b1c1a", weight: 2 });
+  /** Vorschau beim Zeichnen oder Aufziehen, in Doppelseiten-Einheiten */
+  const [sketch, setSketch] = useState<{ paths: PathEl[] } | null>(null);
   const [guides, setGuides] = useState<{ xs: number[]; ys: number[] }>({ xs: [], ys: [] });
   const [gridOn, setGridOn] = useState(() => {
     try {
@@ -152,7 +184,7 @@ export function Stage({
   const Hpx = pageW * data.aspect;
   const toUnits = (dx: number, dy: number) => ({ x: (dx / W) * 200, y: (dy / Hpx) * 100 });
 
-  const shown = items.map((i) => (draft && i.id === draft.id ? { ...i, box: draft.box } : i));
+  const shown = items.map((i) => (draft && i.id === draft.id ? ({ ...i, box: draft.box, ...(i.t === "shape" && draft.from ? { from: draft.from } : {}) } as SpreadItem) : i));
   const selected = shown.find((i) => i.id === sel) ?? null;
   const noOf = (key: string) => data.plates.find((p) => p.key === key)?.no;
   // Seiten nur neu setzen, wenn sich wirklich etwas ändert; beim Ziehen fehlt das gezogene Element
@@ -165,6 +197,7 @@ export function Stage({
         items: p.items.flatMap((it): FreeEl[] => {
           if (it.id === draftId) return [];
           if (it.t === "text") return it.id === editing ? [] : [{ t: "text", text: it.text, role: it.role, box: it.box, light: it.light, look: it.look }];
+          if (it.t === "shape" || it.t === "ink") return [toEl(it)];
           const no = data.plates.find((pl) => pl.key === it.key)?.no;
           if (it.id === cropping) return [];
           return no ? [{ t: "photo", no, box: it.box, crop: it.crop, caption: it.caption }] : [];
@@ -183,7 +216,8 @@ export function Stage({
     return p ? p.w / p.h : null;
   };
   const realRatio = (b: Box) => b.w / ((b.h / 100) * grid.H);
-  const minW = (it: SpreadItem) => (it.t === "text" ? grid.cw * 2 + 2 : grid.cw);
+  const minW = (it: SpreadItem) => (it.t === "text" ? grid.cw * 2 + 2 : it.t === "photo" ? grid.cw : 2);
+  const minH = (it: SpreadItem) => (it.t === "photo" || it.t === "text" ? grid.rowH : 2);
   const where = (b: Box) => {
     const p = b.x + b.w / 2 < 100 ? 0 : 1;
     const col = grid.cols[p].filter((_, i) => i % 2 === 0).findIndex((c) => Math.abs(c - b.x) < 0.6);
@@ -191,7 +225,13 @@ export function Stage({
     return `${p === 0 ? "linke" : "rechte"} Seite${col >= 0 ? `, Spalte ${col + 1}` : ""}${row >= 0 ? `, Zeile ${row + 1}` : ""}`;
   };
   const nameOf = (it: SpreadItem) =>
-    it.t === "photo" ? `Foto ${noOf(it.key) ?? ""} ${photos.get(it.key)?.title || ""}`.trim() : `${TEXT_ROLE[it.role].label}: ${it.text.slice(0, 30)}`;
+    it.t === "photo"
+      ? `Foto ${noOf(it.key) ?? ""} ${photos.get(it.key)?.title || ""}`.trim()
+      : it.t === "text"
+        ? `${TEXT_ROLE[it.role].label}: ${it.text.slice(0, 30)}`
+        : it.t === "shape"
+          ? SHAPES[it.kind].label
+          : `Zeichnung, ${it.strokes.length} ${it.strokes.length === 1 ? "Strich" : "Striche"}`;
 
   // ---- Einrasten ----
   const thX = (8 / W) * 200;
@@ -273,9 +313,9 @@ export function Stage({
       if (e.l) l = r - minW(it);
       else r = l + minW(it);
     }
-    if (bt - t < grid.rowH) {
-      if (e.t) t = bt - grid.rowH;
-      else bt = t + grid.rowH;
+    if (bt - t < minH(it)) {
+      if (e.t) t = bt - minH(it);
+      else bt = t + minH(it);
     }
     let box = { x: l, y: t, w: r - l, h: bt - t };
     let original = false;
@@ -299,8 +339,42 @@ export function Stage({
     return { box, xs: gx, ys: gy, original };
   }
 
+  /** Punkt einrasten (Raster, Kanten, Nachbarn); Shift: Winkel in 45°-Schritten um den Anker */
+  function snapPoint(id: string, p: Pt, anchor: Pt | null, shift: boolean, free: boolean) {
+    const gx: number[] = [];
+    const gy: number[] = [];
+    let q = { ...p };
+    if (shift && anchor) {
+      // in echten Längen rechnen: y ist % der Seitenhöhe
+      const k = grid.H / 100;
+      const vx = q.x - anchor.x;
+      const vy = (q.y - anchor.y) * k;
+      const ang = Math.round(Math.atan2(vy, vx) / (Math.PI / 4)) * (Math.PI / 4);
+      const len = Math.hypot(vx, vy);
+      q = { x: anchor.x + Math.cos(ang) * len, y: anchor.y + (Math.sin(ang) * len) / k };
+    } else if (!free) {
+      const t = targets(id);
+      const nx = nearest(q.x, t.xs, thX);
+      const ny = nearest(q.y, t.ys, thY);
+      if (nx !== null) gx.push((q.x = nx));
+      if (ny !== null) gy.push((q.y = ny));
+    }
+    q.x = Math.min(200, Math.max(0, q.x));
+    q.y = Math.min(100, Math.max(0, q.y));
+    return { p: q, xs: gx, ys: gy };
+  }
+
+  /** Endpunkt einer Linie ziehen; der andere bleibt stehen */
+  function moveEnd(it: Extract<SpreadItem, { t: "shape" }>, b0: Box, end: 0 | 1, dx: number, dy: number, shift: boolean, free: boolean) {
+    const ends = endpoints(b0, it.from);
+    const fixed = ends[1 - end];
+    const s = snapPoint(it.id, { x: ends[end].x + dx, y: ends[end].y + dy }, fixed, shift, free);
+    const lb = end === 0 ? lineBox(s.p, fixed) : lineBox(fixed, s.p);
+    return { box: lb.box, from: lb.from, xs: s.xs, ys: s.ys, original: false };
+  }
+
   // ---- Zeiger ----
-  const startDrag = (e: React.PointerEvent, it: SpreadItem, edges: Edges | null) => {
+  const startDrag = (e: React.PointerEvent, it: SpreadItem, edges: Edges | null, end?: 0 | 1) => {
     e.stopPropagation();
     if (e.button !== 0) return;
     const wasSelected = sel === it.id;
@@ -318,7 +392,7 @@ export function Stage({
     }
     if (e.pointerType === "touch" && !wasSelected && !edges) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { id: it.id, edges, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey };
+    drag.current = { id: it.id, edges, end, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey };
   };
   const frame = useRef(0);
   const onMove = (e: React.PointerEvent) => {
@@ -340,14 +414,18 @@ export function Stage({
     d.moved = true;
     window.clearTimeout(press.current);
     const u = toUnits(clientX - d.sx, clientY - d.sy);
+    if (d.end !== undefined && it.t === "shape") {
+      const r = moveEnd(it, d.box0, d.end, u.x, u.y, shiftKey, altKey);
+      return { it, r, box: r.box, from: r.from };
+    }
     const r = d.edges ? resizeBox(it, d.box0, d.edges, u.x, u.y, shiftKey) : moveBox(it, d.box0, u.x, u.y, altKey);
-    return { it, r, box: it.t === "text" ? { ...r.box, h: it.box.h } : r.box };
+    return { it, r, box: it.t === "text" ? { ...r.box, h: it.box.h } : r.box, from: undefined as Corner | undefined };
   };
   const moveTo = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
     last.current = { clientX, clientY, shiftKey, altKey };
     const c = compute(clientX, clientY, shiftKey, altKey);
     if (!c) return;
-    setDraft({ id: c.it.id, box: c.box, original: c.r.original });
+    setDraft({ id: c.it.id, box: c.box, original: c.r.original, from: c.from });
     setGuides({ xs: c.r.xs, ys: c.r.ys });
   };
   const onUp = (e?: React.PointerEvent) => {
@@ -361,7 +439,7 @@ export function Stage({
     setGuides({ xs: [], ys: [] });
     setDraft(null);
     if (!d || !d.moved || !c) return;
-    const next = items.map((i) => (i.id === d.id ? { ...i, box: c.box } : i));
+    const next = items.map((i) => (i.id === d.id ? ({ ...i, box: c.box, ...(c.from ? { from: c.from } : {}) } as SpreadItem) : i));
     commit(next, undefined, `${nameOf(c.it)}: ${where(c.box)}`);
   };
 
@@ -415,6 +493,170 @@ export function Stage({
     return toUnits(clientX - r.left, clientY - r.top);
   };
 
+  // ---- Zeichnen: Stift, Radierer, Formen aufziehen ----
+  // Stift-Striche landen in einer Zeichnung, solange der Stift gewählt bleibt; jeder Strich ist ein Rückgängig-Schritt.
+  const sketchRef = useRef<
+    | { kind: "pen"; pts: [number, number, number][]; pen: boolean }
+    | { kind: "shape"; shape: ShapeKind; a: Pt; b: Pt; sx: number; sy: number; moved: boolean }
+    | { kind: "erase"; tag: string }
+    | null
+  >(null);
+  /** Hat dieses Gerät einen Stift gemeldet? Dann zeichnet der Finger nicht (Handballen auf dem iPad) */
+  const penSeen = useRef(false);
+  const inkTarget = useRef<string | null>(null);
+  const sketchFrame = useRef(0);
+  const setTool = (t: Tool) => {
+    inkTarget.current = null;
+    sketchRef.current = null;
+    setSketch(null);
+    setToolState(t);
+    if (t !== "select") {
+      setSel(null);
+      setEditing(null);
+      setSay(t === "pen" ? "Stift: auf der Seite zeichnen. Esc beendet." : t === "eraser" ? "Radierer: über Striche wischen." : `${SHAPES[t].label}: auf der Seite aufziehen.`);
+    }
+  };
+  /** Punkt in cqw der Doppelseite (x 0..200, y in cqw) */
+  const cqOf = (p: Pt): [number, number] => [p.x, (p.y / 100) * grid.H];
+  const pressureOf = (e: PointerEvent | React.PointerEvent, isPen: boolean) => (isPen ? Math.max(0.05, e.pressure || 0.5) : 0.5);
+
+  const shapeBox = (sk: { shape: ShapeKind; a: Pt; b: Pt }, square: boolean): { box: Box; from?: Corner } => {
+    if (isLinear(sk.shape)) return lineBox(sk.a, sk.b);
+    const a = sk.a;
+    let b = sk.b;
+    if (square) {
+      // gleiche echte Breite und Höhe: Quadrat, Kreis
+      const k = grid.H / 100;
+      const side = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y) * k);
+      b = { x: a.x + Math.sign(b.x - a.x || 1) * side, y: a.y + (Math.sign(b.y - a.y || 1) * side) / k };
+    }
+    return { box: { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) } };
+  };
+  const lookFor = (k: ShapeKind): ShapeLook => (k === "tape" ? { color: data.cloth.base, weight: 2 } : shapeLook);
+
+  const previewSketch = () => {
+    cancelAnimationFrame(sketchFrame.current);
+    sketchFrame.current = requestAnimationFrame(() => {
+      const sk = sketchRef.current;
+      if (!sk || sk.kind === "erase") return setSketch(null);
+      if (sk.kind === "pen") {
+        const abs: AbsStroke = { c: pen.c, s: pen.s, pen: sk.pen || undefined, pts: sk.pts.map(([x, y, p]) => [...cqOf({ x, y }), p] as [number, number, number]) };
+        return setSketch({ paths: [strokePath(abs)] });
+      }
+      const { box, from } = shapeBox(sk, sk.moved && !!last.current?.shiftKey);
+      setSketch({ paths: shapePaths(sk.shape, box, lookFor(sk.shape), from, grid.H) });
+    });
+  };
+
+  const eraseAt = (p: Pt, tag: string) => {
+    const [x, y] = cqOf(p);
+    const r = coarse ? 2.4 : 1.4;
+    let changed = false;
+    const next = items.flatMap((it): SpreadItem[] => {
+      if (it.t !== "ink") return [it];
+      const abs = strokesToAbs(it.strokes, it.box, grid.H);
+      const keep = abs.filter((st) => distToStroke(st, x, y) > r + st.s / 2);
+      if (keep.length === abs.length) return [it];
+      changed = true;
+      if (!keep.length) return [];
+      const { box, strokes } = absToStrokes(keep, grid.H);
+      return [{ ...it, box, strokes }];
+    });
+    if (changed) commit(next, tag, "Strich radiert");
+  };
+
+  const onDrawDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (e.pointerType === "pen") penSeen.current = true;
+    // Handballen: hat das Gerät einen Stift, zeichnet der Finger nicht
+    else if (e.pointerType === "touch" && penSeen.current && (tool === "pen" || tool === "eraser")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const p = pointOf(e.clientX, e.clientY);
+    last.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey };
+    if (tool === "pen") {
+      const isPen = e.pointerType === "pen";
+      sketchRef.current = { kind: "pen", pts: [[p.x, p.y, pressureOf(e, isPen)]], pen: isPen };
+      previewSketch();
+    } else if (tool === "eraser") {
+      const tag = `erase-${itemId()}`;
+      sketchRef.current = { kind: "erase", tag };
+      eraseAt(p, tag);
+    } else if (tool !== "select") {
+      const a = snapPoint("neu", p, null, false, e.altKey).p;
+      sketchRef.current = { kind: "shape", shape: tool, a, b: a, sx: e.clientX, sy: e.clientY, moved: false };
+    }
+  };
+  const onDrawMove = (e: React.PointerEvent) => {
+    const sk = sketchRef.current;
+    if (!sk) return;
+    last.current = { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey };
+    if (sk.kind === "pen") {
+      // alle Zwischenpunkte, die der Browser zwischen zwei Bildern gesammelt hat (Apple Pencil liefert sonst wenige)
+      const evs = (e.nativeEvent.getCoalescedEvents?.() ?? []) as PointerEvent[];
+      for (const ev of evs.length ? evs : [e.nativeEvent]) {
+        const q = pointOf(ev.clientX, ev.clientY);
+        sk.pts.push([q.x, q.y, pressureOf(ev, sk.pen)]);
+      }
+      previewSketch();
+    } else if (sk.kind === "erase") {
+      eraseAt(pointOf(e.clientX, e.clientY), sk.tag);
+    } else {
+      if (!sk.moved && Math.hypot(e.clientX - sk.sx, e.clientY - sk.sy) < 4) return;
+      sk.moved = true;
+      const s = snapPoint("neu", pointOf(e.clientX, e.clientY), isLinear(sk.shape) ? sk.a : null, e.shiftKey && isLinear(sk.shape), e.altKey);
+      sk.b = s.p;
+      setGuides({ xs: s.xs, ys: s.ys });
+      previewSketch();
+    }
+  };
+  const onDrawUp = () => {
+    const sk = sketchRef.current;
+    sketchRef.current = null;
+    cancelAnimationFrame(sketchFrame.current);
+    setSketch(null);
+    setGuides({ xs: [], ys: [] });
+    if (!sk || sk.kind === "erase") return;
+    if (sk.kind === "pen") return finishStroke(sk.pts, sk.pen);
+    // ein Klick ohne Ziehen legt die Form in Standardgröße hin
+    let shape: { box: Box; from?: Corner };
+    if (!sk.moved) {
+      const w = grid.cw * 2 + 2;
+      if (isLinear(sk.shape)) shape = lineBox(sk.a, { x: Math.min(200, sk.a.x + w * 1.5), y: sk.a.y });
+      else shape = { box: { x: Math.min(sk.a.x, 200 - w), y: Math.min(sk.a.y, 100 - (w / grid.H) * 100), w, h: (w / grid.H) * 100 } };
+    } else shape = shapeBox(sk, !!last.current?.shiftKey);
+    const id = itemId();
+    commit([...items, { t: "shape", id, kind: sk.shape, box: shape.box, look: lookFor(sk.shape), ...(shape.from && shape.from !== "tl" ? { from: shape.from } : {}) }], undefined, `${SHAPES[sk.shape].label} hinzugefügt: ${where(shape.box)}`);
+    // wie in Keynote und PowerPoint: nach dem Aufziehen zurück zur Auswahl, die neue Form ist gewählt
+    setToolState("select");
+    setSel(id);
+  };
+  const finishStroke = (raw: [number, number, number][], isPen: boolean) => {
+    const pts = raw.map(([x, y, p]) => [...cqOf({ x, y }), p] as [number, number, number]);
+    // vereinfachen: Toleranz etwa ein Zehntel cqw, das sieht man nicht, spart aber die Hälfte der Punkte
+    const simple = simplify(pts, 0.06);
+    if (simple.length === 1) simple.push([simple[0][0] + 0.01, simple[0][1], simple[0][2]]);
+    const stroke: AbsStroke = { c: pen.c, s: pen.s, ...(isPen ? { pen: true as const } : {}), pts: simple };
+    const target = items.find((i) => i.id === inkTarget.current && i.t === "ink");
+    if (target && target.t === "ink") {
+      const { box, strokes } = absToStrokes([...strokesToAbs(target.strokes, target.box, grid.H), stroke], grid.H);
+      commit(items.map((i) => (i.id === target.id ? { ...target, box, strokes } : i)), undefined, `Strich ${strokes.length}`);
+    } else {
+      const id = itemId();
+      inkTarget.current = id;
+      const { box, strokes } = absToStrokes([stroke], grid.H);
+      commit([...items, { t: "ink", id, box, strokes }], undefined, "Zeichnung begonnen");
+    }
+  };
+  const pathsOf = (it: SpreadItem): PathEl[] =>
+    it.t === "shape" ? shapePaths(it.kind, it.box, it.look, it.from, grid.H) : it.t === "ink" ? inkPaths(it.strokes, it.box, grid.H) : [];
+  const setShapeOf = (id: string, patch: Partial<ShapeLook>, tag?: string) => {
+    // die zuletzt gewählte Kontur, Fläche und Stärke gelten auch für die nächste Form
+    if (items.find((i) => i.id === id && i.t === "shape" && i.kind !== "tape")) setShapeLook((l) => ({ ...l, ...patch }));
+    commit(items.map((i) => (i.id === id && i.t === "shape" ? { ...i, look: { ...i.look, ...patch } } : i)), tag);
+  };
+
   // ---- Tastatur auf einem Element ----
   const onItemKey = (e: KeyboardEvent | React.KeyboardEvent, it: SpreadItem) => {
     const step = { x: grid.colPitch, y: grid.rowPitch };
@@ -422,9 +664,11 @@ export function Stage({
     const a = arrows[e.key];
     if (a) {
       e.preventDefault();
+      // Linien haben Endpunkte statt Größe
+      if (e.shiftKey && it.t === "shape" && isLinear(it.kind)) return;
       const b = it.box;
       const box = e.shiftKey
-        ? { ...b, w: Math.max(minW(it), b.w + a[0] * step.x), h: it.t === "text" ? b.h : Math.max(grid.rowH, b.h + a[1] * step.y) }
+        ? { ...b, w: Math.max(minW(it), b.w + a[0] * step.x), h: it.t === "text" ? b.h : Math.max(minH(it), b.h + a[1] * step.y) }
         : { ...b, x: Math.min(200 - b.w, Math.max(0, b.x + a[0] * step.x)), y: Math.min(100 - b.h, Math.max(0, b.y + a[1] * step.y)) };
       commit(
         items.map((i) => (i.id === it.id ? { ...i, box } : i)),
@@ -440,7 +684,7 @@ export function Stage({
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (it.t === "photo") setCropping(it.id);
-      else setEditing(it.id);
+      else if (it.t === "text") setEditing(it.id);
     }
   };
   /** Kopie eines Elements eine Rasterzelle versetzt einfügen, oben auf den Stapel */
@@ -453,7 +697,7 @@ export function Stage({
       ? { ...snapAt(pageAt(at.x), at, Math.min(b.w, 100), b.h), w: b.w, h: b.h }
       : { ...b, x: Math.max(0, b.x + dx), y: Math.max(0, b.y + dy) };
     const copy = { ...src, id, box, pairId: undefined } as SpreadItem;
-    commit([...items, copy], undefined, `${src.t === "photo" ? "Foto" : "Text"} eingefügt: ${where(box)}`);
+    commit([...items, copy], undefined, `${src.t === "photo" ? "Foto" : src.t === "text" ? "Text" : nameOf(src)} eingefügt: ${where(box)}`);
     setSel(id);
   };
   const duplicate = (it: SpreadItem) => paste(it);
@@ -516,6 +760,7 @@ export function Stage({
         ...common,
         { label: "Löschen", hint: "Entf", run: () => remove(it) },
       ];
+    if (it?.t === "shape" || it?.t === "ink") return [...common.slice(1), { label: "Löschen", hint: "Entf", run: () => remove(it) }];
     const at = menu.at;
     return [
       { label: "Hier einfügen", hint: "⌘V", run: () => pasteFromMenu(at) },
@@ -559,7 +804,7 @@ export function Stage({
   const remove = (it: SpreadItem) => {
     setSel(null);
     if (it.t === "photo") onShelve(it.key);
-    else commit(items.filter((i) => i.id !== it.id), undefined, "Text entfernt");
+    else commit(items.filter((i) => i.id !== it.id), undefined, `${it.t === "text" ? "Text" : nameOf(it)} entfernt`);
   };
 
   // ⌘C / ⌘X / ⌘V; Text aus anderen Apps wird ein neuer Textrahmen
@@ -569,8 +814,12 @@ export function Stage({
     remove: (it: SpreadItem) => void;
     addTextWith: (t: string) => void;
     onItemKey: (e: KeyboardEvent, it: SpreadItem) => void;
+    tool: Tool;
+    setTool: (t: Tool) => void;
   }>({
     selected: null,
+    tool: "select",
+    setTool: () => {},
     onItemKey: () => {},
     paste: () => {},
     remove: () => {},
@@ -617,7 +866,8 @@ export function Stage({
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
       if (cropping) return;
       if (e.key === "Escape" && !crop) {
-        if (editing) setEditing(null);
+        if (latest.current.tool !== "select") latest.current.setTool("select");
+        else if (editing) setEditing(null);
         else if (sel) setSel(null);
         else onClose();
       } else if (latest.current.selected && /^(Delete|Backspace|Arrow(Left|Right|Up|Down)|\[|\])$/.test(e.key) && !(t && (t.tagName === "SELECT" || t.getAttribute("role") === "menuitem"))) {
@@ -628,6 +878,11 @@ export function Stage({
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && latest.current.selected) {
         e.preventDefault();
         latest.current.paste(latest.current.selected);
+      } else if (!crop && !e.metaKey && !e.ctrlKey && !e.altKey && TOOL_KEYS[e.key.toLowerCase()]) {
+        // Werkzeuge wie in Keynote und Figma: V Auswahl, P Stift, E Radierer, L A R O K Formen
+        e.preventDefault();
+        const next = TOOL_KEYS[e.key.toLowerCase()];
+        latest.current.setTool(latest.current.tool === next ? "select" : next);
       } else if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey) {
         setGridOn((g) => {
           try {
@@ -643,7 +898,7 @@ export function Stage({
 
   const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : narrow ? page : 0;
   useEffect(() => {
-    latest.current = { selected, paste, remove, onItemKey, addTextWith: (t: string) => addText("body", curPage, undefined, t) };
+    latest.current = { selected, paste, remove, onItemKey, addTextWith: (t: string) => addText("body", curPage, undefined, t), tool, setTool };
   });
   const handle = coarse ? 44 : 24;
   const pct = (b: Box) => ({ left: `${b.x / 2}%`, top: `${b.y}%`, width: `${b.w / 2}%`, height: `${b.h}%` });
@@ -755,22 +1010,58 @@ export function Stage({
               <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
             </div>
           ) : (
-          <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <span className="text-on-table text-sm font-semibold">Text</span>
-            {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                draggable
-                onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
-                onClick={() => addText(r, curPage)}
-                className="border-on-table/60 text-on-table hover:border-on-table min-h-9 cursor-grab border px-3 text-sm transition-colors duration-150"
-                title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
-              >
-                + {TEXT_ROLE[r].label}
-              </button>
-            ))}
-            <span className="text-on-table-2 text-[13px]">oder Doppelklick aufs Papier</span>
+          <div className="mb-4 space-y-2">
+            <div className="flex flex-wrap items-center gap-x-1 gap-y-2" role="toolbar" aria-label="Werkzeuge">
+              {(["select", "pen", "eraser"] as const).map((t) => (
+                <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t && t !== "select" ? "select" : t)} />
+              ))}
+              <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />
+              {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
+                <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
+              ))}
+              <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />
+              {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
+                  onClick={() => addText(r, curPage)}
+                  className="border-on-table/60 text-on-table hover:border-on-table mr-1 min-h-9 cursor-grab border px-3 text-sm transition-colors duration-150"
+                  title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
+                >
+                  + {TEXT_ROLE[r].label}
+                </button>
+              ))}
+            </div>
+            {tool === "pen" && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label="Stift">
+                <Swatches value={pen.c} cloth={data.cloth.base} onPick={(c) => c && setPen((p) => ({ ...p, c }))} />
+                <span className="flex gap-1" role="group" aria-label="Breite">
+                  {PEN_SIZES.map((ps) => (
+                    <button
+                      key={ps.label}
+                      type="button"
+                      aria-pressed={pen.s === ps.s}
+                      aria-label={`Breite ${ps.label}`}
+                      title={ps.label}
+                      onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
+                      className={`flex h-9 w-9 items-center justify-center border ${pen.s === ps.s ? "border-on-table" : "border-transparent"}`}
+                    >
+                      <span aria-hidden className="bg-on-table block rounded-full" style={{ width: 4 + ps.s * 6, height: 4 + ps.s * 6 }} />
+                    </button>
+                  ))}
+                </span>
+                <span className="text-on-table-2 text-[13px]">{coarse ? "Mit dem Stift zeichnen; der Finger zeichnet nicht, sobald ein Stift da war." : "Zeichnen mit Maus oder Stift. Esc oder V beendet."}</span>
+              </div>
+            )}
+            {tool !== "select" && tool !== "pen" && (
+              <p className="text-on-table-2 text-[13px]">
+                {tool === "eraser"
+                  ? "Über Striche wischen löscht sie. Formen und Fotos bleiben."
+                  : `${SHAPES[tool].label} aufziehen; ein Klick legt sie in Standardgröße hin. ${isLinear(tool) ? "Shift: 45°-Schritte." : "Shift: Quadrat bzw. Kreis."} Alt: ohne Einrasten.`}
+              </p>
+            )}
           </div>
           )}
           {width > 0 && (
@@ -861,6 +1152,44 @@ export function Stage({
                     const b = boxOf(it, geom);
                     const isSel = it.id === sel;
                     if (it.id === editing) return null;
+                    if (it.t === "shape" || it.t === "ink") {
+                      // Treffer nur auf dem Gezeichneten: was daneben liegt (ein Foto unter dem Pfeil), bleibt greifbar
+                      const filled = it.t === "ink" || it.kind === "tape" || !!it.look.fill;
+                      return (
+                        <div key={it.id} className="contents">
+                          <svg aria-hidden className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 200 ${grid.H}`} preserveAspectRatio="none">
+                            {pathsOf(it).map((pth, n) => (
+                              <path
+                                key={n}
+                                d={pth.d}
+                                fill={filled || pth.fill ? "transparent" : "none"}
+                                stroke="transparent"
+                                strokeWidth={coarse ? 24 : 12}
+                                vectorEffect="non-scaling-stroke"
+                                pointerEvents={filled || pth.fill ? "all" : "stroke"}
+                                className={isSel ? "cursor-move" : "cursor-pointer"}
+                                style={{ touchAction: isSel ? "none" : "auto" }}
+                                onPointerDown={(e) => startDrag(e, it, null)}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  openMenu(e.clientX, e.clientY, it.id);
+                                }}
+                              />
+                            ))}
+                          </svg>
+                          <button
+                            type="button"
+                            aria-label={`${nameOf(it)}, ${where(b)}`}
+                            aria-pressed={isSel}
+                            onFocus={() => setSel(it.id)}
+                            className="pointer-events-none absolute opacity-0"
+                            style={pct(b)}
+                          />
+                        </div>
+                      );
+                    }
                     return (
                       <div
                         key={it.id}
@@ -902,16 +1231,56 @@ export function Stage({
                   {draft &&
                     (() => {
                       const it = shown.find((i) => i.id === draft.id);
-                      return it ? <DragGhost item={it} box={boxOf(it, geom)} photo={it.t === "photo" ? photos.get(it.key) : undefined} font={it.t === "text" ? editFont(it) : undefined} /> : null;
+                      return it ? (
+                        <DragGhost
+                          item={it}
+                          box={boxOf(it, geom)}
+                          photo={it.t === "photo" ? photos.get(it.key) : undefined}
+                          font={it.t === "text" ? editFont(it) : undefined}
+                          paths={pathsOf(it)}
+                          H={grid.H}
+                        />
+                      ) : null;
                     })()}
+                  {/* Zeichenfläche: Stift, Radierer, Formen aufziehen; fängt alle Zeiger, solange ein Werkzeug gewählt ist */}
+                  {tool !== "select" && (
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 z-[70]"
+                      style={{ cursor: tool === "eraser" ? "cell" : "crosshair", touchAction: "none" }}
+                      onPointerDown={onDrawDown}
+                      onPointerMove={onDrawMove}
+                      onPointerUp={onDrawUp}
+                      onPointerCancel={onDrawUp}
+                      onContextMenu={(e) => e.preventDefault()}
+                    />
+                  )}
+                  {sketch && (
+                    <svg aria-hidden className="pointer-events-none absolute inset-0 z-[71] h-full w-full" viewBox={`0 0 200 ${grid.H}`} preserveAspectRatio="none">
+                      <Paths paths={sketch.paths} />
+                    </svg>
+                  )}
                   {/* Griffe des gewählten Elements liegen über allem, ohne das Darunter zu verdecken */}
-                  {selected && selected.id !== editing && selected.id !== cropping && (
-                    <div className="pointer-events-none absolute" style={pct(boxOf(selected, geom))}>
+                  {selected?.t === "shape" && isLinear(selected.kind) && !draft
+                    ? endpoints(selected.box, selected.from).map((pt, n) => (
+                        <span
+                          key={n}
+                          aria-hidden
+                          onPointerDown={(e) => startDrag(e, selected, {}, n as 0 | 1)}
+                          className="absolute z-[66] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                          style={{ left: `${pt.x / 2}%`, top: `${pt.y}%`, width: handle, height: handle, cursor: "crosshair", touchAction: "none" }}
+                        >
+                          <span className="border-ink bg-paper block h-3 w-3 border" />
+                        </span>
+                      ))
+                    : null}
+                  {selected && selected.id !== editing && selected.id !== cropping && !(selected.t === "shape" && isLinear(selected.kind)) && (
+                    <div className={`pointer-events-none absolute ${selected.t === "shape" || selected.t === "ink" ? "outline-1 outline-dashed outline-mark" : ""}`} style={pct(boxOf(selected, geom))}>
                       {draft?.id === selected.id && draft.original && (
                         <span className="bg-ink text-paper absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">Originalformat</span>
                       )}
                       {!draft &&
-                        HANDLES.filter((h) => selected.t === "photo" || (!h.e.t && !h.e.b)).map((h) => (
+                        HANDLES.filter((h) => selected.t !== "text" || (!h.e.t && !h.e.b)).map((h) => (
                           <span
                             key={h.name}
                             aria-hidden
@@ -1077,6 +1446,66 @@ export function Stage({
             </div>
           )}
 
+          {selected?.t === "shape" && (
+            <div className="slip text-ink space-y-3 p-5">
+              <p className="text-sm font-semibold">{SHAPES[selected.kind].label}</p>
+              <div className="space-y-1">
+                <p className="text-ink-2 text-[13px]">{selected.kind === "tape" ? "Farbe" : "Kontur"}</p>
+                <Swatches value={selected.kind === "tape" ? (selected.look.fill ?? selected.look.color) : selected.look.color} cloth={data.cloth.base} onPick={(c) => setShapeOf(selected.id, { color: c ?? selected.look.color, fill: selected.kind === "tape" ? undefined : selected.look.fill })} dark />
+              </div>
+              {(selected.kind === "rect" || selected.kind === "ellipse") && (
+                <div className="space-y-1">
+                  <p className="text-ink-2 text-[13px]">Fläche</p>
+                  <Swatches value={selected.look.fill ?? null} cloth={data.cloth.base} none onPick={(c) => setShapeOf(selected.id, { fill: c ?? undefined })} dark />
+                </div>
+              )}
+              <fieldset className="flex flex-wrap items-center gap-2 text-sm">
+                <legend className="text-ink-2 mb-1 text-[13px]">{selected.kind === "tape" ? "Breite" : "Strich"}</legend>
+                {([1, 2, 3] as const).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    aria-pressed={selected.look.weight === w}
+                    onClick={() => setShapeOf(selected.id, { weight: w })}
+                    className={`border px-3 py-1.5 ${selected.look.weight === w ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                  >
+                    {w === 1 ? "fein" : w === 2 ? "mittel" : "kräftig"}
+                  </button>
+                ))}
+                {selected.kind !== "tape" && (
+                  <label className="ml-2 flex items-center gap-2 text-[13px]">
+                    <input type="checkbox" checked={!!selected.look.dashed} onChange={(e) => setShapeOf(selected.id, { dashed: e.target.checked || undefined })} className="accent-[var(--ink)]" />
+                    gestrichelt
+                  </label>
+                )}
+              </fieldset>
+              <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
+              <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
+                {SHAPES[selected.kind].label} entfernen
+              </TextButton>
+            </div>
+          )}
+          {selected?.t === "ink" && (
+            <div className="slip text-ink space-y-3 p-5">
+              <p className="text-sm font-semibold">Zeichnung</p>
+              <p className="text-ink-2 text-[13px]">
+                {selected.strokes.length} {selected.strokes.length === 1 ? "Strich" : "Striche"}. Ziehen verschiebt, die Griffe skalieren. Einzelne Striche löscht der Radierer (E).
+              </p>
+              <div className="space-y-1">
+                <p className="text-ink-2 text-[13px]">Alle Striche umfärben</p>
+                <Swatches
+                  value={selected.strokes.every((st) => st.c === selected.strokes[0].c) ? selected.strokes[0].c : null}
+                  cloth={data.cloth.base}
+                  dark
+                  onPick={(c) => c && commit(items.map((i) => (i.id === selected.id && i.t === "ink" ? { ...i, strokes: i.strokes.map((st) => ({ ...st, c })) } : i)))}
+                />
+              </div>
+              <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
+              <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
+                Zeichnung entfernen
+              </TextButton>
+            </div>
+          )}
           {shown.length > 1 && (
             <div className="slip text-ink space-y-2 p-5">
               <p className="text-sm font-semibold">Ebenen</p>
@@ -1625,7 +2054,7 @@ function TextToolbar({
 const MemoPage = memo(PageView);
 
 /** Leichte Vorschau des gezogenen Elements: ein Bild oder ein Textblock, ohne die Seite neu zu setzen */
-function DragGhost({ item, box, photo, font }: { item: SpreadItem; box: Box; photo?: StoredPhoto; font?: React.CSSProperties }) {
+function DragGhost({ item, box, photo, font, paths, H }: { item: SpreadItem; box: Box; photo?: StoredPhoto; font?: React.CSSProperties; paths: PathEl[]; H: number }) {
   const style: React.CSSProperties = { left: `${box.x / 2}%`, top: `${box.y}%`, width: `${box.w / 2}%`, height: `${box.h}%` };
   if (item.t === "photo" && photo) {
     const c = item.crop ?? { focus: photo.focus ?? [0.5, 0.5], zoom: photo.zoom ?? 1, fit: photo.fit ?? "cover" };
@@ -1651,5 +2080,118 @@ function DragGhost({ item, box, photo, font }: { item: SpreadItem; box: Box; pho
         {item.text}
       </div>
     );
-  return null;
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" viewBox={`0 0 200 ${H}`} preserveAspectRatio="none">
+      <Paths paths={paths} />
+    </svg>
+  );
+}
+
+/** Pfade aus shapes.ts als SVG; Maße in cqw wie im Buch */
+function Paths({ paths }: { paths: PathEl[] }) {
+  return (
+    <>
+      {paths.map((p, i) => (
+        <path
+          key={i}
+          d={p.d}
+          fill={p.fill ?? "none"}
+          stroke={p.stroke}
+          strokeWidth={p.width}
+          strokeDasharray={p.dash?.join(" ")}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={p.opacity}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Farben für Formen und Stift: Tinte, Papier und die Farben der Einbände; dazu der Einband dieses Buchs und eine eigene */
+const PALETTE: { label: string; value: string }[] = [
+  { label: "Tinte", value: "#1b1c1a" },
+  { label: "Grau", value: "#5a5c56" },
+  { label: "Papier", value: "#eee9df" },
+  { label: "Weiß", value: "#ffffff" },
+  { label: "Ringelblume", value: "#e8a72c" },
+  { label: "Ziegel", value: "#cc7048" },
+  { label: "Meer", value: "#5b979c" },
+  { label: "Salbei", value: "#a3ad92" },
+];
+
+function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; cloth: string; onPick: (c: string | null) => void; none?: boolean; dark?: boolean }) {
+  const colors = PALETTE.some((p) => p.value.toLowerCase() === cloth.toLowerCase()) ? PALETTE : [...PALETTE, { label: "Einband", value: cloth }];
+  const ring = dark ? "outline-ink" : "outline-on-table";
+  return (
+    <span className="flex flex-wrap items-center gap-1" role="group" aria-label="Farbe">
+      {none && (
+        <button
+          type="button"
+          aria-pressed={value === null}
+          aria-label="keine Fläche"
+          title="keine"
+          onClick={() => onPick(null)}
+          className={`relative h-7 w-7 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+        >
+          <svg aria-hidden viewBox="0 0 10 10" className="absolute inset-0 h-full w-full">
+            <line x1={1} y1={9} x2={9} y2={1} stroke="#cc7048" strokeWidth={1} />
+          </svg>
+        </button>
+      )}
+      {colors.map((c) => (
+        <button
+          key={c.label}
+          type="button"
+          title={c.label}
+          aria-label={`Farbe ${c.label}`}
+          aria-pressed={value?.toLowerCase() === c.value.toLowerCase()}
+          onClick={() => onPick(c.value)}
+          className={`h-7 w-7 border border-ink/30 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          style={{ background: c.value }}
+        />
+      ))}
+      <label className="relative h-7 w-7 cursor-pointer border border-ink/30" title="Eigene Farbe">
+        <span className="sr-only">Eigene Farbe</span>
+        <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
+        <input type="color" value={value ?? "#1b1c1a"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+      </label>
+    </span>
+  );
+}
+
+const TOOL_INFO: Record<Tool, { label: string; key: string }> = {
+  select: { label: "Auswahl", key: "V" },
+  pen: { label: "Stift", key: "P" },
+  eraser: { label: "Radierer", key: "E" },
+  ...SHAPES,
+};
+
+/** Werkzeugknopf mit kleinem Zeichen; Name und Kürzel im Tooltip und für Screenreader */
+function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; onClick: () => void }) {
+  const info = TOOL_INFO[tool];
+  const icon: Record<Tool, React.ReactNode> = {
+    select: <path d="M5 3l12 8-5.5 1.2L9 18z" fill="currentColor" />,
+    pen: <path d="M4 16c3-1 4-5 7-8l3-3 2 2-3 3c-3 3-6 5-9 6z M13 6l2 2" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
+    eraser: <path d="M3 14l7-8 6 5-6 6H6z M8 17h9" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
+    line: <path d="M4 16L16 4" stroke="currentColor" strokeWidth={1.6} />,
+    arrow: <path d="M4 16L15 5 M9 5h6v6" fill="none" stroke="currentColor" strokeWidth={1.6} />,
+    rect: <rect x={4} y={5} width={12} height={10} fill="none" stroke="currentColor" strokeWidth={1.6} />,
+    ellipse: <circle cx={10} cy={10} r={6} fill="none" stroke="currentColor" strokeWidth={1.6} />,
+    tape: <path d="M3 12l3-4 1 1 1-1 7 0 1 1 1-1-3 4-1-1-1 1H5l-1-1z" fill="currentColor" opacity={0.75} />,
+  };
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={`${info.label} (${info.key})`}
+      title={`${info.label} (${info.key})`}
+      onClick={onClick}
+      className={`flex h-9 w-9 items-center justify-center border transition-colors duration-150 ${active ? "border-on-table bg-on-table text-table" : "text-on-table border-transparent hover:border-on-table/60"}`}
+    >
+      <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
+        {icon[tool]}
+      </svg>
+    </button>
+  );
 }

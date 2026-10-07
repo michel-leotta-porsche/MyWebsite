@@ -309,7 +309,11 @@ function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean })
 
 const noopSubscribe = () => () => {};
 
-export function RecipeSlip({ plate, onClose }: { plate: Plate; onClose: () => void }) {
+/**
+ * side: auf welcher Seite der Zettel liegt. Er liegt auf der Gegenseite seines Fotos, damit er
+ * nie das Nachbarbild verdeckt und klar ist, zu welchem Bild er gehört (UX-Kritik K10).
+ */
+export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {
   const reduce = useReducedMotion() ?? false;
   const recipe = recipeOf(plate);
   const camera = cameraOf(plate);
@@ -335,10 +339,10 @@ export function RecipeSlip({ plate, onClose }: { plate: Plate; onClose: () => vo
       role="dialog"
       aria-label={`${kind} zu Tafel ${plate.no}: ${plate.title}`}
       tabIndex={0}
-      className="slip text-ink fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:right-[max(24px,calc(50vw-560px))] md:bottom-24"
+      className={`slip text-ink fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:bottom-24 ${side === "left" ? "md:left-[max(24px,calc(50vw-560px))]" : "md:right-[max(24px,calc(50vw-560px))]"}`}
       style={phone ? { left: 12, bottom: 12 } : undefined}
       initial={reduce ? false : { y: 140, clipPath: "inset(100% 0 0 0)", rotate: 0 }}
-      animate={{ y: 0, clipPath: "inset(0% 0 0 0)", rotate: phone ? -0.6 : -1.6 }}
+      animate={{ y: 0, clipPath: "inset(0% 0 0 0)", rotate: phone ? -0.6 : side === "left" ? 1.6 : -1.6 }}
       exit={reduce ? { opacity: 0 } : { y: 120, clipPath: "inset(100% 0 0 0)", rotate: 0 }}
       transition={{ duration: 0.5, ease: EXPO }}
       onClick={(e) => e.stopPropagation()}
