@@ -1,12 +1,18 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import type { BookData } from "@/content/books";
-import { Book } from "@/components/book";
 import { Table, type TableProps } from "@/components/table";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+
+// Das offene Buch (Umblättern in WebGL, Bewegung, Rezeptzettel) ist der größte Teil des Codes.
+// Es kommt nicht mit dem ersten Laden, sondern danach im Leerlauf oder spätestens beim Aufschlagen.
+type BookComponent = typeof import("@/components/book").Book;
+let LoadedBook: BookComponent | null = null;
+let loading: Promise<unknown> | null = null;
+const loadBook = () => (loading ??= import("@/components/book").then((m) => (LoadedBook = m.Book)));
 
 type View = { id: string; auto: boolean } | null;
 
@@ -51,7 +57,8 @@ export function Library({
   // vom Tisch genommen: der Einband schlägt sich von selbst auf; per Link oder Zurück-Taste nicht
   const [autoId, setAutoId] = useState<string | null>(null);
   const view: View = books.some((b) => b.id === hash) ? { id: hash, auto: autoId === hash } : null;
-  const reduce = useReducedMotion() ?? false;
+  const reduce = useReducedMotion();
+  const [bookReady, setBookReady] = useState(LoadedBook !== null);
 
   // Wechsel zwischen Tisch und Buch: der Einband fliegt per View Transition an seinen neuen Platz
   const change = useCallback(
@@ -64,9 +71,14 @@ export function Library({
         });
         window.scrollTo({ top: 0, behavior: "instant" });
       };
-      const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-      if (doc.startViewTransition && !reduce) doc.startViewTransition(run);
-      else run();
+      const go = () => {
+        const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+        if (doc.startViewTransition && !reduce) doc.startViewTransition(run);
+        else run();
+      };
+      // erst wenn der Code des Buchs da ist, sonst fliegt der Einband ins Leere
+      if (next && !LoadedBook) loadBook().then(go, go);
+      else go();
     },
     [reduce],
   );
@@ -79,15 +91,35 @@ export function Library({
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const book = view ? bookById(view.id) : undefined;
-  // Zurück auf dem Tisch steht der Fokus wieder auf dem Band, der offen war
-  const [returnTo, setReturnTo] = useState<string | null>(null);
-  const close = useCallback(() => {
-    setReturnTo(view?.id ?? null);
-    change(null);
-  }, [change, view?.id]);
+  // Buch per Link (#japan) sofort holen, sonst erst, wenn die Seite fertig geladen ist und Ruhe herrscht
+  const linked = view !== null;
+  useEffect(() => {
+    if (bookReady) return;
+    let alive = true;
+    let timer = 0;
+    // Safari kennt requestIdleCallback erst seit Kurzem
+    const ric = (window as Partial<Window>).requestIdleCallback;
+    const fetchBook = () => loadBook().then(() => alive && setBookReady(true));
+    const idle = () => {
+      timer = ric ? ric(fetchBook, { timeout: 4000 }) : window.setTimeout(fetchBook, 1000);
+    };
+    if (linked) fetchBook();
+    else if (document.readyState === "complete") idle();
+    else window.addEventListener("load", idle, { once: true });
+    return () => {
+      alive = false;
+      window.removeEventListener("load", idle);
+      if (ric) cancelIdleCallback(timer);
+      else window.clearTimeout(timer);
+    };
+  }, [linked, bookReady]);
 
-  if (book && wide !== null) {
+  const book = view ? bookById(view.id) : undefined;
+  const close = useCallback(() => change(null), [change]);
+  // bis der Code da ist, bleibt der Tisch liegen (wie im HTML vom Server)
+  const Book = bookReady ? LoadedBook : null;
+
+  if (book && wide !== null && Book) {
     return (
       <Book
         key={`${book.id}-${wide ? "spread" : "single"}`}

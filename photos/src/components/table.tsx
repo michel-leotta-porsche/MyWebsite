@@ -1,12 +1,12 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { type BookData } from "@/content/books";
 import { INTRO_DONE } from "@/components/intro";
 import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Wie die Bücher auf dem Tisch liegen: leicht gedreht und versetzt, nie in Reih und Glied
 const POSE = [
@@ -18,6 +18,12 @@ const POSE = [
 const NUMBER = ["Kein", "Ein", "Zwei", "Drei", "Vier", "Fünf", "Sechs", "Sieben", "Acht", "Neun", "Zehn"];
 
 /** Breite des Einbands auf dem Tisch, das größte Buch ist der Maßstab */
+// --tw ist min(22vw, …, 360px); die Höhenbegrenzung macht den Einband nur kleiner, 22vw bis 360px reicht als Obergrenze
+const coverSizes = (book: BookData) => (w: number) => {
+  const f = (book.scale * w) / 100;
+  return `(min-width: 1637px) ${Math.ceil(360 * f)}px, ${Math.ceil(22 * f)}vw`;
+};
+
 const coverWidth = (book: BookData) =>
   `calc(var(--tw) * ${book.scale})`;
 
@@ -69,7 +75,7 @@ function ClosedBook({
             className="absolute inset-0"
             style={{ viewTransitionName: `cover-${book.id}` }}
           >
-            <PageView book={book} page={{ kind: "cover" }} side="right" eager />
+            <PageView book={book} page={{ kind: "cover" }} side="right" eager sizes={coverSizes(book)} />
           </div>
         </div>
       </button>
@@ -109,7 +115,7 @@ export type TableProps = {
 
 export function Table({ books, onOpen, headerRight, extra, note, tiles, label, focusId }: TableProps) {
   const root = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion() ?? false;
+  const reduce = useReducedMotion();
 
   useEffect(() => {
     if (!focusId) return;

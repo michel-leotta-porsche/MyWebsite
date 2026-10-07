@@ -14,10 +14,17 @@ const C = {
   ink2: "#5a5c56",
 };
 
+// Nur die zuletzt gezeichneten Fotos bleiben im Speicher. Ohne Grenze hielt jede besuchte Seite ihr
+// entpacktes Foto fest (etwa 5 MB bei 960px), und WebKit beendete auf dem iPhone nach einigen Seiten den Tab.
+const MAX_IMAGES = 8;
 const images = new Map<string, Promise<HTMLImageElement>>();
 function loadImage(url: string) {
   let p = images.get(url);
-  if (!p) {
+  if (p) {
+    // zuletzt benutzt: ans Ende der Reihenfolge
+    images.delete(url);
+    images.set(url, p);
+  } else {
     p = new Promise((resolve, reject) => {
       const img = new Image();
       // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
@@ -28,6 +35,7 @@ function loadImage(url: string) {
       img.src = url;
     });
     images.set(url, p);
+    while (images.size > MAX_IMAGES) images.delete(images.keys().next().value!);
   }
   return p;
 }
@@ -145,7 +153,7 @@ function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number
 async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
   ctx.fillStyle = C.paper;
   ctx.fillRect(0, 0, W, H);
-  paperTile ??= loadImage("/textures/paper.png");
+  paperTile ??= loadImage("/textures/paper.webp");
   const tile = await paperTile.catch(() => null);
   if (tile) {
     ctx.save();
@@ -171,7 +179,7 @@ async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, sc
 }
 
 async function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
-  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.png"), loadImage("/textures/linen-warp.png")]);
+  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.webp"), loadImage("/textures/linen-warp.webp")]);
   const tiles = await linenTiles.catch(() => []);
   ctx.save();
   ctx.globalAlpha = 0.13;
