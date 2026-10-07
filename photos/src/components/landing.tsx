@@ -3,19 +3,16 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { FrameButton, linkClass, TextButton } from "@/components/app-ui";
+import type { Mode } from "@/components/book";
+import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { signIn } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
+import { landingBook } from "@/content/landing-book";
 
-import palme from "../../public/photos/02-palme.jpg";
-import bougainvillea from "../../public/photos/04-bougainvillea.jpg";
-import rettungsturm from "../../public/photos/09-rettungsturm.jpg";
-import stuehle from "../../public/photos/stuehle-gelb.jpg";
-import felsbogen from "../../public/photos/11-felsbogen.jpg";
-import strand from "../../public/photos/03-strand.jpg";
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import mittagsblume from "../../public/photos/06-mittagsblume.jpg";
 import markisen from "../../public/photos/markisen.jpg";
@@ -24,11 +21,11 @@ import schild from "../../public/photos/01-schild-am-meer.jpg";
 import torii from "../../public/photos/japan/torii.jpg";
 
 // Landing Page. Das Produkt führt sich selbst vor, ohne Bildschirmfotos:
-// 1. Kopf: ein aufgeschlagenes Buch auf dem Basalttisch, Scrollen blättert drei Blätter in echtem 3D um.
+// 1. Kopf: ein Buch auf dem Basalttisch, Scrollen schlägt es auf und blättert, wie in der Leseansicht (Feder, WebGL-Biegung).
 // 2. Werkbank: vier lose Abzüge fliegen beim Scrollen an ihren Platz auf einer Doppelseite.
 // 3. Rezept: ein großes Foto, der Zettel schiebt sich darunter hervor.
 // 4. Hinlegen: der Band mit Zettel für eine Person, ein Zettel kommt zurück.
-// Alle Bewegung hängt am Scrollen (CSS scroll-driven animations, kein JavaScript dafür) und nutzt nur
+// Die übrige Bewegung hängt am Scrollen (CSS scroll-driven animations, kein JavaScript dafür) und nutzt nur
 // transform und opacity. Ohne Unterstützung oder bei reduzierter Bewegung steht jede Szene fertig da.
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
@@ -88,15 +85,6 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
 
 /* ------------------------------------------------------------------ Papier und Leinen */
 
-/** Foto im Seitenrahmen, Maße in cqw der Seite (Breite 100, Höhe 150) */
-function Pic({ src, x, y, w, h, pos, sizes = "30vw", eager = false }: { src: StaticImageData; x: number; y: number; w: number; h: number; pos?: string; sizes?: string; eager?: boolean }) {
-  return (
-    <div className="absolute overflow-hidden" style={{ left: `${x}cqw`, top: `${y}cqw`, width: `${w}cqw`, height: `${h}cqw` }}>
-      <Image src={src} alt="" fill sizes={sizes} loading={eager ? "eager" : "lazy"} className="object-cover" style={{ objectPosition: pos }} />
-    </div>
-  );
-}
-
 /** Bildunterschrift wie im Buch: Nummer halbfett in Tinte, Titel in grauer Tinte */
 function Cap({ no, title, x, y, right = false }: { no: number; title: string; x: number; y: number; right?: boolean }) {
   return (
@@ -155,108 +143,19 @@ function Slip({ children, className = "" }: { children: ReactNode; className?: s
 
 /* ------------------------------------------------------------------ 1. Kopf: das Buch blättert */
 
-// Doppelseiten des Vorführbuchs. Blatt i trägt vorne die rechte Seite von Doppelseite i
-// und hinten die linke Seite von Doppelseite i + 1 (wie in book.tsx).
-const L0 = (
-  <PageFace side="left">
-    <p className="text-ink absolute top-[14cqw] left-[12cqw] text-[12cqw] leading-[0.9] font-bold tracking-[-0.035em]" style={display}>
-      Sommer
-    </p>
-    <p className="text-ink absolute top-[29cqw] left-[12cqw] text-[3.4cqw]">Fuerteventura</p>
-    <p className="text-ink-2 absolute bottom-[14cqw] left-[12cqw] text-[3.4cqw]">Dein Name</p>
-  </PageFace>
-);
-const LEAVES: { front: ReactNode; back: ReactNode }[] = [
-  {
-    front: (
-      <PageFace side="right">
-        <Pic src={palme} x={0} y={0} w={100} h={150} sizes="(min-width: 768px) 30vw, 50vw" eager />
-      </PageFace>
-    ),
-    back: (
-      <PageFace side="left">
-        <Pic src={bougainvillea} x={0} y={0} w={100} h={150} sizes="(min-width: 768px) 30vw, 50vw" />
-      </PageFace>
-    ),
-  },
-  {
-    front: (
-      <PageFace side="right">
-        <Pic src={rettungsturm} x={30} y={12} w={58} h={87} sizes="(min-width: 768px) 18vw, 30vw" />
-        <Cap no={2} title="Rettungsturm" x={88} y={102} right />
-      </PageFace>
-    ),
-    back: (
-      <PageFace side="left">
-        <Pic src={stuehle} x={12} y={68} w={40} h={60} sizes="(min-width: 768px) 12vw, 20vw" />
-        <Cap no={3} title="Stühle vor gelber Wand" x={12} y={131} />
-      </PageFace>
-    ),
-  },
-  {
-    front: (
-      <PageFace side="right">
-        <Pic src={strand} x={6} y={12} w={82} h={54.7} sizes="(min-width: 768px) 25vw, 40vw" />
-        <Cap no={4} title="Am Wasser" x={88} y={70} right />
-      </PageFace>
-    ),
-    // über den Bund: ein Bild, auf zwei Seiten verteilt (jede Seite zeigt ihre Hälfte)
-    back: (
-      <PageFace side="left">
-        <Pic src={felsbogen} x={0} y={0} w={200} h={150} pos="35% 50%" sizes="(min-width: 768px) 60vw, 100vw" />
-      </PageFace>
-    ),
-  },
-];
-const R_LAST = (
-  <PageFace side="right">
-    <Pic src={felsbogen} x={-100} y={0} w={200} h={150} pos="35% 50%" sizes="(min-width: 768px) 60vw, 100vw" />
-  </PageFace>
-);
-const SPREADS = LEAVES.length + 1;
-
-function TurningBook() {
-  return (
-    <div className="hero-book relative w-full [perspective:2400px]" style={{ ["--n" as string]: LEAVES.length }}>
-      <div className="hero-tilt relative aspect-[4/3] w-full [transform-style:preserve-3d]">
-        {/* Buchblock und Schatten auf dem Tisch */}
-        <div aria-hidden className={`absolute inset-0 ${lifted}`} />
-        <div aria-hidden className="absolute inset-y-[0.6%] -left-[7px] w-[7px] bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]" />
-        <div aria-hidden className="absolute inset-y-[0.6%] -right-[7px] w-[7px] bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]" />
-        <div className="absolute inset-y-0 left-0 w-1/2">{L0}</div>
-        <div className="absolute inset-y-0 right-0 w-1/2">{R_LAST}</div>
-        {LEAVES.map((leaf, i) => (
-          <div
-            key={i}
-            className="leaf absolute inset-y-0 right-0 w-1/2 origin-left [transform-style:preserve-3d]"
-            style={{ ["--i" as string]: i, zIndex: LEAVES.length - i }}
-          >
-            <div className="absolute inset-0 [backface-visibility:hidden]">
-              {leaf.front}
-              <div aria-hidden className="leaf-shade-front pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgb(12_10_8/0.55),rgb(12_10_8/0.15))] opacity-0" />
-            </div>
-            <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]">
-              {leaf.back}
-              <div aria-hidden className="leaf-shade-back pointer-events-none absolute inset-0 bg-[linear-gradient(to_left,rgb(12_10_8/0.55),rgb(12_10_8/0.15))] opacity-0" />
-            </div>
-          </div>
-        ))}
-      </div>
-      {/* Bildfolge-Linie: ein Haltepunkt je Doppelseite, der aktive in Einbandgelb */}
-      <div aria-hidden className="mx-auto mt-10 flex w-40 items-end justify-between md:mt-14">
-        {Array.from({ length: SPREADS }, (_, i) => (
-          <span key={i} className="relative block h-[10px] w-[3px] bg-on-table-2/60">
-            <span className="hero-stop bg-mark absolute inset-x-0 bottom-0 h-[19px] origin-bottom opacity-0" style={{ ["--i" as string]: i }} />
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
+const wide = (f: () => void) => {
+  const mq = window.matchMedia("(min-width: 768px)");
+  mq.addEventListener("change", f);
+  return () => mq.removeEventListener("change", f);
+};
 
 function Hero() {
+  const track = useRef<HTMLElement>(null);
+  // Doppelseite ab Tablet, sonst Einzelseiten wie auf dem Telefon in der Leseansicht
+  const mode: Mode = useSyncExternalStore(wide, () => (window.matchMedia("(min-width: 768px)").matches ? "spread" : "single"), () => "spread");
+  const leaves = mode === "spread" ? landingBook.spreads.length : landingBook.singlePages.length - 1;
   return (
-    <section aria-labelledby="hero-h" className="hero-track relative">
+    <section ref={track} aria-labelledby="hero-h" className="hero-track relative" style={{ ["--leaves" as string]: leaves }}>
       <div className="linen table-surface sticky top-0 flex min-h-svh flex-col overflow-hidden bg-table">
         <SunAndShade light="sun" />
         <header className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-4 md:px-8 md:pt-6">
@@ -285,8 +184,13 @@ function Hero() {
             <p className="text-on-table-2 mt-5 text-sm">Lesen geht ohne Konto.</p>
           </div>
           <div className="md:col-span-8 md:col-start-5 md:pl-[4vw]">
-            <TurningBook />
-            <p className="hero-hint text-on-table-2 mt-4 text-center text-sm">Scrollen zum Blättern</p>
+            <ScrollBook
+              book={landingBook}
+              mode={mode}
+              track={track}
+              width={mode === "spread" ? "min(100%, calc((100svh - 230px) * 4 / 3))" : "min(72vw, calc((100svh - 470px) / 1.5))"}
+            />
+            <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">Scrollen zum Blättern</p>
           </div>
         </div>
       </div>

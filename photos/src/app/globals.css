@@ -285,9 +285,10 @@ html.ohne-schatten [data-shade] {
   transform: scale(0.97);
 }
 
-/* Das Buch liegt leicht gekippt auf dem Tisch */
-.hero-tilt {
-  transform: rotateX(14deg);
+/* Kopf: jedes Blatt hat ein Stück Scrollweg, das Buch bleibt dabei stehen (auch bei reduzierter Bewegung, dann ohne Feder) */
+.hero-track {
+  view-timeline: --hero block;
+  height: calc(var(--leaves, 5) * 65svh + 100svh);
 }
 .bench-count-b {
   display: none;
@@ -299,60 +300,6 @@ html.ohne-schatten [data-shade] {
 
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    /* 1. Kopf: Spur von drei Bildschirmhöhen, jedes Blatt hat ein Stück davon */
-    .hero-track {
-      view-timeline: --hero block;
-      height: 340svh;
-    }
-    .leaf {
-      animation: leaf-turn linear both;
-      animation-timeline: --hero;
-      animation-range: contain calc(10% + var(--i) * 28%) contain calc(26% + var(--i) * 28%);
-    }
-    @keyframes leaf-turn {
-      0% {
-        transform: rotateY(0deg);
-        z-index: calc(var(--n) - var(--i) + 10);
-        animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
-      }
-      100% {
-        transform: rotateY(-180deg);
-        z-index: calc(var(--i) + 20);
-      }
-    }
-    .leaf .leaf-shade-front {
-      animation: shade-front linear both;
-      animation-timeline: --hero;
-      animation-range: inherit;
-    }
-    .leaf .leaf-shade-back {
-      animation: shade-back linear both;
-      animation-timeline: --hero;
-    }
-    .leaf .leaf-shade-front,
-    .leaf .leaf-shade-back {
-      animation-range: contain calc(10% + var(--i) * 28%) contain calc(26% + var(--i) * 28%);
-    }
-    @keyframes shade-front {
-      0% { opacity: 0; }
-      50% { opacity: 0.42; }
-      100% { opacity: 0.42; }
-    }
-    @keyframes shade-back {
-      0% { opacity: 0.42; }
-      50% { opacity: 0.42; }
-      100% { opacity: 0; }
-    }
-    /* Haltepunkte: der aktive wächst und wird gelb */
-    .hero-stop {
-      animation: stop-on linear both;
-      animation-timeline: --hero;
-      animation-range: contain calc(var(--i) * 28% - 10%) contain calc(var(--i) * 28% + 18%);
-    }
-    @keyframes stop-on {
-      0%, 100% { opacity: 0; transform: scaleY(0.53); }
-      6%, 94% { opacity: 1; transform: scaleY(1); }
-    }
     .hero-hint {
       animation: fade-out linear both;
       animation-timeline: --hero;
