@@ -74,6 +74,7 @@ export function Editor() {
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | null>(null);
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [dropHint, setDropHint] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const bookRef = useRef<StoredBook | null>(null);
   useEffect(() => {
@@ -105,6 +106,60 @@ export function Editor() {
     }, 900);
     return () => window.clearTimeout(id);
   }, [book, idParam, touched]);
+
+  // Dateien irgendwo auf der Seite ablegen; nie die Datei im Browser öffnen
+  const hasFiles = (e: DragEvent | React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  const filesOf = (dt: DataTransfer) => {
+    const direct = Array.from(dt.files ?? []);
+    if (direct.length) return direct;
+    return Array.from(dt.items ?? [])
+      .filter((i) => i.kind === "file")
+      .map((i) => i.getAsFile())
+      .filter((f): f is File => !!f);
+  };
+  const addRef = useRef<(files: File[]) => void>(() => {});
+  useEffect(() => {
+    let depth = 0;
+    const over = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const enter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth++;
+      setDragOver(true);
+    };
+    const leave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setDragOver(false);
+    };
+    const drop = (e: DragEvent) => {
+      if (!e.dataTransfer || !hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragOver(false);
+      const files = filesOf(e.dataTransfer);
+      if (files.length) {
+        setDropHint(null);
+        addRef.current(files);
+      } else {
+        // z. B. aus der Fotos-App am Mac: dort kommen keine Dateien im Browser an
+        setDropHint("Diese Fotos kamen nicht als Dateien an. Aus der Fotos-App bitte erst in den Finder ziehen oder „Fotos auswählen“ nutzen.");
+      }
+    };
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
 
   const update = useCallback(
     (f: (b: StoredBook) => StoredBook) => {
@@ -174,6 +229,10 @@ export function Editor() {
     [relayout, update, user],
   );
 
+  useEffect(() => {
+    addRef.current = addFiles;
+  }, [addFiles]);
+
   const data: BookData | null = useMemo(() => {
     if (!book || !book.spreads.length) return null;
     try {
@@ -237,7 +296,9 @@ export function Editor() {
 
   // Ziehen zum Umsortieren der Doppelseiten
   const onDrop = (to: number, e: React.DragEvent) => {
-    const from = Number(e.dataTransfer.getData("text/x-spread"));
+    if (hasFiles(e)) return;
+    const raw = e.dataTransfer.getData("text/x-spread");
+    const from = raw === "" ? NaN : Number(raw);
     if (Number.isNaN(from) || from === to) return;
     update((b) => {
       const s = [...b.spreads];
@@ -250,18 +311,6 @@ export function Editor() {
   return (
     <main
       className="linen table-surface relative min-h-svh bg-table"
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes("Files")) return;
-        e.preventDefault();
-        setDragOver(true);
-      }}
-      onDragLeave={(e) => e.currentTarget === e.target && setDragOver(false)}
-      onDrop={(e) => {
-        if (!e.dataTransfer.files.length) return;
-        e.preventDefault();
-        setDragOver(false);
-        addFiles(Array.from(e.dataTransfer.files));
-      }}
     >
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
@@ -285,7 +334,7 @@ export function Editor() {
         <section aria-label="Doppelseiten" className="min-w-0">
           {/* Schritt 1: Fotos */}
           <div
-            className={`border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6 transition-colors ${dragOver ? "border-mark" : ""}`}
+            className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6"
           >
             <p className="text-on-table text-lg font-semibold">
               {book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}
@@ -306,6 +355,11 @@ export function Editor() {
                 e.target.value = "";
               }}
             />
+            {dropHint && (
+              <p role="alert" className="text-on-table text-sm">
+                {dropHint}
+              </p>
+            )}
             {pending.length > 0 && (
               <ul className="text-on-table-2 w-full space-y-1 text-sm" aria-live="polite">
                 {pending.map((p) => (
@@ -347,7 +401,7 @@ export function Editor() {
                       key={s.keys.join("+")}
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-spread", String(i))}
-                      onDragOver={(e) => e.dataTransfer.types.includes("text/x-spread") && e.preventDefault()}
+                      onDragOver={(e) => Array.from(e.dataTransfer.types).includes("text/x-spread") && e.preventDefault()}
                       onDrop={(e) => onDrop(i, e)}
                       className="p-3"
                     >
@@ -484,6 +538,13 @@ export function Editor() {
         </aside>
       </div>
 
+      {dragOver && (
+        <div aria-hidden className="pointer-events-none fixed inset-3 z-[650] flex items-center justify-center border-2 border-dashed border-mark bg-[rgb(12_10_8/0.6)]">
+          <p className="text-on-table text-2xl font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+            Loslassen, dann kommen die Fotos ins Buch
+          </p>
+        </div>
+      )}
       {sharing && book && <ShareDialog book={book} onClose={() => setSharing(false)} />}
     </main>
   );
