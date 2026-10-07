@@ -152,7 +152,6 @@ export function Editor() {
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [dropHint, setDropHint] = useState<string | null>(null);
-  const [firstDraft, setFirstDraft] = useState<number | null>(null);
   const [undoState, setUndoState] = useState({ past: 0, future: 0 });
   const fileInput = useRef<HTMLInputElement>(null);
   const bookRef = useRef<StoredBook | null>(null);
@@ -339,7 +338,7 @@ export function Editor() {
     async (files: File[]) => {
       const b = bookRef.current;
       if (!user || !b) return;
-      const t0 = performance.now();
+      setDropHint(null);
       performance.mark("fuji:upload-start");
       const room = MAX - b.photos.length;
       const isImage = (f: File) => f.type.startsWith("image/") || /\.(jpe?g|heic|heif|png|webp|avif|dng|tiff?)$/i.test(f.name);
@@ -352,7 +351,13 @@ export function Editor() {
         ...items,
         ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: "kein Foto" })),
       ]);
-      if (over > 0) setDropHint(`${over} Fotos passen nicht mehr hinein, ein Buch hat höchstens ${MAX}.`);
+      // die Grenze klar benennen: wie viele aufgenommen wurden und wohin der Rest kann (#44)
+      if (over > 0)
+        setDropHint(
+          list.length
+            ? `${list.length} von ${list.length + over} Fotos aufgenommen, damit ist das Buch voll (bis zu ${MAX} Fotos). Die übrigen ${over} passen in ein zweites Buch.`
+            : `Das Buch ist schon voll (bis zu ${MAX} Fotos). Die ${over} Fotos passen in ein zweites Buch.`,
+        );
       const mark = (key: string, state: Pending["state"], error?: string) =>
         setPending((p) => p.map((x) => (x.key === key ? { ...x, state, error } : x)));
 
@@ -409,9 +414,8 @@ export function Editor() {
       await Promise.all([work(), work()]);
       await Promise.all(uploads);
       flush();
-      // Messgrundlage T2: Zeit vom Reinziehen bis zum fertigen Erstentwurf
+      // Messgrundlage T2: Zeit vom Reinziehen bis zum fertigen Erstentwurf (nur für die Messskripte, nicht in der Oberfläche)
       performance.measure("fuji:erstentwurf", "fuji:upload-start");
-      setFirstDraft((performance.now() - t0) / 1000);
       window.setTimeout(() => setPending((p) => p.filter((x) => x.state !== "fertig")), 1500);
     },
     [relayout, update, user],
@@ -565,14 +569,32 @@ export function Editor() {
     setSel(null);
     setStageId(s.id);
   };
-  const shelvePhoto = (key: string) => {
+  /**
+   * Foto in die Ablage. Auf einer Doppelseite nach Vorschlag schließt sich die Lücke: die Doppelseite
+   * wird wieder frei und die Automatik verteilt die Fotos neu, statt eine leere Seite stehen zu lassen.
+   * Frei gestaltete Seiten und Textseiten behalten ihre Form; auf der Bühne bleibt die Doppelseite stehen.
+   */
+  const shelvePhoto = (key: string, close = true) => {
     setUndoNotice("In die Ablage gelegt.");
-    update((b) => ({
-      ...mapSpreads(b, (ss) =>
-        ss.map((s) => (!s.keys.includes(key) ? s : s.pages ? removeKey(s, key) : { ...s, keys: s.keys.filter((k) => k !== key), layout: 0 })).filter(keepSpread),
-      ),
-      photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: true } : p)),
-    }));
+    update((b) => {
+      let gap = false;
+      const next = {
+        ...mapSpreads(b, (ss) =>
+          ss
+            .map((s) => {
+              if (!s.keys.includes(key)) return s;
+              if (s.pages) return removeKey(s, key);
+              const keys = s.keys.filter((k) => k !== key);
+              if (s.text || !close) return { ...s, keys, layout: 0 };
+              gap = true;
+              return { ...s, keys, layout: 0, pinned: false };
+            })
+            .filter(keepSpread),
+        ),
+        photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: true } : p)),
+      };
+      return gap ? relayout(next) : next;
+    });
   };
   const unshelvePhoto = (key: string) =>
     update((b) => relayout({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: false } : p)) }));
@@ -641,34 +663,52 @@ export function Editor() {
   const textFits = (s: SpreadDraft) => textOverflow(s, data) === 0;
 
   const status =
-    saved === "speichert" ? "Speichert …" : saved === "gespeichert" ? "Gespeichert" : saved === "offline" ? "Offline gespeichert, geht raus, sobald Netz da ist" : saved === "fehler" ? "Speichern fehlgeschlagen" : "";
+    saved === "speichert"
+      ? "Speichert …"
+      : saved === "gespeichert"
+        ? "Gespeichert"
+        : saved === "offline"
+          ? wide
+            ? "Offline gespeichert, geht raus, sobald Netz da ist"
+            : "Offline gespeichert"
+          : saved === "fehler"
+            ? "Speichern fehlgeschlagen"
+            : "";
 
   return (
     <main className="linen table-surface relative min-h-svh bg-table">
       <Keys onKey={onKey} />
-      <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
-        <span className="flex items-baseline gap-5">
+      {/* Telefon: zwei Zeilen, scrollt mit weg (verdeckt sonst die Doppelseiten); Wiederholen und Verlauf unter „Mehr“.
+          Der Hauptknopf steht in beiden Größen rechts (#43) */}
+      <header className="z-30 flex flex-wrap items-center gap-x-5 gap-y-1 bg-table/95 px-4 py-3 text-sm md:sticky md:top-0 md:gap-x-6 md:px-8 md:py-4">
+        <span className="mr-auto flex items-baseline gap-5">
           <Wordmark />
           <Link href="/zimmer" className={`${linkClass} text-sm`}>
             Ins Bücherzimmer
           </Link>
         </span>
-        <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-          <span aria-live="polite">{status}</span>
-          <TextButton disabled={!undoState.past} onClick={undo} title="Rückgängig (⌘Z)">
+        <span aria-live="polite" className="text-on-table-2">
+          {status}
+        </span>
+        <span aria-hidden className="basis-full md:hidden" />
+        <span className="text-on-table-2 flex items-center gap-x-5 max-md:mr-auto">
+          <TextButton disabled={!undoState.past} onClick={undo} title="Rückgängig (⌘Z)" className={HIT}>
             Rückgängig
           </TextButton>
-          <TextButton disabled={!undoState.future} onClick={redo} title="Wiederholen (⇧⌘Z)">
+          <TextButton disabled={!undoState.future} onClick={redo} title="Wiederholen (⇧⌘Z)" className={`${HIT} max-md:hidden`}>
             Wiederholen
           </TextButton>
-          <TextButton onClick={() => setHistory(true)}>Verlauf</TextButton>
-          <TextButton disabled={!data} onClick={() => setPreview(true)}>
+          <TextButton onClick={() => setHistory(true)} className={`${HIT} max-md:hidden`}>
+            Verlauf
+          </TextButton>
+          <TextButton disabled={!data} onClick={() => setPreview(true)} className={HIT}>
             Ansehen
           </TextButton>
-          <FrameButton disabled={!data || saved === "speichert"} onClick={() => setSharing(true)}>
-            Hinlegen für …
-          </FrameButton>
+          <MoreMenu canRedo={!!undoState.future} onRedo={redo} onHistory={() => setHistory(true)} />
         </span>
+        <FrameButton disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="shrink-0">
+          Hinlegen für …
+        </FrameButton>
       </header>
 
       <div className={`grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
@@ -678,9 +718,17 @@ export function Editor() {
             <p className="text-on-table text-lg font-semibold">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</p>
             <p className="text-on-table-2 max-w-[60ch] text-sm leading-relaxed">
               Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen
-              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone, bis zu {MAX} Fotos.
+              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone.
             </p>
-            <TextButton onClick={() => fileInput.current?.click()}>Fotos auswählen</TextButton>
+            {/* die Grenze steht direkt am Knopf, nicht versteckt im Absatz (#44) */}
+            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <TextButton onClick={() => fileInput.current?.click()} aria-describedby="photo-limit" className="min-h-6">
+                Fotos auswählen
+              </TextButton>
+              <span id="photo-limit" className="text-on-table-2 text-sm tabular-nums">
+                bis zu {MAX} Fotos{book.photos.length ? ` · ${book.photos.length >= MAX ? "Buch ist voll" : `noch ${MAX - book.photos.length} frei`}` : ""}
+              </span>
+            </span>
             <input
               ref={fileInput}
               type="file"
@@ -714,9 +762,6 @@ export function Editor() {
                 ))}
               </ul>
             )}
-            {firstDraft !== null && !pending.length && (
-              <p className="text-on-table-2 text-[13px]">Erstentwurf nach {firstDraft.toFixed(1)} s</p>
-            )}
           </div>
 
           {/* Doppelseiten */}
@@ -738,7 +783,7 @@ export function Editor() {
                 </span>
               </div>
               <p className="text-on-table-2 mt-1 text-[13px]">
-                <Lock on /> fixiert: Was du von Hand änderst, fixiert sich von selbst. „Automatisch gestalten“ ordnet nur die freien Doppelseiten neu.
+                <Lock on /> bleibt, wie du es gesetzt hast.
               </p>
               <ol className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
                 {book.spreads.map((s, i) => {
@@ -753,16 +798,17 @@ export function Editor() {
                       onDrop={(e) => onDrop(i, e)}
                       className="p-3"
                     >
-                      <div className="text-on-table-2 mb-2 flex flex-wrap items-center justify-between gap-x-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => s.id && setSel(active ? null : { type: "spread", id: s.id })}
-                          className={`text-left ${active ? "text-on-table font-semibold" : ""}`}
-                          aria-pressed={active}
-                        >
-                          {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
-                        </button>
-                        <span className="flex flex-wrap items-center gap-x-2">
+                      {/* Leiste: Knöpfe mindestens 24px hoch, mit dem Finger 44px; Entfernen abgesetzt von den Pfeilen (#43) */}
+                      <div className="text-on-table-2 mb-1 flex flex-wrap items-center justify-between gap-x-3 text-[13px]">
+                        <span className="flex items-center gap-x-1">
+                          <button
+                            type="button"
+                            onClick={() => s.id && setSel(active ? null : { type: "spread", id: s.id })}
+                            className={`inline-flex min-h-6 items-center text-left pointer-coarse:min-h-11 ${active ? "text-on-table font-semibold" : ""}`}
+                            aria-pressed={active}
+                          >
+                            {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
+                          </button>
                           <button
                             type="button"
                             onClick={() => togglePin(i)}
@@ -774,33 +820,41 @@ export function Editor() {
                           >
                             <Lock on={!!s.pinned || !!s.text} />
                           </button>
-                          <TextButton onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
+                        </span>
+                        <span className="flex flex-wrap items-center gap-x-3">
+                          <TextButton className={HIT} onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
                             Gestalten
                           </TextButton>
-                          {!s.pages && (
+                          {!s.pages && variantsOf(s, auto).length > 1 && (
                             <TextButton
+                              className={HIT}
                               onClick={() => cycle(i)}
-                              aria-label={`Layout von Doppelseite ${i + 1} wechseln, ${s.layout + 1} von ${variantsOf(s, auto).length}`}
+                              aria-label={`Anderes Layout für Doppelseite ${i + 1}, jetzt ${s.layout + 1} von ${variantsOf(s, auto).length}`}
+                              title={`Layout ${s.layout + 1} von ${variantsOf(s, auto).length}`}
                             >
-                              Layout {s.layout + 1}/{variantsOf(s, auto).length}
+                              Anderes Layout
                             </TextButton>
                           )}
-                          <TextButton className={HIT} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
-                            ←
-                          </TextButton>
+                          <span className="flex items-center gap-x-1">
+                            <TextButton className={HIT} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
+                              ←
+                            </TextButton>
+                            <TextButton
+                              className={HIT}
+                              onClick={() => moveSpread(i, i + 1)}
+                              disabled={i === book.spreads.length - 1}
+                              aria-label={`Doppelseite ${i + 1} nach hinten`}
+                            >
+                              →
+                            </TextButton>
+                          </span>
+                          {/* Entfernen mit Strich und Abstand zu den Pfeilen, damit ein Fehltreffer nicht löscht */}
+                          <span aria-hidden className="bg-on-table-2/40 h-4 w-px" />
                           <TextButton
                             className={HIT}
-                            onClick={() => moveSpread(i, i + 1)}
-                            disabled={i === book.spreads.length - 1}
-                            aria-label={`Doppelseite ${i + 1} nach hinten`}
-                          >
-                            →
-                          </TextButton>
-                          {/* Entfernen mit Abstand zu den Pfeilen, damit ein Fehltreffer nicht löscht */}
-                          <TextButton
-                            className={`${HIT} ml-3`}
                             onClick={() => removeSpread(i)}
                             aria-label={`Doppelseite ${i + 1} entfernen, Fotos in die Ablage`}
+                            title="Doppelseite entfernen, Fotos in die Ablage"
                           >
                             ×
                           </TextButton>
@@ -1145,7 +1199,7 @@ export function Editor() {
           onUndo={undo}
           onRedo={redo}
           onCommit={commitStage}
-          onShelve={shelvePhoto}
+          onShelve={(key) => shelvePhoto(key, false)}
           onPhoto={setPhoto}
           onReset={resetStage}
           onClose={() => setStageId(null)}
@@ -1186,6 +1240,48 @@ export function Editor() {
         <ShareDialog book={book} onClose={() => setSharing(false)} onTitle={(title) => update((b) => ({ ...b, title }), "title")} />
       )}
     </main>
+  );
+}
+
+/** Telefon: Wiederholen und Verlauf hinter „Mehr“, damit der Kopf zwei Zeilen hat (#43) */
+function MoreMenu({ canRedo, onRedo, onHistory }: { canRedo: boolean; onRedo: () => void; onHistory: () => void }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      root.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    };
+    window.addEventListener("pointerdown", away);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("pointerdown", away);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const pick = (f: () => void) => () => {
+    setOpen(false);
+    f();
+  };
+  return (
+    <div ref={root} className="relative md:hidden">
+      <TextButton aria-expanded={open} aria-controls="editor-more" onClick={() => setOpen((o) => !o)} className={HIT}>
+        Mehr
+      </TextButton>
+      {open && (
+        <div id="editor-more" className="slip text-ink absolute top-full right-0 z-40 mt-2 flex w-44 flex-col border border-ink/15 p-2 text-sm shadow-[0_12px_24px_-8px_rgb(12_10_8/0.75)]">
+          <button type="button" disabled={!canRedo} onClick={pick(onRedo)} className="min-h-11 px-3 text-left disabled:opacity-50">
+            Wiederholen
+          </button>
+          <button type="button" onClick={pick(onHistory)} className="min-h-11 px-3 text-left">
+            Verlauf
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -23,8 +23,10 @@ await page.evaluate(async (urls) => {
   const target = document.querySelector("header");
   for (const type of ["dragenter", "dragover", "drop"]) target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
 }, urls);
-await page.getByText(/Erstentwurf nach/).waitFor({ timeout: 600000 });
-out.ingest = { photos: urls.length, wallS: (Date.now() - t0) / 1000, appSays: await page.getByText(/Erstentwurf nach/).textContent(), ...(await page.evaluate(() => window.__stop())), peak };
+// die Werkbank zeigt keinen Messwert mehr an (#43), die Zeit steht als performance.measure bereit
+await page.waitForFunction(() => performance.getEntriesByName("fuji:erstentwurf").length > 0, null, { timeout: 600000 });
+const appSays = await page.evaluate(() => `Erstentwurf nach ${(performance.getEntriesByName("fuji:erstentwurf")[0].duration / 1000).toFixed(1)} s`);
+out.ingest = { photos: urls.length, wallS: (Date.now() - t0) / 1000, appSays, ...(await page.evaluate(() => window.__stop())), peak };
 clearInterval(sampler);
 out.afterIngest = rss();
 if (mode === "big") { console.log(JSON.stringify(out, null, 1)); await browser.close(); process.exit(0); }
