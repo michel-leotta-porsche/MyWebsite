@@ -456,10 +456,10 @@ export function Stage({
           { label: "Duplizieren", hint: "⌘D", run: () => paste(it) },
           { label: "Einfügen", hint: "⌘V", run: () => pasteFromMenu() },
           "sep",
-          { label: "Ganz nach vorn", hint: "⇧⌘]", run: () => layer(it.id, "front") },
-          { label: "Nach vorn", hint: "⌘]", run: () => layer(it.id, "up") },
-          { label: "Nach hinten", hint: "⌘[", run: () => layer(it.id, "down") },
-          { label: "Ganz nach hinten", hint: "⇧⌘[", run: () => layer(it.id, "back") },
+          { label: "Ganz nach vorn", hint: "⇧⌘]", disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "front") },
+          { label: "Nach vorn", hint: "⌘]", disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "up") },
+          { label: "Nach hinten", hint: "⌘[", disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "down") },
+          { label: "Ganz nach hinten", hint: "⇧⌘[", disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "back") },
           "sep",
         ]
       : [];
@@ -497,13 +497,35 @@ export function Stage({
   };
 
   /** Ebenen: die Reihenfolge der Elemente ist die Stapelung, das letzte liegt oben */
+  /** Liegt etwas über (up) bzw. unter (down) dem Element, das es überlappt? */
+  const canLayer = (id: string, dir: "up" | "down") => {
+    const i = items.findIndex((x) => x.id === id);
+    if (i < 0) return false;
+    const me = boxOf(items[i], geom);
+    return items.some((o, n) => {
+      if (dir === "up" ? n <= i : n >= i) return false;
+      const b = boxOf(o, geom);
+      return me.x < b.x + b.w && b.x < me.x + me.w && me.y < b.y + b.h && b.y < me.y + me.h;
+    });
+  };
   const layer = (id: string, to: "up" | "down" | "front" | "back") => {
     const i = items.findIndex((x) => x.id === id);
     if (i < 0) return;
+    const me = boxOf(items[i], geom);
+    const hits = (o: SpreadItem) => {
+      const b = boxOf(o, geom);
+      return me.x < b.x + b.w && b.x < me.x + me.w && me.y < b.y + b.h && b.y < me.y + me.h;
+    };
+    // vorbei am nächsten Element, das wirklich darüber oder darunter liegt; nicht überlappende zählen nicht
+    let j: number;
+    if (to === "front") j = items.length - 1;
+    else if (to === "back") j = 0;
+    else if (to === "up") j = items.findIndex((o, n) => n > i && hits(o));
+    else j = items.findLastIndex((o, n) => n < i && hits(o));
+    if (j < 0 || j === i) return setSay(to === "up" || to === "front" ? "Liegt schon ganz vorn." : "Liegt schon ganz hinten.");
     const next = [...items];
     const [it] = next.splice(i, 1);
-    const at = to === "front" ? next.length : to === "back" ? 0 : Math.max(0, Math.min(next.length, i + (to === "up" ? 1 : -1)));
-    next.splice(at, 0, it);
+    next.splice(j, 0, it);
     commit(next, undefined, to === "up" || to === "front" ? "Nach vorn gelegt" : "Nach hinten gelegt");
   };
   const remove = (it: SpreadItem) => {
@@ -874,6 +896,8 @@ export function Stage({
               onRemove={() => remove(selected)}
               onLayer={(to) => layer(selected.id, to)}
               onDuplicate={() => duplicate(selected)}
+              up={canLayer(selected.id, "up")}
+              down={canLayer(selected.id, "down")}
             />
           )}
           {selected?.t === "text" && (
@@ -915,7 +939,12 @@ export function Stage({
                 />
                 Helle Schrift (für Text auf dunklen Fotos)
               </label>
-              <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} />
+              <LayerButtons
+                onLayer={(to) => layer(selected.id, to)}
+                onDuplicate={() => duplicate(selected)}
+                up={canLayer(selected.id, "up")}
+                down={canLayer(selected.id, "down")}
+              />
               {boxOf(selected, geom).y + boxOf(selected, geom).h > grid.ys[grid.ys.length - 2] + 0.5 && (
                 <p className="text-ink text-[12px] font-semibold">Der Text läuft unten aus dem Satzspiegel. Kürzen oder den Rahmen breiter ziehen.</p>
               )}
@@ -930,7 +959,7 @@ export function Stage({
               <p className="text-sm font-semibold">Ebenen</p>
               <p className="text-ink-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
               <ol className="space-y-px">
-                {[...shown].reverse().map((it, n) => (
+                {[...shown].reverse().map((it) => (
                   <li key={it.id} className="flex items-center gap-2">
                     <button
                       type="button"
@@ -940,10 +969,10 @@ export function Stage({
                     >
                       {nameOf(it) || "Foto"}
                     </button>
-                    <button type="button" aria-label="nach vorn" disabled={n === 0} onClick={() => layer(it.id, "up")} className="h-8 w-8 text-sm disabled:opacity-30">
+                    <button type="button" aria-label="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className="h-8 w-8 text-sm disabled:opacity-30">
                       ↑
                     </button>
-                    <button type="button" aria-label="nach hinten" disabled={n === shown.length - 1} onClick={() => layer(it.id, "down")} className="h-8 w-8 text-sm disabled:opacity-30">
+                    <button type="button" aria-label="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className="h-8 w-8 text-sm disabled:opacity-30">
                       ↓
                     </button>
                   </li>
@@ -978,6 +1007,8 @@ function PhotoPanel({
   onRemove,
   onLayer,
   onDuplicate,
+  up,
+  down,
 }: {
   item: Extract<FreeItem, { t: "photo" }>;
   photo?: StoredPhoto;
@@ -987,6 +1018,8 @@ function PhotoPanel({
   onRemove: () => void;
   onLayer: (to: "up" | "down" | "front" | "back") => void;
   onDuplicate: () => void;
+  up: boolean;
+  down: boolean;
 }) {
   return (
     <div className="slip text-ink space-y-3 p-5">
@@ -1007,28 +1040,38 @@ function PhotoPanel({
           In die Ablage
         </button>
       </div>
-      <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} />
+      <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} up={up} down={down} />
     </div>
   );
 }
 
-function LayerButtons({ onLayer, onDuplicate }: { onLayer: (to: "up" | "down" | "front" | "back") => void; onDuplicate: () => void }) {
+function LayerButtons({
+  onLayer,
+  onDuplicate,
+  up = true,
+  down = true,
+}: {
+  onLayer: (to: "up" | "down" | "front" | "back") => void;
+  onDuplicate: () => void;
+  up?: boolean;
+  down?: boolean;
+}) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]" role="group" aria-label="Ebene und Kopie">
       <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onDuplicate} title="⌘D, oder ⌘C und ⌘V">
         Duplizieren
       </button>
-      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => onLayer("front")} title="⇧⌘]">
+      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40" onClick={() => onLayer("front")} disabled={!up} title="⇧⌘]">
         Ganz nach vorn
       </button>
-      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => onLayer("back")} title="⇧⌘[">
+      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40" onClick={() => onLayer("back")} disabled={!down} title="⇧⌘[">
         Ganz nach hinten
       </button>
     </div>
   );
 }
 
-type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; run: () => void };
+type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; disabled?: boolean; run: () => void };
 
 /** Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt */
 function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
@@ -1079,11 +1122,12 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
               type="button"
               role={en.checked === undefined ? "menuitem" : "menuitemcheckbox"}
               aria-checked={en.checked}
+              disabled={en.disabled}
               onClick={() => {
                 onClose();
                 en.run();
               }}
-              className="hover:bg-ink/8 focus-visible:bg-ink/8 flex min-h-8 w-full items-center gap-3 px-3 text-left focus-visible:outline-none"
+              className="hover:bg-ink/8 focus-visible:bg-ink/8 flex min-h-8 disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 px-3 text-left focus-visible:outline-none"
             >
               <span aria-hidden className="w-3 text-center">
                 {en.checked ? "✓" : ""}

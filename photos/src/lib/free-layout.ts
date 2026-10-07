@@ -55,7 +55,8 @@ export function materialize(data: BookData, spreadIndex: number): [PageDraft, Pa
 
 /** Seiten → Doppelseite: rechte Seite um 100 verschoben, Hälften über den Bund zu einem Element */
 export function toSpread(pages: [PageDraft, PageDraft]): SpreadItem[] {
-  const out: SpreadItem[] = [];
+  const out: (SpreadItem & { _n: number })[] = [];
+  let n = 0;
   const seenPair = new Set<string>();
   pages.forEach((p, pi) => {
     for (const it of p.items) {
@@ -63,16 +64,23 @@ export function toSpread(pages: [PageDraft, PageDraft]): SpreadItem[] {
         if (seenPair.has(it.pairId)) continue;
         seenPair.add(it.pairId);
       }
-      out.push({ ...it, box: { ...it.box, x: it.box.x + pi * 100 } });
+      out.push({ ...it, box: { ...it.box, x: it.box.x + pi * 100 }, _n: n++ });
     }
   });
-  return out;
+  // die Stapelung gilt für die ganze Doppelseite; ältere Stände ohne z behalten ihre Reihenfolge
+  return out
+    .sort((a, b) => (a.z ?? a._n) - (b.z ?? b._n) || a._n - b._n)
+    .map(({ _n, ...it }) => {
+      void _n;
+      return it as SpreadItem;
+    });
 }
 
 /** Doppelseite → Seiten: jedes Element auf die Seite seiner Mitte, Fotos über den Bund werden zwei Hälften */
 export function fromSpread(items: SpreadItem[]): [PageDraft, PageDraft] {
   const pages: [PageDraft, PageDraft] = [{ items: [] }, { items: [] }];
-  for (const it of items) {
+  for (const [z, raw] of items.entries()) {
+    const it = { ...raw, z } as SpreadItem;
     const { x, w } = it.box;
     if (it.t === "photo" && x < 99.5 && x + w > 100.5) {
       const pairId = it.pairId ?? itemId();
