@@ -2,7 +2,7 @@
 
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type User } from "firebase/auth";
-import { initializeFirestore, getFirestore, type Firestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Öffentliche Web-Konfiguration (kein Geheimnis): der Zugriff wird über firestore.rules und storage.rules geregelt
@@ -19,11 +19,17 @@ export const app = () => (getApps().length ? getApp() : initializeApp(config));
 export const auth = () => getAuth(app());
 
 let fs: Firestore | null = null;
-/** Firestore ohne undefined-Felder: optionale Werte fallen einfach weg */
+/**
+ * Firestore ohne undefined-Felder (optionale Werte fallen weg) und mit Zwischenspeicher im Browser:
+ * Änderungen ohne Netz bleiben erhalten, auch über einen Neustart, und gehen raus, sobald wieder Netz da ist.
+ */
 export const db = () => {
   if (fs) return fs;
   try {
-    fs = initializeFirestore(app(), { ignoreUndefinedProperties: true });
+    fs = initializeFirestore(app(), {
+      ignoreUndefinedProperties: true,
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
   } catch {
     fs = getFirestore(app());
   }

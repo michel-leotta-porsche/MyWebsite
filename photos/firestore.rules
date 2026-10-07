@@ -8,6 +8,12 @@ service cloud.firestore {
     match /books/{id} {
       allow read, update, delete: if signedIn() && resource.data.owner == request.auth.uid;
       allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
+
+      // Zwischenstände: nur der Macher des Buchs
+      match /versions/{v} {
+        allow read, create, delete: if signedIn()
+          && get(/databases/$(db)/documents/books/$(id)).data.owner == request.auth.uid;
+      }
     }
 
     match /shares/{token} {

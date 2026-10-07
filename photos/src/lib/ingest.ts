@@ -4,6 +4,7 @@ import exifr from "exifr";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { readFujiRecipe, readXmp } from "@/lib/fuji";
+import { findSubject } from "@/lib/subject";
 import { parseXmp, toPreset } from "@/lib/xmp";
 
 // Ein Foto für ein neues Buch vorbereiten, ganz im Browser:
@@ -21,6 +22,9 @@ export type Ingested = {
   blobs: Record<SizeName, Blob>;
   /** mittlere Farbe in Lab, für die automatische Folge */
   color: [number, number, number];
+  /** Hauptmotiv (0..1) und ob es ein Gesicht ist */
+  subject: [number, number];
+  face: boolean;
   taken?: string;
   camera?: CameraInfo;
   recipe?: Recipe;
@@ -133,6 +137,7 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
     const page = await encode(img, SIZES.page);
     const thumb = await encode(img, SIZES.thumb);
     const color = averageColor(thumb.canvas);
+    const subject = await findSubject(page.canvas);
     return {
       key,
       name: file.name,
@@ -140,6 +145,8 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
       h: large.canvas.height,
       blobs: { large: large.blob, page: page.blob, thumb: thumb.blob },
       color,
+      subject: subject.point,
+      face: subject.face,
       taken,
       camera,
       recipe,

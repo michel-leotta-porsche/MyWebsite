@@ -94,6 +94,10 @@ export type Photo = {
   thumb: StaticImageData;
   /** Bildausschnitt beim Beschneiden (object-position), 0..1 */
   focus?: [number, number];
+  /** Vergrößerung im Bildfeld (1 = füllt das Feld) */
+  zoom?: number;
+  /** contain: das ganze Foto im Feld, ohne Beschnitt */
+  fit?: "cover" | "contain";
   /** Rezept und Kamera, wenn das Foto sie selbst mitbringt (hochgeladene Bücher) */
   recipe?: Recipe;
   camera?: CameraInfo;
@@ -121,7 +125,11 @@ export type Page =
   | { kind: "landscape"; no: number }
   | { kind: "across"; no: number; half: "left" | "right" }
   | { kind: "blank"; no: number }
-  | { kind: "tall"; no: number };
+  | { kind: "tall"; no: number }
+  /** Textseite: Überschrift und kurze Absätze im Satzspiegel */
+  | { kind: "text"; heading?: string; body: string; style: TextStyle };
+
+export type TextStyle = "text" | "gross";
 
 export type Spread = { left: Page; right: Page; plates: number[] };
 
@@ -155,7 +163,8 @@ export type BookData = {
 
 // Bausteine für die Folge: Seiten mit Fotoschlüssel, die Nummern ergeben sich danach
 export type Spec =
-  | { kind: "cover" | "endpaper" | "title" | "index" | "colophon" }
+  | { kind: "cover" | "endpaper" | "title" | "index" | "colophon" | "verso" }
+  | { kind: "text"; heading?: string; body: string; style: TextStyle }
   | { kind: "full" | "plate" | "landscape" | "blank" | "tall" | "across"; key: string }
   | { kind: "small"; key: string; cols: 2 | 3; row: "top" | "bottom"; align: "outer" | "inner" };
 
@@ -173,6 +182,8 @@ export const small = (key: string, cols: 2 | 3, row: "top" | "bottom", align: "o
 });
 export const across = (key: string): Spec => ({ kind: "across", key });
 export const ENDPAPER: Spec = { kind: "endpaper" };
+export const VERSO: Spec = { kind: "verso" };
+export const textPage = (body: string, heading?: string, style: TextStyle = "text"): Spec => ({ kind: "text", body, heading, style });
 export const TITLE: Spec = { kind: "title" };
 export const INDEX: Spec = { kind: "index" };
 export const COLOPHON: Spec = { kind: "colophon" };
@@ -201,7 +212,10 @@ export function build(spec: BookSpec): BookData {
       case "title":
       case "index":
       case "colophon":
+      case "verso":
         return { kind: s.kind };
+      case "text":
+        return { kind: "text", heading: s.heading, body: s.body, style: s.style };
       case "small":
         return { kind: "small", no: noOf(s.key), cols: s.cols, row: s.row, align: s.align };
       case "across":

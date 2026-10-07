@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import messungen from "@/content/messungen.json";
 import { featureScore, KANO, qfd, techImportance, weights, type Kano } from "@/content/qfd";
 import { HouseOfQuality } from "@/components/qfd/house-of-quality";
 import { SurveyResults } from "@/components/qfd/survey-results";
@@ -299,6 +300,40 @@ export default function Page() {
                 </div>
               ))}
             </div>
+            <h3 className="text-on-table mt-12 text-lg font-semibold">V1 gebaut: Phase 1 und erste Messungen</h3>
+            <p className="text-on-table-2 mt-2 max-w-[70ch] text-sm leading-relaxed">
+              Umgesetzt: Versionen und Ablage im Konto mit Zwischenspeicher offline (F2), Verlauf, Rückgängig und Projekt als Datei (F3), Fixieren mit
+              Neuberechnung nur freier Doppelseiten (F4), Ausschnitt mit Zoom, „ganz zeigen“ und Motivwarnung (F5), Textseiten (F6), Stern für wichtige
+              Fotos (F7), Fotos über Seiten ziehen, Ablage, Seiten einfügen und entfernen (F8). {messungen.note}
+            </p>
+            <div tabIndex={0} className="mt-4 overflow-x-auto" aria-label="Tabelle Messungen">
+              <table className="w-full min-w-[820px] text-left text-sm">
+                <thead>
+                  <tr className="text-on-table-2 border-b border-on-table">
+                    <th className="py-2 pr-3 font-normal">Merkmal</th>
+                    <th className="py-2 pr-3 font-normal">Vorher</th>
+                    <th className="py-2 pr-3 font-normal">V1</th>
+                    <th className="py-2 pr-3 font-normal">Ziel</th>
+                    <th className="py-2 font-normal">Stand</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {messungen.rows.map((m, i) => (
+                    <tr key={i} className="border-b border-on-table-2/25 align-top">
+                      <td className="text-on-table py-2.5 pr-3">
+                        <span className="text-on-table-2 mr-2">{m.id}</span>
+                        {m.name}
+                      </td>
+                      <td className="text-on-table-2 py-2.5 pr-3">{m.before}</td>
+                      <td className="text-on-table py-2.5 pr-3 font-semibold">{m.v1}</td>
+                      <td className="text-on-table-2 py-2.5 pr-3">{m.target}</td>
+                      <td className="text-on-table py-2.5">{m.ok === true ? "erreicht" : m.ok === false ? "verfehlt" : "offen"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <p className="text-on-table-2 mt-6 max-w-[70ch] text-sm leading-relaxed">
               <span className="text-on-table font-semibold">Grenzen der Simulation: </span>
               {features.caveats}

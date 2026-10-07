@@ -1,12 +1,19 @@
-import { across, blank, framed, full, landscape, small, tall, type Spec } from "@/content/books";
+import { across, blank, framed, full, landscape, small, tall, textPage, VERSO, type Spec, type TextStyle } from "@/content/books";
 
 // Automatische Gestaltung nach den Regeln aus dem Workshop (docs/workshop-konzept.md):
 // Reihenfolge nach Aufnahmezeit, Gegenüber nach Farbe, Seitentypen im Rhythmus.
 // Jede Doppelseite ist eine Gruppe von ein oder zwei Fotos plus eine Layout-Variante,
 // damit man sie im Editor per Klick wechseln kann.
 
-export type AutoPhoto = { key: string; w: number; h: number; color: [number, number, number]; taken?: string };
-export type SpreadDraft = { keys: string[]; layout: number };
+export type AutoPhoto = { key: string; w: number; h: number; color: [number, number, number]; taken?: string; star?: boolean };
+export type SpreadText = { heading?: string; body: string; style?: TextStyle };
+/**
+ * Eine Doppelseite im Entwurf. pinned: von Hand entschieden, die Automatik fasst sie nicht mehr an.
+ * text: Textseite (immer fixiert), optional mit einem Foto daneben.
+ */
+export type SpreadDraft = { id?: string; keys: string[]; layout: number; pinned?: boolean; text?: SpreadText };
+
+export const spreadId = () => Math.random().toString(36).slice(2, 10);
 
 const ratio = (p: AutoPhoto) => p.w / p.h;
 const isLandscape = (p: AutoPhoto) => ratio(p) > 1.1;
@@ -14,13 +21,29 @@ const isTall = (p: AutoPhoto) => ratio(p) < 0.6;
 const dist = (a: AutoPhoto, b: AutoPhoto) => Math.hypot(a.color[0] - b.color[0], (a.color[1] - b.color[1]) * 1.4, (a.color[2] - b.color[2]) * 1.4);
 const chroma = (p: AutoPhoto) => Math.hypot(p.color[1], p.color[2]);
 
-/** Mögliche Layouts für eine Gruppe; die erste Variante ist die ruhigste Wahl */
+/** Mögliche Layouts einer Textseite, mit oder ohne Foto daneben */
+function textVariants(text: SpreadText, keys: string[], byKey: Map<string, AutoPhoto>): (readonly [Spec, Spec])[] {
+  const t = textPage(text.body, text.heading, text.style ?? "text");
+  const a = keys.map((k) => byKey.get(k)).find(Boolean);
+  if (!a) return [[t, VERSO], [VERSO, t]];
+  if (isLandscape(a)) return [[t, landscape(a.key)], [landscape(a.key), t]];
+  return [[t, full(a.key)], [t, framed(a.key)], [full(a.key), t], [framed(a.key), t]];
+}
+
+/** Mögliche Layouts für eine Doppelseite; die erste Variante ist die ruhigste Wahl */
+export function variantsOf(s: SpreadDraft, byKey: Map<string, AutoPhoto>): (readonly [Spec, Spec] | readonly [Spec])[] {
+  return s.text ? textVariants(s.text, s.keys, byKey) : variants(s.keys, byKey);
+}
+
+/** Mögliche Layouts für eine Gruppe von Fotos */
 export function variants(keys: string[], byKey: Map<string, AutoPhoto>): (readonly [Spec, Spec] | readonly [Spec])[] {
   const ps = keys.map((k) => byKey.get(k)!).filter(Boolean);
+  if (!ps.length) return [[VERSO, VERSO]];
   if (ps.length === 1) {
     const [a] = ps;
     if (isLandscape(a)) return [[across(a.key)], [blank(a.key), landscape(a.key)], [landscape(a.key), blank(a.key)]];
-    if (isTall(a)) return [[blank(a.key), tall(a.key)], [blank(a.key), full(a.key)]];
+    // das hohe Format trägt seine Unterschrift im Papierstreifen; gegenüber bleibt leeres Papier
+    if (isTall(a)) return [[VERSO, tall(a.key)], [blank(a.key), full(a.key)]];
     return [[blank(a.key), full(a.key)], [blank(a.key), framed(a.key)], [small(a.key, 3, "top", "outer"), blank(a.key)]];
   }
   const [a, b] = ps;
@@ -55,6 +78,11 @@ export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; cov
   let acrossUsed = 0;
   while (rest.length) {
     const a = rest.shift()!;
+    // wichtige Fotos bekommen eine Doppelseite für sich und damit die größte Fläche
+    if (a.star) {
+      groups.push([a.key]);
+      continue;
+    }
     // ein breites Querformat darf ab und zu über den Bund laufen
     if (isLandscape(a) && ratio(a) > 1.4 && acrossUsed < Math.max(1, Math.floor(photos.length / 12)) && groups.length > 0) {
       groups.push([a.key]);
@@ -66,7 +94,11 @@ export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; cov
       break;
     }
     // Gegenüber: unter den nächsten drei das farblich nächste
-    const window = rest.slice(0, 3);
+    const window = rest.filter((p) => !p.star).slice(0, 3);
+    if (!window.length) {
+      groups.push([a.key]);
+      continue;
+    }
     const partner = window.reduce((best, p) => (dist(a, p) < dist(a, best) ? p : best), window[0]);
     rest.splice(rest.indexOf(partner), 1);
     groups.push([a.key, partner.key]);
@@ -87,7 +119,11 @@ export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; cov
       if (sincePaper >= 2 && !paperRich(v) && vs.some(paperRich)) return false;
       return true;
     });
-    if (allowed.length) {
+    const starred = keys.length === 1 && byKey.get(keys[0])?.star;
+    if (starred) {
+      // groß: über den Bund, sonst randlos neben der leeren Seite
+      pick = 0;
+    } else if (allowed.length) {
       // abwechseln, damit nicht jede Papierseite gleich aussieht
       const rotate = spreads.length % allowed.length;
       const preferQuiet = sincePaper >= 2 ? allowed.filter(({ v }) => paperRich(v)) : allowed;
@@ -98,7 +134,29 @@ export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; cov
     if (chosen.some((s) => s.kind === "blank")) blanks++;
     lastFull = fullPair(chosen);
     sincePaper = paperRich(chosen) ? 0 : sincePaper + 1;
-    spreads.push({ keys, layout: pick });
+    spreads.push({ id: spreadId(), keys, layout: pick });
   }
   return { spreads, coverKey };
+}
+
+/**
+ * Neu gestalten, ohne Entschiedenes anzufassen: fixierte Doppelseiten und Textseiten bleiben an ihrem Platz,
+ * nur die Fotos der freien Doppelseiten (und neue Fotos) werden neu verteilt.
+ */
+export function relayoutFree(
+  spreads: SpreadDraft[],
+  photos: AutoPhoto[],
+  shelved: Set<string>,
+): { spreads: SpreadDraft[]; coverKey: string } {
+  const fixed = new Set(spreads.filter((s) => s.pinned || s.text).flatMap((s) => s.keys));
+  const free = photos.filter((p) => !fixed.has(p.key) && !shelved.has(p.key));
+  const auto = autoSequence(free);
+  const out: SpreadDraft[] = [];
+  let next = 0;
+  for (const s of spreads) {
+    if (s.pinned || s.text) out.push(s);
+    else if (next < auto.spreads.length) out.push(auto.spreads[next++]);
+  }
+  while (next < auto.spreads.length) out.push(auto.spreads[next++]);
+  return { spreads: out, coverKey: auto.coverKey };
 }

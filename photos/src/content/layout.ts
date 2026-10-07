@@ -7,7 +7,19 @@ export type Tone = "ink" | "ink2" | "clothInk";
 
 export type El =
   /** Foto, beschnitten auf den Kasten (object-fit: cover) */
-  | { t: "img"; no: number; x: number; y: number; w: number; h: number; focus: [number, number]; plate: boolean }
+  | {
+      t: "img";
+      no: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      focus: [number, number];
+      plate: boolean;
+      /** Vergrößerung um den Fokuspunkt (1 = füllt den Kasten) */
+      zoom: number;
+      fit: "cover" | "contain";
+    }
   /** Bildunterschrift; y ist die Oberkante, align die Kante, an der sie hängt */
   | { t: "caption"; no: number; x: number; y: number; w: number; align: "left" | "right"; stack?: boolean }
   | {
@@ -22,6 +34,8 @@ export type El =
       lh: number;
       w?: number;
       display?: boolean;
+      /** Zeilenumbrüche im Text bleiben stehen (Absätze) */
+      lines?: boolean;
     }
   /** Abzug im Bildverzeichnis, ganz sichtbar (contain), springt zur Tafel */
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
@@ -44,7 +58,18 @@ const ratio = (book: BookData, no: number) => {
   const { width, height } = plateOf(book, no).src;
   return height / width;
 };
-const focusOf = (book: BookData, no: number) => plateOf(book, no).focus ?? [0.5, 0.5];
+/** Ausschnitt eines Fotos: Fokus, Zoom und ob es ganz gezeigt wird */
+const view = (book: BookData, no: number) => {
+  const p = plateOf(book, no);
+  return { focus: p.focus ?? ([0.5, 0.5] as [number, number]), zoom: p.zoom ?? 1, fit: p.fit ?? ("cover" as const) };
+};
+
+/** Grob geschätzte Zeilen, um Blöcke untereinander zu setzen (HTML und Textur nutzen dieselbe Schätzung) */
+export const estimateLines = (text: string, size: number, width: number) =>
+  text.split("\n").reduce((a, para) => a + Math.max(1, Math.ceil((para.length * size * 0.52) / width)), 0);
+
+/** Textseite: Größen der beiden Stile in cqw */
+export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh: 1.35 } } as const;
 
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
   const H = book.aspect * 100;
@@ -72,7 +97,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
           // Falz am Rücken
           { t: "rect", x: 0, y: 0, w: 5, h: H, color: "rgb(12 10 8 / 0.08)" },
           { t: "rect", x: 5, y: 0, w: 0.25, h: H, color: "rgb(12 10 8 / 0.18)" },
-          { t: "img", no, x, y, w, h, focus: focusOf(book, no), plate: false },
+          { t: "img", no, x, y, w, h, ...view(book, no), plate: false },
           { t: "frame", x, y, w, h, color: book.cloth.deep, width: 0.5 },
           {
             t: "text",
@@ -109,13 +134,13 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
 
     case "full": {
       const no = page.no;
-      return paper([{ t: "img", no, x: 0, y: 0, w: 100, h: H, focus: focusOf(book, no), plate: true }], true);
+      return paper([{ t: "img", no, x: 0, y: 0, w: 100, h: H, ...view(book, no), plate: true }], true);
     }
 
     case "plate": {
       const no = page.no;
       return paper([
-        { t: "img", no, x: ta.x, y: ta.y, w: ta.w, h: ta.h, focus: focusOf(book, no), plate: true },
+        { t: "img", no, x: ta.x, y: ta.y, w: ta.w, h: ta.h, ...view(book, no), plate: true },
         outerCaption(no, ta.x, ta.w, ta.y + ta.h + 3),
       ]);
     }
@@ -131,14 +156,14 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       const cap: El = atRight
         ? { t: "caption", no, x: x + w, y: y + h + 3, w: 60, align: "right" }
         : { t: "caption", no, x, y: y + h + 3, w: 60, align: "left" };
-      return paper([{ t: "img", no, x, y, w, h, focus: focusOf(book, no), plate: true }, cap]);
+      return paper([{ t: "img", no, x, y, w, h, ...view(book, no), plate: true }, cap]);
     }
 
     case "landscape": {
       const no = page.no;
       const h = 100 * ratio(book, no);
       return paper([
-        { t: "img", no, x: 0, y: ta.y, w: 100, h, focus: focusOf(book, no), plate: true },
+        { t: "img", no, x: 0, y: ta.y, w: 100, h, ...view(book, no), plate: true },
         outerCaption(no, ta.x, ta.w, ta.y + h + 3),
       ]);
     }
@@ -147,7 +172,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       const no = page.no;
       // ein Bild über beide Seiten, bis an alle Kanten; jede Seite zeigt ihre Hälfte
       return paper([
-        { t: "img", no, x: page.half === "left" ? 0 : -100, y: 0, w: 200, h: H, focus: focusOf(book, no), plate: true },
+        { t: "img", no, x: page.half === "left" ? 0 : -100, y: 0, w: 200, h: H, ...view(book, no), plate: true },
       ]);
     }
 
@@ -162,10 +187,23 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       const strip = 100 - w;
       const cx = side === "right" ? w + 2.5 : 2.5;
       return paper([
-        { t: "img", no, x, y: 0, w, h: H, focus: focusOf(book, no), plate: true },
+        { t: "img", no, x, y: 0, w, h: H, ...view(book, no), plate: true },
         // schmaler Streifen: Nummer und Titel untereinander
         { t: "caption", no, x: cx, y: ta.y + ta.h - 10, w: strip - 5, align: "left", stack: true },
       ]);
+    }
+
+    case "text": {
+      const st = TEXT_STYLE[page.style] ?? TEXT_STYLE.text;
+      const els: El[] = [];
+      let y = ta.y;
+      if (page.heading) {
+        const hs = 6;
+        els.push({ t: "text", text: page.heading, x: ta.x, y, size: hs, weight: 700, tone: "ink", lh: 1.02, w: ta.w, display: true });
+        y += estimateLines(page.heading, hs, ta.w) * hs * 1.02 + 5;
+      }
+      els.push({ t: "text", text: page.body, x: ta.x, y, size: st.size, weight: 400, tone: "ink", lh: st.lh, w: 66, lines: true });
+      return paper(els);
     }
 
     case "index": {

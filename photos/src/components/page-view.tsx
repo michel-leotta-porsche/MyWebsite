@@ -99,8 +99,13 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
               aria-hidden={hidden || undefined}
               fill
               sizes={`(min-width: 768px) ${Math.ceil(el.w * 0.4)}vw, ${Math.ceil(el.w * 0.96)}vw`}
-              className="object-cover"
-              style={{ objectPosition: `${el.focus[0] * 100}% ${el.focus[1] * 100}%` }}
+              className={el.fit === "contain" ? "object-contain" : "object-cover"}
+              style={{
+                objectPosition: el.fit === "contain" ? "50% 50%" : `${el.focus[0] * 100}% ${el.focus[1] * 100}%`,
+                // Zoom um den Fokuspunkt; dieselbe Rechnung zeichnet die Textur (page-texture.ts)
+                transform: el.zoom !== 1 && el.fit !== "contain" ? `scale(${el.zoom})` : undefined,
+                transformOrigin: `${el.focus[0] * 100}% ${el.focus[1] * 100}%`,
+              }}
               loading={eager ? "eager" : "lazy"}
             />
           </div>
@@ -126,7 +131,7 @@ function Element({ book, el, eager }: { book: BookData; el: El; eager: boolean }
             fontSize: el.size < 3.4 ? `max(${el.size < 2.4 ? 9 : 11}px, ${el.size}cqw)` : `${el.size}cqw`,
             fontWeight: el.weight,
             lineHeight: el.lh,
-            whiteSpace: el.w ? undefined : "nowrap",
+            whiteSpace: el.lines ? "pre-line" : el.w ? undefined : "nowrap",
             color: el.tone === "clothInk" ? book.cloth.ink : undefined,
             fontVariationSettings: el.display ? '"wdth" 78, "opsz" 96' : undefined,
           }}

@@ -40,12 +40,6 @@ function photoUrl(src: StaticImageData, width: number) {
 let paperTile: Promise<HTMLImageElement> | null = null;
 let linenTiles: Promise<HTMLImageElement[]> | null = null;
 
-function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, focus: [number, number]) {
-  const s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-  const sw = w / s;
-  const sh = h / s;
-  ctx.drawImage(img, (img.naturalWidth - sw) * focus[0], (img.naturalHeight - sh) * focus[1], sw, sh, x, y, w, h);
-}
 
 function contain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
   const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
@@ -221,7 +215,27 @@ async function drawLayout(
         ctx.beginPath();
         ctx.rect(0, 0, W, H);
         ctx.clip();
-        cover(ctx, img, el.x * cq, el.y * cq, el.w * cq, el.h * cq, el.focus);
+        const [bx, by, bw, bh] = [el.x * cq, el.y * cq, el.w * cq, el.h * cq];
+        if (el.fit === "contain") {
+          const s = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
+          const dw = img.naturalWidth * s;
+          const dh = img.naturalHeight * s;
+          ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+        } else {
+          // wie im HTML: erst füllen (object-position = Fokus), dann um den Fokuspunkt des Kastens skalieren
+          ctx.beginPath();
+          ctx.rect(bx, by, bw, bh);
+          ctx.clip();
+          const s = Math.max(bw / img.naturalWidth, bh / img.naturalHeight);
+          const dw = img.naturalWidth * s;
+          const dh = img.naturalHeight * s;
+          const dx = bx + (bw - dw) * el.focus[0];
+          const dy = by + (bh - dh) * el.focus[1];
+          const ox = bx + bw * el.focus[0];
+          const oy = by + bh * el.focus[1];
+          const z = el.zoom;
+          ctx.drawImage(img, ox + (dx - ox) * z, oy + (dy - oy) * z, dw * z, dh * z);
+        }
         ctx.restore();
         return;
       }
@@ -248,7 +262,8 @@ async function drawLayout(
         setFont(ctx, el.weight, px, family, el.display);
         track(ctx, el.display ? -0.035 : 0, px);
         ctx.fillStyle = el.tone === "ink" ? C.ink : el.tone === "ink2" ? C.ink2 : book.cloth.ink;
-        const rows = el.w ? wrap(ctx, el.text, el.w * cq) : [el.text];
+        const paras = el.lines ? el.text.split("\n") : [el.text];
+        const rows = paras.flatMap((para) => (el.w ? (para ? wrap(ctx, para, el.w * cq) : [""]) : [para]));
         rows.forEach((r, n) => ctx.fillText(r, el.x * cq, baseline(el.y * cq + n * el.lh * px, px, el.lh)));
         return;
       }

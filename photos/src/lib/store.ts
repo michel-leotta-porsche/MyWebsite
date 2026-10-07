@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   orderBy,
   query,
   serverTimestamp,
@@ -18,7 +19,7 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } from "@/content/books";
 import type { CameraInfo, Recipe } from "@/content/recipes";
-import { variants, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
+import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
 import type { Ingested, SizeName } from "@/lib/ingest";
 
@@ -47,11 +48,23 @@ export type StoredPhoto = {
   color: [number, number, number];
   taken?: string;
   focus?: [number, number];
+  zoom?: number;
+  fit?: "cover" | "contain";
+  /** Hauptmotiv laut Bildanalyse (0..1), für Ausschnitt-Vorschlag und Warnung */
+  subject?: [number, number];
+  /** wichtig: kommt sicher rein und wird groß */
+  star?: boolean;
+  /** in der Ablage: hochgeladen, aber gerade nicht im Buch */
+  shelved?: boolean;
   recipe?: Recipe;
   camera?: CameraInfo;
 };
 
+/** Schema der gespeicherten Bücher; ältere Stände werden beim Laden angehoben (migrate) */
+export const SCHEMA = 2;
+
 export type StoredBook = {
+  schema?: number;
   id: string;
   owner: string;
   ownerName: string;
@@ -88,7 +101,13 @@ export function numberWord(n: number): string {
 }
 
 export const autoPhotos = (photos: StoredPhoto[]): AutoPhoto[] =>
-  photos.map((p) => ({ key: p.key, w: p.w, h: p.h, color: p.color, taken: p.taken }));
+  photos.map((p) => ({ key: p.key, w: p.w, h: p.h, color: p.color, taken: p.taken, star: p.star }));
+
+/** Ältere Stände auf das aktuelle Schema heben: Doppelseiten bekommen feste Kennungen */
+export function migrate(b: StoredBook): StoredBook {
+  if ((b.schema ?? 1) >= SCHEMA) return b;
+  return { ...b, schema: SCHEMA, spreads: b.spreads.map((s) => ({ ...s, id: s.id ?? spreadId() })) };
+}
 
 /** Gespeichertes Buch → BookData mit denselben Seitentypen wie Michels Bücher */
 export function toBookData(b: StoredBook): BookData {
@@ -102,6 +121,8 @@ export function toBookData(b: StoredBook): BookData {
       src: { src: p.src, width: p.w, height: p.h } as StaticImageData,
       thumb: { src: p.thumb, width: 360, height: Math.round((360 * p.h) / p.w) } as StaticImageData,
       focus: p.focus,
+      zoom: p.zoom,
+      fit: p.fit,
       recipe: p.recipe,
       camera: p.camera,
     };
@@ -132,7 +153,7 @@ export function toBookData(b: StoredBook): BookData {
     sequence: [
       [ENDPAPER, TITLE],
       ...b.spreads.map((s) => {
-        const vs = variants(s.keys, byKey);
+        const vs = variantsOf(s, byKey);
         return vs[s.layout % vs.length];
       }),
       [INDEX, COLOPHON],
@@ -168,6 +189,7 @@ export async function uploadPhoto(uid: string, bookId: string, ph: Ingested): Pr
 }
 
 export async function saveBook(b: StoredBook) {
+  b = { ...b, schema: SCHEMA };
   if (MOCK) return void mem.books.set(b.id, structuredClone(b));
   await setDoc(doc(db(), "books", b.id), { ...b, updatedAt: serverTimestamp() }, { merge: false });
 }
@@ -175,7 +197,42 @@ export async function saveBook(b: StoredBook) {
 export async function loadBook(id: string): Promise<StoredBook | null> {
   if (MOCK) return mem.books.get(id) ?? null;
   const s = await getDoc(doc(db(), "books", id));
-  return s.exists() ? (s.data() as StoredBook) : null;
+  return s.exists() ? migrate(s.data() as StoredBook) : null;
+}
+
+// Versionen: Zwischenstände unter books/{id}/versions, automatisch vor großen Änderungen oder von Hand benannt
+export type Version = { id: string; label: string; auto: boolean; at?: { seconds: number }; book: StoredBook };
+const memVersions = new Map<string, Version[]>();
+
+export async function saveVersion(b: StoredBook, label: string, auto: boolean) {
+  if (MOCK) {
+    const list = memVersions.get(b.id) ?? [];
+    list.unshift({ id: newId(), label, auto, at: { seconds: Math.floor(Date.now() / 1000) }, book: structuredClone(b) });
+    memVersions.set(b.id, list.slice(0, 40));
+    return;
+  }
+  await addDoc(collection(db(), "books", b.id, "versions"), { label, auto, at: serverTimestamp(), book: { ...b, schema: SCHEMA } });
+}
+
+export async function listVersions(bookId: string): Promise<Version[]> {
+  if (MOCK) return memVersions.get(bookId) ?? [];
+  const s = await getDocs(query(collection(db(), "books", bookId, "versions"), orderBy("at", "desc"), limit(40)));
+  return s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Version, "id">) }));
+}
+
+/** Ganzes Projekt als Datei; die Fotos bleiben im Konto und sind über ihre Links erreichbar */
+export function exportBook(b: StoredBook): Blob {
+  const data = { format: "fujiventura-buch", schema: SCHEMA, exportedAt: new Date().toISOString(), book: b };
+  return new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+}
+
+export async function importBook(file: File, owner: string, ownerName: string): Promise<StoredBook> {
+  const data = JSON.parse(await file.text());
+  if (data?.format !== "fujiventura-buch" || !data.book) throw new Error("Keine Fujiventura-Buchdatei");
+  // als neues Buch im eigenen Konto: neue Kennung, man selbst ist Macher
+  const b = migrate({ ...(data.book as StoredBook), id: newId(), owner, ownerName });
+  await saveBook(b);
+  return b;
 }
 
 export async function myBooks(uid: string): Promise<StoredBook[]> {

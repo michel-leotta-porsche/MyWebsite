@@ -1,0 +1,54 @@
+{
+ "date": "Oktober 2026",
+ "note": "Gemessen im Testbrowser (Chromium, Playwright). T2 ohne Hochladen, weil der Testmodus ohne Firebase läuft; mit Netz kommt die Upload-Zeit dazu. Ladezeiten gegen die Live-Seite.",
+ "rows": [
+  {
+   "id": "T2",
+   "name": "Zeit vom Reinziehen bis zum Erstentwurf (10 Fotos, Testmodus ohne Hochladen, Laptop)",
+   "before": "5.8 s",
+   "v1": "4.0 s",
+   "target": "≤ 30 s",
+   "ok": true
+  },
+  {
+   "id": "T4",
+   "name": "Ungefragte Änderungen an fixierten Doppelseiten nach „Automatisch gestalten“ (automatischer Test)",
+   "before": "kein Fixieren",
+   "v1": "0",
+   "target": "0",
+   "ok": true
+  },
+  {
+   "id": "T14",
+   "name": "Startseite: größtes Element sichtbar (LCP), Handy, langsames 4G, 4× langsamere CPU",
+   "before": "6.94 s",
+   "v1": "6.70 s",
+   "target": "≤ 2,5 s",
+   "ok": false
+  },
+  {
+   "id": "T14",
+   "name": "Gastlink: größtes Element sichtbar (LCP), gleiche Drosselung",
+   "before": "5.34 s",
+   "v1": "4.99 s",
+   "target": "≤ 2,5 s",
+   "ok": false
+  },
+  {
+   "id": "T1",
+   "name": "Wiederherstellung: Absturz, Neustart, Gerätewechsel, früherer Stand",
+   "before": "nur lokal",
+   "v1": "Ablage im Konto, Zwischenspeicher offline, Zwischenstände, Datei-Export; echte Szenarien noch nicht automatisch geprüft",
+   "target": "8 von 8",
+   "ok": null
+  },
+  {
+   "id": "T6",
+   "name": "Steuerbare Freiheitsgrade pro Foto",
+   "before": "3 von 8",
+   "v1": "7 von 8 (Seite, Doppelseite, Layout, Ausschnitt, Zoom, ganz zeigen, wichtig); freie Position fehlt bewusst",
+   "target": "7 von 8",
+   "ok": true
+  }
+ ]
+}

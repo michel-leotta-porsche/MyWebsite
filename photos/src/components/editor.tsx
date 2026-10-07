@@ -4,28 +4,51 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { plateOf, type BookData } from "@/content/books";
-import { FrameButton, inputClass, linkClass, SignInTable, TextButton, Wordmark } from "@/components/app-ui";
+import { plateOf, typeArea, type BookData, type Page } from "@/content/books";
+import { estimateLines, layoutPage, TEXT_STYLE } from "@/content/layout";
+import { FrameButton, inputClass, linkClass, SignInTable, SlipDialog, TextButton, Wordmark } from "@/components/app-ui";
 import { Book } from "@/components/book";
+import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
 import { ShareDialog } from "@/components/share-dialog";
-import { autoSequence, variants } from "@/lib/auto-sequence";
+import { relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
 import { ingest } from "@/lib/ingest";
-import { autoPhotos, CLOTHS, loadBook, newId, saveBook, toBookData, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
+import {
+  autoPhotos,
+  CLOTHS,
+  exportBook,
+  listVersions,
+  loadBook,
+  migrate,
+  newId,
+  saveBook,
+  saveVersion,
+  SCHEMA,
+  toBookData,
+  uploadPhoto,
+  type ClothId,
+  type StoredBook,
+  type StoredPhoto,
+  type Version,
+} from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 import { useWide } from "@/lib/use-wide";
 
-// Buch gestalten in drei Schritten: Fotos reinziehen → automatisch gestalten → von Hand ändern.
-// Gespeichert wird von selbst, kurz nach jeder Änderung.
+// Buch gestalten: Fotos reinziehen → automatisch gestalten → von Hand ändern.
+// Was man selbst entscheidet, wird fixiert; „Automatisch gestalten“ rechnet nur freie Doppelseiten neu.
+// Gespeichert wird von selbst, Zwischenstände entstehen vor großen Änderungen; Rückgängig geht mit ⌘Z.
 
 type Pending = { key: string; name: string; state: "lesen" | "laden" | "fertig" | "fehler"; error?: string };
+type Selection = { type: "photo"; key: string } | { type: "spread"; id: string } | null;
 
 const MAX = 60;
+const UNDO = 60;
+const AUTO_VERSION_MS = 10 * 60 * 1000;
 
 /** Seitenformat nach den Fotos: iPhone-Hochformate 3:4, Kamera 2:3 */
 function aspectFor(photos: StoredPhoto[]) {
-  const portraits = photos.filter((p) => p.h > p.w).map((p) => p.h / p.w);
+  const portraits = photos.filter((p) => p.h > p.w && !p.shelved).map((p) => p.h / p.w);
   if (!portraits.length) return 1.5;
   const avg = portraits.reduce((a, b) => a + b, 0) / portraits.length;
   return Math.abs(avg - 4 / 3) < Math.abs(avg - 1.5) ? 4 / 3 : 1.5;
@@ -40,6 +63,26 @@ const recipeLabel = (p: StoredPhoto) =>
         ? `Kein Rezept in der Datei, Kameradaten: ${p.camera.device}`
         : "Keine Metadaten in der Datei (z. B. aus einem Messenger)";
 
+const when = (v: Version) =>
+  v.at ? new Date(v.at.seconds * 1000).toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "gerade eben";
+
+function Lock({ on }: { on: boolean }) {
+  return (
+    <svg aria-hidden viewBox="0 0 12 14" className="inline-block h-3 w-3 align-[-1px]">
+      <rect x="1.5" y="6" width="9" height="7" className={on ? "fill-current" : "fill-none stroke-current"} strokeWidth="1.3" />
+      <path d={on ? "M3.5 6V4a2.5 2.5 0 0 1 5 0v2" : "M3.5 6V4a2.5 2.5 0 0 1 5 0"} className="fill-none stroke-current" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function Star({ on }: { on: boolean }) {
+  return (
+    <svg aria-hidden viewBox="0 0 14 14" className="inline-block h-3.5 w-3.5 align-[-2px]">
+      <path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" className={on ? "fill-current" : "fill-none stroke-current"} strokeWidth="1.1" />
+    </svg>
+  );
+}
+
 export function Editor() {
   const user = useUser();
   const idParam = useQueryParam("id");
@@ -51,6 +94,7 @@ export function Editor() {
     () =>
       user && !idParam
         ? {
+            schema: SCHEMA,
             id: newId(),
             owner: user.uid,
             ownerName: user.displayName ?? "Ich",
@@ -67,16 +111,24 @@ export function Editor() {
   );
   const book = loaded ?? blank;
   const [pending, setPending] = useState<Pending[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [swapFrom, setSwapFrom] = useState<string | null>(null);
+  const [sel, setSel] = useState<Selection>(null);
   const [preview, setPreview] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | null>(null);
+  const [history, setHistory] = useState(false);
+  const [crop, setCrop] = useState<string | null>(null);
+  const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [dropHint, setDropHint] = useState<string | null>(null);
+  const [firstDraft, setFirstDraft] = useState<number | null>(null);
+  const [undoState, setUndoState] = useState({ past: 0, future: 0 });
   const fileInput = useRef<HTMLInputElement>(null);
   const bookRef = useRef<StoredBook | null>(null);
+  const past = useRef<StoredBook[]>([]);
+  const future = useRef<StoredBook[]>([]);
+  const lastTag = useRef<{ tag: string; at: number } | null>(null);
+  const savedOnce = useRef(false);
+  const lastAutoVersion = useRef(0);
   useEffect(() => {
     bookRef.current = book;
   }, [book]);
@@ -86,26 +138,102 @@ export function Editor() {
     if (!user || !idParam || bookRef.current?.id === idParam) return;
     let alive = true;
     loadBook(idParam)
-      .then((b) => alive && b && setLoaded(b))
+      .then((b) => {
+        if (!alive || !b) return;
+        savedOnce.current = true;
+        setLoaded(b);
+      })
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [idParam, user]);
 
-  // nach jeder Änderung speichern, sobald es Fotos gibt
+  // nach jeder Änderung speichern; ohne Netz bleibt die Änderung im Browser und geht später raus
   useEffect(() => {
     if (!book || !touched || !book.photos.length) return;
     const id = window.setTimeout(() => {
-      saveBook(book)
+      const done = saveBook(book);
+      // Firestore bestätigt erst mit Netz; offline zeigt der Kopf das an
+      const offline = window.setTimeout(() => !navigator.onLine && setSaved("offline"), 1500);
+      done
         .then(() => {
+          window.clearTimeout(offline);
           setSaved("gespeichert");
-          if (!idParam) history.replaceState(null, "", `/neu?id=${book.id}`);
+          savedOnce.current = true;
+          if (!idParam) window.history.replaceState(null, "", `/neu?id=${book.id}`);
+          if (Date.now() - lastAutoVersion.current > AUTO_VERSION_MS) {
+            lastAutoVersion.current = Date.now();
+            saveVersion(book, "Zwischenstand", true).catch(() => {});
+          }
         })
         .catch(() => setSaved("fehler"));
     }, 900);
     return () => window.clearTimeout(id);
   }, [book, idParam, touched]);
+
+  /** Zwischenstand vor einer großen Änderung */
+  const snapshot = useCallback((label: string) => {
+    const b = bookRef.current;
+    if (b && savedOnce.current && b.photos.length) saveVersion(b, label, true).catch(() => {});
+  }, []);
+
+  /** Jede Änderung geht hierdurch: Rückgängig-Stapel, Speichern. tag fasst schnelles Tippen zu einem Schritt zusammen */
+  const update = useCallback(
+    (f: (b: StoredBook) => StoredBook, tag?: string) => {
+      setTouched(true);
+      setSaved("speichert");
+      setLoaded((b) => {
+        const cur = b ?? blank;
+        if (!cur) return b;
+        const next = f(cur);
+        if (next === cur) return b;
+        const now = Date.now();
+        const coalesce = tag && lastTag.current?.tag === tag && now - lastTag.current.at < 1200;
+        if (!coalesce) {
+          past.current = [...past.current.slice(-UNDO + 1), cur];
+          future.current = [];
+        }
+        lastTag.current = tag ? { tag, at: now } : null;
+        setUndoState({ past: past.current.length, future: 0 });
+        return next;
+      });
+    },
+    [blank],
+  );
+
+  const undo = useCallback(() => {
+    const prev = past.current.pop();
+    const cur = bookRef.current;
+    if (!prev || !cur) return;
+    future.current.push(cur);
+    lastTag.current = null;
+    setTouched(true);
+    setLoaded(prev);
+    setUndoState({ past: past.current.length, future: future.current.length });
+  }, []);
+  const redo = useCallback(() => {
+    const next = future.current.pop();
+    const cur = bookRef.current;
+    if (!next || !cur) return;
+    past.current.push(cur);
+    setTouched(true);
+    setLoaded(next);
+    setUndoState({ past: past.current.length, future: future.current.length });
+  }, []);
+
+  /** Freie Doppelseiten neu rechnen; fixierte und Textseiten bleiben, wie sie sind */
+  const relayout = useCallback((b: StoredBook): StoredBook => {
+    const shelved = new Set(b.photos.filter((p) => p.shelved).map((p) => p.key));
+    const { spreads, coverKey } = relayoutFree(b.spreads, autoPhotos(b.photos), shelved);
+    const inBook = new Set(spreads.flatMap((s) => s.keys));
+    return {
+      ...b,
+      spreads,
+      coverKey: b.coverKey && inBook.has(b.coverKey) ? b.coverKey : coverKey,
+      aspect: aspectFor(b.photos),
+    };
+  }, []);
 
   // Dateien irgendwo auf der Seite ablegen; nie die Datei im Browser öffnen
   const hasFiles = (e: DragEvent | React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
@@ -161,36 +289,17 @@ export function Editor() {
     };
   }, []);
 
-  const update = useCallback(
-    (f: (b: StoredBook) => StoredBook) => {
-      setTouched(true);
-      setSaved("speichert");
-      setLoaded((b) => {
-        const cur = b ?? blank;
-        return cur ? f(cur) : b;
-      });
-    },
-    [blank],
-  );
-
-  const relayout = useCallback(
-    (b: StoredBook): StoredBook => {
-      const { spreads, coverKey } = autoSequence(autoPhotos(b.photos));
-      return { ...b, spreads, coverKey: b.coverKey && b.photos.some((p) => p.key === b.coverKey) ? b.coverKey : coverKey, aspect: aspectFor(b.photos) };
-    },
-    [],
-  );
-
-  // Fotos reinziehen: eins nach dem anderen lesen, kodieren, hochladen
+  // Fotos reinziehen: eins nach dem anderen lesen, kodieren, hochladen; jedes Foto landet auf einer freien Seite
   const addFiles = useCallback(
     async (files: File[]) => {
       const b = bookRef.current;
       if (!user || !b) return;
+      const t0 = performance.now();
+      performance.mark("fuji:upload-start");
       const room = MAX - b.photos.length;
       const list = files.filter((f) => f.type.startsWith("image/") || /\.(jpe?g|heic|png)$/i.test(f.name)).slice(0, room);
       const items: Pending[] = list.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "lesen" }));
       setPending((p) => [...p, ...items]);
-      const editedByHand = b.spreads.length > 0;
       for (let i = 0; i < list.length; i++) {
         const it = items[i];
         const mark = (state: Pending["state"], error?: string) =>
@@ -209,32 +318,30 @@ export function Editor() {
             large: urls.large,
             thumb: urls.thumb,
             color: ph.color,
+            subject: ph.subject,
             taken: ph.taken,
             recipe: ph.recipe,
             camera: ph.camera,
           };
-          update((cur) => {
-            const photos = [...cur.photos, stored];
-            // neue Fotos landen hinten, als eigene Doppelseiten; ein frisches Buch wird ganz neu gestaltet
-            if (!editedByHand) return relayout({ ...cur, photos });
-            return { ...cur, photos, spreads: [...cur.spreads, { keys: [stored.key], layout: 0 }] };
-          });
+          update((cur) => relayout({ ...cur, photos: [...cur.photos, stored] }));
           mark("fertig");
         } catch (e) {
           mark("fehler", e instanceof Error ? e.message : "Fehler");
         }
       }
+      // Messgrundlage T2: Zeit vom Reinziehen bis zum fertigen Erstentwurf
+      performance.measure("fuji:erstentwurf", "fuji:upload-start");
+      setFirstDraft((performance.now() - t0) / 1000);
       window.setTimeout(() => setPending((p) => p.filter((x) => x.state !== "fertig")), 1500);
     },
     [relayout, update, user],
   );
-
   useEffect(() => {
     addRef.current = addFiles;
   }, [addFiles]);
 
   const data: BookData | null = useMemo(() => {
-    if (!book || !book.spreads.length) return null;
+    if (!book || !book.spreads.some((s) => s.keys.length)) return null;
     try {
       return toBookData(book);
     } catch {
@@ -256,62 +363,154 @@ export function Editor() {
 
   const byKey = new Map(book.photos.map((p) => [p.key, p]));
   const auto = new Map(autoPhotos(book.photos).map((p) => [p.key, p]));
-  const sel = selected ? byKey.get(selected) : undefined;
+  const shelf = book.photos.filter((p) => p.shelved);
   const pageW = wide ? 150 : 132;
+  const selPhoto = sel?.type === "photo" ? byKey.get(sel.key) : undefined;
+  const selSpreadIndex = sel?.type === "spread" ? book.spreads.findIndex((s) => s.id === sel.id) : -1;
+  const selSpread = selSpreadIndex >= 0 ? book.spreads[selSpreadIndex] : undefined;
+  const spreadOf = (key: string) => book.spreads.findIndex((s) => s.keys.includes(key));
 
-  const pick = (key: string) => {
-    if (swapFrom && swapFrom !== key) {
-      // zwei Fotos tauschen ihre Plätze
-      update((b) => ({
-        ...b,
-        spreads: b.spreads.map((s) => ({ ...s, keys: s.keys.map((k) => (k === swapFrom ? key : k === key ? swapFrom : k)) })),
-      }));
-      setSwapFrom(null);
-      setSelected(key);
+  // ---- Änderungen an Doppelseiten und Fotos ----
+  const mapSpreads = (b: StoredBook, f: (s: SpreadDraft[]) => SpreadDraft[]) => ({ ...b, spreads: f(b.spreads.map((s) => ({ ...s, keys: [...s.keys] }))) });
+
+  const cycle = (i: number) =>
+    update((b) =>
+      mapSpreads(b, (ss) =>
+        ss.map((s, n) => (n === i ? { ...s, pinned: true, layout: (s.layout + 1) % variantsOf(s, auto).length } : s)),
+      ),
+    );
+  const togglePin = (i: number) => update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i ? { ...s, pinned: !s.pinned } : s))));
+  const moveSpread = (from: number, to: number) =>
+    update((b) =>
+      mapSpreads(b, (ss) => {
+        if (to < 0 || to >= ss.length || from === to) return ss;
+        const [m] = ss.splice(from, 1);
+        ss.splice(to, 0, { ...m, pinned: true });
+        return ss;
+      }),
+    );
+  const insertText = (at: number) => {
+    const id = spreadId();
+    update((b) => mapSpreads(b, (ss) => (ss.splice(at, 0, { id, keys: [], layout: 0, pinned: true, text: { heading: "", body: "", style: "text" } }), ss)));
+    setSel({ type: "spread", id });
+  };
+  const removeSpread = (i: number) => {
+    snapshot("vor dem Entfernen einer Doppelseite");
+    update((b) => {
+      const keys = new Set(b.spreads[i]?.keys ?? []);
+      return {
+        ...mapSpreads(b, (ss) => ss.filter((_, n) => n !== i)),
+        photos: b.photos.map((p) => (keys.has(p.key) ? { ...p, shelved: true } : p)),
+      };
+    });
+    setSel(null);
+  };
+  /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz */
+  const movePhoto = (key: string, to: number) =>
+    update((b) =>
+      mapSpreads(
+        { ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: false } : p)) },
+        (ss) => {
+          const from = ss.findIndex((s) => s.keys.includes(key));
+          const target = ss[to];
+          if (!target || from === to) return ss;
+          const cap = target.text ? 1 : 2;
+          const displaced = target.keys.length >= cap ? target.keys.pop() : undefined;
+          target.keys.push(key);
+          Object.assign(target, { pinned: true, layout: 0 });
+          if (from >= 0) {
+            const src = ss[from];
+            src.keys = src.keys.filter((k) => k !== key);
+            if (displaced) src.keys.push(displaced);
+            Object.assign(src, { pinned: true, layout: 0 });
+          }
+          return ss.filter((s) => s.keys.length || s.text);
+        },
+      ),
+    );
+  const shelvePhoto = (key: string) =>
+    update((b) => ({
+      ...mapSpreads(b, (ss) => ss.map((s) => (s.keys.includes(key) ? { ...s, keys: s.keys.filter((k) => k !== key), layout: 0 } : s)).filter((s) => s.keys.length || s.text)),
+      photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: true } : p)),
+    }));
+  const unshelvePhoto = (key: string) =>
+    update((b) => relayout({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, shelved: false } : p)) }));
+  const setPhoto = (key: string, patch: Partial<StoredPhoto>, tag?: string) =>
+    update((b) => ({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, ...patch } : p)) }), tag);
+  const setText = (i: number, patch: Partial<NonNullable<SpreadDraft["text"]>>) =>
+    update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i && s.text ? { ...s, text: { ...s.text, ...patch } } : s))), `text-${i}`);
+  const toggleStar = (key: string) =>
+    update((b) => relayout({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, star: !p.star } : p)) }));
+
+  // Tastatur: Rückgängig, Wiederholen; gewähltes Foto mit Alt+Pfeil auf die Nachbarseite, Entf in die Ablage
+  const onKey = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement;
+    const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !typing) {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
       return;
     }
-    setSelected(key === selected ? null : key);
+    if (typing || !selPhoto) return;
+    const i = spreadOf(selPhoto.key);
+    if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      const to = i + (e.key === "ArrowLeft" ? -1 : 1);
+      if (i >= 0 && to >= 0 && to < book.spreads.length) movePhoto(selPhoto.key, to);
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      shelvePhoto(selPhoto.key);
+      setSel(null);
+    }
   };
-  const move = (i: number, d: number) =>
-    update((b) => {
-      const s = [...b.spreads];
-      const j = i + d;
-      if (j < 0 || j >= s.length) return b;
-      [s[i], s[j]] = [s[j], s[i]];
-      return { ...b, spreads: s };
-    });
-  const cycle = (i: number) =>
-    update((b) => ({
-      ...b,
-      spreads: b.spreads.map((s, n) => (n === i ? { ...s, layout: (s.layout + 1) % variants(s.keys, auto).length } : s)),
-    }));
-  const removePhoto = (key: string) =>
-    update((b) => ({
-      ...b,
-      photos: b.photos.filter((p) => p.key !== key),
-      spreads: b.spreads.map((s) => ({ keys: s.keys.filter((k) => k !== key), layout: 0 })).filter((s) => s.keys.length),
-    }));
-  const setPhoto = (key: string, patch: Partial<StoredPhoto>) =>
-    update((b) => ({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
 
-  // Ziehen zum Umsortieren der Doppelseiten
+  // Ziehen: Doppelseiten umsortieren, Fotos auf andere Doppelseiten oder aus der Ablage
   const onDrop = (to: number, e: React.DragEvent) => {
     if (hasFiles(e)) return;
+    const photo = e.dataTransfer.getData("text/x-photo");
+    if (photo) {
+      e.preventDefault();
+      movePhoto(photo, to);
+      return;
+    }
     const raw = e.dataTransfer.getData("text/x-spread");
     const from = raw === "" ? NaN : Number(raw);
-    if (Number.isNaN(from) || from === to) return;
-    update((b) => {
-      const s = [...b.spreads];
-      const [m] = s.splice(from, 1);
-      s.splice(to, 0, m);
-      return { ...b, spreads: s };
-    });
+    if (!Number.isNaN(from)) moveSpread(from, to);
+  };
+  const accepts = (e: React.DragEvent) => {
+    const types = Array.from(e.dataTransfer.types);
+    if (types.includes("text/x-spread") || types.includes("text/x-photo")) e.preventDefault();
   };
 
+  // Bildfeld eines Fotos im aktuellen Layout: Seitenverhältnis und ob es über den Bund läuft
+  const slotOf = (key: string) => {
+    if (!data) return { aspect: 2 / 3, gutter: false };
+    for (const s of data.spreads)
+      for (const side of ["left", "right"] as const) {
+        const page = s[side];
+        if (!("no" in page) || plateOf(data, page.no)?.key !== key) continue;
+        const el = layoutPage(data, page, side).els.find((x) => x.t === "img" && x.plate);
+        if (el && el.t === "img") return { aspect: el.w / el.h, gutter: page.kind === "across" };
+      }
+    return { aspect: 2 / 3, gutter: false };
+  };
+
+  // Textseite: passt der Text?
+  const textFits = (s: SpreadDraft) => {
+    if (!s.text || !data) return true;
+    const st = TEXT_STYLE[s.text.style ?? "text"];
+    const ta = typeArea(data, "right");
+    const head = s.text.heading ? estimateLines(s.text.heading, 6, ta.w) * 6 * 1.02 + 5 : 0;
+    return head + estimateLines(s.text.body || " ", st.size, 66) * st.size * st.lh <= ta.h;
+  };
+
+  const status =
+    saved === "speichert" ? "Speichert …" : saved === "gespeichert" ? "Gespeichert" : saved === "offline" ? "Offline gespeichert, geht raus, sobald Netz da ist" : saved === "fehler" ? "Speichern fehlgeschlagen" : "";
+
   return (
-    <main
-      className="linen table-surface relative min-h-svh bg-table"
-    >
+    <main className="linen table-surface relative min-h-svh bg-table">
+      <Keys onKey={onKey} />
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
         <span className="flex items-baseline gap-5">
           <Wordmark href="/tisch" />
@@ -319,8 +518,15 @@ export function Editor() {
             Zum Tisch
           </Link>
         </span>
-        <span className="text-on-table-2 flex flex-wrap items-baseline gap-5 text-sm">
-          <span aria-live="polite">{saved === "speichert" ? "Speichert …" : saved === "gespeichert" ? "Gespeichert" : saved === "fehler" ? "Speichern fehlgeschlagen" : ""}</span>
+        <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
+          <span aria-live="polite">{status}</span>
+          <TextButton disabled={!undoState.past} onClick={undo} title="Rückgängig (⌘Z)">
+            Rückgängig
+          </TextButton>
+          <TextButton disabled={!undoState.future} onClick={redo} title="Wiederholen (⇧⌘Z)">
+            Wiederholen
+          </TextButton>
+          <TextButton onClick={() => setHistory(true)}>Verlauf</TextButton>
           <TextButton disabled={!data} onClick={() => setPreview(true)}>
             Ansehen
           </TextButton>
@@ -332,16 +538,12 @@ export function Editor() {
 
       <div className="grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_320px] md:px-8">
         <section aria-label="Doppelseiten" className="min-w-0">
-          {/* Schritt 1: Fotos */}
-          <div
-            className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6"
-          >
-            <p className="text-on-table text-lg font-semibold">
-              {book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}
-            </p>
+          {/* Fotos */}
+          <div className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6">
+            <p className="text-on-table text-lg font-semibold">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</p>
             <p className="text-on-table-2 max-w-[60ch] text-sm leading-relaxed">
-              Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen.
-              Beim Hochladen werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. Bis zu {MAX} Fotos.
+              Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen
+              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. Bis zu {MAX} Fotos.
             </p>
             <TextButton onClick={() => fileInput.current?.click()}>Fotos auswählen</TextButton>
             <input
@@ -372,93 +574,162 @@ export function Editor() {
                 ))}
               </ul>
             )}
+            {firstDraft !== null && !pending.length && (
+              <p className="text-on-table-2 text-[13px]">Erstentwurf nach {firstDraft.toFixed(1)} s</p>
+            )}
           </div>
 
-          {/* Schritt 2 und 3: Doppelseiten */}
+          {/* Doppelseiten */}
           {data && (
             <>
               <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-on-table text-lg font-semibold">
-                  {book.spreads.length} Doppelseiten
-                  {swapFrom && <span className="text-on-table-2 ml-3 text-sm font-normal">Wähle das Foto zum Tauschen</span>}
-                </h2>
-                <TextButton
-                  onClick={() => {
-                    if (touched && book.spreads.some((s) => s.layout) && !window.confirm("Alle Seiten neu gestalten? Deine Änderungen an der Folge gehen verloren.")) return;
-                    update(relayout);
-                  }}
-                  className="text-sm"
-                >
-                  Automatisch gestalten
-                </TextButton>
+                <h2 className="text-on-table text-lg font-semibold">{book.spreads.length} Doppelseiten</h2>
+                <span className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                  <TextButton onClick={() => insertText(book.spreads.length)}>Textseite hinzufügen</TextButton>
+                  <TextButton
+                    onClick={() => {
+                      snapshot("vor „Automatisch gestalten“");
+                      update(relayout);
+                    }}
+                    title="Fixierte Doppelseiten und Textseiten bleiben, wie sie sind"
+                  >
+                    Automatisch gestalten
+                  </TextButton>
+                </span>
               </div>
-              <ol className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-px bg-line/0">
+              <p className="text-on-table-2 mt-1 text-[13px]">
+                <Lock on /> fixiert: Was du von Hand änderst, fixiert sich von selbst. „Automatisch gestalten“ ordnet nur die freien Doppelseiten neu.
+              </p>
+              <ol className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
                 {book.spreads.map((s, i) => {
-                  const spreadIndex = i + 1; // 0 ist die Titelseite
-                  const sp = data.spreads[spreadIndex];
+                  const sp = data.spreads[i + 1]; // 0 ist die Titelseite
+                  const active = sel?.type === "spread" && sel.id === s.id;
                   return (
                     <li
-                      key={s.keys.join("+")}
+                      key={s.id ?? s.keys.join("+")}
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-spread", String(i))}
-                      onDragOver={(e) => Array.from(e.dataTransfer.types).includes("text/x-spread") && e.preventDefault()}
+                      onDragOver={accepts}
                       onDrop={(e) => onDrop(i, e)}
                       className="p-3"
                     >
-                      <div className="text-on-table-2 mb-2 flex items-baseline justify-between text-xs">
-                        <span>Doppelseite {i + 1}</span>
-                        <span className="flex gap-3">
+                      <div className="text-on-table-2 mb-2 flex items-baseline justify-between gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => s.id && setSel(active ? null : { type: "spread", id: s.id })}
+                          className={`text-left ${active ? "text-on-table font-semibold" : ""}`}
+                          aria-pressed={active}
+                        >
+                          {s.text ? "Textseite" : `Doppelseite ${i + 1}`}
+                        </button>
+                        <span className="flex items-baseline gap-3">
+                          <button
+                            type="button"
+                            onClick={() => togglePin(i)}
+                            disabled={!!s.text}
+                            aria-pressed={!!s.pinned || !!s.text}
+                            aria-label={s.pinned || s.text ? `Doppelseite ${i + 1} lösen` : `Doppelseite ${i + 1} fixieren`}
+                            className={s.pinned || s.text ? "text-mark" : "text-on-table-2 hover:text-on-table"}
+                            title={s.pinned ? "fixiert: die Automatik lässt sie in Ruhe" : "frei: die Automatik darf sie neu ordnen"}
+                          >
+                            <Lock on={!!s.pinned || !!s.text} />
+                          </button>
                           <TextButton onClick={() => cycle(i)} aria-label={`Layout von Doppelseite ${i + 1} wechseln`}>
                             Layout
                           </TextButton>
-                          <TextButton onClick={() => move(i, -1)} disabled={i === 0} aria-label="Nach vorn">
+                          <TextButton onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label="Nach vorn">
                             ←
                           </TextButton>
-                          <TextButton onClick={() => move(i, 1)} disabled={i === book.spreads.length - 1} aria-label="Nach hinten">
+                          <TextButton onClick={() => moveSpread(i, i + 1)} disabled={i === book.spreads.length - 1} aria-label="Nach hinten">
                             →
+                          </TextButton>
+                          <TextButton onClick={() => removeSpread(i)} aria-label={`Doppelseite ${i + 1} entfernen, Fotos in die Ablage`}>
+                            ×
                           </TextButton>
                         </span>
                       </div>
-                      <div className="flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing">
+                      <div className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}>
                         {(["left", "right"] as const).map((side) => {
-                          const page = sp?.[side];
+                          const page: Page | undefined = sp?.[side];
                           const key = page && "no" in page ? plateOf(data, page.no)?.key : undefined;
+                          const isText = page?.kind === "text";
                           return (
                             <div key={side} className="relative" style={{ width: pageW, height: pageW * data.aspect }}>
                               {page && <PageView book={data} page={page} side={side} />}
                               {key && (
                                 <button
                                   type="button"
-                                  onClick={() => pick(key)}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    e.dataTransfer.setData("text/x-photo", key);
+                                  }}
+                                  onClick={() => setSel(sel?.type === "photo" && sel.key === key ? null : { type: "photo", key })}
                                   aria-label={`Foto auswählen: ${byKey.get(key)?.title || "ohne Titel"}`}
-                                  aria-pressed={selected === key}
-                                  className={`absolute inset-0 z-30 ${selected === key ? "outline-mark outline-2 -outline-offset-2" : ""}`}
+                                  aria-pressed={sel?.type === "photo" && sel.key === key}
+                                  className={`absolute inset-0 z-30 ${sel?.type === "photo" && sel.key === key ? "outline-mark outline-2 -outline-offset-2" : ""}`}
                                 />
+                              )}
+                              {isText && s.id && (
+                                <button
+                                  type="button"
+                                  onClick={() => setSel({ type: "spread", id: s.id! })}
+                                  aria-label="Text bearbeiten"
+                                  className="absolute inset-0 z-30"
+                                />
+                              )}
+                              {key && byKey.get(key)?.star && (
+                                <span aria-label="wichtig" className="text-mark pointer-events-none absolute top-1 right-1 z-40">
+                                  <Star on />
+                                </span>
                               )}
                             </div>
                           );
                         })}
                       </div>
+                      {!textFits(s) && <p className="text-on-table mt-2 text-xs">Der Text ist zu lang für die Seite.</p>}
                     </li>
                   );
                 })}
               </ol>
             </>
           )}
+
+          {/* Ablage: hochgeladen, gerade nicht im Buch */}
+          {shelf.length > 0 && (
+            <div className="mt-10">
+              <h2 className="text-on-table text-lg font-semibold">Ablage</h2>
+              <p className="text-on-table-2 mt-1 text-[13px]">Nicht im Buch. Auf eine Doppelseite ziehen oder zurücklegen.</p>
+              <ul className="mt-3 flex flex-wrap gap-3">
+                {shelf.map((p) => (
+                  <li key={p.key} className="flex flex-col items-start gap-1">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => e.dataTransfer.setData("text/x-photo", p.key)}
+                      onClick={() => setSel({ type: "photo", key: p.key })}
+                      aria-label={`Foto aus der Ablage auswählen: ${p.title || "ohne Titel"}`}
+                      className="relative h-20 w-20"
+                    >
+                      <Image src={p.thumb} alt="" fill sizes="80px" className="object-cover" />
+                    </button>
+                    <TextButton className="text-[12px]" onClick={() => unshelvePhoto(p.key)}>
+                      Ins Buch
+                    </TextButton>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
-        {/* Buch und gewähltes Foto */}
+        {/* Buch, gewähltes Foto, gewählte Textseite */}
         <aside className="space-y-6 md:sticky md:top-20 md:self-start">
           <div className="slip text-ink space-y-3 p-5">
             <p className="text-sm font-semibold">Buch</p>
             <label className="block text-[13px]">
               <span className="text-ink-2">Titel</span>
-              <input
-                className={inputClass}
-                value={book.title}
-                placeholder="z. B. Lissabon"
-                onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }))}
-              />
+              <input className={inputClass} value={book.title} placeholder="z. B. Lissabon" onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
             </label>
             <label className="block text-[13px]">
               <span className="text-ink-2">Zeile darunter</span>
@@ -466,7 +737,7 @@ export function Editor() {
                 className={inputClass}
                 value={book.subtitle}
                 placeholder="automatisch: Anzahl der Fotos"
-                onChange={(e) => update((b) => ({ ...b, subtitle: e.target.value.slice(0, 60) }))}
+                onChange={(e) => update((b) => ({ ...b, subtitle: e.target.value.slice(0, 60) }), "subtitle")}
               />
             </label>
             <fieldset>
@@ -488,52 +759,121 @@ export function Editor() {
             </fieldset>
           </div>
 
-          {sel ? (
+          {selPhoto && (
             <div className="slip text-ink space-y-3 p-5">
               <div className="flex gap-3">
                 <div className="relative h-24 w-24 shrink-0">
-                  <Image src={sel.thumb} alt="" fill sizes="96px" className="object-contain object-left-top" />
+                  <Image src={selPhoto.thumb} alt="" fill sizes="96px" className="object-contain object-left-top" />
                 </div>
-                <p className="text-ink-2 text-[13px] leading-snug">{recipeLabel(sel)}</p>
+                <p className="text-ink-2 text-[13px] leading-snug">{recipeLabel(selPhoto)}</p>
               </div>
+              <button
+                type="button"
+                aria-pressed={!!selPhoto.star}
+                onClick={() => toggleStar(selPhoto.key)}
+                className={`flex items-center gap-2 border px-3 py-1.5 text-sm ${selPhoto.star ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+              >
+                <Star on={!!selPhoto.star} /> {selPhoto.star ? "Wichtig: kommt groß ins Buch" : "Als wichtig markieren"}
+              </button>
               <label className="block text-[13px]">
                 <span className="text-ink-2">Titel</span>
-                <input className={inputClass} value={sel.title} onChange={(e) => setPhoto(sel.key, { title: e.target.value.slice(0, 50) })} />
+                <input className={inputClass} value={selPhoto.title} onChange={(e) => setPhoto(selPhoto.key, { title: e.target.value.slice(0, 50) }, `t-${selPhoto.key}`)} />
               </label>
               <label className="block text-[13px]">
                 <span className="text-ink-2">Zusatz (Ort, Notiz)</span>
-                <input className={inputClass} value={sel.note ?? ""} onChange={(e) => setPhoto(sel.key, { note: e.target.value.slice(0, 50) || undefined })} />
+                <input
+                  className={inputClass}
+                  value={selPhoto.note ?? ""}
+                  onChange={(e) => setPhoto(selPhoto.key, { note: e.target.value.slice(0, 50) || undefined }, `n-${selPhoto.key}`)}
+                />
               </label>
               <label className="block text-[13px]">
                 <span className="text-ink-2">Beschreibung für Screenreader</span>
-                <input className={inputClass} value={sel.alt} onChange={(e) => setPhoto(sel.key, { alt: e.target.value.slice(0, 200) })} />
+                <input className={inputClass} value={selPhoto.alt} onChange={(e) => setPhoto(selPhoto.key, { alt: e.target.value.slice(0, 200) }, `a-${selPhoto.key}`)} />
               </label>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => setSwapFrom(sel.key)}>
-                  Tauschen mit …
-                </button>
+                {!selPhoto.shelved && (
+                  <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => setCrop(selPhoto.key)}>
+                    Ausschnitt …
+                  </button>
+                )}
                 <button
                   type="button"
                   className="underline decoration-mark decoration-2 underline-offset-4"
-                  onClick={() => update((b) => ({ ...b, coverKey: sel.key }))}
-                  disabled={book.coverKey === sel.key}
+                  onClick={() => update((b) => ({ ...b, coverKey: selPhoto.key }))}
+                  disabled={book.coverKey === selPhoto.key || !!selPhoto.shelved}
                 >
-                  {book.coverKey === sel.key ? "Auf dem Einband" : "Auf den Einband"}
+                  {book.coverKey === selPhoto.key ? "Auf dem Einband" : "Auf den Einband"}
                 </button>
-                <button
-                  type="button"
-                  className="text-ink-2 underline underline-offset-4"
-                  onClick={() => {
-                    removePhoto(sel.key);
-                    setSelected(null);
-                  }}
-                >
-                  Entfernen
-                </button>
+                {selPhoto.shelved ? (
+                  <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => unshelvePhoto(selPhoto.key)}>
+                    Ins Buch
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-ink-2 underline underline-offset-4"
+                    onClick={() => {
+                      shelvePhoto(selPhoto.key);
+                      setSel(null);
+                    }}
+                  >
+                    In die Ablage
+                  </button>
+                )}
               </div>
+              {!selPhoto.shelved && (
+                <p className="text-ink-2 text-[12px]">Ziehen auf eine andere Doppelseite verschiebt das Foto. Tastatur: Alt + ← / → , Entf legt es in die Ablage.</p>
+              )}
             </div>
-          ) : (
-            data && <p className="text-on-table-2 text-sm leading-relaxed">Tippe auf ein Foto, um Titel und Platz zu ändern. Doppelseiten lassen sich ziehen.</p>
+          )}
+
+          {selSpread?.text && (
+            <div className="slip text-ink space-y-3 p-5">
+              <p className="text-sm font-semibold">Textseite</p>
+              <label className="block text-[13px]">
+                <span className="text-ink-2">Überschrift (optional)</span>
+                <input
+                  className={inputClass}
+                  value={selSpread.text.heading ?? ""}
+                  placeholder="z. B. Drei Tage am Meer"
+                  onChange={(e) => setText(selSpreadIndex, { heading: e.target.value.slice(0, 60) })}
+                />
+              </label>
+              <label className="block text-[13px]">
+                <span className="text-ink-2">Text</span>
+                <textarea
+                  className={inputClass}
+                  rows={7}
+                  value={selSpread.text.body}
+                  placeholder="Ein paar Sätze zu eurer Geschichte. Leerzeile = neuer Absatz."
+                  onChange={(e) => setText(selSpreadIndex, { body: e.target.value.slice(0, 1200) })}
+                />
+              </label>
+              <fieldset className="flex gap-2 text-sm">
+                <legend className="text-ink-2 mb-1 text-[13px]">Schrift</legend>
+                {(["text", "gross"] as const).map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    aria-pressed={(selSpread.text?.style ?? "text") === st}
+                    onClick={() => setText(selSpreadIndex, { style: st })}
+                    className={`border px-3 py-1.5 ${(selSpread.text?.style ?? "text") === st ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                  >
+                    {st === "text" ? "Absatz" : "Groß"}
+                  </button>
+                ))}
+              </fieldset>
+              <p className={`text-[12px] ${textFits(selSpread) ? "text-ink-2" : "text-ink font-semibold"}`}>
+                {textFits(selSpread) ? "Passt auf die Seite. Daneben kann ein Foto stehen: einfach hierher ziehen." : "Zu lang für die Seite: kürzen oder „Absatz“ wählen."}
+              </p>
+            </div>
+          )}
+
+          {!selPhoto && !selSpread && data && (
+            <p className="text-on-table-2 text-sm leading-relaxed">
+              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Fotos und Doppelseiten lassen sich ziehen.
+            </p>
           )}
         </aside>
       </div>
@@ -545,7 +885,104 @@ export function Editor() {
           </p>
         </div>
       )}
+      {crop && byKey.get(crop) && (
+        <CropDialog
+          photo={byKey.get(crop)!}
+          {...slotOf(crop)}
+          onChange={(v) => {
+            setPhoto(crop, v, `crop-${crop}`);
+            // ein von Hand gesetzter Ausschnitt fixiert seine Doppelseite
+            const i = spreadOf(crop);
+            if (i >= 0 && !book.spreads[i].pinned) update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i ? { ...s, pinned: true } : s))), `crop-${crop}`);
+          }}
+          onClose={() => setCrop(null)}
+        />
+      )}
+      {history && (
+        <HistoryDialog
+          book={book}
+          onRestore={(v) => {
+            snapshot("vor dem Zurückholen");
+            update(() => migrate({ ...v.book, id: book.id, owner: book.owner }));
+            setHistory(false);
+          }}
+          onClose={() => setHistory(false)}
+        />
+      )}
       {sharing && book && <ShareDialog book={book} onClose={() => setSharing(false)} />}
     </main>
+  );
+}
+
+/** Tastenkürzel des Editors; hängt am Fenster, solange der Editor offen ist */
+function Keys({ onKey }: { onKey: (e: KeyboardEvent) => void }) {
+  useEffect(() => {
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onKey]);
+  return null;
+}
+
+/** Verlauf: Zwischenstände ansehen und zurückholen, eigenen Stand sichern, Projekt als Datei */
+function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onRestore: (v: Version) => void; onClose: () => void }) {
+  const [list, setList] = useState<Version[] | null>(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    listVersions(book.id)
+      .then(setList)
+      .catch(() => setList([]));
+  }, [book.id]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const fileUrl = useMemo(() => URL.createObjectURL(exportBook(book)), [book]);
+  useEffect(() => () => URL.revokeObjectURL(fileUrl), [fileUrl]);
+
+  return (
+    <SlipDialog label="Verlauf" onClose={onClose}>
+      <form
+        className="flex gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          await saveVersion(book, name.trim() || "Eigener Stand", false).catch(() => {});
+          setName("");
+          setBusy(false);
+          load();
+        }}
+      >
+        <label htmlFor="version-name" className="sr-only">
+          Name des Stands
+        </label>
+        <input id="version-name" className={inputClass} value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} placeholder="z. B. vor dem Umsortieren" />
+        <button type="submit" disabled={busy} className="border-ink text-ink hover:bg-ink hover:text-paper shrink-0 border px-3 text-sm font-semibold transition-colors duration-150">
+          Stand sichern
+        </button>
+      </form>
+      <ul className="mt-5 max-h-[40svh] space-y-0 overflow-y-auto" tabIndex={0} aria-label="Zwischenstände">
+        {list === null && <li className="text-ink-2 text-sm">Lade …</li>}
+        {list?.length === 0 && <li className="text-ink-2 text-sm">Noch keine Zwischenstände. Sie entstehen von selbst vor großen Änderungen und alle zehn Minuten.</li>}
+        {list?.map((v) => (
+          <li key={v.id} className="flex items-baseline justify-between gap-3 border-t border-ink/15 py-2.5">
+            <span className="min-w-0">
+              <span className={`block truncate text-sm ${v.auto ? "" : "font-semibold"}`}>{v.label}</span>
+              <span className="text-ink-2 text-[12px]">
+                {when(v)} · {v.book.spreads.length} Doppelseiten
+              </span>
+            </span>
+            <button type="button" onClick={() => onRestore(v)} className="shrink-0 text-sm underline decoration-mark decoration-2 underline-offset-4">
+              Zurückholen
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3 border-t border-ink/15 pt-4 text-sm">
+        <a href={fileUrl} download={`${book.title || "fotobuch"}.fujiventura.json`} className="underline decoration-mark decoration-2 underline-offset-4">
+          Projekt als Datei sichern
+        </a>
+        <span className="text-ink-2 text-[12px]">Öffnen über „Mein Tisch“</span>
+      </div>
+    </SlipDialog>
   );
 }

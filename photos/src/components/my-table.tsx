@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
 import { linkClass, SignInTable, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { ShareDialog } from "@/components/share-dialog";
 import { signOutNow } from "@/lib/firebase";
-import { inbox, myBooks, toBookData, type Share, type StoredBook } from "@/lib/store";
+import { importBook, inbox, myBooks, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useUser } from "@/lib/use-user";
 
 /** Mein Tisch: eigene Bücher, Bücher, die jemand für mich hingelegt hat, und ein leeres zum Anlegen */
@@ -18,6 +18,7 @@ export function MyTable() {
   const [gifts, setGifts] = useState<Share[]>([]);
   const [sharing, setSharing] = useState<StoredBook | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -69,6 +70,24 @@ export function MyTable() {
           headerRight: (
             <p className="text-on-table-2 flex items-baseline gap-4 text-sm">
               <span className="hidden md:inline">{user.displayName}</span>
+              <TextButton onClick={() => importInput.current?.click()}>Aus Datei öffnen</TextButton>
+              <input
+                ref={importInput}
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!f) return;
+                  try {
+                    const b = await importBook(f, user.uid, user.displayName ?? "Ich");
+                    location.href = `/neu?id=${b.id}`;
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : String(err));
+                  }
+                }}
+              />
               <TextButton onClick={() => signOutNow()}>Abmelden</TextButton>
             </p>
           ),
