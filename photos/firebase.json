@@ -2,12 +2,27 @@
   "hosting": {
     "public": "out",
     "cleanUrls": true,
-    "ignore": ["firebase.json", "**/.*", "photos/**"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "photos/**"
+    ],
     "headers": [
       {
         "source": "/_next/static/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

@@ -1,5 +1,7 @@
 import type { StaticImageData } from "next/image";
 
+import type { CameraInfo, Recipe } from "@/content/recipes";
+
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import rettungsturm from "../../public/photos/09-rettungsturm.jpg";
 import strand from "../../public/photos/03-strand.jpg";
@@ -92,6 +94,9 @@ export type Photo = {
   thumb: StaticImageData;
   /** Bildausschnitt beim Beschneiden (object-position), 0..1 */
   focus?: [number, number];
+  /** Rezept und Kamera, wenn das Foto sie selbst mitbringt (hochgeladene Bücher) */
+  recipe?: Recipe;
+  camera?: CameraInfo;
 };
 
 /** Tafel: ein Foto mit seiner Nummer im Buch (Reihenfolge des ersten Auftritts) */
@@ -122,6 +127,8 @@ export type Spread = { left: Page; right: Page; plates: number[] };
 
 export type BookData = {
   id: string;
+  /** Name auf Einband und Titelseite */
+  author?: string;
   /** Titel auf Einband und Titelseite */
   title: string;
   /** Zeile unter dem Titel */
@@ -147,37 +154,37 @@ export type BookData = {
 };
 
 // Bausteine für die Folge: Seiten mit Fotoschlüssel, die Nummern ergeben sich danach
-type Spec =
+export type Spec =
   | { kind: "cover" | "endpaper" | "title" | "index" | "colophon" }
   | { kind: "full" | "plate" | "landscape" | "blank" | "tall" | "across"; key: string }
   | { kind: "small"; key: string; cols: 2 | 3; row: "top" | "bottom"; align: "outer" | "inner" };
 
-const full = (key: string): Spec => ({ kind: "full", key });
-const framed = (key: string): Spec => ({ kind: "plate", key });
-const landscape = (key: string): Spec => ({ kind: "landscape", key });
-const blank = (key: string): Spec => ({ kind: "blank", key });
-const tall = (key: string): Spec => ({ kind: "tall", key });
-const small = (key: string, cols: 2 | 3, row: "top" | "bottom", align: "outer" | "inner"): Spec => ({
+export const full = (key: string): Spec => ({ kind: "full", key });
+export const framed = (key: string): Spec => ({ kind: "plate", key });
+export const landscape = (key: string): Spec => ({ kind: "landscape", key });
+export const blank = (key: string): Spec => ({ kind: "blank", key });
+export const tall = (key: string): Spec => ({ kind: "tall", key });
+export const small = (key: string, cols: 2 | 3, row: "top" | "bottom", align: "outer" | "inner"): Spec => ({
   kind: "small",
   key,
   cols,
   row,
   align,
 });
-const across = (key: string): Spec => ({ kind: "across", key });
-const ENDPAPER: Spec = { kind: "endpaper" };
-const TITLE: Spec = { kind: "title" };
-const INDEX: Spec = { kind: "index" };
-const COLOPHON: Spec = { kind: "colophon" };
+export const across = (key: string): Spec => ({ kind: "across", key });
+export const ENDPAPER: Spec = { kind: "endpaper" };
+export const TITLE: Spec = { kind: "title" };
+export const INDEX: Spec = { kind: "index" };
+export const COLOPHON: Spec = { kind: "colophon" };
 
-type BookSpec = Omit<BookData, "plates" | "spreads" | "singlePages" | "coverNo"> & {
+export type BookSpec = Omit<BookData, "plates" | "spreads" | "singlePages" | "coverNo"> & {
   photos: Record<string, Photo>;
   coverKey: string;
   /** Doppelseiten nach dem Einband; `across` steht allein und belegt beide Seiten */
   sequence: (readonly [Spec, Spec] | readonly [Spec])[];
 };
 
-function build(spec: BookSpec): BookData {
+export function build(spec: BookSpec): BookData {
   const { photos, sequence, coverKey, ...meta } = spec;
   const order: string[] = [];
   const noOf = (key: string) => {

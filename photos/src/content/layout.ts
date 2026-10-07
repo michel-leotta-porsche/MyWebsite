@@ -85,7 +85,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
             lh: 0.9,
             display: true,
           },
-          { t: "text", text: "Michel Leotta", x, y: H - book.bottom + 2.4, size: 3.6, weight: 500, tone: "clothInk", lh: 1.2 },
+          { t: "text", text: book.author ?? "Michel Leotta", x, y: H - book.bottom + 2.4, size: 3.6, weight: 500, tone: "clothInk", lh: 1.2 },
         ],
       };
     }
@@ -103,7 +103,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       ];
       if (book.places)
         els.push({ t: "text", text: book.places, x: ta.x, y: ta.y + 14, size: 3, weight: 400, tone: "ink2", lh: LEADING });
-      els.push({ t: "text", text: "Michel Leotta", x: ta.x, y: ta.y + ta.h - 3, size: 3, weight: 400, tone: "ink2", lh: LEADING });
+      els.push({ t: "text", text: book.author ?? "Michel Leotta", x: ta.x, y: ta.y + ta.h - 3, size: 3, weight: 400, tone: "ink2", lh: LEADING });
       return paper(els);
     }
 

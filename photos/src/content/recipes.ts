@@ -32,8 +32,10 @@ export type LightroomRecipe = {
   kind: "lightroom";
   name: string;
   /** Pfad zur .xmp-Datei, wird beim Öffnen gelesen und kann heruntergeladen werden */
-  xmp: string;
-  source: { label: string; url: string };
+  xmp?: string;
+  /** oder das Preset selbst, aus einem hochgeladenen Foto erzeugt */
+  inline?: string;
+  source?: { label: string; url: string };
   placeholder: boolean;
 };
 
@@ -157,10 +159,10 @@ const recipes: Record<string, Recipe> = {
 const cameras = camera as Record<string, CameraInfo>;
 
 export function recipeOf(plate: Plate): Recipe | undefined {
-  return recipes[plate.key];
+  return plate.recipe ?? recipes[plate.key];
 }
 export function cameraOf(plate: Plate): CameraInfo | undefined {
-  return cameras[plate.key];
+  return plate.camera ?? cameras[plate.key];
 }
 /** Hat die Tafel einen Zettel (Rezept oder Kamera)? */
 export const hasSlip = (plate: Plate) => !!recipeOf(plate) || !!cameraOf(plate);

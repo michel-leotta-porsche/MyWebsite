@@ -81,3 +81,30 @@ export function parseXmp(xmp: string): LightroomSettings | null {
     grain: num(xmp, "GrainAmount") ?? 0,
   };
 }
+
+// Was nicht in ein Preset gehört: bildbezogene Werte (Zuschnitt, Masken, Retusche, Objektiv, absoluter Weißabgleich)
+const SKIP = /^(Crop|HasCrop|AlreadyApplied|RawFileName|Version|ProcessVersion|WhiteBalance|Temperature|Tint|Lens|Perspective|Upright|AutoLateralCA|Defringe|VignetteAmount|VignetteMidpoint|HasSettings|PresetType|UUID|Name|Cluster|Supports|Requires|ToneMapStrength|ConvertToGrayscale|CameraProfileDigest|Retouch|RedEye|Mask|Paint|Gradient|Circular|OverrideLookVignette|DepthBasedCorrections)/;
+
+/** Ein importierbares Lightroom-Preset (.xmp) aus den globalen crs:-Werten eines Fotos */
+export function toPreset(xmp: string, name: string): string {
+  const attrs = [...xmp.matchAll(/crs:([A-Za-z0-9]+)="([^"]*)"/g)]
+    .filter(([, k]) => !SKIP.test(k))
+    .map(([, k, v]) => `crs:${k}="${v}"`);
+  const curves = [...xmp.matchAll(/<crs:(ToneCurvePV2012(?:Red|Green|Blue)?)>[\s\S]*?<\/crs:\1>/g)].map((m) => m[0]);
+  const esc = name.replace(/[<>&"]/g, "");
+  const uuid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return `<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+   crs:PresetType="Normal" crs:UUID="${uuid}" crs:SupportsAmount="False" crs:SupportsColor="True"
+   crs:SupportsMonochrome="True" crs:SupportsHighDynamicRange="True" crs:SupportsNormalDynamicRange="True"
+   crs:SupportsSceneReferred="True" crs:SupportsOutputReferred="True" crs:HasSettings="True"
+   crs:ProcessVersion="15.4" ${attrs.join(" ")}>
+   <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">${esc}</rdf:li></rdf:Alt></crs:Name>
+   <crs:Group><rdf:Alt><rdf:li xml:lang="x-default">Fujiventura</rdf:li></rdf:Alt></crs:Group>
+   ${curves.join("\n   ")}
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+`;
+}

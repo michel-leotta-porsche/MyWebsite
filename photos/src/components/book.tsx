@@ -252,6 +252,7 @@ export function Book({
   mode,
   autoOpen,
   onClose,
+  extra,
 }: {
   book: BookData;
   mode: Mode;
@@ -259,6 +260,8 @@ export function Book({
   autoOpen: boolean;
   /** Buch zurück auf den Tisch legen */
   onClose: () => void;
+  /** Zusätzliche Knöpfe in der Kopfzeile, z. B. Zettel schreiben */
+  extra?: (book: BookData, plates: number[]) => React.ReactNode;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -663,6 +666,7 @@ export function Book({
               <RollingLabel text={caption} reduce={reduce} />
             </span>
             <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+            {extra?.(book, current)}
           </div>
           <p className="text-on-table-2 justify-self-end text-sm" aria-live="polite">
             <span className="text-on-table">{book.title}</span>
@@ -683,7 +687,10 @@ export function Book({
           <span aria-hidden className="min-w-0 truncate">
             <RollingLabel text={caption} reduce={reduce} />
           </span>
-          <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+          <span className="flex shrink-0 gap-3">
+            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} />
+            {extra?.(book, current)}
+          </span>
         </div>
 
         {/* Bühne */}

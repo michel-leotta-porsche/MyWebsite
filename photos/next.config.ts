@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   // Eigenes Projekt im Repo der Hauptseite: Wurzel festnageln, sonst greift Turbopack nach oben
   turbopack: { root: path.join(__dirname) },
   outputFileTracingRoot: path.join(__dirname),
+  // Entwicklung: Bilder aus Firebase Storage über den Bildserver erlauben
+  images: { remotePatterns: [{ protocol: "https", hostname: "firebasestorage.googleapis.com" }] },
   ...(staticExport && {
     output: "export",
     // feste Breiten statt Bildserver, siehe src/image-loader.ts

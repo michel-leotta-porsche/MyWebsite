@@ -1,7 +1,7 @@
 "use client";
 
 import { useReducedMotion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { type BookData } from "@/content/books";
 import { INTRO_DONE } from "@/components/intro";
@@ -21,7 +21,19 @@ const NUMBER = ["Kein", "Ein", "Zwei", "Drei", "Vier", "Fünf", "Sechs", "Sieben
 const coverWidth = (book: BookData) =>
   `calc(var(--tw) * ${book.scale})`;
 
-function ClosedBook({ book, onOpen, index }: { book: BookData; onOpen: () => void; index: number }) {
+function ClosedBook({
+  book,
+  onOpen,
+  index,
+  extra,
+  note,
+}: {
+  book: BookData;
+  onOpen: () => void;
+  index: number;
+  extra?: ReactNode;
+  note?: string;
+}) {
   const pose = POSE[index % POSE.length];
   const edge = Math.round(3 + book.spreads.length / 3);
   return (
@@ -68,11 +80,32 @@ function ClosedBook({ book, onOpen, index }: { book: BookData; onOpen: () => voi
         </span>
         {book.plates.length} Tafeln
       </p>
+      {extra && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">{extra}</div>}
+      {/* Zettel daneben: für wen das Buch hingelegt wurde */}
+      {note && (
+        <p className="slip text-ink absolute -top-6 -right-10 w-40 rotate-[4deg] p-3 text-[13px] leading-snug shadow-[0_10px_18px_-10px_rgb(12_10_8/0.8)]">
+          {note}
+        </p>
+      )}
     </div>
   );
 }
 
-export function Table({ books, onOpen }: { books: BookData[]; onOpen: (id: string) => void }) {
+export type TableProps = {
+  books: BookData[];
+  onOpen: (id: string) => void;
+  /** Rechts im Kopf, z. B. Anmelden */
+  headerRight?: ReactNode;
+  /** Zeile unter jedem Buch */
+  extra?: (book: BookData) => ReactNode;
+  /** Zettel neben einem Buch */
+  note?: (book: BookData) => string | undefined;
+  /** Weitere Dinge auf dem Tisch, z. B. ein leeres Buch zum Anlegen */
+  tiles?: ReactNode;
+  label?: string;
+};
+
+export function Table({ books, onOpen, headerRight, extra, note, tiles, label }: TableProps) {
   const root = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion() ?? false;
 
@@ -104,7 +137,7 @@ export function Table({ books, onOpen }: { books: BookData[]; onOpen: (id: strin
 
   return (
     <section
-      aria-label="Tisch mit Fotobüchern"
+      aria-label={label ?? "Tisch mit Fotobüchern"}
       className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table"
       style={{
         // Einbandbreite auf dem Tisch: Doppelseiten-Format wie beim Lesen, nur kleiner
@@ -116,17 +149,20 @@ export function Table({ books, onOpen }: { books: BookData[]; onOpen: (id: strin
         <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
           Fujiventura
         </h1>
-        <p className="text-on-table-2 text-sm">
-          {NUMBER[books.length] ?? books.length} Bücher von Michel Leotta
-        </p>
+        {headerRight ?? (
+          <p className="text-on-table-2 text-sm">
+            {NUMBER[books.length] ?? books.length} Bücher von Michel Leotta
+          </p>
+        )}
       </header>
       <div
         ref={root}
         className="table-spread relative z-0 flex flex-1 flex-col items-stretch gap-10 px-6 pt-10 pb-16 md:flex-row md:flex-wrap md:items-center md:justify-center md:gap-[7vw] md:px-8 md:pt-0 md:pb-10"
       >
         {books.map((b, i) => (
-          <ClosedBook key={b.id} book={b} index={i} onOpen={() => onOpen(b.id)} />
+          <ClosedBook key={b.id} book={b} index={i} onOpen={() => onOpen(b.id)} extra={extra?.(b)} note={note?.(b)} />
         ))}
+        {tiles}
       </div>
     </section>
   );

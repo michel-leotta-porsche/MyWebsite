@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
@@ -182,17 +182,25 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
 
 /** Lightroom: Grundwerte, Tonkurve, die sich zeichnet, HSL als Balken um die Mitte */
 function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: boolean }) {
-  const [s, setS] = useState<LightroomSettings | null>(null);
+  const [loaded, setLoaded] = useState<LightroomSettings | null>(null);
+  const inline = useMemo(() => (recipe.inline ? parseXmp(recipe.inline) : null), [recipe.inline]);
   useEffect(() => {
+    if (recipe.inline || !recipe.xmp) return;
     let alive = true;
     fetch(recipe.xmp)
       .then((r) => r.text())
-      .then((t) => alive && setS(parseXmp(t)))
+      .then((t) => alive && setLoaded(parseXmp(t)))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [recipe.xmp]);
+  }, [recipe.inline, recipe.xmp]);
+  const s = inline ?? loaded;
+  // Preset zum Laden: Datei auf dem Server oder aus dem Foto erzeugt
+  const href = useMemo(
+    () => recipe.xmp ?? (recipe.inline ? `data:application/rdf+xml;charset=utf-8,${encodeURIComponent(recipe.inline)}` : undefined),
+    [recipe.inline, recipe.xmp],
+  );
   if (!s) return <p className="text-ink-2 text-sm">Lade Preset …</p>;
   const path = s.curve.map(([x, y], i) => `${i ? "L" : "M"}${(x / 255) * 100},${100 - (y / 255) * 100}`).join(" ");
   const fmt = (v: number, unit?: string) => (unit === "EV" ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}` : signed(v));
@@ -253,15 +261,17 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
       </ul>
       <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
         <a
-          href={recipe.xmp}
-          download
+          href={href}
+          download={`${recipe.name}.xmp`}
           className="text-ink text-sm font-semibold underline decoration-mark decoration-2 underline-offset-4"
         >
           Preset laden (.xmp)
         </a>
-        <a href={recipe.source.url} className="text-ink-2 text-[12px] underline underline-offset-2" target="_blank" rel="noreferrer">
-          {recipe.source.label}
-        </a>
+        {recipe.source && (
+          <a href={recipe.source.url} className="text-ink-2 text-[12px] underline underline-offset-2" target="_blank" rel="noreferrer">
+            {recipe.source.label}
+          </a>
+        )}
       </div>
     </>
   );

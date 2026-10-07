@@ -20,6 +20,8 @@ function loadImage(url: string) {
   if (!p) {
     p = new Promise((resolve, reject) => {
       const img = new Image();
+      // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
+      if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
       img.decoding = "async";
       img.onload = () => resolve(img);
       img.onerror = reject;
