@@ -157,6 +157,28 @@ function Element({ book, el, eager, z }: { book: BookData; el: El; eager: boolea
           style={{ ...box(el.x, el.y, el.w, el.h), boxShadow: `inset 0 0 0 ${el.width}cqw ${el.color}` }}
         />
       );
+    case "path":
+      // Pfad in cqw: viewBox = Seite (100 breit, Höhe in cqw); dieselben Pfade zeichnet die Textur
+      return (
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+          style={{ zIndex: z }}
+          viewBox={`0 0 100 ${book.aspect * 100}`}
+          preserveAspectRatio="none"
+        >
+          <path
+            d={el.d}
+            fill={el.fill ?? "none"}
+            stroke={el.stroke}
+            strokeWidth={el.width}
+            strokeDasharray={el.dash?.join(" ")}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={el.opacity}
+          />
+        </svg>
+      );
   }
 }
 

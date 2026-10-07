@@ -1,3 +1,4 @@
+import { inkPaths, shapePaths, type PathEl } from "@/content/shapes";
 import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
@@ -46,7 +47,9 @@ export type El =
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
   | { t: "rect"; x: number; y: number; w: number; h: number; color: string }
   /** Prägemulde: Linie innen um das eingelassene Bild */
-  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number };
+  | { t: "frame"; x: number; y: number; w: number; h: number; color: string; width: number }
+  /** Form oder Handschrift als Pfad in cqw (shapes.ts) */
+  | PathEl;
 
 export type Layout = {
   bg: "paper" | "cloth" | "clothDeep";
@@ -85,21 +88,93 @@ const INDEX_LABEL = 4.4;
  * Spalten im Kontaktbogen, von groß nach klein. 4, 6 und 12 liegen genau auf dem 6er-Raster
  * (12 = jede Rasterspalte halbiert), 8 und 10 füllen dieselbe Breite mit derselben Fuge.
  */
-const INDEX_COLS = [4, 6, 8, 10, 12] as const;
+export function gridLines(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {
+  const ta = typeArea(book, side);
+  const H = book.aspect * 100;
+  const cw = (ta.w - 5 * 2) / 6;
+  const rh = (ta.h - 8 * 2) / 9;
+  const cols: number[] = [];
+  const rows: number[] = [];
+  for (let i = 0; i < 6; i++) cols.push(ta.x + i * (cw + 2), ta.x + i * (cw + 2) + cw);
+  for (let i = 0; i < 9; i++) rows.push(ta.y + i * (rh + 2), ta.y + i * (rh + 2) + rh);
+  return { ta, H, cw, rh, colPitch: cw + 2, rowPitch: rh + 2, xs: [0, ...cols, 100], ys: [0, ...rows, H] };
+}
 
-/** Die größten Daumen, bei denen alle Tafeln samt Nummern im Satzspiegel bleiben */
-export function indexGrid(book: BookData, ta: { y: number; w: number; h: number }) {
-  const n = book.plates.length;
-  const top = ta.y + 7;
-  const bottom = ta.y + ta.h;
-  const grid = (cols: number) => {
-    const cw = (ta.w - (cols - 1) * INDEX_GAP) / cols;
-    const ch = cw * book.aspect;
-    const rows = Math.max(1, Math.ceil(n / cols));
-    const end = top + (rows - 1) * (ch + INDEX_ROW) + ch + INDEX_LABEL;
-    return { cols, cw, ch, top, rows, end };
-  };
-  return INDEX_COLS.map(grid).find((g) => g.end <= bottom) ?? grid(INDEX_COLS[INDEX_COLS.length - 1]);
+type CBox = { x: number; y: number; w: number; h: number };
+const hits = (a: CBox, b: CBox) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Unterschrift eines Fotos auf einer freien Seite: unter dem Bild an der Außenkante, sonst im Papierstreifen außen, sonst keine */
+function autoCaption(no: number, b: CBox, side: "left" | "right", book: BookData, others: CBox[]): El | null {
+  const ta = typeArea(book, side);
+  const H = book.aspect * 100;
+  const y = b.y + b.h + 3;
+  const left = Math.max(b.x, ta.x);
+  const right = Math.min(b.x + b.w, ta.x + ta.w);
+  const w = Math.max(30, Math.min(60, right - left));
+  const below: CBox = side === "left" ? { x: left, y, w, h: 7 } : { x: right - w, y, w, h: 7 };
+  if (y + 7 <= H - 3 && right - left > 8 && !others.some((o) => hits(o, below)))
+    return side === "left" ? { t: "caption", no, x: left, y, w, align: "left" } : { t: "caption", no, x: right, y, w, align: "right" };
+  const strip = side === "right" ? 100 - (b.x + b.w) : b.x;
+  if (strip >= 14) {
+    const sx = side === "right" ? b.x + b.w + 2.5 : 2.5;
+    const sy = Math.min(b.y + b.h, ta.y + ta.h) - 10;
+    const box: CBox = { x: sx, y: sy, w: strip - 5, h: 10 };
+    if (!others.some((o) => hits(o, box))) return { t: "caption", no, x: sx, y: sy, w: strip - 5, align: "left", stack: true };
+  }
+  return null;
+}
+
+function layoutFree(book: BookData, items: FreeEl[], side: "left" | "right"): El[] {
+  const H = book.aspect * 100;
+  const toC = (b: FreeEl["box"]): CBox => ({ x: b.x, w: b.w, y: (b.y / 100) * H, h: (b.h / 100) * H });
+  const boxes = items.map((it) => {
+    const c = toC(it.box);
+    // Textrahmen: Höhe folgt dem Text
+    return it.t === "text" ? { ...c, h: textHeight(it.text, it.role, c.w, it.look) } : c;
+  });
+  // Formen und Zeichnungen stören keine Bildunterschrift: sie liegen bewusst auf der Seite
+  const solid = items.map((it) => it.t === "photo" || it.t === "text");
+  const els: El[] = [];
+  items.forEach((it, i) => {
+    const b = boxes[i];
+    if (it.t === "photo") {
+      els.push({ t: "img", no: it.no, ...b, ...(it.crop ?? view(book, it.no)), plate: true });
+      // ein Foto über den Bund trägt nur eine Unterschrift: auf der Seite, auf der mehr von ihm liegt
+      const here = Math.min(100, b.x + b.w) - Math.max(0, b.x);
+      const there = b.x < 0 ? -b.x : Math.max(0, b.x + b.w - 100);
+      const visible = here > 0 && (b.x < 0 ? here > there : here >= there);
+      if (it.caption === "auto" && visible) {
+        const cap = autoCaption(it.no, { ...b, x: Math.max(0, b.x), w: Math.min(100, b.x + b.w) - Math.max(0, b.x) }, side, book, boxes.filter((_, n) => n !== i && solid[n]));
+        if (cap) els.push(cap);
+      }
+    } else if (it.t === "shape") {
+      els.push(...shapePaths(it.kind, it.box, it.look, it.from, H));
+    } else if (it.t === "ink") {
+      els.push(...inkPaths(it.strokes, it.box, H));
+    } else {
+      const st = TEXT_ROLE[it.role];
+      const m = textMetrics(it.role, it.look);
+      els.push({
+        t: "text",
+        text: it.text,
+        x: b.x,
+        y: b.y,
+        size: m.size,
+        weight: m.weight as 400 | 700,
+        tone: it.light ? "paper" : st.tone,
+        lh: m.lh,
+        w: b.w,
+        // die breite Display-Achse gilt nur für die Grotesk
+        display: st.display && m.font === "grotesk",
+        lines: true,
+        font: it.look?.font,
+        color: it.look?.color,
+        align: it.look?.align,
+        italic: it.look?.italic,
+      });
+    }
+  });
+  return els;
 }
 
 export function layoutPage(book: BookData, page: Page, side: "left" | "right"): Layout {
