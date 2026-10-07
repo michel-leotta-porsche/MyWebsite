@@ -20,6 +20,9 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
+/* Telefon quer: wenig Höhe, viel Breite; Kopf und Bedienung rücken an die Seiten */
+@custom-variant flat (@media (orientation: landscape) and (max-height: 500px));
+
 @theme inline {
   --color-table: var(--table);
   --color-table-deep: var(--table-deep);
