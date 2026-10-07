@@ -7,6 +7,8 @@ import {
   deleteBookForever,
   dropFromInbox,
   keepInInbox,
+  mySharesOf,
+  notesOf,
   trashBook,
   watchInbox,
   watchMyBooks,
@@ -15,6 +17,29 @@ import {
 } from "@/lib/store";
 
 type Zone = "own" | "gifts";
+
+/** Wo ein eigenes Buch hingelegt ist und was davon zurückkam */
+export type Spread = { to: string[]; notes: number; ears: number };
+
+/** Für jedes eigene Buch: bei wem es liegt, wie viele Zettel und Eselsohren kamen. Ruhende Links zählen nicht. */
+async function spreadOf(uid: string): Promise<Record<string, Spread>> {
+  const shares = (await mySharesOf(uid)).filter((s) => !s.paused);
+  const out: Record<string, Spread> = {};
+  await Promise.all(
+    shares.map(async (s) => {
+      const id = s.bookId ?? s.book?.id;
+      if (!id) return;
+      const notes = await notesOf(s.token).catch(() => []);
+      const e = (out[id] ??= { to: [], notes: 0, ears: 0 });
+      if (s.to && !e.to.includes(s.to)) e.to.push(s.to);
+      for (const n of notes) {
+        if (n.kind === "ear") e.ears++;
+        else e.notes++;
+      }
+    }),
+  );
+  return out;
+}
 
 /**
  * Alles, was im Bücherzimmer liegt, und was man damit tun kann.
@@ -27,6 +52,8 @@ export function useRoom(uid: string) {
   const [gifts, setGifts] = useState<Share[] | null>(null);
   const [errors, setErrors] = useState<Partial<Record<Zone, string>>>({});
   const [attempt, setAttempt] = useState({ own: 0, gifts: 0 });
+  const [spread, setSpread] = useState<Record<string, Spread>>({});
+  const [spreadRun, setSpreadRun] = useState(0);
 
   const fail = (zone: Zone) => (e: unknown) => setErrors((x) => ({ ...x, [zone]: friendlyError(e) }));
 
@@ -55,6 +82,17 @@ export function useRoom(uid: string) {
     [uid, attempt.gifts],
   );
 
+  // Nur eine Zugabe an den Büchern: schlägt das Laden fehl, fehlt die Zeile einfach
+  useEffect(() => {
+    let alive = true;
+    spreadOf(uid)
+      .then((s) => alive && setSpread(s))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [uid, spreadRun]);
+
   const retry = useCallback((zone: Zone) => {
     setErrors((x) => ({ ...x, [zone]: undefined }));
     setAttempt((a) => ({ ...a, [zone]: a[zone] + 1 }));
@@ -70,6 +108,10 @@ export function useRoom(uid: string) {
     own: books?.filter((b) => !b.trashed) ?? null,
     trash: (books ?? []).filter((b) => b.trashed).sort((a, b) => (b.trashed ?? 0) - (a.trashed ?? 0)),
     gifts,
+    /** Buch-Kennung → bei wem es liegt, Zettel, Eselsohren */
+    spread,
+    /** neu zählen, z. B. nachdem das Buch jemandem hingelegt wurde */
+    recount: () => setSpreadRun((n) => n + 1),
     errors,
     retry,
     /** In den Papierkorb; zurück mit dem Rückgabewert */
