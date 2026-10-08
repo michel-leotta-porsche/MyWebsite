@@ -9,6 +9,7 @@ import { layoutPage, TEXT_STYLE } from "@/content/layout";
 import { FrameButton, inputClass, linkClass, SignInTable, SlipDialog, TextButton, Wordmark } from "@/components/app-ui";
 import { Book } from "@/components/book";
 import { CropDialog } from "@/components/crop-dialog";
+import { DevelopDialog } from "@/components/develop-dialog";
 import { PageView } from "@/components/page-view";
 import { ShareDialog } from "@/components/share-dialog";
 import { Stage } from "@/components/stage";
@@ -138,6 +139,7 @@ export function Editor() {
   const [sharing, setSharing] = useState(false);
   const [history, setHistory] = useState(false);
   const [crop, setCrop] = useState<string | null>(null);
+  const [develop, setDevelop] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const lastClick = useRef<{ i: number; at: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -1059,6 +1061,9 @@ export function Editor() {
                     Ausschnitt …
                   </button>
                 )}
+                <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => setDevelop(selPhoto.key)}>
+                  Bearbeiten …
+                </button>
                 <button
                   type="button"
                   className="underline decoration-mark decoration-2 underline-offset-4"
@@ -1239,6 +1244,24 @@ export function Editor() {
             if (i >= 0 && !book.spreads[i].pinned) update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i ? { ...s, pinned: true } : s))), `crop-${crop}`);
           }}
           onClose={() => setCrop(null)}
+        />
+      )}
+      {develop && byKey.get(develop) && (
+        <DevelopDialog
+          // bearbeitet wird ein Foto; die anderen der Doppelseite liegen zum Wechseln und Angleichen daneben
+          photos={(() => {
+            const i = spreadOf(develop);
+            const keys = i >= 0 ? book.spreads[i].keys : [develop];
+            return keys.map((k) => byKey.get(k)).filter((p): p is StoredPhoto => !!p);
+          })()}
+          start={develop}
+          uid={user.uid}
+          bookId={book.id}
+          onDone={(patches) => {
+            if (Object.keys(patches).length) update((b) => ({ ...b, photos: b.photos.map((p) => (patches[p.key] ? { ...p, ...patches[p.key] } : p)) }));
+            setDevelop(null);
+          }}
+          onClose={() => setDevelop(null)}
         />
       )}
       {history && (

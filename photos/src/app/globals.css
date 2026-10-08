@@ -574,3 +574,20 @@ html.ohne-schatten [data-shade] {
     }
   }
 }
+
+/* Weißabgleich-Feld im Bearbeiten-Dialog: Achsen, Raster und die Farbrichtungen wie im Kameramenü */
+.wbpad {
+  background:
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgb(27 28 26 / 0.35) calc(50% - 0.5px), rgb(27 28 26 / 0.35) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(0deg, transparent calc(50% - 0.5px), rgb(27 28 26 / 0.35) calc(50% - 0.5px), rgb(27 28 26 / 0.35) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(90deg, rgb(70 120 170 / 0.28), rgb(200 90 60 / 0.28)),
+    linear-gradient(0deg, rgb(200 170 60 / 0.25), rgb(60 90 190 / 0.25));
+}
+.wbpad::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(90deg, rgb(27 28 26 / 0.08) 1px, transparent 1px), linear-gradient(0deg, rgb(27 28 26 / 0.08) 1px, transparent 1px);
+  background-size: calc(100% / 19) calc(100% / 19);
+}

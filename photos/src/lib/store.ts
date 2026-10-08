@@ -23,6 +23,7 @@ import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } fr
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
+import type { NamedRecipe, PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
 
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
@@ -60,6 +61,10 @@ export type StoredPhoto = {
   shelved?: boolean;
   recipe?: Recipe;
   camera?: CameraInfo;
+  /** Nachbearbeitung im Editor; src, large und thumb zeigen dann auf die eingerechnete Fassung */
+  edit?: PhotoEdit;
+  /** das unbearbeitete Foto: Neu gerechnet wird immer von hier, Zurücksetzen holt es zurück */
+  orig?: { src: string; large: string; thumb: string; color: [number, number, number] };
 };
 
 /** Schema der gespeicherten Bücher; ältere Stände werden beim Laden angehoben (migrate) */
@@ -139,6 +144,7 @@ export function toBookData(b: StoredBook): BookData {
       fit: p.fit,
       recipe: p.recipe,
       camera: p.camera,
+      edit: p.edit,
     };
   }
   const cloth = CLOTHS[b.cloth] ?? CLOTHS.ringelblume;
@@ -206,6 +212,55 @@ export async function uploadPhoto(uid: string, bookId: string, ph: Ingested): Pr
     }),
   );
   return Object.fromEntries(sizes.map((s, i) => [s, urls[i]])) as Record<SizeName, string>;
+}
+
+/** Eingerechnete Fassung eines Fotos hochladen; neue Dateinamen, weil die alten ein Jahr im Cache liegen */
+export async function uploadEdited(uid: string, bookId: string, key: string, blobs: Record<SizeName, Blob>): Promise<Record<SizeName, string>> {
+  if (MOCK) return { thumb: URL.createObjectURL(blobs.thumb), page: URL.createObjectURL(blobs.page), large: URL.createObjectURL(blobs.large) };
+  const tag = Date.now().toString(36);
+  const sizes = ["thumb", "page", "large"] as SizeName[];
+  const urls = await Promise.all(
+    sizes.map(async (size) => {
+      const r = ref(storage(), `u/${uid}/${bookId}/${key}-e${tag}-${size}.jpg`);
+      await uploadBytes(r, blobs[size], { contentType: "image/jpeg", cacheControl: "public, max-age=31536000" });
+      return getDownloadURL(r);
+    }),
+  );
+  return Object.fromEntries(sizes.map((s, i) => [s, urls[i]])) as Record<SizeName, string>;
+}
+
+// Eigene Rezepte im Profil: users/{uid}/recipes/{id}; im Testmodus nur im Browser
+const MOCK_RECIPES = "fuji:mock-recipes";
+export async function myRecipes(uid: string): Promise<NamedRecipe[]> {
+  if (MOCK) {
+    try {
+      return JSON.parse(localStorage.getItem(MOCK_RECIPES) ?? "[]") as NamedRecipe[];
+    } catch {
+      return [];
+    }
+  }
+  const snap = await getDocs(collection(db(), "users", uid, "recipes"));
+  return snap.docs.map((d) => d.data() as NamedRecipe).sort((a, b) => a.name.localeCompare(b.name, "de"));
+}
+export async function saveRecipe(uid: string, r: NamedRecipe) {
+  if (MOCK) {
+    const all = (await myRecipes(uid)).filter((x) => x.id !== r.id);
+    try {
+      localStorage.setItem(MOCK_RECIPES, JSON.stringify([...all, r]));
+    } catch {}
+    return;
+  }
+  await setDoc(doc(db(), "users", uid, "recipes", r.id), r);
+}
+export async function deleteRecipe(uid: string, id: string) {
+  if (MOCK) {
+    const all = (await myRecipes(uid)).filter((x) => x.id !== id);
+    try {
+      localStorage.setItem(MOCK_RECIPES, JSON.stringify(all));
+    } catch {}
+    return;
+  }
+  await deleteDoc(doc(db(), "users", uid, "recipes", id));
 }
 
 export async function saveBook(b: StoredBook) {

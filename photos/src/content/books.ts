@@ -1,6 +1,7 @@
 import type { StaticImageData } from "next/image";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
+import type { PhotoEdit } from "@/lib/develop/model";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import rettungsturm from "../../public/photos/09-rettungsturm.jpg";
@@ -101,6 +102,8 @@ export type Photo = {
   /** Rezept und Kamera, wenn das Foto sie selbst mitbringt (hochgeladene Bücher) */
   recipe?: Recipe;
   camera?: CameraInfo;
+  /** nachbearbeitet im Editor: steht dann auf dem Zettel */
+  edit?: PhotoEdit;
 };
 
 /** Tafel: ein Foto mit seiner Nummer im Buch (Reihenfolge des ersten Auftritts) */

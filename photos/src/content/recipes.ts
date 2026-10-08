@@ -1,5 +1,6 @@
 import type { Plate } from "@/content/books";
 import camera from "@/content/camera.json";
+import { isNeutral } from "@/lib/develop/model";
 
 // Rezepte und Kameradaten zu den Tafeln.
 // Fuji: Die Fuerteventura-Fotos sind mit einem Fuji-Rezept entstanden, die Werte stecken in den
@@ -165,4 +166,4 @@ export function cameraOf(plate: Plate): CameraInfo | undefined {
   return plate.camera ?? cameras[plate.key];
 }
 /** Hat die Tafel einen Zettel (Rezept oder Kamera)? */
-export const hasSlip = (plate: Plate) => !!recipeOf(plate) || !!cameraOf(plate);
+export const hasSlip = (plate: Plate) => !!recipeOf(plate) || !!cameraOf(plate) || !isNeutral(plate.edit);
