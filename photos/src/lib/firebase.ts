@@ -8,7 +8,9 @@ import { getStorage } from "firebase/storage";
 // Öffentliche Web-Konfiguration (kein Geheimnis): der Zugriff wird über firestore.rules und storage.rules geregelt
 const config = {
   apiKey: "AIzaSyCh1QxkXtljnVpeZNjZMghO2xFsDj6VygY",
-  authDomain: "fujiventura.firebaseapp.com",
+  // Anmeldung über die eigene Domain: Safari trennt den Speicher fremder Domains, über firebaseapp.com
+  // ginge der Zwischenstand der Google-Anmeldung verloren. Firebase Hosting liefert /__/auth/ hier selbst aus.
+  authDomain: "fujiventura.web.app",
   projectId: "fujiventura",
   storageBucket: "fujiventura.firebasestorage.app",
   messagingSenderId: "972013615891",
