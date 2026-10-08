@@ -23,7 +23,7 @@ console.log(`${files.length} Fotos in ${WIDTHS.length} Breiten abgelegt`);
 
 // Arbeitsstände aus src/app/(intern) gehören nicht auf die Live-Seite: Seite, Daten und Ordner entfernen
 const out = path.join(import.meta.dirname, "..", "out");
-const INTERN = ["kritik", "qfd", "umfrage"];
+const INTERN = ["kritik", "qfd", "umfrage", "bausteine"];
 for (const name of INTERN) {
   for (const f of [`${name}.html`, `${name}.txt`, name]) await rm(path.join(out, f), { recursive: true, force: true });
 }
