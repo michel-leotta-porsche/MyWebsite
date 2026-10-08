@@ -296,6 +296,43 @@ html.ohne-struktur .printed::after {
   }
 }
 
+/* Regal: ein Buch pro Zeile, gerade ausgerichtet; daneben Daten, Zettel und Knöpfe. Ab breiten Fenstern zwei Spalten */
+.shelf-rows {
+  --tw: min(34vw, 168px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.table-book.shelf-row {
+  display: grid;
+  grid-template-columns: calc(var(--tw) + 8px) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 18px;
+  padding-block: 22px;
+  border-top: 1px solid rgb(163 154 142 / 0.22);
+  transform: none;
+  --rot: 0deg !important;
+}
+.shelf-rows > .shelf-row:first-child {
+  border-top: 0;
+  padding-top: 8px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .table-book.shelf-row .book-actions {
+    opacity: 1;
+  }
+}
+@media (min-width: 1024px) {
+  .shelf-rows {
+    --tw: 168px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 56px;
+  }
+  .shelf-rows > .shelf-row:nth-child(2) {
+    border-top: 0;
+    padding-top: 8px;
+  }
+}
+
 /* Fahrplan-Linie: Haltepunkte der Bildfolge */
 .stop {
   transition:

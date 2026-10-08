@@ -38,15 +38,21 @@ function ClosedBook({
   actions,
   note,
   meta,
+  extra,
   feature = false,
+  row = false,
 }: {
   book: BookData;
   index: number;
   actions?: ReactNode;
   note?: string;
   meta?: ReactNode;
+  /** unter der Zeile mit den Daten, z. B. Zettel und Eselsohren von Freunden */
+  extra?: ReactNode;
   /** einzeln und groß, mit Knopf zum Aufschlagen (Gastlink) */
   feature?: boolean;
+  /** als Zeile im Regal: Einband links, alles andere daneben */
+  row?: boolean;
 }) {
   const { open, focusId } = useContext(OpenBook);
   const button = useRef<HTMLButtonElement>(null);
@@ -64,7 +70,7 @@ function ClosedBook({
 
   return (
     <li
-      className={`table-book relative ${arrive ? "arrive" : ""} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
+      className={`table-book relative ${arrive ? "arrive" : ""} ${row ? "shelf-row" : ""} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
       style={
         {
           ["--rot" as string]: `${ROT[index % ROT.length]}deg`,
@@ -83,6 +89,7 @@ function ClosedBook({
         <div className="lift relative" style={{ width: coverWidth(book), aspectRatio: `1 / ${book.aspect}` }}>
           {/* Zettel unter dem Einband: von wem das Buch kommt */}
           {note &&
+            !row &&
             (feature ? (
               // Am Unterrand festgemacht: der Zettel steckt immer gleich tief unter dem Einband, der Text bleibt darüber frei
               <span
@@ -139,9 +146,10 @@ function ClosedBook({
           </button>
         </div>
       ) : (
-        <div className="mt-4 grid gap-0.5 text-sm" style={{ width: coverWidth(book) }}>
-          <p className="text-on-table text-base leading-snug font-semibold tracking-[-0.01em]">{book.title}</p>
+        <div className={row ? "grid min-w-0 content-start gap-0.5 text-sm" : "mt-4 grid gap-0.5 text-sm"} style={row ? undefined : { width: coverWidth(book) }}>
+          <p className={`text-on-table leading-snug font-semibold tracking-[-0.01em] ${row ? "text-lg" : "text-base"}`}>{book.title}</p>
           <p className="text-on-table-2">{meta ?? `${book.plates.length} Tafeln`}</p>
+          {extra}
           {actions && <div className="book-actions mt-1.5 flex flex-wrap gap-x-4 gap-y-1">{actions}</div>}
         </div>
       )}
@@ -159,9 +167,11 @@ export function Shelf({
   books,
   note,
   meta,
+  extra,
   actions,
   tiles,
   feature = false,
+  rows = false,
   children,
 }: {
   id?: string;
@@ -169,7 +179,10 @@ export function Shelf({
   books: BookData[];
   note?: (book: BookData) => string | undefined;
   meta?: (book: BookData) => ReactNode;
+  extra?: (book: BookData) => ReactNode;
   actions?: (book: BookData) => ReactNode;
+  /** Regal: ein Buch pro Zeile, daneben was dazugehört (ab breiten Fenstern zwei Spalten) */
+  rows?: boolean;
   tiles?: ReactNode;
   /** ein einzelnes Buch groß und mittig, mit Knopf zum Aufschlagen (Gastlink) */
   feature?: boolean;
@@ -187,9 +200,9 @@ export function Shelf({
         </div>
       )}
       {(books.length > 0 || tiles) && (
-        <ul className={feature ? "flex justify-center pt-24 flat:pt-0" : "shelf"}>
+        <ul className={feature ? "flex justify-center pt-24 flat:pt-0" : rows ? "shelf-rows" : "shelf"}>
           {books.map((b, i) => (
-            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} feature={feature} />
+            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} extra={extra?.(b)} feature={feature} row={rows} />
           ))}
           {tiles}
         </ul>

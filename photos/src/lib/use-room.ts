@@ -15,16 +15,20 @@ import {
   watchInbox,
   watchMyBooks,
   type Blocked,
+  type Note,
   type Share,
   type StoredBook,
 } from "@/lib/store";
 
 type Zone = "own" | "gifts";
 
-/** Wo ein eigenes Buch hingelegt ist und was davon zurückkam */
-export type Spread = { to: string[]; notes: number; ears: number };
+/** Ein Zettel oder Eselsohr, mit dem Link, über den es kam; `who` ist der Name des Gasts oder, ohne Namen, für wen der Link war */
+export type Feedback = Note & { token: string; who: string };
 
-/** Für jedes eigene Buch: bei wem es liegt, wie viele Zettel und Eselsohren kamen. Ruhende Links zählen nicht. */
+/** Wo ein eigenes Buch hingelegt ist und was davon zurückkam; `items` neueste zuerst */
+export type Spread = { to: string[]; notes: number; ears: number; items: Feedback[] };
+
+/** Für jedes eigene Buch: bei wem es liegt, welche Zettel und Eselsohren kamen. Ruhende Links zählen nicht. */
 async function spreadOf(uid: string): Promise<Record<string, Spread>> {
   const shares = (await mySharesOf(uid)).filter((s) => !s.paused);
   const out: Record<string, Spread> = {};
@@ -33,14 +37,17 @@ async function spreadOf(uid: string): Promise<Record<string, Spread>> {
       const id = s.bookId ?? s.book?.id;
       if (!id) return;
       const notes = await notesOf(s.token).catch(() => []);
-      const e = (out[id] ??= { to: [], notes: 0, ears: 0 });
+      const e = (out[id] ??= { to: [], notes: 0, ears: 0, items: [] });
       if (s.to && !e.to.includes(s.to)) e.to.push(s.to);
       for (const n of notes) {
         if (n.kind === "ear") e.ears++;
-        else e.notes++;
+        else if (n.text?.trim()) e.notes++;
+        else continue;
+        e.items.push({ ...n, token: s.token, who: n.from?.trim() || s.to || "Gast" });
       }
     }),
   );
+  for (const e of Object.values(out)) e.items.sort((a, b) => (b.at?.seconds ?? 0) - (a.at?.seconds ?? 0));
   return out;
 }
 
