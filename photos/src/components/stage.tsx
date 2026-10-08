@@ -1465,6 +1465,8 @@ export function Stage({
 
   // Handy: die Leiste unten weicht der Text-Leiste und dem Zuschneiden
   const dockShown = phone && !cropping;
+  /** erstes Foto der Doppelseite: dort beginnt „Fotos bearbeiten“ ohne Auswahl */
+  const firstKey = items.find((i) => i.t === "photo")?.key ?? null;
   /** Handy: ein gewähltes Foto oder ein Text zeigt seine Handgriffe im Fach statt in einer Karte darunter */
   const selTray = phone && !draft && (selected?.t === "photo" || selected?.t === "text") ? selected : null;
 
@@ -1480,6 +1482,9 @@ export function Stage({
             </svg>
           </button>
           <span className="text-on-table min-w-0 flex-1 truncate font-semibold">Doppelseite {index + 1}</span>
+          {onDevelop && firstKey && (
+            <IconButton label="Fotos bearbeiten" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)} d="M4 7h9 M17 7h3 M15 4.5v5 M4 17h3 M11 17h9 M9 14.5v5" />
+          )}
           <IconButton label="Rückgängig" disabled={!canUndo} onClick={onUndo} d="M9 5L4 10l5 5 M4 10h11a5 5 0 010 10h-3" />
           <IconButton label="Wiederholen" disabled={!canRedo} onClick={onRedo} d="M15 5l5 5-5 5 M20 10H9a5 5 0 000 10h3" />
           <IconButton label="Mehr" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((o) => !o)} dots />
@@ -1500,7 +1505,10 @@ export function Stage({
             <TextButton disabled={!canRedo} onClick={onRedo}>
               Wiederholen
             </TextButton>
-            <TextButton aria-pressed={gridOn} onClick={toggleGrid} title="Raster zeigen (G)">
+            {onDevelop && firstKey && (
+            <TextButton onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>Fotos bearbeiten</TextButton>
+          )}
+          <TextButton aria-pressed={gridOn} onClick={toggleGrid} title="Raster zeigen (G)">
               Raster {gridOn ? "aus" : "an"}
             </TextButton>
             {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
