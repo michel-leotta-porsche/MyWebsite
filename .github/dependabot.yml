@@ -1,0 +1,28 @@
+# Dependabot: meldet unsichere Pakete und schlägt Updates als PR vor.
+# Kleine Updates (minor/patch) kommen gebündelt einmal pro Woche, große (major) einzeln, damit man sie bewusst prüft.
+# Jeder Dependabot-PR läuft durch „Prüfen“ und bekommt einen Vorschau-Link, bevor er gemergt wird.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/", "/photos", "/photos/functions"]
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Berlin
+    groups:
+      klein:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "Pakete"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Europe/Berlin
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Actions"

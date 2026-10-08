@@ -11,6 +11,10 @@ concurrency:
   group: pruefen-${{ github.ref }}
   cancel-in-progress: true
 
+# nur lesen: dieser Workflow braucht keine Schreibrechte am Repo
+permissions:
+  contents: read
+
 jobs:
   website:
     name: Website
@@ -45,3 +49,15 @@ jobs:
       # erst bauen: next build legt next-env.d.ts an (Typen für Bild-Importe), das nicht im Repo liegt
       - run: npm run build
       - run: npx tsc --noEmit
+
+  pakete:
+    name: Neue Pakete
+    # vergleicht die Lockfiles mit dem Hauptstand: rot, wenn der PR ein Paket mit bekannter Lücke (hoch oder kritisch) hinzufügt.
+    # Bestehende Funde blockieren nicht, die meldet Dependabot.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
