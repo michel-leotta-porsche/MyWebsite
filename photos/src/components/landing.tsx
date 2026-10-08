@@ -10,6 +10,7 @@ import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
@@ -30,6 +31,7 @@ import torii from "../../public/photos/japan/torii.jpg";
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
 const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
+// Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 
 /** Anmelden und gleich ins Bücherzimmer; wer schon angemeldet ist, geht direkt hinein */
@@ -90,30 +92,33 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
 /* ------------------------------------------------------------------ Papier und Leinen */
 
 /** Bildunterschrift wie im Buch: Nummer halbfett in Tinte, Titel in grauer Tinte */
-function Cap({ no, title, x, y, right = false }: { no: number; title: string; x: number; y: number; right?: boolean }) {
+// Auf dem Telefon ist die Seite so klein, dass nur Nummer und Titel passen; Zusatzzeile und Eintrag `wide` erst ab Tablet
+function Cap({ items, note, x, y, right = false }: { items: [number, string, "wide"?][]; note?: string; x: number; y: number; right?: boolean }) {
   return (
     <p
-      className={`text-ink-2 absolute whitespace-nowrap ${right ? "text-right" : ""}`}
+      className={`text-ink-2 absolute w-max max-w-[62cqw] ${right ? "text-right" : ""}`}
       style={{ top: `${y}cqw`, [right ? "right" : "left"]: `${right ? 100 - x : x}cqw`, fontSize: "max(9px, 3.1cqw)", lineHeight: 1.375 }}
     >
-      <span className="text-ink font-semibold">{no}</span>
-      <span className="ml-[0.6em]">{title}</span>
+      {items.map(([no, title, wide], k) => (
+        <span key={no} className={`whitespace-nowrap ${k ? "ml-[1.2em]" : ""} ${wide ? "hidden md:inline" : ""}`}>
+          <span className="text-ink font-semibold">{no}</span>
+          <span className="ml-[0.6em]">{title}</span>
+        </span>
+      ))}
+      {note && <span className="hidden md:block">{note}</span>}
     </p>
   );
 }
 
-/** Eine Buchseite: Naturpapier, zum Bund hin dunkler (die Seite wölbt sich dort) */
+/** Eine Buchseite: Naturpapier, zum Bund hin der Falz */
 function PageFace({ side, children, className = "" }: { side: "left" | "right"; children?: ReactNode; className?: string }) {
   return (
     <div className={`paper absolute inset-0 overflow-hidden [container-type:inline-size] ${className}`}>
       {children}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 w-[14cqw]"
-        style={{
-          [side === "left" ? "right" : "left"]: 0,
-          background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(12 10 8 / 0.16), rgb(12 10 8 / 0.05) 30%, transparent)`,
-        }}
+        className="pointer-events-none absolute inset-y-0"
+        style={{ [side === "left" ? "right" : "left"]: 0, width: `${FOLD_WIDTH}cqw`, background: foldGradient(side) }}
       />
     </div>
   );
@@ -123,8 +128,8 @@ function PageFace({ side, children, className = "" }: { side: "left" | "right"; 
 function Cover({ photo, title, author, className = "" }: { photo: StaticImageData; title: string; author: string; className?: string }) {
   return (
     <div className={`relative ${className}`}>
-      <div aria-hidden className={`absolute inset-0 ${lifted}`} />
-      <div aria-hidden className="absolute top-[1.2%] bottom-[0.4%] left-full w-[10px] bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]" />
+      <div aria-hidden className="book-shadow-closed absolute inset-0" />
+      <div aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full w-[10px]" />
       <div className="linen bg-cloth relative aspect-[2/3] w-full overflow-hidden [container-type:inline-size]">
         <div aria-hidden className="absolute inset-y-0 left-0 w-[5cqw] bg-[rgb(12_10_8/0.08)]" />
         <div aria-hidden className="absolute inset-y-0 left-[5cqw] w-[0.25cqw] bg-[rgb(12_10_8/0.18)]" />
@@ -268,6 +273,22 @@ const SLOTS = [
   { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], bend: 8, phone: ["70vw", "6svh", "9deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
 ] as const;
 
+// Wölbung der aufgeschlagenen Seiten: am Bund sinken Ober- und Unterkante um so viel Prozent der Höhe ein, nach außen läuft es aus.
+// Bewusst knapp; mehr wirkt wie ein Effekt statt wie Papier.
+const SAG = { top: 1.2, bottom: 0.8 };
+const CURVE_STEPS = 8;
+
+/** clip-path der Doppelseite. `loose`: dieselben Punkte weit draußen, damit die Abzüge im Flug nicht beschnitten werden */
+function pageCurve(loose: boolean) {
+  // von außen links zum Bund und weiter nach außen rechts; u = Abstand vom Bund in Seitenbreiten
+  const xs = Array.from({ length: 2 * CURVE_STEPS + 1 }, (_, k) => (k * 100) / (2 * CURVE_STEPS));
+  const sag = (x: number, s: number) => s * (1 - Math.abs(x - 50) / 50) ** 2;
+  const pt = (x: number, y: number) => (loose ? `${x * 5 - 200}% ${y * 5 - 200}%` : `${+x.toFixed(2)}% ${+y.toFixed(3)}%`);
+  const top = xs.map((x) => pt(x, sag(x, SAG.top)));
+  const bottom = [...xs].reverse().map((x) => pt(x, 100 - sag(x, SAG.bottom)));
+  return `polygon(${[...top, ...bottom].join(", ")})`;
+}
+
 // So viele Streifen je Hälfte: der Abzug biegt sich an ihren Kanten wie Fotopapier im Luftzug
 const STRIPS = 5;
 
@@ -343,17 +364,26 @@ function Workbench() {
             </p>
           </div>
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
-          <div className="relative aspect-[4/3] w-full [container-type:inline-size] [perspective:1400px]">
+          <div
+            className="relative aspect-[4/3] w-full [container-type:inline-size]"
+            style={{ ["--loose" as string]: pageCurve(true), ["--curve" as string]: pageCurve(false) }}
+          >
+            {/* Buchblock links und rechts, darunter der Schatten des aufgeschlagenen Buchs */}
+            <div aria-hidden className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] w-[1.2cqw]" />
+            <div aria-hidden className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full w-[1.2cqw]" />
+            <div aria-hidden className="book-shadow-open absolute inset-0" />
+            {/* Die Seiten wölben sich zum Bund hin; die Form greift erst, wenn alle Abzüge liegen (globals.css) */}
+            <div className="bench-book absolute inset-0 [perspective:1400px]">
             {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
-            <div className={`bench-paper absolute inset-0 grid grid-cols-2 ${lifted}`}>
+            <div className="bench-paper absolute inset-0 grid grid-cols-2">
               <div className="relative">
                 <PageFace side="left" />
               </div>
               <div className="relative">
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
-                    <Cap no={2} title="Mittagsblume" x={88} y={81} right />
-                    <Cap no={3} title="Markisen · 4 Platter Reifen" x={88} y={131} right />
+                    <Cap items={[[1, "Drachenbaum", "wide"], [2, "Mittagsblume"]]} note="Öffnet erst in der Mittagssonne." x={88} y={62} right />
+                    <Cap items={[[3, "Markisen"], [4, "Reifen"]]} note="Eingerollt gegen den Wind. Der Reifen gab früher auf." x={88} y={130} right />
                   </div>
                 </PageFace>
               </div>
@@ -384,6 +414,18 @@ function Workbench() {
                 <Sheet src={s.src} sizes={s.sizes} />
               </div>
             ))}
+            {/* Falz und Papier über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
+            <div aria-hidden className="bench-caps pointer-events-none absolute inset-0">
+              <div className="printed" style={printedStyle} />
+              {(["left", "right"] as const).map((side) => (
+                <div
+                  key={side}
+                  className="absolute inset-y-0"
+                  style={{ [side === "left" ? "right" : "left"]: "50%", width: `${FOLD_WIDTH / 2}cqw`, background: foldGradient(side) }}
+                />
+              ))}
+            </div>
+            </div>
           </div>
           <p className="text-on-table-2 relative mt-6 text-sm">
             <span className="bench-count-a">4 Fotos, nach Aufnahmezeit</span>

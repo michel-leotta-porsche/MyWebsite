@@ -804,25 +804,25 @@ export function Book({
                   {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
                   <div
                     aria-hidden
-                    className="absolute inset-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
+                    className="book-shadow-open absolute inset-0"
                     style={{ left: mode === "spread" ? "50%" : 0 }}
                   />
                   <motion.div
                     aria-hidden
-                    className="absolute inset-y-0 left-0 shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75)]"
+                    className="book-shadow-open absolute inset-y-0 left-0"
                     style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
                   />
 
                   {/* Papierkanten, so dick wie das Buch Seiten hat */}
                   <motion.div
                     aria-hidden
-                    className="absolute top-[0.6%] bottom-[0.6%] left-full origin-left bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+                    className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full origin-left"
                     style={{ transform: rightEdgeT, width: Math.round(3 + count / 4) }}
                   />
                   {mode === "spread" && (
                     <motion.div
                       aria-hidden
-                      className="absolute top-[0.6%] right-full bottom-[0.6%] origin-right bg-[repeating-linear-gradient(to_left,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+                      className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] origin-right"
                       style={{ transform: leftEdgeT, width: Math.round(3 + count / 4) }}
                     />
                   )}

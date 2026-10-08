@@ -98,15 +98,15 @@ function ClosedBook({
               </span>
             ))}
           {/* Schatten auf dem Tisch, das Licht kommt von oben rechts; beim Anheben blendet ein weicherer dazu */}
-          <div aria-hidden className="absolute inset-0 shadow-[-10px_20px_34px_-16px_rgb(12_10_8/0.85),-2px_4px_8px_-3px_rgb(12_10_8/0.55)]" />
+          <div aria-hidden className="book-shadow-closed absolute inset-0" />
           <div
             aria-hidden
-            className="lift-shadow absolute inset-0 opacity-0 shadow-[-16px_40px_56px_-22px_rgb(12_10_8/0.7)] transition-opacity duration-200 ease-out"
+            className="lift-shadow book-shadow-lift absolute inset-0 opacity-0 transition-opacity duration-200 ease-out"
           />
           {/* Buchblock: Papierkanten rechts, so dick wie das Buch Seiten hat */}
           <div
             aria-hidden
-            className="absolute top-[1.2%] bottom-[0.4%] left-full bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+            className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full"
             style={{ width: edge }}
           />
           <div aria-hidden className="absolute inset-0" style={{ viewTransitionName: `cover-${book.id}` }}>

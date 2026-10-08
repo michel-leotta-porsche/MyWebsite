@@ -95,22 +95,22 @@ export function ScrollBook({
       >
         {/* Schatten auf dem Tisch: unter dem rechten Teil immer, unter dem linken erst aufgeschlagen */}
         <div
-          className="absolute inset-0 shadow-[0_34px_60px_-20px_rgb(12_10_8/0.8),0_8px_18px_-8px_rgb(12_10_8/0.55)]"
+          className="book-shadow-open absolute inset-0"
           style={{ left: mode === "spread" ? "50%" : 0 }}
         />
         <motion.div
-          className="absolute inset-y-0 left-0 shadow-[0_34px_60px_-20px_rgb(12_10_8/0.8),0_8px_18px_-8px_rgb(12_10_8/0.55)]"
+          className="book-shadow-open absolute inset-y-0 left-0"
           style={{ width: mode === "spread" ? "50%" : 0, opacity: open }}
         />
 
         {/* Buchblock: so dick wie das Buch Blätter hat, Blatt für Blatt gestreift */}
         <motion.div
-          className="absolute top-[0.6%] bottom-[0.6%] left-full origin-left bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+          className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full origin-left"
           style={{ transform: rightEdgeT, width: edge }}
         />
         {mode === "spread" && (
           <motion.div
-            className="absolute top-[0.6%] right-full bottom-[0.6%] origin-right bg-[repeating-linear-gradient(to_left,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]"
+            className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] origin-right"
             style={{ transform: leftEdgeT, width: edge }}
           />
         )}

@@ -4,6 +4,7 @@ import { getImageProps, type StaticImageData } from "next/image";
 
 import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
 import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
+import { FOLD_STOPS, FOLD_WIDTH, foldColor, PRINT } from "@/lib/book-look";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
 // Dieselbe Elementliste wie page-view.tsx (layoutPage), alle Maße in cqw = Seitenbreite / 100.
@@ -30,7 +31,11 @@ function loadImage(url: string) {
       // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
       if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
       img.decoding = "async";
-      img.onload = () => resolve(img);
+      // erst fertig entpackt zurückgeben, sonst entpackt drawImage im Hauptthread und das Blatt hakt beim ersten Bild
+      img.onload = () => img.decode().then(
+        () => resolve(img),
+        () => resolve(img),
+      );
       img.onerror = reject;
       img.src = url;
     });
@@ -140,13 +145,11 @@ function caption(
 }
 
 function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number, H: number, cq: number) {
-  const w = 14 * cq;
+  const w = FOLD_WIDTH * cq;
   const x0 = side === "left" ? W : 0;
   const x1 = side === "left" ? W - w : w;
   const g = ctx.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, "rgb(12 10 8 / 0.16)");
-  g.addColorStop(0.3, "rgb(12 10 8 / 0.05)");
-  g.addColorStop(1, "rgb(12 10 8 / 0)");
+  for (const [at, a] of FOLD_STOPS) g.addColorStop(at, foldColor(a));
   ctx.fillStyle = g;
   ctx.fillRect(Math.min(x0, x1), 0, w, H);
 }
@@ -310,7 +313,27 @@ async function drawLayout(
       }
     }
   });
+  if (layout.bg === "paper") await printed(ctx, W, H, dpr);
   if (layout.gutter) gutter(ctx, side, W, H, cq);
+}
+
+/** Wie `.printed` im HTML: mattes Papier hebt das Schwarz, die Fasern liegen auch über den Fotos */
+async function printed(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
+  ctx.save();
+  ctx.globalAlpha = PRINT.wash;
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, W, H);
+  paperTile ??= loadImage("/textures/paper.webp");
+  const tile = await paperTile.catch(() => null);
+  const pat = tile && ctx.createPattern(tile, "repeat");
+  if (pat) {
+    pat.setTransform(new DOMMatrix().scale(1 / scale));
+    ctx.globalAlpha = PRINT.grain;
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = pat;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
 }
 
 /**
