@@ -2,10 +2,10 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Check, ChevronDown, Columns2, RotateCcw, Trash, X } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, Columns2, Redo2, RotateCcw, Trash, Undo2, X } from "lucide-react";
 import { motion } from "motion/react";
 
-import { Button, buttonClass } from "@/components/ui/button";
+import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
 import { bakePhoto } from "@/lib/develop/bake";
 import {
   applyLut,
@@ -23,6 +23,8 @@ import {
   REC0,
   recipeIsEmpty,
   sameRecipe,
+  fineOf as lookFineOf,
+  wearsLook,
   signedStep,
   stats,
   type NamedRecipe,
@@ -523,13 +525,69 @@ export function DevelopDialog({
       }),
     );
   };
+  /* ----- Rückgängig und Wiederholen: Stände aller Fotos, ein Regelzug zählt als ein Schritt ----- */
+
+  const [past, setPast] = useState<Record<string, PhotoEdit>[]>([]);
+  const [future, setFuture] = useState<Record<string, PhotoEdit>[]>([]);
+  const editsNow = useRef(edits);
+  useEffect(() => {
+    editsNow.current = edits;
+  }, [edits]);
+  const lastLive = useRef(0);
+  // nach Rückgängig das Foto zeigen, das sich dabei ändert
+  const showChanged = (to: Record<string, PhotoEdit>) => {
+    const k = photos.find((p) => JSON.stringify(to[p.key]) !== JSON.stringify(editsNow.current[p.key]))?.key;
+    if (k && k !== sel) setSel(k);
+  };
+  const remember = () => {
+    setPast((p) => [...p.slice(-79), editsNow.current]);
+    setFuture([]);
+  };
+  const undo = () => {
+    const prev = past.at(-1);
+    if (!prev || busy) return;
+    fade();
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [editsNow.current, ...f]);
+    showChanged(prev);
+    setEdits(prev);
+    lastLive.current = 0;
+  };
+  const redo = () => {
+    const next = future[0];
+    if (!next || busy) return;
+    fade();
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, editsNow.current]);
+    showChanged(next);
+    setEdits(next);
+    lastLive.current = 0;
+  };
+  const steps = useRef({ undo, redo });
+  useEffect(() => {
+    steps.current = { undo, redo };
+  });
+
   const act = (fn: (e: PhotoEdit) => PhotoEdit, slow = false) => {
+    remember();
     fade(slow);
     setEdit(fn);
   };
   const setRec = (fn: (r: RecipeValues) => Partial<RecipeValues>, slow = false) => act((e) => ({ ...e, rec: { ...e.rec, ...fn(e.rec) } }), slow);
-  const live = (patch: Partial<PhotoEdit>) => setEdit((e) => ({ ...e, ...patch }));
-  const liveRec = (patch: Partial<RecipeValues>) => setEdit((e) => ({ ...e, rec: { ...e.rec, ...patch } }));
+  // Regler und Wischen ändern laufend; erst nach einer kurzen Pause beginnt ein neuer Schritt im Verlauf
+  const burst = () => {
+    const now = performance.now();
+    if (now - lastLive.current > 700) remember();
+    lastLive.current = now;
+  };
+  const live = (patch: Partial<PhotoEdit>) => {
+    burst();
+    setEdit((e) => ({ ...e, ...patch }));
+  };
+  const liveRec = (patch: Partial<RecipeValues>) => {
+    burst();
+    setEdit((e) => ({ ...e, rec: { ...e.rec, ...patch } }));
+  };
 
   /* ----- Vorschläge ----- */
 
@@ -555,13 +613,36 @@ export function DevelopDialog({
   const recEmpty = recipeIsEmpty(edit.rec);
   const recLabel = recMatch ? recMatch.name : recEmpty ? "" : edit.recName ? `${edit.recName} · geändert` : "Eigene Werte";
 
+  // eigener Look: nimmt Feinschliff und Look mit, die Auto-Werte des Fotos (Tonwerte, Farbübertragung) bleiben
+  const applyOwn = (r: NamedRecipe) => act((e) => ({ ...e, ...r.f, rec: { ...r.v }, recName: r.name }), true);
   const pickRecipe = (v: string) => {
     if (v === "save") return setNaming(true);
     if (v === "cur") return;
     if (v === "") return act((e) => ({ ...e, rec: REC0(), recName: undefined }));
     const r = allRecipes.find((x) => x.id === v);
-    if (r) act((e) => ({ ...e, rec: { ...r.v }, recName: r.name }), true);
+    if (r) applyOwn(r);
   };
+  const saveOwn = (name: string) => {
+    // gleicher Name überschreibt den bestehenden Look, statt einen zweiten anzulegen
+    const same = own.find((x) => x.name === name);
+    const r: NamedRecipe = { id: same?.id ?? `own-${Date.now().toString(36)}`, name, txt: "eigener Look", v: { ...edit.rec }, f: lookFineOf(edit) };
+    setOwn((o) => [...o.filter((x) => x.name !== name), r].sort((a, b) => a.name.localeCompare(b.name, "de")));
+    setEdit((e) => ({ ...e, recName: name }));
+    setNaming(false);
+    setNote(`„${name}“ steht jetzt unter Vorschläge bei „Deine Looks“, auch für andere Fotos und Bücher.`);
+    saveRecipe(uid, r).catch(() => setNote("Der Look ließ sich nicht speichern."));
+  };
+  const askDelete = (gone: NamedRecipe) =>
+    setAsk({
+      text: `„${gone.name}“ löschen? Fotos, die ihn nutzen, bleiben, wie sie sind.`,
+      yes: "Löschen",
+      no: "Behalten",
+      onYes: () => {
+        setOwn((o) => o.filter((r) => r.id !== gone.id));
+        deleteRecipe(uid, gone.id).catch(() => {});
+      },
+    });
+  const saveForm = naming && <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />;
 
   /* ----- Gesten auf dem Foto ----- */
 
@@ -650,6 +731,15 @@ export function DevelopDialog({
   useEffect(() => {
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest("input, select, textarea, [role=slider]");
     const down = (e: KeyboardEvent) => {
+      // ⌘Z / ⇧⌘Z (Strg+Z / Strg+Y) auch auf einem Regler; in Textfeldern bleibt das Rückgängig des Felds
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key.toLowerCase() === "z" || e.key.toLowerCase() === "y")) {
+        const t = e.target;
+        if (t instanceof HTMLElement && t.closest("input:not([type=range]), select, textarea")) return;
+        e.preventDefault();
+        if (e.key.toLowerCase() === "y" || e.shiftKey) steps.current.redo();
+        else steps.current.undo();
+        return;
+      }
       if (typing(e.target)) return;
       // \ liegt auf deutschen Tastaturen hinter Alt (Mac) oder AltGr; deshalb ohne Prüfung der Zusatztasten
       if ((e.key === "\\" || e.key === "m") && !e.repeat) setHolding(true);
@@ -784,9 +874,18 @@ export function DevelopDialog({
         <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:col-span-2 lg:p-0">
           <h2 className="text-xl font-bold tracking-[-0.02em]">Bearbeiten</h2>
           <div className="flex items-center gap-2 lg:gap-3">
-            <Button size="sm" onClick={close} className="pl-2.5">
+            <ToolGroup label="Verlauf">
+              <IconButton label="Rückgängig (⌘Z)" onClick={undo} disabled={!past.length || !!busy}>
+                <Undo2 aria-hidden />
+              </IconButton>
+              <IconButton label="Wiederholen (⇧⌘Z)" onClick={redo} disabled={!future.length || !!busy}>
+                <Redo2 aria-hidden />
+              </IconButton>
+            </ToolGroup>
+            {/* Telefon: nur das Zeichen, damit Verlauf, Abbrechen und Fertig in eine Zeile passen */}
+            <Button size="sm" onClick={close} className="pl-2.5 max-sm:min-w-11 max-sm:px-0" aria-label="Abbrechen">
               <X aria-hidden />
-              Abbrechen
+              <span className="max-sm:sr-only">Abbrechen</span>
             </Button>
             <Button variant="cloth" size="sm" onClick={finish} disabled={!!busy} className="pl-3 md:min-h-11 md:px-5">
               <Check aria-hidden />
@@ -987,6 +1086,37 @@ export function DevelopDialog({
                 />
               </div>
             )}
+            {tab === "s" && (
+              <div className="mt-7">
+                <h3 className={groupTitle}>Deine Looks</h3>
+                {own.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
+                    {own.map((r) => (
+                      <div key={r.id} className="relative min-w-0">
+                        <Tile img={tileImg} edit={{ ...edit, ...r.f, rec: r.v }} name={r.name} txt={r.f ? "eigener Look" : "eigenes Rezept"} pressed={wearsLook(edit, r)} onClick={() => applyOwn(r)} />
+                        <button
+                          type="button"
+                          onClick={() => askDelete(r)}
+                          aria-label={`${r.name} löschen`}
+                          title={`${r.name} löschen`}
+                          className="bg-paper/90 text-ink hover:bg-paper absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full shadow-[0_1px_4px_rgb(12_10_8/0.3)]"
+                        >
+                          <X aria-hidden className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
+                )}
+                {saveForm || (
+                  <Button variant="paper" size="sm" className="mt-3.5 pl-2.5" onClick={() => setNaming(true)} disabled={isNeutral(edit)}>
+                    <BookmarkPlus aria-hidden />
+                    Als eigenen Look speichern
+                  </Button>
+                )}
+              </div>
+            )}
 
             {tab === "l" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
@@ -1076,7 +1206,7 @@ export function DevelopDialog({
                           </optgroup>
                         )}
                         {!recMatch && !recEmpty && <option value="cur">{recLabel}</option>}
-                        <option value="save">Aktuelle Werte als Rezept speichern …</option>
+                        <option value="save">Als eigenen Look speichern …</option>
                       </select>
                       <ChevronDown aria-hidden className="text-ink pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2" />
                     </span>
@@ -1084,39 +1214,14 @@ export function DevelopDialog({
                       <button
                         type="button"
                         className="text-danger hover:bg-danger/8 flex min-h-9 items-center gap-2 rounded-full px-2.5 text-sm font-semibold pointer-coarse:min-h-11"
-                        onClick={() => {
-                          const gone = recMatch;
-                          setAsk({
-                            text: `Rezept „${gone.name}“ löschen? Fotos, die es nutzen, bleiben, wie sie sind.`,
-                            yes: "Löschen",
-                            no: "Behalten",
-                            onYes: () => {
-                              setOwn((o) => o.filter((r) => r.id !== gone.id));
-                              deleteRecipe(uid, gone.id).catch(() => {});
-                            },
-                          });
-                        }}
+                        onClick={() => askDelete(recMatch)}
                       >
                         <Trash aria-hidden className="size-4" />
                         Löschen
                       </button>
                     )}
                   </div>
-                  {naming && (
-                    <SaveForm
-                      onCancel={() => setNaming(false)}
-                      onSave={(name) => {
-                        // gleicher Name überschreibt das bestehende Rezept, statt ein zweites anzulegen
-                        const same = own.find((x) => x.name === name);
-                        const r: NamedRecipe = { id: same?.id ?? `own-${Date.now().toString(36)}`, name, txt: "eigenes", v: { ...edit.rec } };
-                        setOwn((o) => [...o.filter((x) => x.name !== name), r]);
-                        setEdit((e) => ({ ...e, recName: name }));
-                        setNaming(false);
-                        setNote(`„${name}“ steht jetzt in der Auswahl, auch für andere Fotos und Bücher.`);
-                        saveRecipe(uid, r).catch(() => setNote("Das Rezept ließ sich nicht speichern."));
-                      }}
-                    />
-                  )}
+                  {saveForm}
                 </div>
                 <div className="sm:col-span-2 lg:col-span-1">
                   <Chips<RecipeValues["film"]>
@@ -1196,7 +1301,7 @@ function SaveForm({ onSave, onCancel }: { onSave: (name: string) => void; onCanc
       }}
     >
       <label htmlFor="dv-rc-name" className="text-ink-2 text-[13px]">
-        Name für das Rezept
+        Name für deinen Look
       </label>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <input

@@ -624,6 +624,8 @@ export function Editor() {
 
   // Tastatur: Rückgängig, Wiederholen; gewähltes Foto mit Alt+Pfeil auf die Nachbarseite, Entf in die Ablage
   const onKey = (e: KeyboardEvent) => {
+    // die Bildbearbeitung hat ihr eigenes Rückgängig
+    if (develop) return;
     const t = e.target as HTMLElement;
     const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !typing) {

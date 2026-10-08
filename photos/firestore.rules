@@ -56,12 +56,13 @@ service cloud.firestore {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
         && id.matches('own-[0-9a-z]{1,16}')
-        && request.resource.data.keys().hasOnly(['id', 'name', 'txt', 'v'])
+        && request.resource.data.keys().hasOnly(['id', 'name', 'txt', 'v', 'f'])
         && request.resource.data.keys().hasAll(['id', 'name', 'v'])
         && request.resource.data.id == id
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
         && (!('txt' in request.resource.data) || (request.resource.data.txt is string && request.resource.data.txt.size() <= 60))
-        && validRecipe(request.resource.data.v);
+        && validRecipe(request.resource.data.v)
+        && (!('f' in request.resource.data) || validLookFine(request.resource.data.f));
     }
 
     // Rezeptwerte: dieselben Felder und Bereiche wie die Regler im Bearbeiten-Dialog
@@ -78,6 +79,20 @@ service cloud.firestore {
         && v.dr in [100, 200, 400]
         && v.cc in [0, 1, 2] && v.fxb in [0, 1, 2] && v.grain in [0, 1, 2]
         && v.gsize in ['klein', 'groß'];
+    }
+
+    // Eigener Look: Feinschliff und Look mit Stärke, dieselben Bereiche wie die Regler
+    function validLookFine(f) {
+      return f is map
+        && f.keys().hasOnly(['exposure', 'contrast', 'shadows', 'warmth', 'sat', 'look', 'amount'])
+        && f.keys().hasAll(['exposure', 'contrast', 'shadows', 'warmth', 'sat', 'look', 'amount'])
+        && f.exposure is number && f.exposure >= -1 && f.exposure <= 1
+        && f.contrast is number && f.contrast >= -1 && f.contrast <= 1
+        && f.shadows is number && f.shadows >= 0 && f.shadows <= 1
+        && f.warmth is number && f.warmth >= -1 && f.warmth <= 1
+        && f.sat is number && f.sat >= -1 && f.sat <= 1
+        && (f.look == null || f.look in ['sommer', 'kreide', 'daemmerung', 'salz', 'kohle', 'messing'])
+        && f.amount is number && f.amount >= 0 && f.amount <= 1;
     }
 
     // Bücher, die jemand für mich hingelegt hat
