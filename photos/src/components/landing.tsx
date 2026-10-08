@@ -11,7 +11,7 @@ import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
-import { SignInButtons } from "@/components/sign-in-buttons";
+import { APPLE_READY, SignInButtons } from "@/components/sign-in-buttons";
 import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
@@ -34,6 +34,7 @@ import torii from "../../public/photos/japan/torii.jpg";
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
 const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
+const PROVIDERS = APPLE_READY ? "Apple oder Google" : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 
@@ -255,7 +256,7 @@ function Hero() {
               <EnterButton />
             </div>
             <p className="text-on-table-2 mt-5 text-sm">
-              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung mit Apple oder Google, es gelten die{" "}
+              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung mit {PROVIDERS}, es gelten die{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
                 Nutzungsbedingungen
               </Link>{" "}
@@ -611,7 +612,7 @@ function Closing() {
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
             <EnterButton label="Erstes Buch anlegen" />
             <p className="text-on-table-2 text-sm">
-              Kostenlos, Anmeldung mit Apple oder Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              Kostenlos, Anmeldung mit {PROVIDERS}. Bücher sieht nur, wem du einen Link gibst.{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
                 Nutzungsbedingungen
               </Link>
