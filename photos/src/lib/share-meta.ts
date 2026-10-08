@@ -5,11 +5,11 @@ import type { Metadata } from "next";
 export const SITE_URL = "https://fujiventura.web.app";
 
 // Wortmarke und Buch im Ringelblumen-Leinen mit Foto im Fenster, 1200×630. Neuer Dateiname, damit Messenger die alte Vorschau nicht aus dem Cache holen
-const image = { url: "/og-buch.jpg", width: 1200, height: 630, alt: "Fujiventura: Fotobuch im gelben Leineneinband mit einer Mittagsblume im Titelfenster" };
+const image = { url: "/og-calima.jpg", width: 1200, height: 630, alt: "Calima: Fotobuch im gelben Leineneinband mit einer Mittagsblume im Titelfenster" };
 
 export function shareMeta(title: string, description: string): Pick<Metadata, "openGraph" | "twitter"> {
   return {
-    openGraph: { title, description, images: [image], locale: "de_DE", type: "website", siteName: "Fujiventura" },
+    openGraph: { title, description, images: [image], locale: "de_DE", type: "website", siteName: "Calima" },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };
 }

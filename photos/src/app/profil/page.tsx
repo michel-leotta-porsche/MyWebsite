@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Profile } from "@/components/profile";
 
 export const metadata: Metadata = {
-  title: "Profil · Fujiventura",
+  title: "Profil · Calima",
   robots: { index: false, follow: false },
 };
 

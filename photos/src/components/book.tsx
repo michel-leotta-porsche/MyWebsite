@@ -737,13 +737,13 @@ export function Book({
             onClick={onClose}
             className="text-on-table justify-self-start text-lg font-bold whitespace-nowrap flat:whitespace-normal tracking-[-0.02em] decoration-mark decoration-2 underline-offset-4 hover:underline"
             style={{ fontVariationSettings: '"wdth" 80' }}
-            aria-label="Fujiventura, zurück zum Tisch"
+            aria-label="Calima, zurück zum Tisch"
           >
             {/* Pfeil zeigt, dass der Name zurückführt; auf dem Telefon gibt es kein Esc */}
             <span aria-hidden className="text-on-table-2 mr-1.5 inline-block font-normal">
               ←
             </span>
-            Fujiventura
+            Calima
           </button>
           {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
           <div className="text-on-table-2 hidden items-baseline gap-4 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col flat:items-start flat:gap-1">

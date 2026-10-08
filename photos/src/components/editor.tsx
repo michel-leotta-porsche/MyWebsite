@@ -1349,7 +1349,7 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
         ))}
       </ul>
       <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3 border-t border-ink/15 pt-4 text-sm">
-        <a href={fileUrl} download={`${book.title || "fotobuch"}.fujiventura.json`} className="underline decoration-mark decoration-2 underline-offset-4">
+        <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className="underline decoration-mark decoration-2 underline-offset-4">
           Projekt als Datei sichern
         </a>
         <span className="text-ink-2 text-[12px]">Öffnen über das Bücherzimmer</span>

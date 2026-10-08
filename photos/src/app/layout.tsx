@@ -13,7 +13,7 @@ const serif = Newsreader({ variable: "--font-serif", subsets: ["latin"], style: 
 const mono = IBM_Plex_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["400", "700"], style: ["normal", "italic"], preload: false });
 const hand = Caveat({ variable: "--font-hand", subsets: ["latin"], preload: false });
 
-const title = "Fujiventura · Fotobücher zum Blättern";
+const title = "Calima · Fotobücher zum Blättern";
 const description = "Deine Fotos als Buch zum Umblättern. Gestalten, Freunden hinlegen, Zettel zurückbekommen.";
 
 export const metadata: Metadata = {

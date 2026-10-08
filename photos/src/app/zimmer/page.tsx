@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { BookRoom } from "@/components/book-room";
 
 export const metadata: Metadata = {
-  title: "Bücherzimmer · Fujiventura",
+  title: "Bücherzimmer · Calima",
   robots: { index: false, follow: false },
 };
 

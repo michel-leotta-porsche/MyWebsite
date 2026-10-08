@@ -4,7 +4,7 @@ import { Moved } from "./moved";
 
 // Die Werkbank als eigener Raum ist im Bücherzimmer aufgegangen; alte Lesezeichen führen dorthin
 export const metadata: Metadata = {
-  title: "Bücherzimmer · Fujiventura",
+  title: "Bücherzimmer · Calima",
   robots: { index: false, follow: false },
 };
 
