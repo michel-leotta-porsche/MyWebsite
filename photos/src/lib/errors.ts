@@ -19,3 +19,19 @@ export function friendlyError(e: unknown): string {
   if (e instanceof Error && !code && e.message) return e.message;
   return "Das hat nicht geklappt. Versuch es bitte nochmal.";
 }
+
+// Abgebrochen hat die Person selbst: kein Fehler, nichts anzeigen
+const SIGN_IN_CANCELLED = ["auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/user-cancelled"];
+const SIGN_IN_MESSAGES: Record<string, string> = {
+  "auth/popup-blocked": "Das Anmeldefenster wurde blockiert. Erlaube Fenster für Calima und versuch es nochmal.",
+  "auth/network-request-failed": "Keine Verbindung. Versuch es gleich nochmal.",
+  "auth/too-many-requests": "Zu viele Versuche. Warte bitte einen Moment.",
+  "auth/user-disabled": "Dieses Konto ist gesperrt. Schreib mir, wenn das ein Irrtum ist.",
+};
+
+/** Fehler beim Anmelden in Alltagssprache; null, wenn die Person selbst abgebrochen hat */
+export function signInError(e: unknown): string | null {
+  const code = typeof e === "object" && e && "code" in e ? String((e as { code: unknown }).code) : "";
+  if (SIGN_IN_CANCELLED.includes(code)) return null;
+  return SIGN_IN_MESSAGES[code] ?? "Die Anmeldung hat nicht geklappt. Versuch es bitte nochmal.";
+}

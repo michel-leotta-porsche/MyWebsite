@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal";
-import { FrameButton, Wordmark } from "@/components/ui-base";
+import { FrameButton, hitClass, Wordmark } from "@/components/ui-base";
+import { signInError } from "@/lib/errors";
 import { signIn, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Textknöpfe mit Unterstrich, Rahmenknopf, Anmeldung.
 
-export { FrameButton, linkClass, TextButton, Wordmark } from "@/components/ui-base";
+export { FrameButton, hitClass, linkClass, TextButton, Wordmark } from "@/components/ui-base";
 
 /** Kopf eines Raums: Wortmarke führt zur Landing Page, daneben der Raum als Überschrift der Seite */
 export function RoomTitle({ children }: { children: ReactNode }) {
@@ -46,7 +47,7 @@ export function RoomNav({ className = "" }: { className?: string }) {
           <Link
             key={r.href}
             href={r.href}
-            className="text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline"
+            className={`${hitClass} text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline`}
           >
             {r.label}
           </Link>
@@ -69,9 +70,10 @@ export function RequireUser({ title, text, children }: { title: string; text: Re
 
 /** Leerer Tisch mit Anmeldung */
 export function SignInTable({ title, children }: { title: string; children?: ReactNode }) {
+  const [error, setError] = useState<string | null>(null);
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
-      <header className="flex items-baseline justify-between px-4 pt-4 md:px-8 md:pt-6">
+      <header className="flex items-baseline justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
         <Wordmark />
       </header>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 pb-24">
@@ -80,7 +82,19 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
         </h1>
         <div className="text-on-table-2 mt-3 text-base leading-relaxed">{children}</div>
         <div className="mt-8">
-          <FrameButton onClick={() => signIn().catch(() => {})}>Mit Google anmelden</FrameButton>
+          <FrameButton
+            onClick={() => {
+              setError(null);
+              signIn().catch((e) => setError(signInError(e)));
+            }}
+          >
+            Mit Google anmelden
+          </FrameButton>
+          {error && (
+            <p role="alert" className="text-on-table mt-3 text-sm">
+              {error}
+            </p>
+          )}
         </div>
         <LegalLinks className="mt-6" />
       </div>
@@ -146,7 +160,7 @@ export function UndoToast({ text, onUndo, onClose }: { text: string; onUndo: () 
     return () => window.clearTimeout(id);
   }, [onClose]);
   return (
-    <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]">
+    <div role="status" className="slip text-ink fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]">
       <span>{text}</span>
       <button
         type="button"

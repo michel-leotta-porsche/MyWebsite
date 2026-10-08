@@ -3,9 +3,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { inputClass, SlipDialog } from "@/components/app-ui";
+import { SITE_URL } from "@/lib/share-meta";
 import { mySharesOf, notesOf, refreshShares, shareBook, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
 
-const linkFor = (token: string) => `${location.origin}/b?t=${token}`;
+// In der iOS-App ist die eigene Adresse capacitor://localhost; geteilt wird immer eine Web-Adresse
+const linkFor = (token: string) => `${location.protocol.startsWith("http") ? location.origin : SITE_URL}/b?t=${token}`;
 
 /** So lange lässt sich „Zurückziehen“ noch rückgängig machen, bevor der Link gelöscht wird */
 const WITHDRAW_MS = 5000;

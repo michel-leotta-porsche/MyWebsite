@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { books as sampleBooks, type BookData } from "@/content/books";
@@ -45,6 +46,7 @@ function Room({ user }: { user: User }) {
   const [showTrash, setShowTrash] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [emptying, setEmptying] = useState(false);
+  const router = useRouter();
   const importInput = useRef<HTMLInputElement>(null);
 
   const { own, gifts, trash } = room;
@@ -159,7 +161,7 @@ function Room({ user }: { user: User }) {
                 if (!f) return;
                 try {
                   const b = await importBook(f, user.uid, user.displayName ?? "Ich");
-                  location.href = `/neu?id=${b.id}`;
+                  router.push(`/neu?id=${b.id}`);
                 } catch (err) {
                   setError(friendlyError(err));
                 }

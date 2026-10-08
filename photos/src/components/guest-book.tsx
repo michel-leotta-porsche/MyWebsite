@@ -7,6 +7,7 @@ import type { BookData } from "@/content/books";
 import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-ui";
 import { Library } from "@/components/books";
 import { Shelf, Table } from "@/components/table";
+import { signInError } from "@/lib/errors";
 import { signIn } from "@/lib/firebase";
 import { keepInInbox, leaveNote, loadShare, toBookData, type Share } from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
@@ -28,6 +29,7 @@ export function GuestBook() {
   const [earsSent, setEarsSent] = useState<number[]>([]);
   const [failed, setFailed] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
+  const [signInFailed, setSignInFailed] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -131,7 +133,19 @@ export function GuestBook() {
                   <span>…</span>
                 )
               ) : (
-                <TextButton onClick={() => signIn().catch(() => {})}>In mein Bücherzimmer legen</TextButton>
+                <TextButton
+                  onClick={() => {
+                    setSignInFailed(null);
+                    signIn().catch((e) => setSignInFailed(signInError(e)));
+                  }}
+                >
+                  In mein Bücherzimmer legen
+                </TextButton>
+              )}
+              {!user && signInFailed && (
+                <span role="alert" className="text-on-table mt-1 block">
+                  {signInFailed}
+                </span>
               )}
             </p>
           }
@@ -188,10 +202,17 @@ export function GuestBook() {
   );
 }
 
+/** Leerer Tisch mit Weg zurück: in der App gibt es keine Zurück-Taste des Browsers */
 function Empty({ text }: { text: string }) {
+  const user = useUser();
   return (
-    <main className="linen table-surface flex min-h-svh items-center justify-center bg-table px-6">
+    <main className="linen table-surface flex min-h-svh flex-col items-center justify-center gap-6 bg-table px-6">
       <p className="text-on-table-2 max-w-sm text-center">{text}</p>
+      {user !== undefined && (
+        <Link href={user ? "/zimmer" : "/"} className={`${linkClass} text-sm underline`}>
+          {user ? "Zum Bücherzimmer" : "Zur Startseite"}
+        </Link>
+      )}
     </main>
   );
 }
