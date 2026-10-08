@@ -11,7 +11,6 @@ export const metadata: Metadata = {
 
 const inline = `${linkClass} underline`;
 
-// Entwurf, von Michel freizugeben. Kein Ersatz für eine Rechtsberatung.
 export default function Page() {
   return (
     <LegalPage title="Nutzungsbedingungen">
