@@ -1051,21 +1051,32 @@ export function Editor() {
         {/* Telefon: Buch-Angaben über den Doppelseiten, Werkzeuge des Gewählten als Blatt am unteren Rand (UX-Kritik K4) */}
         <aside className="space-y-6 max-md:order-first md:sticky md:top-20 md:self-start">
           <div className="slip text-ink relative space-y-5 rounded-cut p-5">
-            {/* Einband als Vorschau: Titel und Leinen ändern sich, während man tippt und wählt */}
+            {/* Einband als Vorschau: derselbe Satz wie im Buch (Titelbild, Titel, Zeile darunter, Name), ändert sich beim Tippen */}
             <div className="flex items-end gap-4">
-              <div
-                aria-hidden
-                className="linen relative aspect-[2/3] w-20 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-colors duration-500 ease-out"
-                style={{ backgroundColor: CLOTHS[book.cloth]?.base ?? CLOTHS.ringelblume.base, color: CLOTHS[book.cloth]?.ink ?? CLOTHS.ringelblume.ink }}
-              >
-                <span className="absolute inset-y-0 left-0 w-[5%] bg-[rgb(12_10_8/0.22)]" />
-                <span
-                  className="absolute right-1.5 bottom-2 left-2.5 line-clamp-3 text-[11px] leading-[0.95] font-bold tracking-[-0.03em] break-words"
-                  style={{ fontVariationSettings: '"wdth" 76' }}
+              {data ? (
+                <div
+                  aria-hidden
+                  className="relative w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)]"
+                  style={{ aspectRatio: `1 / ${data.aspect}` }}
                 >
-                  {book.title || "Ohne Titel"}
-                </span>
-              </div>
+                  <PageView book={data} page={{ kind: "cover" }} side="right" sizes={() => "128px"} />
+                </div>
+              ) : (
+                // noch ohne Fotos: nur Leinen mit Titel und Zeile darunter
+                <div
+                  aria-hidden
+                  className="linen relative aspect-[2/3] w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-colors duration-500 ease-out"
+                  style={{ backgroundColor: CLOTHS[book.cloth]?.base ?? CLOTHS.ringelblume.base, color: CLOTHS[book.cloth]?.ink ?? CLOTHS.ringelblume.ink }}
+                >
+                  <span className="absolute inset-y-0 left-0 w-[5%] bg-[rgb(12_10_8/0.22)]" />
+                  <span className="absolute right-1.5 bottom-3 left-2.5">
+                    <span className="line-clamp-3 text-[12px] leading-[0.95] font-bold tracking-[-0.03em] break-words" style={{ fontVariationSettings: '"wdth" 76' }}>
+                      {book.title || "Ohne Titel"}
+                    </span>
+                    {book.subtitle && <span className="mt-1 line-clamp-2 block text-[9px] leading-tight font-medium break-words">{book.subtitle}</span>}
+                  </span>
+                </div>
+              )}
               <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
                 Buch
               </p>

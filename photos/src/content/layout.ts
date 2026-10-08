@@ -267,7 +267,19 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
             lh: 0.9,
             display: true,
           },
-          { t: "text", text: book.author ?? "Michel Leotta", x, y: H - book.bottom + 2.4, size: 3.6, weight: 500, tone: "clothInk", lh: 1.2 },
+          // Zeile darunter, dann der Name: ein Block, damit eine lange Zeile umbricht und den Namen mitschiebt
+          {
+            t: "text",
+            text: [book.subtitle, book.author ?? "Michel Leotta"].filter(Boolean).join("\n"),
+            x,
+            y: H - book.bottom + 2.4,
+            w: 100 - x - 10,
+            size: 4,
+            weight: 500,
+            tone: "clothInk",
+            lh: 1.25,
+            lines: true,
+          },
         ],
       };
     }
