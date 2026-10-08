@@ -4,8 +4,8 @@ import type { Metadata } from "next";
 // ganze Objekt (Next führt Metadaten nur flach zusammen), deshalb bauen sie es hiermit neu.
 export const SITE_URL = "https://fujiventura.web.app";
 
-// Ein Foto ohne Menschen, statisch auf 1200×630 zugeschnitten
-const image = { url: "/og.jpg", width: 1200, height: 630, alt: "Mittagsblume auf Fuerteventura, Foto aus einem Fujiventura-Buch" };
+// Wortmarke und Buch im Ringelblumen-Leinen mit Foto im Fenster, 1200×630. Neuer Dateiname, damit Messenger die alte Vorschau nicht aus dem Cache holen
+const image = { url: "/og-buch.jpg", width: 1200, height: 630, alt: "Fujiventura: Fotobuch im gelben Leineneinband mit einer Mittagsblume im Titelfenster" };
 
 export function shareMeta(title: string, description: string): Pick<Metadata, "openGraph" | "twitter"> {
   return {
