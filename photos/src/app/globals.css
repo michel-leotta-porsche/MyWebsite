@@ -4,6 +4,7 @@
 :root {
   --table: #1b1917; /* Basalt, wie die Lava der Insel */
   --table-deep: #121110;
+  --table-raised: #2a2724; /* Hinweise über dem Tisch; on-table 12.4:1, on-table-2 5.4:1 */
   --on-table: #ece6dc; /* Text auf dem Tisch, 14.1:1 */
   --on-table-2: #a39a8e; /* Nebentext auf dem Tisch, 6.3:1 */
   --table-light: radial-gradient(ellipse 60% 55% at 50% 46%, rgb(255 236 210 / 0.075), transparent 72%);
@@ -16,6 +17,8 @@
   --ink-2: #5a5c56; /* Bildunterschrift auf Papier, 5.6:1; auf dem Zettel 5.3:1 */
   --slip: #ebe3d1; /* Rezeptzettel, dünneres, vergilbtes Papier; Tinte 13.4:1, graue Tinte 5.3:1 */
   --mark: var(--cloth); /* Position und Fokus; auf hellen Tischen dunkler */
+  --danger: #8f2f14; /* Löschen auf Papier und Zettel, 6.4:1 auf slip */
+  --danger-on-table: #e8a08a; /* Löschen auf dem Tisch, 8.2:1 */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
@@ -26,6 +29,7 @@
 @theme inline {
   --color-table: var(--table);
   --color-table-deep: var(--table-deep);
+  --color-table-raised: var(--table-raised);
   --color-on-table: var(--on-table);
   --color-on-table-2: var(--on-table-2);
   --color-cloth: var(--cloth);
@@ -36,6 +40,11 @@
   --color-paper-shade: var(--paper-shade);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
+  --color-danger: var(--danger);
+  /* Rundung nach Material (design-neu/rundung.md): gedruckt 0, zugeschnittenes Papier cut, Werkzeug-Behälter tool, Gedrücktes rounded-full */
+  --radius-cut: 6px;
+  --radius-tool: 16px;
+  --color-danger-on-table: var(--danger-on-table);
   --font-sans: var(--font-bricolage);
   --ease-out: var(--ease-out);
   --ease-in-out: var(--ease-in-out);

@@ -66,6 +66,9 @@ typography:
     fontVariation: "\"wdth\" 75, \"opsz\" 96"
 rounded:
   none: "0px"
+  cut: "6px"
+  tool: "16px"
+  full: "9999px"
 spacing:
   gutter-sm: "16px"
   gutter-md: "32px"
@@ -114,7 +117,7 @@ Licht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wöl
 - Ein einziger Gegenstand (das Buch) statt Raster, Karten oder Lightbox.
 - Zwei Materialien mit Gewebestruktur (Tisch, Einband), glattes Bilderdruckpapier für die Seiten.
 - Eine Schrift (Bricolage Grotesque) mit Breiten- und Optik-Achse, Ziffern tabellarisch.
-- Keine Radien. Kanten sind Papierkanten.
+- Gedrucktes hat Papierkanten (0px). Werkzeuge über dem Tisch sind rund, nach Material gestuft (siehe Shapes).
 - Bewegung mit Masse: Federn auf dem Scrollwert, Blätter beschleunigen und setzen weich auf.
 
 ## Colors
@@ -140,7 +143,7 @@ Monochromer Tisch aus Basalt, ein warmes Buchleinen-Gelb als einzige Stimme, Nat
 Der Tisch ist immer dunkel, ein eigenes dunkles Farbschema gibt es nicht. Schatten mischen aus warmem Basalt (`rgb(12 10 8)`), nie aus neutralem Grau.
 
 ### Named Rules
-**The One Voice Rule.** Das Buchleinen-Gelb ist außerhalb des Einbands nur Signal: Position in der Bildfolge, Fokus, Hover-Unterstrich. Nie als Fläche auf dem Tisch, nie als Textfarbe.
+**The One Voice Rule.** Das Buchleinen-Gelb ist außerhalb des Einbands Signal: Position in der Bildfolge, Fokus, Hover-Unterstrich. Einzige Fläche auf dem Tisch: der eine Hauptknopf einer Ansicht (`Button variant="cloth"`, Buchleinen mit Gewebe, Text in `cloth-ink` 6.8:1). Nie als Textfarbe.
 
 **The Material Rule.** Jede Fläche ist ein Material: Tischleinen, Buchleinen oder Papier. Eine neue Fläche muss sagen, welches davon sie ist; eine vierte Oberflächenfarbe gibt es nicht.
 
@@ -208,9 +211,34 @@ Tiefe ist physisch, nicht ornamental. Es gibt genau ein Objekt über dem Tisch, 
 
 ## Shapes
 
-Keine Radien, nirgends (`0px`). Seiten, Tafeln, Einband und Vollbild sind Rechtecke mit Papierkanten. Die einzigen anderen Formen entstehen aus dem Material: das Dreieck des Eselsohrs (per `clip-path`), die 3px schmalen Balken der Haltepunkte, der Falz am Rücken (5cqw breit, mit 1px-Linie). Die Gewebestruktur von Tisch und Einband ist ein Rauschen in zwei Fadenrichtungen (`soft-light`, 32 % Deckkraft, unter 768px 18 %), ohne Bilddatei.
+Rundung folgt dem Material, nicht dem Bauteil (Workshop 8.10.2026, `design-neu/rundung.md`). Vier Stufen, mehr gibt es nicht:
+
+| Stufe | Wert | Wofür |
+| --- | --- | --- |
+| `none` | 0 | Gedrucktes, Gebundenes, Fotografiertes: Einband, Seite, Tafel, Foto, Daumen, Buch-Miniatur, Vorschau |
+| `cut` (`rounded-cut`) | 6px | zugeschnittenes Papier: Zettel, Leseausweis, Anleitungskarten, Blatt von unten, Stoffproben der Farbwahl |
+| `tool` (`rounded-tool`) | 16px | Behälter für Werkzeuge: Listengruppe, Menü |
+| `full` (`rounded-full`) | Pille, Kreis | was man drückt: Knopf, Umschalter, Status-Pille, Werkzeugleiste, Hinweis; Avatar, Stempel |
+
+In einer gerundeten Fläche liegt nur `none` oder `full`, nie eine Zwischenstufe.
+
+**The Paper Edge Rule.** Ein Foto und die Seite, auf der es liegt, bekommen nie einen Radius, auch nicht als Miniatur, Vorschau oder Platzhalter.
+
+Seiten, Tafeln, Einband und Vollbild sind Rechtecke mit Papierkanten. Die einzigen anderen Formen entstehen aus dem Material: das Dreieck des Eselsohrs (per `clip-path`), die 3px schmalen Balken der Haltepunkte, der Falz am Rücken (5cqw breit, mit 1px-Linie). Die Gewebestruktur von Tisch und Einband ist ein Rauschen in zwei Fadenrichtungen (`soft-light`, 32 % Deckkraft, unter 768px 18 %), ohne Bilddatei.
 
 ## Components
+
+### Werkzeuge (`src/components/ui/`)
+Verhalten aus Base UI (`@base-ui/react`), Hinweise aus Sonner, Symbole aus Lucide (Strich 1.8–2, `aria-hidden`, Icon-only immer mit Namen), Haptik in der App über `@capacitor/haptics` (`haptic()` in `lib/haptics.ts`). Vorschau: `/bausteine` (intern).
+- **Button** (`button.tsx`): `cloth` (Hauptknopf, einmal pro Ansicht), `quiet` (auf dem Tisch), `paper` und `ink` (auf Papier). Pille, gibt beim Drücken auf 96 % nach, kein Schein in Ruhe. `IconButton` 44×44, `ToolGroup` für Symbolleisten.
+- **Sheet** (`sheet.tsx`): Blatt von unten auf Zettelpapier, `rounded-t-cut`, Griff, Wischen nach unten schließt, Tastatur-aware.
+- **Menu** (`menu.tsx`): Zettel, `rounded-tool`, wächst aus dem Knopf (150ms), Löschen in `danger`.
+- **Toaster/notify** (`toaster.tsx`): dunkle Pille (`table-raised`) unten, mit Aktion „Rückgängig“.
+- **ListGroup/ListRow/StatusPill** (`list.tsx`): gruppierte Liste wie in den iPhone-Einstellungen; Symbol frei, ohne Kachel; Status immer als Wort.
+- **Field** (`field.tsx`): Linie statt Kasten, schwebende Beschriftung, Tintenlinie wächst beim Fokus.
+- **Swatches** (`swatches.tsx`): Stoffproben, Radio-Gruppe mit Pfeiltasten, Haken springt auf.
+- **Segmented** (`segmented.tsx`): Umschalter, Daumen gleitet mit Feder (Motion).
+
 
 ### Textknöpfe (Vollbild)
 Ruhig, nur Wort, kein Kasten.
@@ -258,8 +286,8 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 
 ### Don't:
 - **Don't** Masonry-Raster, Kartengitter oder eine Lightbox ohne Herkunft bauen; Bilder kommen aus dem Buch und kehren dorthin zurück.
-- **Don't** Radien verwenden (`0px` überall).
+- **Don't** Gedrucktes runden oder eine fünfte Radius-Stufe erfinden; Werte nur aus `none`, `cut`, `tool`, `full`.
 - **Don't** `cloth` als Hintergrund einer Fläche auf dem Tisch oder als Textfarbe einsetzen.
-- **Don't** Schatten oder Verläufe auf Bedienelemente legen; Licht gehört dem Papier.
+- **Don't** Glanz, Schein oder Verläufe auf Bedienelemente legen; Licht gehört dem Papier. Erlaubt: kurzer Innenschatten beim Drücken, Schatten unter Ebenen, die über dem Tisch schweben (Blatt, Menü, Hinweis).
 - **Don't** Kameradaten, Brennweiten, Aufnahmedaten oder Fujifilm-Zeichen zeigen.
 - **Don't** eine zweite Schrift einführen.
