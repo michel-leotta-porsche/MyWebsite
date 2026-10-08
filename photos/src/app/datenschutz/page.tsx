@@ -75,6 +75,15 @@ export default function Page() {
         </p>
       </LegalSection>
 
+      <LegalSection title="Meldungen und Ausblenden">
+        <p>
+          Meldest du ein Buch, speichere ich den Grund, deinen freiwilligen Text, den Link, Titel und Absender des Buchs, die Uhrzeit und, wenn
+          du angemeldet bist, deine Nutzerkennung. Lesen kann das nur ich. Blendest du die Bücher einer Person aus, steht deren Kennung und
+          Name in deinem Konto. Wann du den Nutzungsbedingungen zugestimmt hast, speichere ich ebenfalls. Rechtsgrundlage ist Art. 6 Abs. 1
+          lit. f DSGVO (Schutz vor Missbrauch) bzw. lit. b. Erledigte Meldungen lösche ich.
+        </p>
+      </LegalSection>
+
       <LegalSection title="Speicher auf deinem Gerät">
         <p>
           Calima merkt sich ein paar Einstellungen auf deinem Gerät, etwa ob das Raster beim Gestalten an ist oder welche Schritte eines

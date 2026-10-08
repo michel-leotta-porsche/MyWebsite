@@ -405,12 +405,116 @@ export async function deleteAccountData(uid: string, onStep?: (text: string) => 
     await deleteDoc(doc(db(), "shares", s.token));
   }
   onStep?.("Ablage und Rezepte");
-  for (const name of ["inbox", "recipes"]) {
+  for (const name of ["inbox", "recipes", "blocked"]) {
     const docs = await getDocs(collection(db(), "users", uid, name));
     await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
   }
+  await deleteDoc(doc(db(), "users", uid));
   onStep?.("Fotos");
   await deleteFolder(ref(storage(), `u/${uid}`));
+}
+
+/* ------------------------------------------------------------------ Melden, Ausblenden, Nutzungsbedingungen */
+
+export const REPORT_REASONS = {
+  anstoessig: "Anstößig oder sexuell",
+  gewalt: "Gewalt oder Hass",
+  belaestigung: "Belästigung oder Bedrohung",
+  rechte: "Fremde Fotos, ohne Einverständnis",
+  anderes: "Etwas anderes",
+} as const;
+export type ReportReason = keyof typeof REPORT_REASONS;
+
+export type Report = {
+  id: string;
+  token: string;
+  owner: string;
+  fromName: string;
+  title: string;
+  reason: ReportReason;
+  text: string;
+  reporter: string | null;
+  at?: { seconds: number };
+};
+
+/** Ein geteiltes Buch melden; geht auch ohne Konto. Michel sieht Meldungen im Profil */
+export async function reportShare(share: Share, reason: ReportReason, text: string, reporter: string | null) {
+  if (MOCK) return;
+  await addDoc(collection(db(), "reports"), {
+    token: share.token,
+    owner: share.owner,
+    fromName: share.fromName.slice(0, 80),
+    title: (share.book?.title ?? "").slice(0, 80),
+    reason,
+    text: text.slice(0, 500),
+    reporter,
+    at: serverTimestamp(),
+  });
+}
+
+/** Offene Meldungen, nur für Admins lesbar (firestore.rules) */
+export async function openReports(): Promise<Report[]> {
+  if (MOCK) return [];
+  const s = await getDocs(query(collection(db(), "reports"), orderBy("at", "desc"), limit(100)));
+  return s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Report, "id">) }));
+}
+
+/** Erledigte Meldung löschen (so steht es in der Datenschutzerklärung) */
+export async function closeReport(id: string) {
+  if (MOCK) return;
+  await deleteDoc(doc(db(), "reports", id));
+}
+
+/** Link sperren: Zettel und Link löschen. Für Admins bei einer Meldung; das Buch beim Macher bleibt */
+export async function takeDownShare(token: string) {
+  if (MOCK) return;
+  const notes = await getDocs(collection(db(), "shares", token, "notes")).catch(() => null);
+  await Promise.all((notes?.docs ?? []).map((n) => deleteDoc(n.ref)));
+  await deleteDoc(doc(db(), "shares", token));
+}
+
+/** Einen Zettel oder ein Eselsohr entfernen (der Macher des Buchs) */
+export async function deleteNote(token: string, noteId: string) {
+  if (MOCK) return;
+  await deleteDoc(doc(db(), "shares", token, "notes", noteId));
+}
+
+export type Blocked = { uid: string; name: string };
+
+/** Bücher dieser Person nicht mehr zeigen; was schon in der Ablage liegt, fliegt raus */
+export async function blockSender(uid: string, sender: string, name: string, tokens: string[]) {
+  if (MOCK) return;
+  await setDoc(doc(db(), "users", uid, "blocked", sender), { name: name.slice(0, 80), at: serverTimestamp() });
+  await Promise.all(tokens.map((t) => deleteDoc(doc(db(), "users", uid, "inbox", t))));
+}
+
+export async function unblockSender(uid: string, sender: string) {
+  if (MOCK) return;
+  await deleteDoc(doc(db(), "users", uid, "blocked", sender));
+}
+
+export function watchBlocked(uid: string, next: (list: Blocked[]) => void): () => void {
+  if (MOCK) {
+    queueMicrotask(() => next([]));
+    return () => {};
+  }
+  return onSnapshot(
+    collection(db(), "users", uid, "blocked"),
+    (s) => next(s.docs.map((d) => ({ uid: d.id, name: String(d.data().name ?? "") }))),
+    () => next([]),
+  );
+}
+
+/** Hat die Person den Nutzungsbedingungen schon zugestimmt? (vor dem ersten Teilen) */
+export async function termsAccepted(uid: string): Promise<boolean> {
+  if (MOCK) return false;
+  const s = await getDoc(doc(db(), "users", uid));
+  return !!s.data()?.termsAt;
+}
+
+export async function acceptTerms(uid: string) {
+  if (MOCK) return;
+  await setDoc(doc(db(), "users", uid), { termsAt: serverTimestamp() }, { merge: true });
 }
 
 /** Geschenktes Buch vom eigenen Tisch nehmen; beim Schenkenden bleibt es */

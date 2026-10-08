@@ -9,7 +9,23 @@ import { OPERATOR } from "@/components/legal";
 import { confirmIdentity, deleteAccountUser, signOutNow, type User } from "@/lib/firebase";
 import { friendlyError, signInError } from "@/lib/errors";
 import { setSessionHint } from "@/lib/session-hint";
-import { deleteAccountData, inbox, myBooks, mySharesOf, type Share, type StoredBook } from "@/lib/store";
+import { isAdmin } from "@/lib/admin";
+import {
+  closeReport,
+  deleteAccountData,
+  inbox,
+  myBooks,
+  mySharesOf,
+  openReports,
+  REPORT_REASONS,
+  takeDownShare,
+  unblockSender,
+  watchBlocked,
+  type Blocked,
+  type Report,
+  type Share,
+  type StoredBook,
+} from "@/lib/store";
 
 /** Profil: wer angemeldet ist, was auf den Tischen liegt, welche Links draußen sind */
 export function Profile() {
@@ -37,6 +53,8 @@ function Card({ user }: { user: User }) {
   const [gifts, setGifts] = useState<Share[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [blocked, setBlocked] = useState<Blocked[]>([]);
+  useEffect(() => watchBlocked(user.uid, setBlocked), [user.uid]);
 
   useEffect(() => {
     let alive = true;
@@ -144,6 +162,27 @@ function Card({ user }: { user: User }) {
           </p>
         </section>
 
+        {blocked.length > 0 && (
+          <section aria-labelledby="blocked-h" className="mt-16">
+            <h2 id="blocked-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+              Ausgeblendet
+            </h2>
+            <p className="text-on-table-2 mt-3 max-w-xl text-base">Bücher dieser Personen landen nicht mehr in deinem Bücherzimmer.</p>
+            <ul className="mt-4 border-t border-on-table-2/40">
+              {blocked.map((b) => (
+                <li key={b.uid} className="flex items-baseline justify-between gap-6 border-b border-on-table-2/25 py-3 text-base">
+                  <span className="text-on-table">{b.name || "Ohne Namen"}</span>
+                  <TextButton className="text-sm" onClick={() => unblockSender(user.uid, b.uid).catch(() => {})}>
+                    Wieder zeigen
+                  </TextButton>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {isAdmin(user) && <Reports />}
+
         <section aria-labelledby="hilfe-h" className="mt-16">
           <h2 id="hilfe-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
             Rechtliches und Hilfe
@@ -242,5 +281,65 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
         </button>
       </div>
     </SlipDialog>
+  );
+}
+
+/** Nur für Michel: offene Meldungen mit „Link sperren“. Konten sperrt er in der Firebase-Konsole (Authentication → Nutzer) */
+function Reports() {
+  const [reports, setReports] = useState<Report[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    openReports()
+      .then((r) => alive && setReports(r))
+      .catch((e) => alive && setError(friendlyError(e)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const done = (id: string) => setReports((all) => all?.filter((r) => r.id !== id) ?? null);
+  const act = (id: string, run: () => Promise<void>) => run().then(() => done(id)).catch((e) => setError(friendlyError(e)));
+
+  return (
+    <section aria-labelledby="reports-h" className="mt-16">
+      <h2 id="reports-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+        Meldungen
+      </h2>
+      {error && (
+        <p role="alert" className="text-on-table mt-3 text-sm">
+          {error}
+        </p>
+      )}
+      {reports && reports.length === 0 && <p className="text-on-table-2 mt-3 text-base">Keine offenen Meldungen.</p>}
+      {reports && reports.length > 0 && (
+        <ul className="mt-4 border-t border-on-table-2/40">
+          {reports.map((r) => (
+            <li key={r.id} className="border-b border-on-table-2/25 py-3 text-base">
+              <p className="text-on-table">
+                {REPORT_REASONS[r.reason] ?? r.reason} · „{r.title || "Ohne Titel"}“ von {r.fromName}
+              </p>
+              {r.text && <p className="text-on-table-2 mt-1 text-sm">„{r.text}“</p>}
+              <p className="text-on-table-2 mt-1 text-sm">
+                {r.at ? new Date(r.at.seconds * 1000).toLocaleString("de-DE") : ""} · Macher-ID {r.owner}
+              </p>
+              <p className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                <Link href={`/b?t=${r.token}`} className={linkClass}>
+                  Ansehen
+                </Link>
+                <TextButton onClick={() => act(r.id, async () => {
+                  await takeDownShare(r.token);
+                  await closeReport(r.id);
+                })}>
+                  Link sperren
+                </TextButton>
+                <TextButton className="text-on-table-2" onClick={() => act(r.id, () => closeReport(r.id))}>
+                  Erledigt, alles in Ordnung
+                </TextButton>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

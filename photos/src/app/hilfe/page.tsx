@@ -45,11 +45,16 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Einen Inhalt melden">
+      <LegalSection title="Einen Inhalt melden oder ausblenden">
         <p>
-          Hat dir jemand ein Buch hingelegt, das nicht in Ordnung ist, schick mir den Link an <Mail /> und schreib kurz, worum es geht. Ich prüfe
-          das innerhalb von 24 Stunden, nehme Inhalte herunter, die gegen die{" "}
+          Hat dir jemand ein Buch hingelegt, das nicht in Ordnung ist, tippe im Buch auf „Melden“ (im Bücherzimmer unter „Mehr …“). Melden geht
+          auch ohne Konto. Ich prüfe jede Meldung innerhalb von 24 Stunden, nehme Inhalte herunter, die gegen die{" "}
           <Link href="/nutzungsbedingungen" className={inline}>Nutzungsbedingungen</Link> verstoßen, und sperre wenn nötig das Konto dahinter.
+          Du erreichst mich dafür auch unter <Mail />.
+        </p>
+        <p>
+          Mit „Bücher von … ausblenden“ siehst du nichts mehr von dieser Person. Zurücknehmen kannst du das im{" "}
+          <Link href="/profil" className={inline}>Profil</Link>.
         </p>
       </LegalSection>
 
