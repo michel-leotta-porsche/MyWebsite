@@ -15,10 +15,49 @@ const C = {
   ink2: "#5a5c56",
 };
 
+// Ein fertig entpacktes Bild: ImageBitmap, wo der Browser es kann, sonst das img-Element
+type Pic = HTMLImageElement | ImageBitmap;
+const widthOf = (p: Pic) => ("naturalWidth" in p ? p.naturalWidth : p.width);
+const heightOf = (p: Pic) => ("naturalHeight" in p ? p.naturalHeight : p.height);
+
 // Nur die zuletzt gezeichneten Fotos bleiben im Speicher. Ohne Grenze hielt jede besuchte Seite ihr
 // entpacktes Foto fest (etwa 5 MB bei 960px), und WebKit beendete auf dem iPhone nach einigen Seiten den Tab.
 const MAX_IMAGES = 8;
-const images = new Map<string, Promise<HTMLImageElement>>();
+const images = new Map<string, Promise<Pic>>();
+
+/** Wie bisher: img-Element laden und vor der Rückgabe entpacken */
+function viaElement(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
+    if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.onload = () => img.decode().then(
+      () => resolve(img),
+      () => resolve(img),
+    );
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+/**
+ * Lädt ein Bild und entpackt es außerhalb des Hauptthreads (createImageBitmap aus den Dateidaten).
+ * Ein img-Element darf der Browser nach decode() wieder verwerfen, dann entpackt drawImage es mitten
+ * im Blättern neu; eine ImageBitmap bleibt entpackt, bis sie geschlossen wird.
+ */
+async function decodeImage(url: string): Promise<Pic> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const res = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (res.ok) return await createImageBitmap(await res.blob());
+    } catch {
+      // z. B. ohne CORS-Freigabe: unten über das img-Element
+    }
+  }
+  return viaElement(url);
+}
+
 function loadImage(url: string) {
   let p = images.get(url);
   if (p) {
@@ -26,21 +65,14 @@ function loadImage(url: string) {
     images.delete(url);
     images.set(url, p);
   } else {
-    p = new Promise((resolve, reject) => {
-      const img = new Image();
-      // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
-      if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
-      img.decoding = "async";
-      // erst fertig entpackt zurückgeben, sonst entpackt drawImage im Hauptthread und das Blatt hakt beim ersten Bild
-      img.onload = () => img.decode().then(
-        () => resolve(img),
-        () => resolve(img),
-      );
-      img.onerror = reject;
-      img.src = url;
-    });
+    p = decodeImage(url);
     images.set(url, p);
-    while (images.size > MAX_IMAGES) images.delete(images.keys().next().value!);
+    while (images.size > MAX_IMAGES) {
+      const [oldest, gone] = images.entries().next().value!;
+      images.delete(oldest);
+      // Speicher der Bitmap freigeben; mit Abstand, falls eine Seite gerade noch mit ihr zeichnet
+      gone.then((b) => "close" in b && setTimeout(() => b.close(), 5000), () => {});
+    }
   }
   return p;
 }
@@ -50,14 +82,18 @@ function photoUrl(src: StaticImageData, width: number) {
   return getImageProps({ src, alt: "", width: Math.min(1800, Math.round(width)) }).props.src as string;
 }
 
-let paperTile: Promise<HTMLImageElement> | null = null;
+// Kacheln bleiben als img-Element: wenige, kleine Dateien, die nie aus dem Speicher fallen
+let paperTile: Promise<HTMLImageElement | null> | null = null;
 let linenTiles: Promise<HTMLImageElement[]> | null = null;
+const paper = () => (paperTile ??= viaElement("/textures/paper.webp").catch(() => null));
+const linenPair = () =>
+  (linenTiles ??= Promise.all([viaElement("/textures/linen-weft.webp"), viaElement("/textures/linen-warp.webp")]).catch(() => []));
 
 
-function contain(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number) {
-  const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
-  const dw = img.naturalWidth * s;
-  const dh = img.naturalHeight * s;
+function contain(ctx: CanvasRenderingContext2D, img: Pic, x: number, y: number, w: number, h: number) {
+  const s = Math.min(w / widthOf(img), h / heightOf(img));
+  const dw = widthOf(img) * s;
+  const dh = heightOf(img) * s;
   // unten bündig wie object-bottom
   ctx.drawImage(img, x + (w - dw) / 2, y + h - dh, dw, dh);
 }
@@ -154,11 +190,9 @@ function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number
   ctx.fillRect(Math.min(x0, x1), 0, w, H);
 }
 
-async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
+function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number, tile: HTMLImageElement | null) {
   ctx.fillStyle = C.paper;
   ctx.fillRect(0, 0, W, H);
-  paperTile ??= loadImage("/textures/paper.webp");
-  const tile = await paperTile.catch(() => null);
   if (tile) {
     ctx.save();
     ctx.globalAlpha = 0.28;
@@ -182,9 +216,7 @@ async function paperBase(ctx: CanvasRenderingContext2D, W: number, H: number, sc
   ctx.restore();
 }
 
-async function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
-  linenTiles ??= Promise.all([loadImage("/textures/linen-weft.webp"), loadImage("/textures/linen-warp.webp")]);
-  const tiles = await linenTiles.catch(() => []);
+function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number, tiles: HTMLImageElement[]) {
   ctx.save();
   ctx.globalAlpha = 0.13;
   for (const t of tiles) {
@@ -197,7 +229,26 @@ async function linen(ctx: CanvasRenderingContext2D, W: number, H: number, scale:
   ctx.restore();
 }
 
-async function drawLayout(
+type Loaded = { imgs: (Pic | null)[]; tile: HTMLImageElement | null; linenTiles: HTMLImageElement[] };
+
+/** Alles, was eine Seite braucht, laden und entpacken; das Zeichnen danach wartet auf nichts mehr */
+async function loadLayout(book: BookData, layout: Layout, W: number, dpr: number): Promise<Loaded> {
+  const cq = W / 100;
+  const [imgs, tile, linenTiles] = await Promise.all([
+    Promise.all(
+      layout.els.map((el) => {
+        if (el.t === "img") return loadImage(photoUrl(plateOf(book, el.no).src, el.w * cq * dpr)).catch(() => null);
+        if (el.t === "thumb") return loadImage(photoUrl(plateOf(book, el.no).thumb, el.w * cq * dpr)).catch(() => null);
+        return null;
+      }),
+    ),
+    paper(),
+    layout.linen ? linenPair() : Promise.resolve([]),
+  ]);
+  return { imgs, tile, linenTiles };
+}
+
+function drawLayout(
   ctx: CanvasRenderingContext2D,
   book: BookData,
   layout: Layout,
@@ -205,24 +256,16 @@ async function drawLayout(
   W: number,
   H: number,
   dpr: number,
+  { imgs, tile, linenTiles }: Loaded,
 ) {
   const cq = W / 100;
   const family = getComputedStyle(document.body).fontFamily;
-  if (layout.bg === "paper") await paperBase(ctx, W, H, dpr);
+  if (layout.bg === "paper") paperBase(ctx, W, H, dpr, tile);
   else {
     ctx.fillStyle = layout.bg === "cloth" ? book.cloth.base : book.cloth.deep;
     ctx.fillRect(0, 0, W, H);
   }
-  if (layout.linen) await linen(ctx, W, H, dpr);
-
-  // Bilder zuerst parallel laden
-  const imgs = await Promise.all(
-    layout.els.map((el) => {
-      if (el.t === "img") return loadImage(photoUrl(plateOf(book, el.no).src, el.w * cq * dpr)).catch(() => null);
-      if (el.t === "thumb") return loadImage(photoUrl(plateOf(book, el.no).thumb, el.w * cq * dpr)).catch(() => null);
-      return null;
-    }),
-  );
+  if (layout.linen) linen(ctx, W, H, dpr, linenTiles);
 
   layout.els.forEach((el, i) => {
     switch (el.t) {
@@ -235,18 +278,18 @@ async function drawLayout(
         ctx.clip();
         const [bx, by, bw, bh] = [el.x * cq, el.y * cq, el.w * cq, el.h * cq];
         if (el.fit === "contain") {
-          const s = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
-          const dw = img.naturalWidth * s;
-          const dh = img.naturalHeight * s;
+          const s = Math.min(bw / widthOf(img), bh / heightOf(img));
+          const dw = widthOf(img) * s;
+          const dh = heightOf(img) * s;
           ctx.drawImage(img, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
         } else {
           // wie im HTML: erst füllen (object-position = Fokus), dann um den Fokuspunkt des Kastens skalieren
           ctx.beginPath();
           ctx.rect(bx, by, bw, bh);
           ctx.clip();
-          const s = Math.max(bw / img.naturalWidth, bh / img.naturalHeight);
-          const dw = img.naturalWidth * s;
-          const dh = img.naturalHeight * s;
+          const s = Math.max(bw / widthOf(img), bh / heightOf(img));
+          const dw = widthOf(img) * s;
+          const dh = heightOf(img) * s;
           const dx = bx + (bw - dw) * el.focus[0];
           const dy = by + (bh - dh) * el.focus[1];
           const ox = bx + bw * el.focus[0];
@@ -329,18 +372,16 @@ async function drawLayout(
       }
     }
   });
-  if (layout.bg === "paper") await printed(ctx, W, H, dpr);
+  if (layout.bg === "paper") printed(ctx, W, H, dpr, tile);
   if (layout.gutter) gutter(ctx, side, W, H, cq);
 }
 
 /** Wie `.printed` im HTML: mattes Papier hebt das Schwarz, die Fasern liegen auch über den Fotos */
-async function printed(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
+function printed(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number, tile: HTMLImageElement | null) {
   ctx.save();
   ctx.globalAlpha = PRINT.wash;
   ctx.fillStyle = C.paper;
   ctx.fillRect(0, 0, W, H);
-  paperTile ??= loadImage("/textures/paper.webp");
-  const tile = await paperTile.catch(() => null);
   const pat = tile && ctx.createPattern(tile, "repeat");
   if (pat) {
     pat.setTransform(new DOMMatrix().scale(1 / scale));
@@ -353,25 +394,29 @@ async function printed(ctx: CanvasRenderingContext2D, W: number, H: number, scal
 }
 
 /**
- * Zeichnet eine Seite in Gerätepixeln. W, H: Seitengröße in CSS-Pixeln, dpr: Auflösung.
- * Gibt das Canvas zurück, sobald Bilder und Schrift geladen sind.
+ * Bereitet eine Seite in Gerätepixeln vor. W, H: Seitengröße in CSS-Pixeln, dpr: Auflösung.
+ * Lädt Bilder und Schrift (wartet, blockiert nicht) und gibt eine Funktion zurück, die die Seite
+ * in einem Zug zeichnet. So entscheidet der Aufrufer, wann die Arbeit im Hauptthread anfällt.
  */
-export async function drawPage(book: BookData, page: Page, side: "left" | "right", W: number, H: number, dpr: number) {
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(W * dpr);
-  canvas.height = Math.round(H * dpr);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return canvas;
-  ctx.scale(dpr, dpr);
+export async function preparePage(book: BookData, page: Page, side: "left" | "right", W: number, H: number, dpr: number) {
   const layout = layoutPage(book, page, side);
   // Schriften der Textrahmen werden erst bei Bedarf geladen; vor dem Zeichnen sicherstellen
-  await Promise.all(
-    layout.els.flatMap((e) =>
+  const [loaded] = await Promise.all([
+    loadLayout(book, layout, W, dpr),
+    ...layout.els.flatMap((e) =>
       e.t === "text" && e.font ? [document.fonts.load(`${e.italic ? "italic " : ""}${e.weight} 20px ${fontFamilyOf(e.font)}`).catch(() => [])] : [],
     ),
-  );
+  ]);
   await document.fonts.ready;
-  ctx.textBaseline = "alphabetic";
-  await drawLayout(ctx, book, layout, side, W, H, dpr);
-  return canvas;
+  return () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return canvas;
+    ctx.scale(dpr, dpr);
+    ctx.textBaseline = "alphabetic";
+    drawLayout(ctx, book, layout, side, W, H, dpr, loaded);
+    return canvas;
+  };
 }
