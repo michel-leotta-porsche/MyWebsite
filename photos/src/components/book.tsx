@@ -140,6 +140,11 @@ export function LeafView({
   const glReady = useSyncExternalStore(curl.subscribe, () => curl.has(i), () => false);
   const viaGL = turning && glReady;
 
+  // Ferne Blätter liegen verdeckt im Stapel. Jedes 3D-Blatt ist für Safari eine eigene Zeichenfläche in voller
+  // Seitengröße (bei 3-facher Pixeldichte etwa 7 MB je Seite); mit allen Blättern im DOM waren es bei einem
+  // Buch mit 45 Blättern über 600 MB, und Safari beendete den Tab gleich nach dem Aufschlagen.
+  if (!near) return null;
+
   return (
     <motion.div
       className={`absolute inset-y-0 origin-left [transform-style:preserve-3d] ${turning && !viaGL ? "will-change-transform" : ""}`}
@@ -156,7 +161,7 @@ export function LeafView({
     >
       {/* verdeckte Seiten sind für Tastatur und Screenreader nicht da */}
       <div className="absolute inset-0 overflow-hidden [backface-visibility:hidden]" inert={k !== i}>
-        {near ? <PageView book={book} page={leaf.front} side="right" eager={i === 0} /> : <Blank book={book} page={leaf.front} />}
+        <PageView book={book} page={leaf.front} side="right" eager={i === 0} />
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_right,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
@@ -168,7 +173,7 @@ export function LeafView({
         style={{ opacity: backOpacity }}
         inert={k !== i + 1 || mode === "single"}
       >
-        {near ? <PageView book={book} page={leaf.back} side="left" /> : <Blank book={book} page={leaf.back} />}
+        <PageView book={book} page={leaf.back} side="left" />
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_left,rgb(12_10_8/0.55),rgb(12_10_8/0.15))]"
