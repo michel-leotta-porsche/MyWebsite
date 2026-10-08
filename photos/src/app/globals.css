@@ -724,6 +724,51 @@ html.ohne-schatten [data-shade] {
   opacity: 0;
 }
 
+/* Überschrift kommt Wort für Wort, Text und Knopf gleich danach; bei reduzierter Bewegung steht alles sofort da */
+@media (prefers-reduced-motion: no-preference) {
+  .word-rise {
+    animation: word-rise 900ms var(--ease-out) both;
+    animation-delay: calc(80ms + var(--i, 0) * 70ms);
+  }
+  @keyframes word-rise {
+    from {
+      opacity: 0;
+      translate: 0 0.3em;
+    }
+  }
+}
+
+/* Geschwisterbände neben dem geschlossenen Buch; ohne Scroll-Animationen weg (landing.tsx, Neighbours) */
+.hero-neighbour {
+  display: none;
+}
+@supports (animation-timeline: view()) {
+  .hero-neighbour {
+    display: block;
+    translate: var(--at) 0;
+    rotate: var(--rot);
+    scale: 0.86;
+    animation: neighbour-fade linear both;
+    animation-timeline: --hero;
+    animation-range: contain 0% contain 12%;
+  }
+  @keyframes neighbour-fade {
+    to { opacity: 0; }
+  }
+  /* mit Bewegung rücken sie zur Seite, als mache das aufgehende Buch Platz */
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-neighbour {
+      animation-name: neighbour-away;
+    }
+    @keyframes neighbour-away {
+      to {
+        opacity: 0;
+        translate: var(--to) 3%;
+      }
+    }
+  }
+}
+
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .hero-hint {

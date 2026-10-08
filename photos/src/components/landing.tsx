@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
+import { Link2Off, Undo2 } from "lucide-react";
+
 import { hitClass, linkClass } from "@/components/ui-base";
+import { buttonClass } from "@/components/ui/button";
 import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
@@ -23,6 +26,7 @@ import markisen from "../../public/photos/markisen.jpg";
 import reifen from "../../public/photos/reifen.jpg";
 import schild from "../../public/photos/01-schild-am-meer.jpg";
 import torii from "../../public/photos/japan/torii.jpg";
+import bougainvillea from "../../public/photos/04-bougainvillea.jpg";
 
 // Landing Page. Das Produkt führt sich selbst vor, ohne Bildschirmfotos:
 // 1. Kopf: ein Buch auf dem Basalttisch, Scrollen schlägt es auf und blättert, wie in der Leseansicht (Feder, WebGL-Biegung).
@@ -65,38 +69,27 @@ function useEnter() {
 function HeaderSession() {
   const user = useLazyUser();
   // solange Firebase prüft, bleibt die Stelle leer statt zu springen
-  if (user === undefined) return <span className="text-sm">&nbsp;</span>;
-  if (user)
-    return (
-      <Link href="/zimmer" className={`${linkClass} text-sm`}>
-        Ins Bücherzimmer
-      </Link>
-    );
+  if (user === undefined) return <span aria-hidden className="inline-block min-h-9 w-24" />;
   // zwei Anbieter passen nicht in den Kopf: die Anmeldung im Bücherzimmer zeigt beide
   return (
-    <Link href="/zimmer" className={`${linkClass} text-sm`}>
-      Anmelden
+    <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
+      {user ? "Ins Bücherzimmer" : "Anmelden"}
     </Link>
   );
 }
-
-const enterClass = "press px-6 py-3 text-base";
 
 /** label: ein einzelner Link ins Bücherzimmer (Schluss der Seite); ohne label die Anmeldung mit Apple und Google */
 function EnterButton({ label }: { label?: string }) {
   const { user, busy, error, enter, warm } = useEnter();
   if (user || label)
     return (
-      <Link
-        href="/zimmer"
-        className={`border-on-table text-on-table hover:bg-on-table hover:text-table inline-block border font-semibold transition-colors duration-150 ${enterClass}`}
-      >
+      <Link href="/zimmer" className={buttonClass("cloth", "md", "px-7")}>
         {user ? "Ins Bücherzimmer" : label}
       </Link>
     );
   return (
     <span className="flex w-full flex-col items-start gap-2">
-      <SignInButtons busy={busy} disabled={user === undefined} onPick={enter} warm={warm} />
+      <SignInButtons busy={busy} disabled={user === undefined} onPick={enter} warm={warm} tone="cloth" />
       {error && (
         <span role="alert" className="text-on-table max-w-xs text-sm">
           {error}
@@ -141,21 +134,34 @@ function PageFace({ side, children, className = "" }: { side: "left" | "right"; 
 }
 
 /** Geschlossener Band in Ringelblumen-Leinen, Maße wie der echte Einband (layout.ts, „cover“) */
-function Cover({ photo, title, author, className = "" }: { photo: StaticImageData; title: string; author: string; className?: string }) {
+function Cover({
+  photo,
+  title,
+  author,
+  cloth = "bg-cloth text-cloth-ink",
+  className = "",
+}: {
+  photo: StaticImageData;
+  title: string;
+  author: string;
+  /** Leinen und Prägung als Klassen; Standard Ringelblume */
+  cloth?: string;
+  className?: string;
+}) {
   return (
     <div className={`relative ${className}`}>
       <div aria-hidden className="book-shadow-closed absolute inset-0" />
       <div aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full w-[10px]" />
-      <div className="linen bg-cloth relative aspect-[2/3] w-full overflow-hidden [container-type:inline-size]">
+      <div className={`linen relative aspect-[2/3] w-full overflow-hidden [container-type:inline-size] ${cloth}`}>
         <div aria-hidden className="absolute inset-y-0 left-0 w-[5cqw] bg-[rgb(12_10_8/0.08)]" />
         <div aria-hidden className="absolute inset-y-0 left-[5cqw] w-[0.25cqw] bg-[rgb(12_10_8/0.18)]" />
         <div className="absolute top-[9cqw] left-[12cqw] aspect-[4/5] w-[54cqw] shadow-[1px_2px_3px_rgb(58_39_6/0.35),0_0_0_0.5px_rgb(58_39_6/0.2)]">
           <Image src={photo} alt="" fill sizes="(min-width: 768px) 260px, 50vw" className="object-cover" />
         </div>
-        <p className="text-cloth-ink absolute bottom-[22cqw] left-[12cqw] text-[11cqw] leading-[0.9] font-bold tracking-[-0.035em]" style={{ fontVariationSettings: '"wdth" 78, "opsz" 96' }}>
+        <p className="absolute bottom-[22cqw] left-[12cqw] text-[11cqw] leading-[0.9] font-bold tracking-[-0.035em]" style={{ fontVariationSettings: '"wdth" 78, "opsz" 96' }}>
           {title}
         </p>
-        <p className="text-cloth-ink absolute bottom-[14cqw] left-[12cqw] text-[3.6cqw] font-medium">{author}</p>
+        <p className="absolute bottom-[14cqw] left-[12cqw] text-[3.6cqw] font-medium">{author}</p>
       </div>
     </div>
   );
@@ -163,10 +169,52 @@ function Cover({ photo, title, author, className = "" }: { photo: StaticImageDat
 
 /** Zettel: dünnes, vergilbtes Papier, wie der Rezeptzettel im Buch */
 function Slip({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`slip text-ink absolute p-4 shadow-[0_14px_24px_-12px_rgb(12_10_8/0.8)] ${className}`}>{children}</div>;
+  return <div className={`slip text-ink absolute rounded-cut p-4 shadow-[0_14px_24px_-12px_rgb(12_10_8/0.8)] ${className}`}>{children}</div>;
 }
 
 /* ------------------------------------------------------------------ 1. Kopf: das Buch blättert */
+
+/** Überschrift, die Wort für Wort auf den Tisch kommt (globals.css, word-rise); Screenreader lesen den Satz am Stück */
+function Words({ text }: { text: string }) {
+  const words = text.split(" ");
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden>
+        {words.map((w, i) => (
+          <span key={i}>
+            <span className="word-rise inline-block" style={{ ["--i" as string]: i }}>
+              {w}
+            </span>
+            {i < words.length - 1 ? " " : ""}
+          </span>
+        ))}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Zwei Geschwisterbände liegen neben dem geschlossenen Buch, wie auf dem Tisch im Bücherzimmer.
+ * Beim Aufschlagen rücken sie zur Seite und blenden aus (globals.css, hero-neighbour). Ohne Scroll-Animationen
+ * bleiben sie weg, sonst lägen sie unter der aufgeschlagenen Doppelseite.
+ */
+function Neighbours({ width }: { width: string }) {
+  // gleiche Lage wie der geschlossene Einband: rechte Hälfte der Doppelseite, um ein Viertel nach links gerückt, gekippt
+  return (
+    <div aria-hidden className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2" style={{ width: `calc(${width} / 2)` }}>
+      <div style={{ transform: "perspective(1800px) rotateX(16deg) scale(0.94)" }}>
+        <div className="hero-neighbour hero-neighbour-l absolute inset-x-0 top-0" style={{ ["--at" as string]: "-50%", ["--to" as string]: "-95%", ["--rot" as string]: "-7deg" }}>
+          <Cover photo={torii} title="Japan" author="Michel Leotta" cloth="bg-[#c9c8c3] text-[#1b1c1a]" className="w-full" />
+        </div>
+        <div className="hero-neighbour hero-neighbour-r absolute inset-x-0 top-0" style={{ ["--at" as string]: "48%", ["--to" as string]: "95%", ["--rot" as string]: "6deg" }}>
+          {/* Leinen „Meer“ und „Nebel“ wie in CLOTHS (store.ts); store.ts zieht Firebase nach, darum hier die Werte */}
+          <Cover photo={bougainvillea} title="Garten" author="Michel Leotta" cloth="bg-[#5b979c] text-[#0f1f21]" className="w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const wide = (f: () => void) => {
   const mq = window.matchMedia("(min-width: 768px)");
@@ -247,16 +295,20 @@ function Hero() {
         <div className="relative z-10 grid flex-1 items-center gap-8 px-4 pt-6 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12">
           <div ref={text} className="md:col-span-4 md:self-end md:pb-[14svh]">
             <h1 id="hero-h" className="text-on-table leading-[0.86] font-bold tracking-[-0.04em] [text-wrap:balance]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
-              Deine Fotos, gebunden.
+              <Words text="Deine Fotos, gebunden." />
             </h1>
-            <p className="text-on-table mt-6 max-w-[26rem] text-lg leading-relaxed opacity-80 md:text-xl">
+            <p className="word-rise text-on-table mt-6 max-w-[26rem] text-lg leading-relaxed opacity-80 md:text-xl" style={{ ["--i" as string]: 4 }}>
               Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-x-7 gap-y-4">
+            <div className="word-rise mt-8 flex flex-wrap items-center gap-x-7 gap-y-4" style={{ ["--i" as string]: 5 }}>
               <EnterButton />
             </div>
-            <p className="text-on-table-2 mt-5 text-sm">
-              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung mit {PROVIDERS}, es gelten die{" "}
+            <p className="text-on-table-2 mt-5 flex items-start gap-2 text-sm">
+              <span aria-hidden className="bg-cloth mt-[0.5lh] size-1.5 shrink-0 -translate-y-1/2 rounded-full" />
+              Kostenlos. Wer einen Link bekommt, liest ohne Konto.
+            </p>
+            <p className="text-on-table-2 mt-2 text-xs leading-relaxed">
+              Ein Buch zum Blättern im Browser, kein Druck. Anmeldung mit {PROVIDERS}, es gelten die{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
                 Nutzungsbedingungen
               </Link>{" "}
@@ -268,12 +320,12 @@ function Hero() {
             </p>
           </div>
           <div className="md:col-span-8 md:col-start-5 md:pl-[4vw]">
-            <ScrollBook
-              book={landingBook}
-              mode={mode}
-              track={track}
-              width={width}
-            />
+            <div className="relative">
+              <Neighbours width={width} />
+              <div className="relative">
+                <ScrollBook book={landingBook} mode={mode} track={track} width={width} />
+              </div>
+            </div>
             <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">Scrollen zum Blättern</p>
           </div>
         </div>
@@ -557,8 +609,8 @@ function Recipe() {
 /* ------------------------------------------------------------------ 4. Hinlegen */
 
 const DETAILS = [
-  { title: "Frei, wenn du willst", text: "Bilder schieben, zuschneiden, über den Bund ziehen. Text in vier Schriften, Linien, Klebestreifen, ein Stift. Jeder Handgriff lässt sich zurücknehmen." },
-  { title: "Kein Profil, kein Feed", text: "Ein Buch sieht nur, wer den Link hat. Jeden Link kannst du einzeln zurückziehen." },
+  { icon: Undo2, title: "Frei, wenn du willst", text: "Bilder schieben, zuschneiden, über den Bund ziehen. Text in vier Schriften, Linien, Klebestreifen, ein Stift. Jeder Handgriff lässt sich zurücknehmen." },
+  { icon: Link2Off, title: "Kein Profil, kein Feed", text: "Ein Buch sieht nur, wer den Link hat. Jeden Link kannst du einzeln zurückziehen." },
 ] as const;
 
 function Share() {
@@ -566,7 +618,7 @@ function Share() {
     <section aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
         <div aria-hidden className="relative mx-auto aspect-[1/1] w-full max-w-[560px] md:col-span-6 md:mx-0">
-          <Cover photo={torii} title="Japan" author="Michel Leotta" className="absolute top-[2%] left-[4%] w-[54%] -rotate-[4deg]" />
+          <Cover photo={torii} title="Japan" author="Michel Leotta" cloth="bg-[#c9c8c3] text-[#1b1c1a]" className="absolute top-[2%] left-[4%] w-[54%] -rotate-[4deg]" />
           <Slip className="reveal-slip top-[10%] right-[2%] w-[46%] rotate-[3deg] text-[15px]">
             Für Jana, von Michel
             <span className="text-ink-2 mt-1.5 block font-mono text-[11px] break-all">calima.web.app/b?t=…</span>
@@ -584,11 +636,12 @@ function Share() {
             Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die
             nur du liest.
           </p>
-          <ul className="border-on-table-2/30 mt-12 border-t">
+          <ul className="mt-12 grid gap-3 lg:grid-cols-2">
             {DETAILS.map((d) => (
-              <li key={d.title} className="border-on-table-2/30 border-b py-6">
-                <h3 className="text-on-table text-xl font-semibold tracking-[-0.015em]">{d.title}</h3>
-                <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{d.text}</p>
+              <li key={d.title} className="bg-on-table/5 rounded-tool p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)]">
+                <d.icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
+                <h3 className="text-on-table mt-4 text-lg font-semibold tracking-[-0.015em]">{d.title}</h3>
+                <p className="text-on-table-2 mt-1.5 text-base leading-relaxed">{d.text}</p>
               </li>
             ))}
           </ul>
