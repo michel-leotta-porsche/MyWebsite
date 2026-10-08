@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal";
-import { FrameButton, hitClass, Wordmark } from "@/components/ui-base";
+import { FrameButton, hitClass, linkClass, Wordmark } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
 import { signIn, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
@@ -96,7 +96,14 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
             </p>
           )}
         </div>
-        <LegalLinks className="mt-6" />
+        <p className="text-on-table-2 mt-6 text-sm">
+          Mit dem Anmelden gelten die{" "}
+          <Link href="/nutzungsbedingungen" className={`${linkClass} underline`}>
+            Nutzungsbedingungen
+          </Link>
+          .
+        </p>
+        <LegalLinks className="mt-4" />
       </div>
     </main>
   );

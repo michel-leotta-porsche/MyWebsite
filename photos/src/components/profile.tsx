@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { linkClass, RequireUser, RoomNav, RoomTitle, TextButton } from "@/components/app-ui";
-import { signOutNow, type User } from "@/lib/firebase";
-import { friendlyError } from "@/lib/errors";
-import { inbox, myBooks, mySharesOf, type Share, type StoredBook } from "@/lib/store";
+import { linkClass, RequireUser, RoomNav, RoomTitle, SlipDialog, TextButton } from "@/components/app-ui";
+import { OPERATOR } from "@/components/legal";
+import { confirmIdentity, deleteAccountUser, signOutNow, type User } from "@/lib/firebase";
+import { friendlyError, signInError } from "@/lib/errors";
+import { setSessionHint } from "@/lib/session-hint";
+import { deleteAccountData, inbox, myBooks, mySharesOf, type Share, type StoredBook } from "@/lib/store";
 
 /** Profil: wer angemeldet ist, was auf den Tischen liegt, welche Links draußen sind */
 export function Profile() {
@@ -17,6 +19,9 @@ export function Profile() {
     </RequireUser>
   );
 }
+
+const PROVIDERS: Record<string, string> = { "google.com": "Google", "apple.com": "Apple" };
+const providerOf = (user: User) => PROVIDERS[user.providerData?.[0]?.providerId ?? ""] ?? "Google";
 
 const since = (user: User) => {
   const t = user.metadata?.creationTime;
@@ -31,6 +36,7 @@ function Card({ user }: { user: User }) {
   const [shares, setShares] = useState<Share[] | null>(null);
   const [gifts, setGifts] = useState<Share[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -128,13 +134,113 @@ function Card({ user }: { user: User }) {
             Konto
           </h2>
           <p className="text-on-table-2 mt-3 max-w-xl text-base leading-relaxed">
-            Angemeldet über Google. Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
+            Angemeldet über {providerOf(user)}. Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
           </p>
-          <p className="mt-5 text-sm">
+          <p className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
             <TextButton onClick={() => signOutNow().then(() => router.push("/"))}>Abmelden</TextButton>
+            <TextButton className="text-on-table-2" onClick={() => setDeleting(true)}>
+              Konto löschen …
+            </TextButton>
+          </p>
+        </section>
+
+        <section aria-labelledby="hilfe-h" className="mt-16">
+          <h2 id="hilfe-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+            Rechtliches und Hilfe
+          </h2>
+          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-base">
+            {[
+              ["/hilfe", "Hilfe"],
+              ["/nutzungsbedingungen", "Nutzungsbedingungen"],
+              ["/datenschutz", "Datenschutz"],
+              ["/impressum", "Impressum"],
+            ].map(([href, label]) => (
+              <li key={href}>
+                <Link href={href} className={`${linkClass} underline`}>
+                  {label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="text-on-table-2 mt-5 max-w-xl text-sm leading-relaxed">
+            Fragen, Fehler oder ein Inhalt, der nicht hierher gehört:{" "}
+            <a href={`mailto:${OPERATOR.email}`} className={`${linkClass} underline`}>
+              {OPERATOR.email}
+            </a>
+            . Calima ist nicht mit Fujifilm verbunden; FUJIFILM und FUJI sind Marken der FUJIFILM Corporation.
           </p>
         </section>
       </div>
+      {deleting && <DeleteAccount user={user} counts={{ books: own?.length, photos, shares: shares?.length }} onClose={() => setDeleting(false)} />}
     </main>
+  );
+}
+
+/**
+ * Konto löschen: erst bestätigen, dann neu anmelden (Firebase verlangt eine frische Anmeldung), dann alles löschen.
+ * Danach gibt es keinen Weg zurück, deshalb steht im Dialog genau, was verschwindet.
+ */
+function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?: number; photos?: number; shares?: number }; onClose: () => void }) {
+  const router = useRouter();
+  const [step, setStep] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busy = step !== null;
+  const mock = process.env.NEXT_PUBLIC_FUJI_MOCK === "1";
+
+  const run = async () => {
+    setError(null);
+    try {
+      setStep("Anmeldung bestätigen");
+      if (!mock) await confirmIdentity(user);
+    } catch (e) {
+      setStep(null);
+      const msg = signInError(e);
+      if (msg) setError(msg);
+      return;
+    }
+    try {
+      await deleteAccountData(user.uid, (s) => setStep(`${s} werden gelöscht`));
+      setStep("Konto wird gelöscht");
+      if (!mock) await deleteAccountUser(user);
+      setSessionHint(false);
+      router.replace("/konto-geloescht");
+    } catch (e) {
+      setStep(null);
+      setError(`${friendlyError(e)} Was schon gelöscht ist, bleibt gelöscht. Versuch es bitte nochmal.`);
+    }
+  };
+
+  const count = (v: number | undefined) => (v === undefined ? "" : ` (${v})`);
+  return (
+    <SlipDialog label="Konto löschen" onClose={() => !busy && onClose()}>
+      <p className="text-sm leading-relaxed">Gelöscht wird alles, was zu deinem Konto gehört:</p>
+      <ul className="mt-2 text-sm leading-relaxed">
+        <li>· deine Bücher{count(counts.books)} mit allen Fotos{count(counts.photos)}, Zwischenständen und dem Papierkorb</li>
+        <li>· deine geteilten Links{count(counts.shares)} samt Zetteln und Eselsohren der Gäste</li>
+        <li>· deine Ablage „Für dich“ und deine eigenen Rezepte</li>
+        <li>· dein Konto bei Calima</li>
+      </ul>
+      <p className="mt-3 text-sm leading-relaxed">Wer einen Link von dir hat, kann das Buch danach nicht mehr öffnen.</p>
+      <p className="mt-3 text-sm leading-relaxed font-semibold">Das lässt sich nicht rückgängig machen.</p>
+      {!mock && <p className="text-ink-2 mt-3 text-[13px]">Zur Sicherheit meldest du dich dafür noch einmal an.</p>}
+      {error && (
+        <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
+          {error}
+        </p>
+      )}
+      <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={run}
+          className="border-ink bg-ink text-paper hover:bg-ink/85 min-h-11 border px-3 py-2 font-semibold disabled:opacity-60"
+        >
+          {busy ? `${step} …` : "Konto endgültig löschen"}
+        </button>
+        <button type="button" disabled={busy} onClick={onClose} className="min-h-11 underline decoration-mark decoration-2 underline-offset-4">
+          Abbrechen
+        </button>
+      </div>
+    </SlipDialog>
   );
 }

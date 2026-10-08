@@ -26,6 +26,7 @@ const SIGN_IN_MESSAGES: Record<string, string> = {
   "auth/popup-blocked": "Das Anmeldefenster wurde blockiert. Erlaube Fenster für Calima und versuch es nochmal.",
   "auth/network-request-failed": "Keine Verbindung. Versuch es gleich nochmal.",
   "auth/too-many-requests": "Zu viele Versuche. Warte bitte einen Moment.",
+  "auth/user-mismatch": "Das war ein anderes Konto. Wähle bitte das, mit dem du hier angemeldet bist.",
   "auth/user-disabled": "Dieses Konto ist gesperrt. Schreib mir, wenn das ein Irrtum ist.",
 };
 

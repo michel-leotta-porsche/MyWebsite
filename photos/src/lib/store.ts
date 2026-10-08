@@ -17,7 +17,7 @@ import {
   where,
   addDoc,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, listAll, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, listAll, ref, uploadBytes, type StorageReference } from "firebase/storage";
 
 import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } from "@/content/books";
 import type { CameraInfo, Recipe } from "@/content/recipes";
@@ -372,6 +372,45 @@ export async function deleteBookForever(b: StoredBook) {
   const files = await listAll(ref(storage(), `u/${b.owner}/${b.id}`)).catch(() => null);
   await Promise.all((files?.items ?? []).map((f) => deleteObject(f).catch(() => {})));
   await deleteDoc(doc(db(), "books", b.id));
+}
+
+/** Alle Dateien unter einem Ordner in Storage, auch in Unterordnern */
+async function deleteFolder(dir: StorageReference) {
+  const list = await listAll(dir);
+  await Promise.all(list.items.map((f) => deleteObject(f).catch(() => {})));
+  for (const sub of list.prefixes) await deleteFolder(sub);
+}
+
+/**
+ * Alles löschen, was zu einem Konto gehört (App Store 5.1.1(v)): Bücher samt Zwischenständen, geteilte Links samt Zetteln,
+ * die Ablage „Für dich“, eigene Rezepte und alle Fotos in Storage. Den Firebase-Nutzer löscht danach der Aufrufer.
+ * Läuft nur mit Netz, damit nichts halb im Zwischenspeicher hängen bleibt.
+ * Was bleibt: Wer ein Buch in seine Ablage gelegt hat, behält dort Titel und Absendernamen; das Buch selbst öffnet sich nicht mehr.
+ */
+export async function deleteAccountData(uid: string, onStep?: (text: string) => void) {
+  if (MOCK) {
+    mem.books.clear();
+    mem.shares.clear();
+    pausedMock.clear();
+    return;
+  }
+  if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Zum Löschen brauchst du eine Verbindung.");
+  onStep?.("Bücher");
+  for (const b of await myBooks(uid)) await deleteBookForever(b);
+  onStep?.("Geteilte Links");
+  // Links, deren Buch es nicht mehr gibt
+  for (const s of await mySharesOf(uid)) {
+    const notes = await getDocs(collection(db(), "shares", s.token, "notes")).catch(() => null);
+    await Promise.all((notes?.docs ?? []).map((n) => deleteDoc(n.ref)));
+    await deleteDoc(doc(db(), "shares", s.token));
+  }
+  onStep?.("Ablage und Rezepte");
+  for (const name of ["inbox", "recipes"]) {
+    const docs = await getDocs(collection(db(), "users", uid, name));
+    await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
+  }
+  onStep?.("Fotos");
+  await deleteFolder(ref(storage(), `u/${uid}`));
 }
 
 /** Geschenktes Buch vom eigenen Tisch nehmen; beim Schenkenden bleibt es */

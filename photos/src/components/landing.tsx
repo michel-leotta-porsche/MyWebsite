@@ -263,7 +263,11 @@ function Hero() {
               <EnterButton />
             </div>
             <p className="text-on-table-2 mt-5 text-sm">
-              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung über Google, siehe{" "}
+              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung über Google, es gelten die{" "}
+              <Link href="/nutzungsbedingungen" className={linkClass}>
+                Nutzungsbedingungen
+              </Link>{" "}
+              und der{" "}
               <Link href="/datenschutz" className={linkClass}>
                 Datenschutz
               </Link>
@@ -616,6 +620,10 @@ function Closing() {
             <EnterButton label="Erstes Buch anlegen" />
             <p className="text-on-table-2 text-sm">
               Kostenlos, Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              <Link href="/nutzungsbedingungen" className={linkClass}>
+                Nutzungsbedingungen
+              </Link>
+              {" · "}
               <Link href="/datenschutz" className={linkClass}>
                 Datenschutz
               </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type User } from "firebase/auth";
+import { deleteUser, getAuth, GoogleAuthProvider, reauthenticateWithPopup, signInWithPopup, signOut, type User } from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -39,10 +39,22 @@ export const db = () => {
 };
 export const storage = () => getStorage(app());
 
-export async function signIn() {
+const google = () => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  return signInWithPopup(auth(), provider);
+  return provider;
+};
+
+export async function signIn() {
+  return signInWithPopup(auth(), google());
 }
+
+/**
+ * Konto löschen verlangt eine frische Anmeldung (sonst auth/requires-recent-login). Deshalb erst neu anmelden,
+ * dann die Daten löschen, zuletzt den Nutzer: so bleibt nie ein Konto ohne Daten oder Daten ohne Konto halb stehen.
+ * Mit Sign in with Apple kommt hier später der Widerruf des Apple-Tokens dazu (revokeAccessToken).
+ */
+export const confirmIdentity = (user: User) => reauthenticateWithPopup(user, google());
+export const deleteAccountUser = (user: User) => deleteUser(user);
 export const signOutNow = () => signOut(auth());
 export type { User };
