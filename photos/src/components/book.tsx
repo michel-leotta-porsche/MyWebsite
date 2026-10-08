@@ -13,6 +13,7 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react";
+import { ChevronLeft, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { pageNos, plateName, plateOf, type BookData, type Page } from "@/content/books";
@@ -23,6 +24,7 @@ import { JumpContext, PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
 import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { buttonClass } from "@/components/ui/button-class";
 
 export type Mode = "spread" | "single";
 export type Leaf = { front: Page; back: Page };
@@ -751,14 +753,12 @@ export function Book({
           <button
             type="button"
             onClick={onClose}
-            className="text-on-table justify-self-start text-lg font-bold whitespace-nowrap flat:whitespace-normal tracking-[-0.02em] decoration-mark decoration-2 underline-offset-4 hover:underline"
+            className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 justify-self-start pr-2 text-lg font-bold whitespace-nowrap tracking-[-0.02em] transition-opacity duration-150 active:opacity-60 flat:whitespace-normal"
             style={{ fontVariationSettings: '"wdth" 80' }}
             aria-label="Calima, zurück zum Tisch"
           >
-            {/* Pfeil zeigt, dass der Name zurückführt; auf dem Telefon gibt es kein Esc */}
-            <span aria-hidden className="text-on-table-2 mr-1.5 inline-block font-normal">
-              ←
-            </span>
+            {/* Pfeil zeigt, dass der Name zurückführt (wie „‹ Bücherzimmer“ in der Werkbank); auf dem Telefon gibt es kein Esc */}
+            <ChevronLeft aria-hidden className="text-on-table-2 size-5" />
             Calima
           </button>
           {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
@@ -1037,7 +1037,7 @@ export function Book({
 }
 
 /**
- * Textknöpfe „Rezept“ für die Tafeln der aufgeschlagenen Doppelseite. Bei mehreren Fotos trägt der Knopf den
+ * Knöpfe „Rezept“ (Pillen) für die Tafeln der aufgeschlagenen Doppelseite. Bei mehreren Fotos trägt der Knopf den
  * Fototitel, und Zeigen oder Fokus hebt das Foto auf der Seite hervor; die Nummer allein sagt nicht, welches es ist.
  */
 function SlipButtons({
@@ -1056,7 +1056,7 @@ function SlipButtons({
   if (!nos.length) return null;
   const many = nos.length > 1;
   return (
-    <span className="flex min-w-0 shrink-0 gap-x-3 md:flex-wrap">
+    <span className="flex min-w-0 shrink-0 gap-2 md:flex-wrap">
       {nos.map(({ no, label, title }) => (
         <button
           key={no}
@@ -1069,12 +1069,15 @@ function SlipButtons({
           onPointerLeave={() => onPoint(null)}
           onFocus={() => onPoint(no)}
           onBlur={() => onPoint(null)}
-          className="text-on-table max-w-[11rem] truncate underline decoration-mark decoration-2 underline-offset-4"
+          className={buttonClass("quiet", "sm", `max-w-[13rem] ${slip === no ? "bg-on-table/16" : ""}`)}
         >
-          {label}
-          {/* Telefon: nur die Nummer, sonst passt die Zeile nicht; der offene Zettel hebt sein Foto hervor */}
-          {many && <span className="md:hidden"> {no}</span>}
-          {many && <span className="max-md:hidden">{title ? ` · ${title}` : ` ${no}`}</span>}
+          <ScrollText aria-hidden />
+          <span className="truncate">
+            {label}
+            {/* Telefon: nur die Nummer, sonst passt die Zeile nicht; der offene Zettel hebt sein Foto hervor */}
+            {many && <span className="md:hidden"> {no}</span>}
+            {many && <span className="max-md:hidden">{title ? ` · ${title}` : ` ${no}`}</span>}
+          </span>
         </button>
       ))}
     </span>

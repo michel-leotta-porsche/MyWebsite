@@ -1,7 +1,7 @@
 "use client";
 
 import { Drawer } from "@base-ui/react/drawer";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 // Blatt von unten (iPhone-Sheet) als zugeschnittener Zettel, darum nur leicht gerundet: Wischen nach unten schließt, Esc und Tippen daneben auch.
 // Verhalten kommt aus Base UI (Fokus, inert, Wischen, Tastatur), das Aussehen von hier.
@@ -18,12 +18,14 @@ type Props = {
   /** Titel nur für Screenreader, z. B. wenn der Inhalt schon eine Überschrift hat */
   hideTitle?: boolean;
   description?: ReactNode;
+  /** ab 768px breiter, z. B. für ein Bild über beide Seiten */
+  wide?: boolean;
   children: ReactNode;
 };
 
 type ReactElementLike = Parameters<typeof Drawer.Trigger>[0]["render"];
 
-export function Sheet({ open, onOpenChange, trigger, title, hideTitle = false, description, children }: Props) {
+export function Sheet({ open, onOpenChange, trigger, title, hideTitle = false, description, wide = false, children }: Props) {
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <Drawer.Trigger render={trigger} />}
@@ -34,7 +36,7 @@ export function Sheet({ open, onOpenChange, trigger, title, hideTitle = false, d
           />
           <Drawer.Viewport className="fixed inset-0 z-[700] flex items-end justify-center">
             <Drawer.Popup
-              className={`slip text-ink relative -mb-12 max-h-[calc(88svh+3rem)] w-full overflow-y-auto overscroll-contain rounded-t-cut px-5 pt-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px)+3rem)] shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)] outline-none [transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-[450ms] ${EASE} data-swiping:select-none data-starting-style:[transform:translateY(calc(100%-3rem+2px))] data-ending-style:[transform:translateY(calc(100%-3rem+2px))] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] md:max-w-xl`}
+              className={`slip text-ink relative -mb-12 max-h-[calc(88svh+3rem)] w-full overflow-y-auto overscroll-contain rounded-t-cut px-5 pt-2.5 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px)+3rem)] shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)] outline-none [transform:translateY(var(--drawer-swipe-movement-y))] transition-transform duration-[450ms] ${EASE} data-swiping:select-none data-starting-style:[transform:translateY(calc(100%-3rem+2px))] data-ending-style:[transform:translateY(calc(100%-3rem+2px))] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] ${wide ? "md:max-w-3xl" : "md:max-w-xl"}`}
             >
               <div aria-hidden className="bg-ink/20 mx-auto mb-3 h-[5px] w-10 rounded-full" />
               <Drawer.Content>
@@ -53,3 +55,35 @@ export function Sheet({ open, onOpenChange, trigger, title, hideTitle = false, d
 }
 
 export const SheetClose = Drawer.Close;
+
+/**
+ * Blatt für Dialoge, die nur da sind, solange sie gebraucht werden: fährt beim Einhängen hoch,
+ * beim Schließen (Wischen, Tippen daneben, Esc, close()) erst herunter und ruft dann onClose.
+ * locked: solange etwas läuft, bleibt es offen.
+ */
+export function MountedSheet({
+  onClose,
+  locked = false,
+  children,
+  ...p
+}: Omit<Props, "open" | "onOpenChange" | "trigger" | "children"> & {
+  onClose: () => void;
+  locked?: boolean;
+  /** close(then) schließt mit Animation und ruft danach then statt onClose */
+  children: ReactNode | ((close: (then?: () => void) => void) => ReactNode);
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const close = (then?: () => void) => {
+    setOpen(false);
+    window.setTimeout(then ?? onClose, 420);
+  };
+  return (
+    <Sheet {...p} open={open} onOpenChange={(o) => !o && !locked && close()}>
+      {typeof children === "function" ? children(close) : children}
+    </Sheet>
+  );
+}

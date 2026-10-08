@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Wordmark } from "@/components/ui-base";
-import { linkClass } from "@/components/ui-classes";
+import { buttonClass } from "@/components/ui/button-class";
 
 export const metadata: Metadata = { title: "Konto gelöscht · Calima", robots: { index: false } };
 
@@ -20,8 +20,8 @@ export default function Page() {
         <p className="text-on-table-2 mt-3 text-base leading-relaxed">
           Deine Bücher, Fotos und geteilten Links sind weg. Danke, dass du Calima ausprobiert hast.
         </p>
-        <p className="mt-8 text-base">
-          <Link href="/" className={`${linkClass} underline`}>
+        <p className="mt-8">
+          <Link href="/" className={buttonClass("quiet")}>
             Zur Startseite
           </Link>
         </p>

@@ -1,19 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { plateOf, typeArea, type BookData, type Page } from "@/content/books";
 import { layoutPage, TEXT_STYLE } from "@/content/layout";
-import { inputClass, SignInTable, TextButton } from "@/components/app-ui";
+import { SignInTable } from "@/components/app-ui";
 import { Book } from "@/components/book";
 import { buttonClass, Button, IconButton, ToolGroup } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { Field, noteClass } from "@/components/ui/field";
 import { ListGroup, ListRow } from "@/components/ui/list";
 import { Menu, MenuItem } from "@/components/ui/menu";
-import { Sheet } from "@/components/ui/sheet";
+import { MountedSheet } from "@/components/ui/sheet";
 import { Swatches } from "@/components/ui/swatches";
 import { notify, Toaster } from "@/components/ui/toaster";
 import { CropDialog } from "@/components/crop-dialog";
@@ -58,7 +58,7 @@ type Selection = { type: "photo"; key: string } | { type: "spread"; id: string }
 const MAX = 60;
 /** Unter 768px: Panel des Gewählten als Blatt am unteren Rand, direkt beim Foto statt weit darunter */
 const SHEET =
-  "max-md:rounded-t-cut max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
+  "md:rounded-cut max-md:rounded-t-cut max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
 
 function SheetClose({ onClose }: { onClose: () => void }) {
   return (
@@ -803,17 +803,33 @@ export function Editor() {
                 {dropHint}
               </p>
             )}
+            {pending.length > 0 &&
+              (() => {
+                const total = pending.filter((p) => p.error !== "kein Foto").length;
+                const done = pending.filter((p) => p.state === "fertig").length;
+                return (
+                  total > 0 && (
+                    <div className="w-full max-w-sm">
+                      <p className="text-on-table text-sm tabular-nums" aria-live="polite">
+                        {done} von {total} Fotos im Buch
+                      </p>
+                      {/* Fortschritt als Linie, die mit scaleX wächst (Signal, keine Fläche) */}
+                      <span aria-hidden className="bg-on-table/12 mt-2 block h-1 overflow-hidden rounded-full">
+                        <span className="bg-cloth block h-full origin-left rounded-full transition-transform duration-500 ease-out" style={{ transform: `scaleX(${done / total})` }} />
+                      </span>
+                    </div>
+                  )
+                );
+              })()}
             {pending.length > 0 && (
-              <p className="text-on-table text-sm tabular-nums" aria-live="polite">
-                {pending.filter((p) => p.state === "fertig").length} von {pending.filter((p) => p.error !== "kein Foto").length} Fotos im Buch
-              </p>
-            )}
-            {pending.length > 0 && (
-              <ul className="text-on-table-2 max-h-48 w-full space-y-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
+              <ul className="text-on-table-2 max-h-48 w-full space-y-1.5 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
                 {pending.map((p) => (
-                  <li key={p.key} className="flex justify-between gap-4">
-                    <span className="truncate">{p.name}</span>
-                    <span className={p.state === "fehler" ? "text-on-table" : ""}>
+                  <li key={p.key} className="flex items-center gap-2.5">
+                    <span aria-hidden className={`shrink-0 [&_svg]:size-4 ${p.state === "fehler" ? "text-danger-on-table" : p.state === "fertig" ? "text-on-table" : ""}`}>
+                      {p.state === "fertig" ? <Check /> : p.state === "fehler" ? <CircleAlert /> : <LoaderCircle className="motion-safe:animate-spin" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    <span className={`shrink-0 ${p.state === "fehler" ? "text-on-table" : ""}`}>
                       {p.state === "lesen" ? "liest …" : p.state === "laden" ? "lädt hoch …" : p.state === "fertig" ? "fertig" : `Fehler: ${p.error}`}
                     </span>
                   </li>
@@ -1037,9 +1053,9 @@ export function Editor() {
                     >
                       <Image src={p.thumb} alt="" fill sizes="80px" className="object-cover" />
                     </button>
-                    <TextButton className="text-[12px]" onClick={() => unshelvePhoto(p.key)}>
+                    <Button size="sm" className="w-20 px-0" onClick={() => unshelvePhoto(p.key)} aria-label={`${p.title || "Foto"} ins Buch`}>
                       Ins Buch
-                    </TextButton>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -1198,7 +1214,7 @@ export function Editor() {
               <label className="block text-[13px]">
                 <span className="text-ink-2">Text</span>
                 <textarea
-                  className={inputClass}
+                  className={noteClass}
                   rows={7}
                   value={selSpread.text.body}
                   placeholder="Ein paar Sätze zu eurer Geschichte. Leerzeile = neuer Absatz."
@@ -1339,7 +1355,6 @@ function Keys({ onKey }: { onKey: (e: KeyboardEvent) => void }) {
 
 /** Verlauf: Zwischenstände ansehen und zurückholen, eigenen Stand sichern, Projekt als Datei. Blatt von unten wie die übrigen Dialoge */
 function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onRestore: (v: Version) => void; onClose: () => void }) {
-  const [open, setOpen] = useState(false);
   const [list, setList] = useState<Version[] | null>(null);
   const [all, setAll] = useState(false);
   const [name, setName] = useState("");
@@ -1352,84 +1367,73 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
   useEffect(() => {
     load();
   }, [load]);
-  // erst nach dem Einhängen öffnen, damit das Blatt hochfährt
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setOpen(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
   const fileUrl = useMemo(() => URL.createObjectURL(exportBook(book)), [book]);
   useEffect(() => () => URL.revokeObjectURL(fileUrl), [fileUrl]);
 
-  // Schließen fährt das Blatt erst herunter, dann meldet es sich ab
-  const close = (then?: () => void) => {
-    setOpen(false);
-    window.setTimeout(() => (then ? then() : onClose()), 420);
-  };
   const shown = list && !all ? list.slice(0, 8) : list;
 
   return (
-    <Sheet
-      title="Verlauf"
-      description="Zwischenstände entstehen von selbst vor großen Änderungen und alle zehn Minuten."
-      open={open}
-      onOpenChange={(o) => !o && close()}
-    >
-      <form
-        className="flex items-end gap-3"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          await saveVersion(book, name.trim() || "Eigener Stand", false).catch(() => {});
-          setName("");
-          setBusy(false);
-          load();
-        }}
-      >
-        <Field label="Eigenen Stand benennen" className="min-w-0 flex-1" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
-        <Button type="submit" variant="paper" size="sm" disabled={busy} className="mb-1.5">
-          <BookmarkPlus aria-hidden />
-          Sichern
-        </Button>
-      </form>
+    <MountedSheet title="Verlauf" description="Zwischenstände entstehen von selbst vor großen Änderungen und alle zehn Minuten." onClose={onClose}>
+      {(close) => (
+        <>
+          <form
+            className="flex items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setBusy(true);
+              await saveVersion(book, name.trim() || "Eigener Stand", false).catch(() => {});
+              setName("");
+              setBusy(false);
+              load();
+            }}
+          >
+            <Field label="Eigenen Stand benennen" className="min-w-0 flex-1" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
+            <Button type="submit" variant="paper" size="sm" disabled={busy} className="mb-1.5">
+              <BookmarkPlus aria-hidden />
+              Sichern
+            </Button>
+          </form>
 
-      <div className="mt-6">
-        {list === null && <p className="text-ink-2 text-sm">Lade …</p>}
-        {list?.length === 0 && <p className="text-ink-2 text-sm">Noch keine Zwischenstände.</p>}
-        {shown && shown.length > 0 && (
-          <ListGroup paper label="Zwischenstände">
-            {shown.map((v) => (
-              <ListRow
-                key={v.id}
-                paper
-                lead={v.auto ? <History aria-hidden /> : <Bookmark aria-hidden />}
-                title={<span className={`block truncate ${v.auto ? "font-normal" : ""}`}>{v.label}</span>}
-                detail={`${when(v)} · ${v.book.spreads.length} Doppelseiten`}
-                trail={
-                  // Telefon: nur das Symbol, damit Name und Datum Platz haben
-                  <Button variant="paper" size="sm" onClick={() => close(() => onRestore(v))} aria-label={`${v.label} vom ${when(v)} zurückholen`} className="max-sm:size-11 max-sm:px-0">
-                    <RotateCcw aria-hidden />
-                    <span className="max-sm:sr-only">Zurückholen</span>
-                  </Button>
-                }
-              />
-            ))}
-          </ListGroup>
-        )}
-        {list && !all && list.length > 8 && (
-          <Button variant="paper" size="sm" className="mt-3" onClick={() => setAll(true)}>
-            Ältere zeigen ({list.length - 8})
-          </Button>
-        )}
-      </div>
+          <div className="mt-6">
+            {list === null && <p className="text-ink-2 text-sm">Lade …</p>}
+            {list?.length === 0 && <p className="text-ink-2 text-sm">Noch keine Zwischenstände.</p>}
+            {shown && shown.length > 0 && (
+              <ListGroup paper label="Zwischenstände">
+                {shown.map((v) => (
+                  <ListRow
+                    key={v.id}
+                    paper
+                    lead={v.auto ? <History aria-hidden /> : <Bookmark aria-hidden />}
+                    title={<span className={`block truncate ${v.auto ? "font-normal" : ""}`}>{v.label}</span>}
+                    detail={`${when(v)} · ${v.book.spreads.length} Doppelseiten`}
+                    trail={
+                      // Telefon: nur das Symbol, damit Name und Datum Platz haben
+                      <Button variant="paper" size="sm" onClick={() => close(() => onRestore(v))} aria-label={`${v.label} vom ${when(v)} zurückholen`} className="max-sm:size-11 max-sm:px-0">
+                        <RotateCcw aria-hidden />
+                        <span className="max-sm:sr-only">Zurückholen</span>
+                      </Button>
+                    }
+                  />
+                ))}
+              </ListGroup>
+            )}
+            {list && !all && list.length > 8 && (
+              <Button variant="paper" size="sm" className="mt-3" onClick={() => setAll(true)}>
+                Ältere zeigen ({list.length - 8})
+              </Button>
+            )}
+          </div>
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className={buttonClass("paper", "sm")}>
-          <Download aria-hidden />
-          Projekt als Datei sichern
-        </a>
-        <span className="text-ink-2 text-[13px]">Öffnen über das Bücherzimmer</span>
-      </div>
-    </Sheet>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className={buttonClass("paper", "sm")}>
+              <Download aria-hidden />
+              Projekt als Datei sichern
+            </a>
+            <span className="text-ink-2 text-[13px]">Öffnen über das Bücherzimmer</span>
+          </div>
+        </>
+      )}
+    </MountedSheet>
   );
 }
 
