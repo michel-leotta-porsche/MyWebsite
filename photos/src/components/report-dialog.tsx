@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { inputClass, SlipDialog } from "@/components/app-ui";
+import { Button } from "@/components/ui/button";
+import { noteClass } from "@/components/ui/field";
+import { Sheet } from "@/components/ui/sheet";
 import { friendlyError } from "@/lib/errors";
 import { REPORT_REASONS, reportShare, type ReportReason, type Share } from "@/lib/store";
 
@@ -33,7 +35,7 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
   };
 
   return (
-    <SlipDialog label="Buch melden" onClose={() => state !== "busy" && onClose()}>
+    <Sheet open title="Buch melden" onOpenChange={(o) => !o && state !== "busy" && onClose()}>
       {state === "sent" ? (
         <div className="text-sm leading-relaxed">
           <p>Danke. Ich sehe mir das innerhalb von 24 Stunden an und nehme das Buch herunter, wenn es gegen die Nutzungsbedingungen verstößt.</p>
@@ -52,7 +54,7 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
           <fieldset className="mt-3">
             <legend className="sr-only">Grund</legend>
             {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
-              <label key={r} className="flex min-h-11 items-center gap-3 text-sm">
+              <label key={r} className="border-ink/10 flex min-h-12 items-center gap-3 border-b text-[15px] last:border-b-0">
                 <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="accent-ink" />
                 {REPORT_REASONS[r]}
               </label>
@@ -61,7 +63,7 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
           <label htmlFor="report-text" className="text-ink-2 mt-2 block text-[13px]">
             Magst du kurz sagen, worum es geht? (freiwillig)
           </label>
-          <textarea id="report-text" value={text} onChange={(e) => setText(e.target.value.slice(0, 500))} rows={3} className={inputClass} />
+          <textarea id="report-text" value={text} onChange={(e) => setText(e.target.value.slice(0, 500))} rows={3} className={noteClass} />
           {onBlock && (
             <label className="mt-2 flex min-h-11 items-center gap-3 text-sm">
               <input type="checkbox" checked={block} onChange={(e) => setBlock(e.target.checked)} className="accent-ink" />
@@ -77,16 +79,12 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
             <Link href="/nutzungsbedingungen" className="text-ink-2 text-[13px] underline decoration-mark decoration-2 underline-offset-4">
               Nutzungsbedingungen
             </Link>
-            <button
-              type="submit"
-              disabled={!reason || state === "busy"}
-              className="border-ink bg-ink text-paper hover:bg-ink/85 min-h-11 border px-3 py-2 text-sm font-semibold disabled:opacity-50"
-            >
+            <Button type="submit" variant="ink" disabled={!reason || state === "busy"}>
               {state === "busy" ? "Sendet …" : "Melden"}
-            </button>
+            </Button>
           </div>
         </form>
       )}
-    </SlipDialog>
+    </Sheet>
   );
 }

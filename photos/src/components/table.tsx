@@ -1,10 +1,12 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { type BookData } from "@/content/books";
 import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { buttonClass } from "@/components/ui/button";
 
 /** Aufschlagen eines Bands; kommt aus der Library, damit Tisch und Reihen nichts vom Hash oder der View Transition wissen */
 /** `plate`: gleich an dieser Tafel aufschlagen (z. B. vom Eselsohr eines Freundes aus) */
@@ -140,15 +142,9 @@ export function ClosedBook({
             {meta ?? `${book.plates.length} Tafeln`}
           </p>
           {/* Der eine betonte Knopf der Ansicht: sagt, was man mit dem Buch tun kann */}
-          <button
-            type="button"
-            onClick={() => open(book.id)}
-            className="group/cta border-on-table text-on-table hover:bg-on-table hover:text-table border px-5 py-2.5 text-base font-semibold transition-colors duration-150"
-          >
+          <button type="button" onClick={() => open(book.id)} className={buttonClass("cloth", "md", "group/cta px-6")}>
             Buch aufschlagen
-            <span aria-hidden className="ml-2 inline-block transition-transform duration-500 ease-out group-hover/cta:translate-x-1">
-              →
-            </span>
+            <ArrowRight aria-hidden className="transition-transform duration-500 ease-out group-hover/cta:translate-x-1" />
           </button>
         </div>
       ) : (
