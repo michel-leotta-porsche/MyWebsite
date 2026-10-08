@@ -125,7 +125,7 @@ Licht und Tiefe sind physisch begründet: Schatten des Buchs auf dem Tisch, Wöl
 Monochromer Tisch aus Basalt, ein warmes Buchleinen-Gelb als einzige Stimme, Naturpapier mit fast schwarzer Tinte. Jeder Band hat sein eigenes Leinen.
 
 ### Primary
-- **Ringelblumen-Buchleinen** (`cloth`): Fläche des Einbands, sonst nur Signal: gefüllter Teil der Bildfolge-Linie, aktiver Haltepunkt, Unterstrich bei Hover der Textknöpfe, Fokusrahmen auf dem Tisch, Textauswahl, Scrollbalken. Auf dem Tisch erreicht es 8.34:1, bleibt aber Signal: nur für Nicht-Text (Linien, Balken, Rahmen) einsetzen. Auf Papier und Zettel hat es nur 1.7:1.
+- **Ringelblumen-Buchleinen** (`cloth`): Fläche des Einbands, sonst nur Signal: gefüllter Teil der Bildfolge-Linie, aktiver Haltepunkt, Unterstrich bei Hover von Links im Fließtext, Fokusrahmen auf dem Tisch, Textauswahl, Scrollbalken. Auf dem Tisch erreicht es 8.34:1, bleibt aber Signal: nur für Nicht-Text (Linien, Balken, Rahmen) einsetzen. Auf Papier und Zettel hat es nur 1.7:1.
 - **Tiefes Buchleinen** (`cloth-deep`): Falz am Rücken des Einbands (25 % und 60 % Deckkraft) und Vorsatzpapier (90 %). Nie für Text.
 - **Prägung** (`cloth-ink`): Titel und Autorname auf dem Einband (6.79:1 auf `cloth`), Textfarbe der Auswahl.
 
@@ -240,11 +240,10 @@ Verhalten aus Base UI (`@base-ui/react`), Hinweise aus Sonner, Symbole aus Lucid
 - **Segmented** (`segmented.tsx`): Umschalter, Daumen gleitet mit Feder (Motion).
 
 
-### Textknöpfe (Vollbild)
-Ruhig, nur Wort, kein Kasten.
-- **Shape:** keine Fläche, kein Rahmen, eckig.
-- **Default:** `on-table`, 14px, Innenabstand 4px × 8px („Zurück“, „Weiter“), „Schließen“ mit 8px × 12px.
-- **Hover:** Unterstrich in `cloth`, 2px dick, 4px Abstand zur Schrift.
+### Knöpfe im Vollbild
+Symbole statt Wörter, wie in den Leisten (Plan „Design neu denken“, Punkt 4).
+- **Shape:** `IconButton` bzw. `buttonClass("quiet", "icon")`, Pille 44×44, Lucide `X`, `ChevronLeft`, `ChevronRight`.
+- **Name:** immer `aria-label` und `title` („Schließen“, „Voriges Bild“, „Nächstes Bild“).
 - **Focus:** 2px Rahmen in `cloth`, 3px Abstand (global).
 
 ### Blätterflächen und Tafelflächen
