@@ -4,7 +4,7 @@ import type { MotionValue } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import type { BookData, Page } from "@/content/books";
-import { drawPage } from "@/components/page-texture";
+import { preparePage } from "@/components/page-texture";
 
 // Das umblätternde Blatt als ein Gitternetz in WebGL: biegt sich als glatte Kurve,
 // Licht aus der Flächennormale, Schatten auf der Seite darunter. Ruhende Seiten bleiben HTML.
@@ -48,6 +48,31 @@ const BEND = 70;
 const DEPTH = 2600;
 // Platz über und unter dem Buch, weil ein aufgerichtetes Blatt in der Perspektive größer wirkt
 const EXTRA = 0.35;
+// Texturen erst vorbereiten, wenn das Buch so lange still liegt (ms): Zeichnen und Hochladen kosten
+// auf dem iPhone je Seite Dutzende Millisekunden und dürfen nie in ein laufendes Umblättern fallen
+const QUIET = 140;
+// Schafft ein Gerät beim Umblättern im Mittel weniger als etwa 40 Bilder pro Sekunde (ms pro Bild),
+// blättert es ab dem zweiten solchen Umblättern flach weiter
+const SLOW_FRAME = 25;
+const FLAT_KEY = "blaettern-flach";
+
+/** Grafik ohne GPU (Software-Renderer) oder schon einmal zu langsam gewesen: dann flach blättern */
+function weakDevice(gl: WebGLRenderingContext) {
+  try {
+    if (sessionStorage.getItem(FLAT_KEY) === "1") return true;
+  } catch {
+    // ohne Speicher: nur die Prüfung unten
+  }
+  const info = gl.getExtension("WEBGL_debug_renderer_info");
+  const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+  return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(renderer);
+}
+
+/** Leerlauf abwarten; Safari kennt requestIdleCallback nicht, dort reicht ein Takt nach dem nächsten Bild */
+function whenIdle(cb: () => void) {
+  if (typeof requestIdleCallback === "function") requestIdleCallback(cb, { timeout: 400 });
+  else requestAnimationFrame(() => setTimeout(cb, 0));
+}
 
 const VERT = `
 attribute vec3 aPos;
@@ -124,7 +149,7 @@ type GLState = {
 
 function init(canvas: HTMLCanvasElement): GLState | null {
   const gl = canvas.getContext("webgl", { premultipliedAlpha: true, antialias: true, alpha: true });
-  if (!gl) return null;
+  if (!gl || weakDevice(gl)) return null;
   const prog = gl.createProgram()!;
   gl.attachShader(prog, compile(gl, gl.VERTEX_SHADER, VERT));
   gl.attachShader(prog, compile(gl, gl.FRAGMENT_SHADER, FRAG));
@@ -212,8 +237,13 @@ export function PageCurl({
   const size = useRef({ W: 0, H: 0, dpr: 1 });
   const frame = useRef(0);
   const render = useRef<() => void>(() => {});
-  const pending = useRef(new Set<number>());
   const generation = useRef(0);
+  // Wann sich das Buch zuletzt bewegt hat, und welche Blätter in welcher Reihenfolge Texturen brauchen
+  const lastMove = useRef(0);
+  const want = useRef<number[]>([]);
+  const lastK = useRef(k);
+  const running = useRef(false);
+  const pump = useRef<() => void>(() => {});
   // neue Größe: Texturen neu erzeugen
   const [sizeKey, setSizeKey] = useState(0);
 
@@ -232,6 +262,31 @@ export function PageCurl({
     state.current = st;
     const tex = textures.current;
     const verts = new Float32Array((SEGMENTS + 1) * 14);
+    // Bildabstände, solange WebGL ein Blatt biegt; nach jedem Umblättern ausgewertet
+    let turnFrames: number[] = [];
+    let lastFrame = 0;
+    let slowTurns = 0;
+    const judgeTurn = () => {
+      const f = turnFrames.sort((a, b) => a - b);
+      turnFrames = [];
+      lastFrame = 0;
+      if (f.length < 8) return;
+      if (f[Math.floor(f.length / 2)] > SLOW_FRAME) slowTurns++;
+      else slowTurns = 0;
+      if (slowTurns < 2) return;
+      // zu langsam für die Biegung: ab jetzt flach, auch beim nächsten Öffnen in dieser Sitzung
+      try {
+        sessionStorage.setItem(FLAT_KEY, "1");
+      } catch {}
+      tex.forEach((tx) => {
+        st!.gl.deleteTexture(tx.front);
+        st!.gl.deleteTexture(tx.back);
+      });
+      tex.clear();
+      store.clear();
+      state.current = null;
+      st!.gl.clear(st!.gl.COLOR_BUFFER_BIT);
+    };
 
     render.current = () => {
       frame.current = 0;
@@ -261,9 +316,11 @@ export function PageCurl({
         gl.enableVertexAttribArray(loc.aN);
         gl.vertexAttribPointer(loc.aN, 2, gl.FLOAT, false, stride, 20);
       };
+      let bent = false;
       textures.current.forEach((tex, i) => {
         const p = clamp01(tv - i);
         if (p <= 0.004 || p >= 0.996) return;
+        bent = true;
         const theta = geometry(p, W, H, verts);
         // Schatten auf die Seite, über der das Blatt gerade schwebt
         const lift = Math.sin((theta * Math.PI) / 180);
@@ -293,6 +350,12 @@ export function PageCurl({
         gl.bindTexture(gl.TEXTURE_2D, tex.back);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, (SEGMENTS + 1) * 2);
       });
+      const now = performance.now();
+      if (bent) {
+        // Pausen des Fingers zählen nicht als langsames Bild
+        if (lastFrame && now - lastFrame < 250) turnFrames.push(now - lastFrame);
+        lastFrame = now;
+      } else if (lastFrame) judgeTurn();
     };
 
     const measure = () => {
@@ -332,6 +395,7 @@ export function PageCurl({
     };
     c.addEventListener("webglcontextlost", lost);
     const unsub = t.on("change", () => {
+      lastMove.current = performance.now();
       if (!frame.current) frame.current = requestAnimationFrame(() => render.current());
     });
     return () => {
@@ -353,51 +417,106 @@ export function PageCurl({
     };
   }, [bookRef, mode, store, t]);
 
-  // Texturen für die Blätter rund um die aufgeschlagene Seite vorbereiten, eins nach dem anderen
+  // Eine Warteschlange arbeitet die Blätter nacheinander ab. Laden und Entpacken laufen jederzeit;
+  // Zeichnen und Hochladen nur, wenn das Buch still liegt und der Browser Leerlauf hat.
+  useEffect(() => {
+    // Dauer der letzten gezeichneten Seite: so viel freie Zeit braucht ein Bild, um sie unterzubringen
+    let cost = 12;
+    // wartet auf einen Moment, in dem eine Seite gezeichnet werden kann; false, wenn die Arbeit nicht mehr gilt
+    const calm = (gen: number) =>
+      new Promise<boolean>((resolve) => {
+        const valid = () => gen === generation.current && !!state.current;
+        const check = () => {
+          if (!valid()) return resolve(false);
+          const quiet = performance.now() - lastMove.current;
+          if (quiet >= QUIET) {
+            whenIdle(() => {
+              // im Leerlauf kann ein neues Umblättern begonnen haben
+              if (performance.now() - lastMove.current < QUIET) check();
+              else resolve(valid());
+            });
+          } else if (typeof requestIdleCallback === "function") {
+            // während der Bewegung nur, wenn das Bild genug Luft hat (schnelle Rechner); Safari wartet auf Ruhe
+            requestIdleCallback((d) => (d.timeRemaining() >= cost ? resolve(valid()) : setTimeout(check, 32)));
+          } else setTimeout(check, Math.max(16, QUIET - quiet));
+        };
+        check();
+      });
+    const timed = <T,>(f: () => T) => {
+      const t0 = performance.now();
+      const r = f();
+      cost = Math.min(50, performance.now() - t0);
+      return r;
+    };
+    // ein Blatt mitten im Umblättern bekommt seine Textur erst danach, sonst springt es von flach auf gebogen
+    const midTurn = (i: number) => {
+      const p = t.get() - i;
+      return p > 0.004 && p < 0.996;
+    };
+
+    pump.current = async () => {
+      if (running.current) return;
+      running.current = true;
+      try {
+        for (;;) {
+          const gen = generation.current;
+          const missing = want.current.filter((n) => !textures.current.has(n));
+          const i = missing.find((n) => !midTurn(n));
+          const { W, H, dpr } = size.current;
+          if (!missing.length || !W || !state.current) return;
+          if (i === undefined) {
+            // nur noch das Blatt, das gerade umschlägt: später noch einmal schauen
+            await new Promise((r) => setTimeout(r, 300));
+            continue;
+          }
+          const leaf = leaves[i];
+          const [front, back] = await Promise.all([
+            preparePage(book, leaf.front, "right", W, H, dpr),
+            preparePage(book, leaf.back, "left", W, H, dpr),
+          ]);
+          // jede Seite in einem eigenen ruhigen Moment zeichnen, dann beide hochladen
+          if (!(await calm(gen))) continue;
+          const a = timed(front);
+          if (!(await calm(gen))) {
+            release(a);
+            continue;
+          }
+          const b = timed(back);
+          if (!(await calm(gen)) || !want.current.includes(i) || midTurn(i)) {
+            release(a, b);
+            continue;
+          }
+          const s = state.current!;
+          textures.current.set(i, { front: texture(s.gl, a), back: texture(s.gl, b) });
+          // die Pixel liegen jetzt in der Textur
+          release(a, b);
+          store.add(i);
+          render.current();
+        }
+      } catch {
+        // ohne Textur blättert das HTML-Blatt flach weiter
+      } finally {
+        running.current = false;
+      }
+    };
+  }, [book, leaves, store, t]);
+
+  // Blätter rund um die aufgeschlagene Seite; zuerst das, das in Blätterrichtung als Nächstes umschlägt
   useEffect(() => {
     const st = state.current;
     if (!st) return;
-    const want = [k, k - 1, k + 1].filter((i) => i >= 0 && i < leaves.length);
+    const forward = k >= lastK.current;
+    lastK.current = k;
+    want.current = (forward ? [k, k + 1, k - 1] : [k - 1, k, k + 1]).filter((i) => i >= 0 && i < leaves.length);
     // ferne Blätter freigeben
     textures.current.forEach((tx, i) => {
-      if (want.includes(i)) return;
+      if (want.current.includes(i)) return;
       st.gl.deleteTexture(tx.front);
       st.gl.deleteTexture(tx.back);
       textures.current.delete(i);
       store.remove(i);
     });
-    let cancelled = false;
-    const gen = generation.current;
-    (async () => {
-      for (const i of want) {
-        if (cancelled) return;
-        if (textures.current.has(i) || pending.current.has(i)) continue;
-        const { W, H, dpr } = size.current;
-        if (!W) return;
-        pending.current.add(i);
-        try {
-          const [front, back] = await Promise.all([
-            drawPage(book, leaves[i].front, "right", W, H, dpr),
-            drawPage(book, leaves[i].back, "left", W, H, dpr),
-          ]);
-          const s = state.current;
-          if (s && gen === generation.current) {
-            textures.current.set(i, { front: texture(s.gl, front), back: texture(s.gl, back) });
-            store.add(i);
-            render.current();
-          }
-          // die Pixel liegen jetzt in der Textur (oder werden nicht mehr gebraucht)
-          release(front, back);
-        } catch {
-          // ohne Textur blättert das HTML-Blatt flach weiter
-        } finally {
-          pending.current.delete(i);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    pump.current();
   }, [book, k, leaves, store, sizeKey]);
 
   return (
