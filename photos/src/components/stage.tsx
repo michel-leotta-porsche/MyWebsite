@@ -21,7 +21,11 @@ import {
   type AbsStroke,
   type PathEl,
 } from "@/content/shapes";
-import { inputClass, TextButton } from "@/components/app-ui";
+import { BringToFront, ChevronDown, ChevronLeft, ChevronUp, Copy, Crop, Grid3x3, Plus, Redo2, RotateCcw, SendToBack, SlidersHorizontal, Trash, Undo2 } from "lucide-react";
+
+import { Button, buttonClass, IconButton as ToolIcon, ToolGroup } from "@/components/ui/button";
+import { Field, noteClass } from "@/components/ui/field";
+import { Segmented } from "@/components/ui/segmented";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
 import {
@@ -1310,22 +1314,23 @@ export function Stage({
 
   /** Ebenen: was oben liegt, steht oben; am Desktop in der Seitenleiste, am Handy in einem Blatt von unten */
   const layerList = () => (
-      <ol className="space-y-px">
+      <ol className="bg-ink/5 overflow-hidden rounded-tool">
         {[...shown].reverse().map((it) => (
-          <li key={it.id} className="flex items-center gap-2">
+          <li key={it.id} className={`border-ink/8 flex items-center gap-1 pr-1 [&+&]:border-t ${it.id === sel ? "bg-ink/8" : ""}`}>
             <button
               type="button"
               onClick={() => setSel(it.id)}
               aria-pressed={it.id === sel}
-              className={`${phone ? "min-h-11" : "min-h-8"} min-w-0 flex-1 truncate border-l-2 px-2 text-left text-[13px] ${it.id === sel ? "border-mark font-semibold" : "border-transparent"}`}
+              className={`${phone ? "min-h-11" : "min-h-10"} relative min-w-0 flex-1 truncate pl-4 text-left text-[14px] ${it.id === sel ? "font-semibold" : ""}`}
             >
+              {it.id === sel && <span aria-hidden className="bg-mark absolute inset-y-2 left-0 w-[3px] rounded-r-full" />}
               {nameOf(it) || "Foto"}
             </button>
-            <button type="button" aria-label="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className={`${phone ? "h-11 w-11" : "h-8 w-8"} text-sm disabled:opacity-30`}>
-              ↑
+            <button type="button" aria-label="nach vorn" title="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
+              <ChevronUp aria-hidden className="size-4" />
             </button>
-            <button type="button" aria-label="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className={`${phone ? "h-11 w-11" : "h-8 w-8"} text-sm disabled:opacity-30`}>
-              ↓
+            <button type="button" aria-label="nach hinten" title="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
+              <ChevronDown aria-hidden className="size-4" />
             </button>
           </li>
         ))}
@@ -1437,10 +1442,11 @@ export function Stage({
         draggable
         onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
         onClick={() => addText(r, curPage)}
-        className={`border-on-table/60 text-on-table hover:border-on-table cursor-grab border px-3 text-sm transition-colors duration-150 ${phone ? "min-h-11" : "mr-1 min-h-9"}`}
+        className={buttonClass("quiet", "sm", `cursor-grab pl-2.5 ${phone ? "min-h-11" : "min-h-10"}`)}
         title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
       >
-        + {TEXT_ROLE[r].label}
+        <Plus aria-hidden />
+        {TEXT_ROLE[r].label}
       </button>
     ));
 
@@ -1455,7 +1461,7 @@ export function Stage({
             aria-label={`Breite ${ps.label}`}
             title={ps.label}
             onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
-            className={`flex h-9 w-9 items-center justify-center border ${pen.s === ps.s ? "border-on-table" : "border-transparent"}`}
+            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150 ${pen.s === ps.s ? "bg-on-table/16 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.4)]" : "hover:bg-on-table/8"}`}
           >
             <span aria-hidden className="bg-on-table block rounded-full" style={{ width: 4 + ps.s * 6, height: 4 + ps.s * 6 }} />
           </button>
@@ -1490,31 +1496,38 @@ export function Stage({
           <IconButton label="Mehr" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((o) => !o)} dots />
         </header>
       ) : (
-      <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 md:px-8">
-          <span className="flex items-baseline gap-5">
-            <TextButton data-stage-first onClick={onClose}>
-              ← Zur Übersicht
-            </TextButton>
-            <span className="text-on-table font-semibold">Doppelseite {index + 1}</span>
-            <span className="text-on-table-2 hidden text-sm md:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
+      <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 bg-table/95 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 backdrop-blur-sm md:px-8">
+          <span className="flex min-w-0 items-center gap-4">
+            <button type="button" data-stage-first onClick={onClose} className={buttonClass("quiet", "sm", "pl-2.5")}>
+              <ChevronLeft aria-hidden />
+              Übersicht
+            </button>
+            <span className="text-on-table font-semibold whitespace-nowrap">Doppelseite {index + 1}</span>
+            <span className="text-on-table-2 hidden truncate text-sm lg:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
           </span>
-          <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-            <TextButton disabled={!canUndo} onClick={onUndo}>
-              Rückgängig
-            </TextButton>
-            <TextButton disabled={!canRedo} onClick={onRedo}>
-              Wiederholen
-            </TextButton>
-            {onDevelop && firstKey && (
-            <TextButton onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>Fotos bearbeiten</TextButton>
-          )}
-          <TextButton aria-pressed={gridOn} onClick={toggleGrid} title="Raster zeigen (G)">
-              Raster {gridOn ? "aus" : "an"}
-            </TextButton>
+          <span className="flex flex-wrap items-center gap-2">
             {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
-            <TextButton onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
+            <Button size="sm" onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
+              <RotateCcw aria-hidden />
               Auf Vorschlag zurücksetzen
-            </TextButton>
+            </Button>
+            {onDevelop && firstKey && (
+              <Button size="sm" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>
+                <SlidersHorizontal aria-hidden />
+                Fotos bearbeiten
+              </Button>
+            )}
+            <ToolGroup label="Verlauf und Raster">
+              <ToolIcon label="Rückgängig (⌘Z)" disabled={!canUndo} onClick={onUndo}>
+                <Undo2 aria-hidden />
+              </ToolIcon>
+              <ToolIcon label="Wiederholen (⇧⌘Z)" disabled={!canRedo} onClick={onRedo}>
+                <Redo2 aria-hidden />
+              </ToolIcon>
+              <ToolIcon label="Raster zeigen (G)" aria-pressed={gridOn} onClick={toggleGrid} className="aria-pressed:!bg-on-table aria-pressed:text-table">
+                <Grid3x3 aria-hidden />
+              </ToolIcon>
+            </ToolGroup>
           </span>
         </header>
       )}
@@ -1526,12 +1539,17 @@ export function Stage({
       <div className={`grid gap-8 px-4 md:px-8 ${phone ? "pb-8" : "pb-24 md:grid-cols-[minmax(0,1fr)_300px]"}`}>
         <div ref={wrap} className="min-w-0">
           {narrow && (
-            <div className={`mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${phone ? "mt-1" : ""}`} role="group" aria-label="Ansicht">
-              {(["all", 0, 1] as const).map((v) => (
-                <TextButton key={v} aria-pressed={view === v} className={view === v ? "font-semibold" : ""} onClick={() => camTo(v)}>
-                  {v === "all" ? "Ganze Doppelseite" : v === 0 ? "Links" : "Rechts"}
-                </TextButton>
-              ))}
+            <div className={`mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 ${phone ? "mt-1" : ""}`}>
+              <Segmented
+                label="Ansicht"
+                value={String(view) as "all" | "0" | "1"}
+                onChange={(v) => camTo(v === "all" ? "all" : (Number(v) as 0 | 1))}
+                options={[
+                  { value: "all", label: "Ganze Doppelseite" },
+                  { value: "0", label: "Links" },
+                  { value: "1", label: "Rechts" },
+                ]}
+              />
               <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
             </div>
           )}
@@ -1554,15 +1572,16 @@ export function Stage({
             </div>
           )}
           {cropping ? (
-            <div className="mb-4 flex min-h-9 items-center gap-x-5 overflow-hidden" role="toolbar" aria-label="Zuschneiden">
-              <span className="text-on-table shrink-0 text-sm font-semibold">Zuschneiden</span>
-              <button type="button" onClick={() => setCropMsg("done")} className="border-on-table text-on-table hover:bg-on-table hover:text-table min-h-9 shrink-0 border px-3 text-sm font-semibold transition-colors duration-150">
+            <div className="mb-4 flex min-h-9 items-center gap-x-2 overflow-hidden" role="toolbar" aria-label="Zuschneiden">
+              <span className="text-on-table mr-2 shrink-0 text-sm font-semibold">Zuschneiden</span>
+              <Button variant="cloth" size="sm" className="shrink-0 px-5" haptic="success" onClick={() => setCropMsg("done")}>
                 Fertig
-              </button>
-              <TextButton className="shrink-0" onClick={() => setCropMsg("cancel")}>
+              </Button>
+              <Button size="sm" className="shrink-0" onClick={() => setCropMsg("cancel")}>
                 Abbrechen
-              </TextButton>
-              <TextButton
+              </Button>
+              <Button
+                size="sm"
                 className="shrink-0"
                 onClick={() => {
                   const id = cropping;
@@ -1571,20 +1590,22 @@ export function Stage({
                 }}
               >
                 Mehr …
-              </TextButton>
+              </Button>
               <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
             </div>
           ) : phone ? null : (
           <div className="mb-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-x-1 gap-y-2" role="toolbar" aria-label="Werkzeuge">
-              {(["select", "pen", "eraser"] as const).map((t) => (
-                <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t && t !== "select" ? "select" : t)} />
-              ))}
-              <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />
-              {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
-                <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
-              ))}
-              <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2" role="toolbar" aria-label="Werkzeuge">
+              <span className={toolPill}>
+                {(["select", "pen", "eraser"] as const).map((t) => (
+                  <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t && t !== "select" ? "select" : t)} />
+                ))}
+              </span>
+              <span className={toolPill}>
+                {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
+                  <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
+                ))}
+              </span>
               {textButtons()}
             </div>
             {tool === "pen" && (
@@ -2063,8 +2084,8 @@ export function Stage({
             />
           )}
           {selected?.t === "text" && (
-            <div className="slip text-ink space-y-3 p-5">
-              <p className="text-sm font-semibold">Textrahmen</p>
+            <div className={panelClass}>
+              <p className={panelTitle}>Textrahmen</p>
               <fieldset className="flex flex-wrap gap-2 text-sm">
                 <legend className="text-ink-2 mb-1 text-[13px]">Stil</legend>
                 {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
@@ -2073,7 +2094,7 @@ export function Stage({
                     type="button"
                     aria-pressed={selected.role === r}
                     onClick={() => commit(items.map((i) => (i.id === selected.id ? { ...i, role: r } : i)))}
-                    className={`border px-3 py-1.5 ${selected.role === r ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                    className={chip(selected.role === r)}
                   >
                     {TEXT_ROLE[r].label}
                   </button>
@@ -2083,7 +2104,7 @@ export function Stage({
                 <span className="text-ink-2">Text</span>
                 <textarea
                   ref={textArea}
-                  className={inputClass}
+                  className={noteClass}
                   rows={6}
                   value={selected.text}
                   onChange={(e) => {
@@ -2110,15 +2131,13 @@ export function Stage({
               {boxOf(selected, geom).y + boxOf(selected, geom).h > grid.ys[grid.ys.length - 2] + 0.5 && (
                 <p className="text-ink text-[12px] font-semibold">Der Text läuft unten aus dem Satzspiegel. Kürzen oder den Rahmen breiter ziehen.</p>
               )}
-              <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
-                Textrahmen entfernen
-              </TextButton>
+              <RemoveButton onClick={() => remove(selected)}>Textrahmen entfernen</RemoveButton>
             </div>
           )}
 
           {selected?.t === "shape" && (
-            <div className="slip text-ink space-y-3 p-5">
-              <p className="text-sm font-semibold">{SHAPES[selected.kind].label}</p>
+            <div className={panelClass}>
+              <p className={panelTitle}>{SHAPES[selected.kind].label}</p>
               <div className="space-y-1">
                 <p className="text-ink-2 text-[13px]">{selected.kind === "tape" ? "Farbe" : "Kontur"}</p>
                 <Swatches value={selected.kind === "tape" ? (selected.look.fill ?? selected.look.color) : selected.look.color} cloth={data.cloth.base} onPick={(c) => setShapeOf(selected.id, { color: c ?? selected.look.color, fill: selected.kind === "tape" ? undefined : selected.look.fill })} dark />
@@ -2137,7 +2156,7 @@ export function Stage({
                     type="button"
                     aria-pressed={selected.look.weight === w}
                     onClick={() => setShapeOf(selected.id, { weight: w })}
-                    className={`border px-3 py-1.5 ${selected.look.weight === w ? "border-ink bg-ink text-paper" : "border-ink/30"}`}
+                    className={chip(selected.look.weight === w)}
                   >
                     {w === 1 ? "fein" : w === 2 ? "mittel" : "kräftig"}
                   </button>
@@ -2150,14 +2169,12 @@ export function Stage({
                 )}
               </fieldset>
               <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
-              <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
-                {SHAPES[selected.kind].label} entfernen
-              </TextButton>
+              <RemoveButton onClick={() => remove(selected)}>{SHAPES[selected.kind].label} entfernen</RemoveButton>
             </div>
           )}
           {selected?.t === "ink" && (
-            <div className="slip text-ink space-y-3 p-5">
-              <p className="text-sm font-semibold">Zeichnung</p>
+            <div className={panelClass}>
+              <p className={panelTitle}>Zeichnung</p>
               <p className="text-ink-2 text-[13px]">
                 {selected.strokes.length} {selected.strokes.length === 1 ? "Strich" : "Striche"}. Ziehen verschiebt, die Griffe skalieren. Einzelne Striche löscht der Radierer (E).
               </p>
@@ -2171,14 +2188,12 @@ export function Stage({
                 />
               </div>
               <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
-              <TextButton className="!text-ink text-sm" onClick={() => remove(selected)}>
-                Zeichnung entfernen
-              </TextButton>
+              <RemoveButton onClick={() => remove(selected)}>Zeichnung entfernen</RemoveButton>
             </div>
           )}
           {!phone && shown.length > 1 && (
-            <div className="slip text-ink space-y-2 p-5">
-              <p className="text-sm font-semibold">Was oben liegt</p>
+            <div className={panelClass}>
+              <p className={panelTitle}>Was oben liegt</p>
               <p className="text-ink-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
               {layerList()}
             </div>
@@ -2255,34 +2270,57 @@ function PhotoPanel({
   down: boolean;
 }) {
   return (
-    <div className="slip text-ink space-y-3 p-5">
-      <p className="text-sm font-semibold">Foto</p>
-      <label className="block text-[13px]">
-        <span className="text-ink-2">Titel</span>
-        <input className={inputClass} value={photo?.title ?? ""} onChange={(e) => onTitle(e.target.value.slice(0, 50))} />
+    <div className={panelClass}>
+      <p className={panelTitle}>Foto</p>
+      <Field label="Titel" value={photo?.title ?? ""} onChange={(e) => onTitle(e.target.value.slice(0, 50))} />
+      <label className="flex min-h-10 items-center gap-2.5 text-[14px]">
+        <input type="checkbox" checked={item.caption === "auto"} onChange={(e) => onCaption(e.target.checked ? "auto" : "off")} className="size-4 accent-[var(--ink)]" />
+        <span>
+          Unterschrift auf der Seite <span className="text-ink-2">(sonst im Kopf)</span>
+        </span>
       </label>
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" checked={item.caption === "auto"} onChange={(e) => onCaption(e.target.checked ? "auto" : "off")} className="accent-[var(--ink)]" />
-        Unterschrift auf der Seite (sonst in der Kopfzeile)
-      </label>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-        <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onCrop}>
-          Ausschnitt …
-        </button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="paper" size="sm" className="pl-2.5" onClick={onCrop}>
+          <Crop aria-hidden />
+          Ausschnitt
+        </Button>
         {onDevelop && (
-          <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onDevelop}>
-            Bearbeiten …
-          </button>
+          <Button variant="paper" size="sm" className="pl-2.5" onClick={onDevelop}>
+            <SlidersHorizontal aria-hidden />
+            Bearbeiten
+          </Button>
         )}
-        <button type="button" className="text-ink-2 underline underline-offset-4" onClick={onRemove}>
-          Aus dem Buch nehmen
-        </button>
       </div>
       <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} up={up} down={down} />
+      <RemoveButton onClick={onRemove}>Aus dem Buch nehmen</RemoveButton>
     </div>
   );
 }
 
+// Karten der Seitenleiste: zugeschnittenes Papier mit kleiner Ecke (DESIGN.md, Shapes)
+const panelClass = "slip text-ink space-y-4 rounded-cut p-5 shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)]";
+const panelTitle = "text-[15px] font-bold tracking-[-0.01em]";
+// Werkzeuggruppe auf dem Tisch: eine Pille, die Werkzeuge darin rund
+const toolPill = "bg-on-table/7 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(236_230_220/0.09)]";
+/** Wahl aus wenigen Möglichkeiten auf Papier (Stil, Strich): gewählt in Tinte */
+const chip = (on: boolean) =>
+  `min-h-9 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-11 ${on ? "bg-ink text-paper" : "bg-ink/6 text-ink shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] hover:bg-ink/10"}`;
+
+/** Entfernen: leise, in Warnrot, mit Papierkorb */
+function RemoveButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-danger hover:bg-danger/8 -ml-2 flex min-h-9 items-center gap-2 rounded-full px-2 text-sm font-semibold pointer-coarse:min-h-11"
+    >
+      <Trash aria-hidden className="size-4" />
+      {children}
+    </button>
+  );
+}
+
+/** Duplizieren und Ebene als kleine Symbolgruppe auf Papier; die Namen stehen im Tooltip und für Screenreader */
 function LayerButtons({
   onLayer,
   onDuplicate,
@@ -2294,17 +2332,21 @@ function LayerButtons({
   up?: boolean;
   down?: boolean;
 }) {
+  const icon = "text-ink hover:bg-ink/10 grid size-9 place-items-center rounded-full disabled:opacity-35 pointer-coarse:size-11 [&_svg]:size-[18px]";
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-2 text-[13px]" role="group" aria-label="Ebene und Kopie">
-      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onDuplicate} title="⌘D, oder ⌘C und ⌘V">
-        Duplizieren
-      </button>
-      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40" onClick={() => onLayer("front")} disabled={!up} title="⇧⌘]">
-        Ganz nach vorn
-      </button>
-      <button type="button" className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40" onClick={() => onLayer("back")} disabled={!down} title="⇧⌘[">
-        Ganz nach hinten
-      </button>
+    <div className="flex items-center gap-3">
+      <div className="bg-ink/6 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]" role="group" aria-label="Ebene und Kopie">
+        <button type="button" className={icon} onClick={onDuplicate} aria-label="Duplizieren" title="Duplizieren (⌘D)">
+          <Copy aria-hidden />
+        </button>
+        <button type="button" className={icon} onClick={() => onLayer("front")} disabled={!up} aria-label="Ganz nach vorn" title="Ganz nach vorn (⇧⌘])">
+          <BringToFront aria-hidden />
+        </button>
+        <button type="button" className={icon} onClick={() => onLayer("back")} disabled={!down} aria-label="Ganz nach hinten" title="Ganz nach hinten (⇧⌘[)">
+          <SendToBack aria-hidden />
+        </button>
+      </div>
+      <span className="text-ink-2 text-[13px]">Kopie und Ebene</span>
     </div>
   );
 }
@@ -2692,7 +2734,7 @@ function TextToolbar({
   const pt = Math.round(m.size * PT);
   const setPt = (v: number) => onLook({ size: Math.min(40, Math.max(1.6, v / PT)) }, `size-${item.id}`);
   const above = box.y > 9;
-  const btn = "flex h-8 min-w-8 items-center justify-center px-1.5 text-sm hover:bg-ink/8";
+  const btn = "flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 text-sm transition-colors duration-150 hover:bg-ink/8";
   const on = "bg-ink text-paper hover:bg-ink";
   const colors = [...SWATCHES, { label: "Einband", value: cloth }];
   // im Bildschirm halten: am Handy ragte die Leiste über die Seitenkante, „Fett“ und Farben waren nicht erreichbar (iPhone-Workshop, Befund 6)
@@ -2724,7 +2766,7 @@ function TextToolbar({
       aria-label="Text gestalten"
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className={`slip text-ink flex select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)] ${docked ? "mx-auto w-fit max-w-full" : "absolute z-[65] max-w-[min(560px,calc(100vw-32px))]"}`}
+      className={`slip text-ink flex select-text flex-wrap items-center gap-1 rounded-tool p-1.5 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)] ${docked ? "mx-auto w-fit max-w-full" : "absolute z-[65] max-w-[min(560px,calc(100vw-32px))]"}`}
       style={docked ? undefined : { left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
     >
       <label className="sr-only" htmlFor={`font-${item.id}`}>
@@ -2734,7 +2776,7 @@ function TextToolbar({
         id={`font-${item.id}`}
         value={m.font}
         onChange={(e) => onLook({ font: e.target.value === "grotesk" ? null : (e.target.value as FontKey) })}
-        className="h-8 border border-ink/25 bg-transparent px-1.5 text-sm"
+        className="bg-ink/6 h-8 rounded-full border-0 px-3 text-sm shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
         style={{ fontFamily: FONTS[m.font].css }}
       >
         {(Object.keys(FONTS) as FontKey[]).map((f) => (
@@ -2757,7 +2799,7 @@ function TextToolbar({
           max={170}
           value={pt}
           onChange={(e) => e.target.value && setPt(Number(e.target.value))}
-          className="h-8 w-12 border border-ink/25 bg-transparent text-center text-sm tabular-nums"
+          className="bg-ink/6 h-8 w-12 rounded-full border-0 text-center text-sm tabular-nums shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
         />
         <button type="button" className={btn} aria-label="größer" onClick={() => setPt(pt + (pt >= 24 ? 4 : 1))}>
           +
@@ -2803,12 +2845,12 @@ function TextToolbar({
               aria-label={`Farbe ${c.label}`}
               aria-pressed={active}
               onClick={() => onLook({ color: c.value })}
-              className={`h-6 w-6 border ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
+              className={`h-6 w-6 rounded-cut border ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
               style={{ background: c.value ?? "var(--ink)" }}
             />
           );
         })}
-        <label className="relative h-6 w-6 cursor-pointer border border-ink/30" title="Eigene Farbe">
+        <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-cut border border-ink/30" title="Eigene Farbe">
           <span className="sr-only">Eigene Farbe</span>
           <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
           <input
@@ -2897,7 +2939,7 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
   const colors = PALETTE.some((p) => p.value.toLowerCase() === cloth.toLowerCase()) ? PALETTE : [...PALETTE, { label: "Einband", value: cloth }];
   const ring = dark ? "outline-ink" : "outline-on-table";
   return (
-    <span className="flex flex-wrap items-center gap-1" role="group" aria-label="Farbe">
+    <span className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Farbe">
       {none && (
         <button
           type="button"
@@ -2905,7 +2947,7 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label="keine Fläche"
           title="keine"
           onClick={() => onPick(null)}
-          className={`relative h-7 w-7 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`relative h-7 w-7 overflow-hidden rounded-cut border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
         >
           <svg aria-hidden viewBox="0 0 10 10" className="absolute inset-0 h-full w-full">
             <line x1={1} y1={9} x2={9} y2={1} stroke="#cc7048" strokeWidth={1} />
@@ -2920,11 +2962,11 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label={`Farbe ${c.label}`}
           aria-pressed={value?.toLowerCase() === c.value.toLowerCase()}
           onClick={() => onPick(c.value)}
-          className={`h-7 w-7 border border-ink/30 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`h-7 w-7 rounded-cut border border-ink/30 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
           style={{ background: c.value }}
         />
       ))}
-      <label className="relative h-7 w-7 cursor-pointer border border-ink/30" title="Eigene Farbe">
+      <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-cut border border-ink/30" title="Eigene Farbe">
         <span className="sr-only">Eigene Farbe</span>
         <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
         <input type="color" value={value ?? "#1b1c1a"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
@@ -2999,7 +3041,7 @@ function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; on
       aria-label={`${info.label} (${info.key})`}
       title={`${info.label} (${info.key})`}
       onClick={onClick}
-      className={`flex h-9 w-9 items-center justify-center border transition-colors duration-150 ${active ? "border-on-table bg-on-table text-table" : "text-on-table border-transparent hover:border-on-table/60"}`}
+      className={`flex size-10 items-center justify-center rounded-full transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${active ? "bg-on-table text-table" : "text-on-table hover:bg-on-table/10"}`}
     >
       <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
         {icon[tool]}
