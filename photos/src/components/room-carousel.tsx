@@ -79,6 +79,23 @@ function paintRow(ul: HTMLElement, flat: boolean) {
   return best;
 }
 
+/** Wo die Reihe steht, wenn Buch i in der Mitte liegt */
+function slideLeft(ul: HTMLElement, i: number) {
+  const li = ul.children[Math.min(Math.max(i, 0), ul.children.length - 1)] as HTMLElement | undefined;
+  return li ? li.offsetLeft - (ul.clientWidth - li.offsetWidth) / 2 : ul.scrollLeft;
+}
+
+function scrollToSlide(ul: HTMLElement, i: number, reduce: boolean) {
+  ul.scrollTo({ left: slideLeft(ul, i), behavior: reduce ? "auto" : "smooth" });
+}
+
+/** Buch, das bei dieser Scrollposition der Mitte am nächsten läge */
+function nearestSlide(ul: HTMLElement, left: number) {
+  let best = 0;
+  for (let i = 1; i < ul.children.length; i++) if (Math.abs(slideLeft(ul, i) - left) < Math.abs(slideLeft(ul, best) - left)) best = i;
+  return best;
+}
+
 /**
  * Eine Reihe im Bücherzimmer als Karussell: ein Buch liegt groß unter der Lampe, die Nachbarn rücken in den Halbschatten.
  * Größe und Licht hängen stufenlos am Finger (`--p` je Buch, 0 in der Mitte, 1 einen Platz daneben);
@@ -214,11 +231,70 @@ export function Carousel({
   }, [slides.length, reduce]);
 
   const go = (i: number) => {
-    const ul = list.current;
-    const li = ul?.children[clamp(i)] as HTMLElement | undefined;
-    if (!ul || !li) return;
-    ul.scrollTo({ left: li.offsetLeft - (ul.clientWidth - li.offsetWidth) / 2, behavior: reduce ? "auto" : "smooth" });
+    if (list.current) scrollToSlide(list.current, i, reduce);
   };
+
+  // Mit der Maus ziehen wie mit dem Finger: die Reihe folgt dem Zeiger, beim Loslassen läuft sie mit Schwung aus
+  // und rastet ein. Trackpad (seitlich wischen) und Touch scrollen ohnehin nativ; Klick nach dem Ziehen öffnet nichts.
+  useEffect(() => {
+    const ul = list.current;
+    if (!ul) return;
+    let drag: { id: number; x: number; left: number; t: number; v: number; moved: boolean } | null = null;
+    let release = 0;
+    const loosen = () => {
+      window.clearTimeout(release);
+      ul.classList.remove("is-dragging");
+    };
+    const down = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      loosen();
+      drag = { id: e.pointerId, x: e.clientX, left: ul.scrollLeft, t: e.timeStamp, v: 0, moved: false };
+    };
+    const move = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x;
+      if (!drag.moved) {
+        if (Math.abs(dx) < 4) return;
+        drag.moved = true;
+        moving.current = true;
+        ul.setPointerCapture(e.pointerId);
+        // ohne Einrasten, solange die Hand zieht
+        ul.classList.add("is-dragging");
+      }
+      const left = drag.left - dx;
+      const dt = Math.max(e.timeStamp - drag.t, 1);
+      drag.v = 0.7 * ((left - ul.scrollLeft) / dt) + 0.3 * drag.v;
+      drag.t = e.timeStamp;
+      ul.scrollLeft = left;
+    };
+    const up = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const { moved, v, t } = drag;
+      drag = null;
+      if (!moved) return;
+      // Schwung: je schneller losgelassen, desto weiter; wer vor dem Loslassen anhält, bleibt beim nächsten Buch
+      const fling = e.timeStamp - t > 80 ? 0 : v * 220;
+      scrollToSlide(ul, nearestSlide(ul, ul.scrollLeft + fling), reduce);
+      // Einrasten erst wieder, wenn die Reihe steht
+      ul.addEventListener("scrollend", loosen, { once: true });
+      release = window.setTimeout(() => {
+        loosen();
+        // stand die Reihe schon richtig, kam kein Scrollen und damit kein Einrasten: Klicks wieder zulassen
+        moving.current = false;
+      }, 900);
+    };
+    ul.addEventListener("pointerdown", down);
+    ul.addEventListener("pointermove", move);
+    ul.addEventListener("pointerup", up);
+    ul.addEventListener("pointercancel", up);
+    return () => {
+      ul.removeEventListener("pointerdown", down);
+      ul.removeEventListener("pointermove", move);
+      ul.removeEventListener("pointerup", up);
+      ul.removeEventListener("pointercancel", up);
+      loosen();
+    };
+  }, [shown, reduce]);
 
   const slide = slides[current];
 
@@ -241,6 +317,8 @@ export function Carousel({
               aria-label={heading}
               aria-roledescription="Karussell"
               tabIndex={0}
+              // Fotos nicht als Bild aus der Reihe ziehen, die Maus zieht die Reihe
+              onDragStart={(e) => e.preventDefault()}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;
                 if (e.key === "ArrowRight") go(near + 1);
