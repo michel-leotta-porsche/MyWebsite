@@ -10,7 +10,7 @@ import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
-import { foldGradient, FOLD_WIDTH } from "@/lib/book-look";
+import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
@@ -92,14 +92,20 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
 /* ------------------------------------------------------------------ Papier und Leinen */
 
 /** Bildunterschrift wie im Buch: Nummer halbfett in Tinte, Titel in grauer Tinte */
-function Cap({ no, title, x, y, right = false }: { no: number; title: string; x: number; y: number; right?: boolean }) {
+// Auf dem Telefon ist die Seite so klein, dass nur Nummer und Titel passen; Zusatzzeile und Eintrag `wide` erst ab Tablet
+function Cap({ items, note, x, y, right = false }: { items: [number, string, "wide"?][]; note?: string; x: number; y: number; right?: boolean }) {
   return (
     <p
-      className={`text-ink-2 absolute whitespace-nowrap ${right ? "text-right" : ""}`}
+      className={`text-ink-2 absolute w-max max-w-[62cqw] ${right ? "text-right" : ""}`}
       style={{ top: `${y}cqw`, [right ? "right" : "left"]: `${right ? 100 - x : x}cqw`, fontSize: "max(9px, 3.1cqw)", lineHeight: 1.375 }}
     >
-      <span className="text-ink font-semibold">{no}</span>
-      <span className="ml-[0.6em]">{title}</span>
+      {items.map(([no, title, wide], k) => (
+        <span key={no} className={`whitespace-nowrap ${k ? "ml-[1.2em]" : ""} ${wide ? "hidden md:inline" : ""}`}>
+          <span className="text-ink font-semibold">{no}</span>
+          <span className="ml-[0.6em]">{title}</span>
+        </span>
+      ))}
+      {note && <span className="hidden md:block">{note}</span>}
     </p>
   );
 }
@@ -376,8 +382,8 @@ function Workbench() {
               <div className="relative">
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
-                    <Cap no={2} title="Mittagsblume" x={88} y={63} right />
-                    <Cap no={3} title="Markisen · 4 Platter Reifen" x={88} y={131} right />
+                    <Cap items={[[1, "Drachenbaum", "wide"], [2, "Mittagsblume"]]} note="Öffnet erst in der Mittagssonne." x={88} y={62} right />
+                    <Cap items={[[3, "Markisen"], [4, "Reifen"]]} note="Eingerollt gegen den Wind. Der Reifen gab früher auf." x={88} y={130} right />
                   </div>
                 </PageFace>
               </div>
@@ -408,8 +414,9 @@ function Workbench() {
                 <Sheet src={s.src} sizes={s.sizes} />
               </div>
             ))}
-            {/* Falz über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
+            {/* Falz und Papier über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
             <div aria-hidden className="bench-caps pointer-events-none absolute inset-0">
+              <div className="printed" style={printedStyle} />
               {(["left", "right"] as const).map((side) => (
                 <div
                   key={side}

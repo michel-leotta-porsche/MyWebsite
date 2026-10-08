@@ -4,7 +4,7 @@ import { getImageProps, type StaticImageData } from "next/image";
 
 import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
 import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
-import { FOLD_STOPS, FOLD_WIDTH, foldColor } from "@/lib/book-look";
+import { FOLD_STOPS, FOLD_WIDTH, foldColor, PRINT } from "@/lib/book-look";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
 // Dieselbe Elementliste wie page-view.tsx (layoutPage), alle Maße in cqw = Seitenbreite / 100.
@@ -313,7 +313,27 @@ async function drawLayout(
       }
     }
   });
+  if (layout.bg === "paper") await printed(ctx, W, H, dpr);
   if (layout.gutter) gutter(ctx, side, W, H, cq);
+}
+
+/** Wie `.printed` im HTML: mattes Papier hebt das Schwarz, die Fasern liegen auch über den Fotos */
+async function printed(ctx: CanvasRenderingContext2D, W: number, H: number, scale: number) {
+  ctx.save();
+  ctx.globalAlpha = PRINT.wash;
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, W, H);
+  paperTile ??= loadImage("/textures/paper.webp");
+  const tile = await paperTile.catch(() => null);
+  const pat = tile && ctx.createPattern(tile, "repeat");
+  if (pat) {
+    pat.setTransform(new DOMMatrix().scale(1 / scale));
+    ctx.globalAlpha = PRINT.grain;
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = pat;
+    ctx.fillRect(0, 0, W, H);
+  }
+  ctx.restore();
 }
 
 /**

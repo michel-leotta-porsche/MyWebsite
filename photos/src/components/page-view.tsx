@@ -6,7 +6,7 @@ import { createContext, useContext, type CSSProperties } from "react";
 import { plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
-import { FOLD_WIDTH, foldGradient } from "@/lib/book-look";
+import { FOLD_WIDTH, foldGradient, printedStyle } from "@/lib/book-look";
 
 // Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
 
@@ -211,6 +211,8 @@ export function PageView({
       {layout.els.map((el, i) => (
         <Element key={i} book={book} el={el} eager={eager} z={i + 1} sizes={sizes} />
       ))}
+      {/* Papier über allem: die Fotos sind gedruckt, nicht aufgeklebt */}
+      {layout.bg === "paper" && <div aria-hidden className="printed z-[299]" style={printedStyle} />}
       {layout.gutter && <Gutter side={side} />}
     </div>
   );

@@ -13,6 +13,13 @@ export const FOLD_STOPS: readonly (readonly [number, number])[] = [
   [1, 0],
 ];
 
+// Gedruckt statt aufgeklebt: über der fertigen Papierseite, auch über den Fotos.
+// wash hebt das Schwarz an wie mattes Papier, grain legt die Papierfasern darüber (multiply).
+export const PRINT = { wash: 0.08, grain: 0.25 };
+
+/** CSS-Variablen für `.printed` (globals.css) */
+export const printedStyle = { ["--wash" as string]: PRINT.wash, ["--grain" as string]: PRINT.grain };
+
 export const foldColor = (a: number) => `rgb(12 10 8 / ${a})`;
 
 /** CSS-Verlauf für eine Seite; `side` ist die Seite des Buchs, der Bund liegt gegenüber */

@@ -192,6 +192,31 @@ body {
   --block-dir: to left;
 }
 
+/* Gedruckt statt aufgeklebt (Werte: book-look.ts, PRINT). Ruht, wird nie animiert. */
+.printed {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.printed::before,
+.printed::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.printed::before {
+  background: var(--paper);
+  opacity: var(--wash);
+}
+.printed::after {
+  background-image: url("/textures/paper.webp");
+  mix-blend-mode: multiply;
+  opacity: var(--grain);
+}
+html.ohne-struktur .printed::after {
+  display: none;
+}
+
 /* Bücher in einer Reihe: unten bündig auf der Tischkante, leicht gedreht */
 .shelf {
   --tw: min(18vw, 248px);
