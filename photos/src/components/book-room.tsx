@@ -23,10 +23,13 @@ import { friendlyError } from "@/lib/errors";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
 import { markSeen, seenSnapshot } from "@/lib/seen";
+import { useShelf } from "@/lib/shelf";
 
 /** Google-Konten, unter denen Michel angemeldet ist. Kein Schutz: die Fotos liegen ohnehin öffentlich unter /photos */
 const OWNER_EMAILS = ["michel.julian.leotta@gmail.com"];
 const isOwner = (u: User) => !!u.email && OWNER_EMAILS.includes(u.email.toLowerCase());
+/** Das eine Beispielbuch für alle, die noch kein eigenes haben */
+const SAMPLE_ID = "fuerteventura";
 
 const books = (n: number) => (n === 0 ? "Keine Bücher" : n === 1 ? "Ein Buch" : `${numberWord(n)} Bücher`);
 const some = (n: number) => (n === 1 ? "eines" : numberWord(n).toLowerCase());
@@ -46,8 +49,9 @@ export function BookRoom() {
   );
 }
 
-type Item = { book: BookData; stored?: StoredBook; gift?: Share };
-type More = { stored: StoredBook } | { gift: Share };
+/** bundled: mitgeliefert (Beispielbuch oder Michels Bände), lässt sich nur weglegen */
+type Item = { book: BookData; stored?: StoredBook; gift?: Share; bundled?: true };
+type More = { stored: StoredBook } | { gift: Share } | { bundled: BookData };
 
 function Room({ user }: { user: User }) {
   const room = useRoom(user.uid);
@@ -63,22 +67,27 @@ function Room({ user }: { user: User }) {
   const importInput = useRef<HTMLInputElement>(null);
 
   const { own, gifts, trash } = room;
+  const shelf = useShelf();
+  const owner = isOwner(user);
   // was beim Betreten schon gesehen war; neu ist, was danach kam
   const [seen] = useState(() => (typeof window === "undefined" ? null : seenSnapshot()));
   const isNew = (bookId: string, n: Feedback) => !!seen && (n.at?.seconds ?? 0) > seen.at(bookId);
 
   // geteilte Bücher bekommen eine eigene Kennung, damit sie neben gleichnamigen eigenen liegen können
+  // Michels Bände Fuerteventura und Japan liegen für ihn hier wie seine anderen Bücher;
+  // alle anderen sehen Fuerteventura als Beispiel, bis ihr erstes eigenes Buch daliegt. Beides lässt sich weglegen.
+  const bundled = useMemo(() => (owner ? sampleBooks : own?.length === 0 ? sampleBooks.filter((b) => b.id === SAMPLE_ID) : []), [owner, own]);
+  const putAway = bundled.filter((b) => shelf.hidden.includes(b.id));
   const mine = useMemo(() => {
     const list: Item[] = [];
-    // Michels Bände Fuerteventura und Japan liegen nur für ihn hier, wie seine anderen Bücher
-    if (isOwner(user)) for (const b of sampleBooks) list.push({ book: b });
+    for (const b of bundled) if (!shelf.hidden.includes(b.id)) list.push({ book: b, bundled: true });
     for (const b of own ?? []) {
       try {
         list.push({ book: toBookData(b), stored: b });
       } catch {}
     }
     return list;
-  }, [own, user]);
+  }, [own, bundled, shelf.hidden]);
   const given = useMemo(() => {
     const list: Item[] = [];
     for (const g of gifts ?? []) {
@@ -144,7 +153,7 @@ function Room({ user }: { user: User }) {
       return {
         key: d.book.id,
         book: d.book,
-        decor: sp && (
+        decor: d.bundled && !owner ? <SampleBand /> : sp && (
           <>
             <SlipTabs names={sp.to} fresh={sp.items.filter((n) => isNew(d.book.id, n)).map((n) => n.who)} />
             {sp.ears > 0 && <CoverEar />}
@@ -188,6 +197,31 @@ function Room({ user }: { user: User }) {
             </Panel>
           );
         const d = byId(slide.book.id);
+        if (d?.bundled) {
+          const b = d.book;
+          return (
+            <Panel
+              title={b.title}
+              meta={owner ? `${b.plates.length} Tafeln · mitgeliefert` : `Beispiel · ${b.plates.length} Tafeln von Michel Leotta`}
+              book={b}
+              after={
+                !owner && (
+                  <div className="mt-6">
+                    <div className="note-paper deal w-[86%] -rotate-1 px-4 pt-3 pb-3.5">
+                      <p className="text-ink-2 text-[21px] leading-[1.05]" style={{ fontFamily: "var(--font-hand), cursive" }}>
+                        So sieht ein fertiges Buch aus. Blätter rein, dann mach dein eigenes.
+                      </p>
+                    </div>
+                  </div>
+                )
+              }
+            >
+              <IconButton label="Mehr" onClick={() => setMore({ bundled: b })}>
+                <Ellipsis aria-hidden />
+              </IconButton>
+            </Panel>
+          );
+        }
         const s = d?.stored;
         const sp = s ? room.spread[s.id] : undefined;
         const base = !s ? `${slide.book.plates.length} Tafeln` : s.title.trim() ? `${slide.book.plates.length} Tafeln` : `${s.photos.filter((p) => !p.shelved).length} Fotos · ohne Titel`;
@@ -278,7 +312,7 @@ function Room({ user }: { user: User }) {
     </Carousel>
   );
 
-  const count = !ownLoaded || !giftsLoaded ? "\u00a0" : fresh.length > 0 ? news(fresh) : stock(mine.length, given.length);
+  const count = !ownLoaded || !giftsLoaded ? "\u00a0" : fresh.length > 0 ? news(fresh) : stock(mine.filter((d) => owner || !d.bundled).length, given.length);
 
   return (
     <main>
@@ -299,6 +333,21 @@ function Room({ user }: { user: User }) {
             </p>
           </div>
           {giftsFirst ? [forYou, fromYou] : [fromYou, forYou]}
+          {putAway.length > 0 && (
+            <section aria-label="Weggelegt" className="text-on-table-2 text-sm">
+              <h2>Weggelegt</h2>
+              <ul className="mt-2 max-w-xl">
+                {putAway.map((b) => (
+                  <li key={b.id} className="flex items-baseline justify-between gap-4 border-t border-on-table-2/25 py-2.5">
+                    <span className="text-on-table min-w-0 truncate">
+                      {b.title} <span className="text-on-table-2">· {owner ? "mitgeliefert" : "Beispiel"}</span>
+                    </span>
+                    <TextButton onClick={() => shelf.putBack(b.id)}>Zurücklegen</TextButton>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {trash.length > 0 && (
             <section aria-label="Papierkorb" className="text-on-table-2 text-sm">
               <TextButton className="text-on-table-2" aria-expanded={showTrash} onClick={() => setShowTrash((v) => !v)}>
@@ -344,8 +393,25 @@ function Room({ user }: { user: User }) {
       </Library>
 
       {more && (
-        <RoomSheet title={"stored" in more ? more.stored.title || "Ohne Titel" : more.gift.book.title || "Ohne Titel"} onClose={() => setMore(null)}>
-          {"stored" in more ? (
+        <RoomSheet
+          title={("stored" in more ? more.stored.title : "gift" in more ? more.gift.book.title : more.bundled.title) || "Ohne Titel"}
+          onClose={() => setMore(null)}
+        >
+          {"bundled" in more ? (
+            <Actions>
+              <Action
+                onClick={() => {
+                  const b = more.bundled;
+                  setMore(null);
+                  shelf.putAway(b.id);
+                  undoable(`„${b.title}“ liegt nicht mehr in deinem Zimmer.`, () => shelf.putBack(b.id));
+                }}
+                hint="Unten bei „Weggelegt“ lässt es sich zurücklegen"
+              >
+                Aus dem Zimmer nehmen
+              </Action>
+            </Actions>
+          ) : "stored" in more ? (
             <Actions>
               <Action
                 onClick={() => {
@@ -742,6 +808,15 @@ function stock(mine: number, given: number) {
   if (given === 0) return `${books(mine)} von dir.`;
   if (mine === 0) return `${books(given)} für dich.`;
   return `${books(mine + given)}: ${some(mine)} von dir, ${some(given)} für dich.`;
+}
+
+/** Aufkleber auf dem Beispielbuch, damit niemand es für ein eigenes hält */
+function SampleBand() {
+  return (
+    <span aria-hidden className="sample-band">
+      Beispiel
+    </span>
+  );
 }
 
 function Actions({ children }: { children: ReactNode }) {
