@@ -47,6 +47,15 @@ service cloud.firestore {
         && (!('camera' in request.resource.data) || request.resource.data.camera in ['handy', 'kamera', 'beides']);
     }
 
+    // Eigene Rezepte aus der Bildbearbeitung: nur ihr Macher
+    match /users/{uid}/recipes/{id} {
+      allow read, delete: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['id', 'name', 'txt', 'v'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 40
+        && request.resource.data.v is map;
+    }
+
     // Bücher, die jemand für mich hingelegt hat
     match /users/{uid}/inbox/{token} {
       allow read, write: if signedIn() && request.auth.uid == uid;
