@@ -130,9 +130,10 @@ export function Library({
   if (book && wide !== null && Book) {
     return (
       <Book
-        key={`${book.id}-${wide ? "spread" : "single"}`}
+        key={book.id}
         book={book}
-        mode={wide ? "spread" : "single"}
+        // auch auf dem Telefon die ganze Doppelseite, wie das Buch auf der Startseite
+        mode="spread"
         autoOpen={view?.auto ?? false}
         onClose={close}
         extra={bookExtra}

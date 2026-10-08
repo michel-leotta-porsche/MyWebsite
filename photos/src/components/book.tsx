@@ -940,7 +940,14 @@ export function Book({
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                {swipe ? "Wischen oder Tippen zum Blättern" : "Scrollen, Klicken oder ← → zum Blättern"}
+                {swipe ? (
+                  "Wischen oder Tippen zum Blättern"
+                ) : (
+                  <>
+                    <span className="pointer-coarse:hidden">Scrollen, Klicken oder ← → zum Blättern</span>
+                    <span className="hidden pointer-coarse:inline">Scrollen oder Wischen zum Blättern</span>
+                  </>
+                )}
               </motion.p>
             )}
           </AnimatePresence>
