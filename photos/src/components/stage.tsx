@@ -130,6 +130,7 @@ export function Stage({
   onPhoto,
   onReset,
   onClose,
+  onDevelop,
 }: {
   data: BookData;
   geom: Geom;
@@ -151,6 +152,8 @@ export function Stage({
   onPhoto: (key: string, patch: Partial<StoredPhoto>, tag: string) => void;
   onReset: () => void;
   onClose: () => void;
+  /** Bildbearbeitung (Looks, Vorschläge, Feinschliff) für ein Foto öffnen */
+  onDevelop?: (key: string) => void;
 }) {
   const grid = useMemo(() => spreadGrid(geom), [geom]);
   const [sel, setSel] = useState<string | null>(null);
@@ -1341,6 +1344,12 @@ export function Stage({
   const activeDock: Dock | null = tool === "pen" || tool === "eraser" ? "draw" : tool !== "select" ? "shapes" : dock;
   /** Handy: ein Fach öffnen; Zeichnen nimmt gleich den Stift, die anderen Fächer legen das Werkzeug weg */
   const openDock = (d: Dock) => {
+    if (selTray) {
+      setSel(null);
+      setDock(d);
+      if (d === "draw") setTool("pen");
+      return;
+    }
     if (activeDock === d) {
       setDock(null);
       if (tool !== "select") setTool("select");
@@ -1455,7 +1464,9 @@ export function Stage({
   );
 
   // Handy: die Leiste unten weicht der Text-Leiste und dem Zuschneiden
-  const dockShown = phone && !cropping && !(selected?.t === "text" && !draft);
+  const dockShown = phone && !cropping;
+  /** Handy: ein gewähltes Foto oder ein Text zeigt seine Handgriffe im Fach statt in einer Karte darunter */
+  const selTray = phone && !draft && (selected?.t === "photo" || selected?.t === "text") ? selected : null;
 
   return (
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
@@ -1504,7 +1515,7 @@ export function Stage({
         {say}
       </p>
 
-      <div className={`grid gap-8 px-4 md:px-8 ${phone ? (landscape ? "pb-8" : "pb-[calc(200px+env(safe-area-inset-bottom))]") : "pb-24 md:grid-cols-[minmax(0,1fr)_300px]"}`}>
+      <div className={`grid gap-8 px-4 md:px-8 ${phone ? "pb-8" : "pb-24 md:grid-cols-[minmax(0,1fr)_300px]"}`}>
         <div ref={wrap} className="min-w-0">
           {narrow && (
             <div className={`mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${phone ? "mt-1" : ""}`} role="group" aria-label="Ansicht">
@@ -1869,8 +1880,108 @@ export function Stage({
               </div>
             </div>
           )}
+          {dockShown && (
+            // Handy: vier Fächer direkt unter der Doppelseite; hoch bleibt die Leiste bei langer Seite unten am Rand stehen, quer würde sie die Seite verdecken
+            <nav aria-label="Werkzeuge" className={`bg-table-deep border-on-table/15 ${landscape ? "relative" : "sticky bottom-0"} z-[75] -mx-4 mt-4 border-t pb-[env(safe-area-inset-bottom)] md:-mx-8`}>
+              {selTray?.t === "photo" && (
+                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label="Foto">
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                    {onDevelop && (
+                      <button type="button" onClick={() => onDevelop(selTray.key)} className="bg-on-table text-table min-h-11 shrink-0 px-4 text-sm font-semibold">
+                        Bearbeiten …
+                      </button>
+                    )}
+                    {[
+                      { label: "Ausschnitt …", run: () => setCropping(selTray.id) },
+                      { label: selTray.caption === "auto" ? "Unterschrift aus" : "Unterschrift an", run: () => commit(items.map((i) => (i.id === selTray.id ? { ...i, caption: selTray.caption === "auto" ? "off" : "auto" } : i))) },
+                      { label: "Nach vorn", run: () => layer(selTray.id, "up"), off: !canLayer(selTray.id, "up") },
+                      { label: "Nach hinten", run: () => layer(selTray.id, "down"), off: !canLayer(selTray.id, "down") },
+                      { label: "Duplizieren", run: () => duplicate(selTray) },
+                      { label: "Aus dem Buch", run: () => remove(selTray) },
+                    ].map((a) => (
+                      <button
+                        key={a.label}
+                        type="button"
+                        disabled={a.off}
+                        onClick={a.run}
+                        className="border-on-table/60 text-on-table min-h-11 shrink-0 border px-3 text-sm disabled:opacity-35"
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-on-table-2 mt-2 text-[13px]">Ziehen verschiebt, zwei Finger ändern die Größe.</p>
+                </div>
+              )}
+              {selTray?.t === "text" && (
+                <div className="border-on-table/15 min-h-[108px] border-b px-2 pt-3 pb-3" role="group" aria-label="Text">
+                  <TextToolbar key={selTray.id} docked item={selTray} box={boxOf(selTray, geom)} cloth={data.cloth.base} onLook={(patch, tag) => setLook(selTray.id, patch, tag)} />
+                </div>
+              )}
+              {!selTray && activeDock && (
+                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={DOCKS[activeDock].label}>
+                  {activeDock === "photos" &&
+                    (shelf.length > 0 || elsewhere.length > 0 ? (
+                      photoStrip
+                    ) : (
+                      <p className="text-on-table-2 text-[13px]">Alle Fotos des Buchs liegen schon auf dieser Doppelseite.</p>
+                    ))}
+                  {activeDock === "text" && (
+                    <>
+                      <div className="flex flex-wrap gap-2">{textButtons()}</div>
+                      <p className="text-on-table-2 mt-2 text-[13px]">Doppeltippen auf einen Text schreibt.</p>
+                    </>
+                  )}
+                  {activeDock === "draw" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1">
+                        {(["pen", "eraser"] as const).map((t) => (
+                          <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(t)} />
+                        ))}
+                        {tool === "pen" && <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />}
+                        {tool === "pen" && penWidths()}
+                      </div>
+                      {tool === "pen" ? (
+                        penColors()
+                      ) : (
+                        <p className="text-on-table-2 text-[13px]">Über Striche wischen löscht sie. Formen und Fotos bleiben.</p>
+                      )}
+                    </div>
+                  )}
+                  {activeDock === "shapes" && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
+                          <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
+                        ))}
+                      </div>
+                      <p className="text-on-table-2 mt-2 text-[13px]">
+                        {tool === "select" ? "Form wählen, dann auf der Seite aufziehen." : `${SHAPES[tool as ShapeKind].label} aufziehen, ein Tipp legt sie hin.`}
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-4">
+                {(Object.keys(DOCKS) as Dock[]).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={!selTray && activeDock === d}
+                    onClick={() => openDock(d)}
+                    className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[12px] transition-colors duration-150 ${!selTray && activeDock === d ? "text-on-table shadow-[inset_0_2px_var(--mark)]" : "text-on-table-2"}`}
+                  >
+                    <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round">
+                      {DOCKS[d].icon}
+                    </svg>
+                    {DOCKS[d].label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+          )}
           {/* Handy: die Text-Werkzeuge stehen fest unten in Daumenreichweite, nie abgeschnitten und nie mitgezoomt */}
-          {narrow && selected?.t === "text" && !draft && (
+          {narrow && !phone && selected?.t === "text" && !draft && (
             <div className="fixed inset-x-0 bottom-0 z-[80] px-2 pb-[max(8px,env(safe-area-inset-bottom))]">
               <TextToolbar
                 key={selected.id}
@@ -1928,13 +2039,14 @@ export function Stage({
         </div>
 
         <aside className={`space-y-5 ${phone ? "" : "md:sticky md:top-20 md:self-start"}`}>
-          {selected?.t === "photo" && (
+          {!phone && selected?.t === "photo" && (
             <PhotoPanel
               item={selected}
               photo={photos.get(selected.key)}
               onCaption={(c) => commit(items.map((i) => (i.id === selected.id ? { ...i, caption: c } : i)))}
               onTitle={(title) => onPhoto(selected.key, { title }, `t-${selected.key}`)}
               onCrop={() => setCropping(selected.id)}
+              onDevelop={onDevelop && (() => onDevelop(selected.key))}
               onRemove={() => remove(selected)}
               onLayer={(to) => layer(selected.id, to)}
               onDuplicate={() => duplicate(selected)}
@@ -2067,71 +2179,6 @@ export function Stage({
         </aside>
       </div>
 
-      {dockShown && (
-        // Handy: vier Fächer in Daumenreichweite, eins ist offen; quer steht die Leiste unter der Doppelseite
-        <nav aria-label="Werkzeuge" className={`${landscape ? "relative" : "fixed inset-x-0 bottom-0"} bg-table-deep border-on-table/15 z-[75] border-t pb-[env(safe-area-inset-bottom)]`}>
-          {activeDock && (
-            <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={DOCKS[activeDock].label}>
-              {activeDock === "photos" &&
-                (shelf.length > 0 || elsewhere.length > 0 ? (
-                  photoStrip
-                ) : (
-                  <p className="text-on-table-2 text-[13px]">Alle Fotos des Buchs liegen schon auf dieser Doppelseite.</p>
-                ))}
-              {activeDock === "text" && (
-                <>
-                  <div className="flex flex-wrap gap-2">{textButtons()}</div>
-                  <p className="text-on-table-2 mt-2 text-[13px]">Doppeltippen auf einen Text schreibt.</p>
-                </>
-              )}
-              {activeDock === "draw" && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1">
-                    {(["pen", "eraser"] as const).map((t) => (
-                      <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(t)} />
-                    ))}
-                    {tool === "pen" && <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />}
-                    {tool === "pen" && penWidths()}
-                  </div>
-                  {tool === "pen" ? (
-                    penColors()
-                  ) : (
-                    <p className="text-on-table-2 text-[13px]">Über Striche wischen löscht sie. Formen und Fotos bleiben.</p>
-                  )}
-                </div>
-              )}
-              {activeDock === "shapes" && (
-                <>
-                  <div className="flex items-center gap-1">
-                    {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
-                      <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
-                    ))}
-                  </div>
-                  <p className="text-on-table-2 mt-2 text-[13px]">
-                    {tool === "select" ? "Form wählen, dann auf der Seite aufziehen." : `${SHAPES[tool as ShapeKind].label} aufziehen, ein Tipp legt sie hin.`}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-          <div className="grid grid-cols-4">
-            {(Object.keys(DOCKS) as Dock[]).map((d) => (
-              <button
-                key={d}
-                type="button"
-                aria-pressed={activeDock === d}
-                onClick={() => openDock(d)}
-                className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[12px] transition-colors duration-150 ${activeDock === d ? "text-on-table shadow-[inset_0_2px_var(--mark)]" : "text-on-table-2"}`}
-              >
-                <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round">
-                  {DOCKS[d].icon}
-                </svg>
-                {DOCKS[d].label}
-              </button>
-            ))}
-          </div>
-        </nav>
-      )}
       {/* Handy: Menü hinter „…“; liegt außerhalb des Kopfs, damit es auch die Leiste unten überdeckt */}
       {phone && moreOpen && (
         <>
@@ -2180,6 +2227,7 @@ function PhotoPanel({
   onCaption,
   onTitle,
   onCrop,
+  onDevelop,
   onRemove,
   onLayer,
   onDuplicate,
@@ -2191,6 +2239,7 @@ function PhotoPanel({
   onCaption: (c: "auto" | "off") => void;
   onTitle: (t: string) => void;
   onCrop: () => void;
+  onDevelop?: () => void;
   onRemove: () => void;
   onLayer: (to: "up" | "down" | "front" | "back") => void;
   onDuplicate: () => void;
@@ -2212,6 +2261,11 @@ function PhotoPanel({
         <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onCrop}>
           Ausschnitt …
         </button>
+        {onDevelop && (
+          <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={onDevelop}>
+            Bearbeiten …
+          </button>
+        )}
         <button type="button" className="text-ink-2 underline underline-offset-4" onClick={onRemove}>
           Aus dem Buch nehmen
         </button>

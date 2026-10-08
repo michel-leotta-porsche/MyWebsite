@@ -1227,6 +1227,7 @@ export function Editor() {
           onPhoto={setPhoto}
           onReset={resetStage}
           onClose={() => setStageId(null)}
+          onDevelop={setDevelop}
         />
       )}
       {dragOver && (
