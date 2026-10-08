@@ -297,6 +297,19 @@ html.ohne-struktur .printed::after {
 }
 }
 
+/*
+ * Eingaben mit dem Finger mindestens 16px: darunter zoomt Safari beim Tippen in die Seite (iPhone-Workshop, Befund 5).
+ * Außerhalb der Ebenen, damit es die Schriftgrößen-Utilities überstimmt. Das Textfeld direkt auf der Bühne
+ * setzt seine Schrift selbst (in 16px, verkleinert per transform) und ist deshalb ausgenommen.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"]),
+  textarea:not([data-page-text]),
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
 /* Auf kleinen Schirmen wirkt das Gewebe sonst wie Rauschen */
 @media (max-width: 767px) {
   .linen::after {

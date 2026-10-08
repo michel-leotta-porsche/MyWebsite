@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { memo, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { toEl, type BookData, type Box, type Corner, type FontKey, type FreeEl, type FreeItem, type ShapeKind, type ShapeLook, type TextLook, type TextRole } from "@/content/books";
 import { FONTS, TEXT_ROLE, textMetrics } from "@/content/layout";
@@ -52,6 +52,8 @@ type Drag = {
   shift: boolean;
   /** Endpunkt einer Linie (0 Anfang, 1 Ende) statt Rahmengriff */
   end?: 0 | 1;
+  /** mit dem Finger: größere Totzone, damit ein Tipp nichts verschiebt */
+  touch: boolean;
 };
 
 /** Werkzeug der Bühne: Auswahl, Stift, Radierer oder eine Form zum Aufziehen */
@@ -171,6 +173,8 @@ export function Stage({
   /** Kontextmenü: Rechtsklick oder langes Drücken; id null = freies Papier */
   const [menu, setMenu] = useState<{ cx: number; cy: number; id: string | null; at: { x: number; y: number } } | null>(null);
   const press = useRef<number>(0);
+  /** langes Drücken ist abgelaufen; das Menü öffnet erst beim Loslassen, damit der Finger keinen Eintrag auslöst */
+  const held = useRef<{ cx: number; cy: number; id: string } | null>(null);
   const [say, setSay] = useState("");
   const [crop, setCrop] = useState<string | null>(null);
   /** Zuschneiden direkt auf der Seite (wie in PowerPoint) */
@@ -261,8 +265,9 @@ export function Stage({
           : `Zeichnung, ${it.strokes.length} ${it.strokes.length === 1 ? "Strich" : "Striche"}`;
 
   // ---- Einrasten ----
-  const thX = (8 / W) * 200;
-  const thY = (8 / Hpx) * 100;
+  // mit dem Finger schwächer: 4px statt 8px, damit das Foto nicht kleben bleibt und dann springt
+  const thX = ((coarse ? 4 : 8) / W) * 200;
+  const thY = ((coarse ? 4 : 8) / Hpx) * 100;
   const targets = (id: string) => {
     const others = items.filter((i) => i.id !== id).map((i) => boxOf(i, geom));
     return {
@@ -404,29 +409,39 @@ export function Stage({
   const startDrag = (e: React.PointerEvent, it: SpreadItem, edges: Edges | null, end?: 0 | 1) => {
     e.stopPropagation();
     if (e.button !== 0) return;
-    const wasSelected = sel === it.id;
     setSel(it.id);
     if (editing && editing !== it.id) setEditing(null);
-    // Touch: langes Drücken öffnet das Menü; erst antippen, dann ziehen, so verschiebt Scrollen nichts aus Versehen
-    if (e.pointerType === "touch" && !edges) {
+    const touch = e.pointerType === "touch";
+    // Touch: der erste Zug verschiebt sofort (iPhone-Workshop, Befund 3). Langes Drücken ohne Bewegung
+    // merkt sich nur das Menü; es öffnet beim Loslassen, sonst löst der Finger den Eintrag darunter aus (Befund 2)
+    held.current = null;
+    if (touch && !edges) {
       const { clientX, clientY } = e;
       window.clearTimeout(press.current);
       press.current = window.setTimeout(() => {
         drag.current = null;
         setDraft(null);
-        openMenu(clientX, clientY, it.id);
+        setGuides({ xs: [], ys: [] });
+        held.current = { cx: clientX, cy: clientY, id: it.id };
+        navigator.vibrate?.(10);
       }, 550);
     }
-    if (e.pointerType === "touch" && !wasSelected && !edges) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { id: it.id, edges, end, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey };
+    speed.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, v: 0 };
+    drag.current = { id: it.id, edges, end, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey, touch };
   };
   const frame = useRef(0);
+  /** Fingertempo in px/ms, geglättet; schnell gezogen rastet nichts ein */
+  const speed = useRef({ x: 0, y: 0, t: 0, v: 0 });
   const onMove = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
-    // höchstens einmal pro Bild rechnen
-    const { clientX, clientY, shiftKey, altKey } = e;
+    const sp = speed.current;
+    const dt = e.timeStamp - sp.t;
+    if (dt > 0) speed.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, v: sp.v * 0.6 + (Math.hypot(e.clientX - sp.x, e.clientY - sp.y) / dt) * 0.4 };
+    // höchstens einmal pro Bild rechnen; mit dem Finger rastet es erst ein, wenn er langsam wird
+    const { clientX, clientY, shiftKey } = e;
+    const altKey = e.altKey || (d.touch && speed.current.v > 0.25);
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => moveTo(clientX, clientY, shiftKey, altKey));
   };
@@ -437,7 +452,7 @@ export function Stage({
     if (!d) return null;
     const it = items.find((i) => i.id === d.id);
     if (!it) return null;
-    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < 3) return null;
+    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < (d.touch ? 8 : 3)) return null;
     d.moved = true;
     window.clearTimeout(press.current);
     const u = toUnits(clientX - d.sx, clientY - d.sy);
@@ -458,6 +473,14 @@ export function Stage({
   const onUp = (e?: React.PointerEvent) => {
     cancelAnimationFrame(frame.current);
     window.clearTimeout(press.current);
+    const h = held.current;
+    held.current = null;
+    if (h && e) {
+      drag.current = null;
+      last.current = null;
+      openMenu(h.cx, h.cy, h.id);
+      return;
+    }
     const pt = e ? { clientX: e.clientX, clientY: e.clientY, shiftKey: e.shiftKey, altKey: e.altKey } : last.current;
     const c = pt ? compute(pt.clientX, pt.clientY, pt.shiftKey, pt.altKey) : null;
     const d = drag.current;
@@ -771,7 +794,7 @@ export function Stage({
           run: () => commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, caption: i.caption === "auto" ? "off" : "auto" } : i))),
         },
         ...common,
-        { label: "Löschen (in die Ablage)", hint: "Entf", run: () => remove(it) },
+        { label: "Aus dem Buch nehmen", hint: "Entf", run: () => remove(it) },
       ];
     if (it?.t === "text")
       return [
@@ -933,6 +956,27 @@ export function Stage({
   const editItem = editing ? shown.find((i) => i.id === editing && i.t === "text") : undefined;
   const setTextOf = (id: string, text: string) =>
     commit(items.map((i) => (i.id === id && i.t === "text" ? { ...i, text: text.slice(0, 1200) } : i)), `text-${id}`);
+  /**
+   * Textfeld auf der Seite: mit dem Finger in 16px setzen und auf Seitengröße verkleinern,
+   * sonst zoomt Safari beim Tippen hinein (iPhone-Workshop, Befund 5). Was man sieht, bleibt gleich.
+   */
+  const pageTextStyle = (it: Extract<FreeItem, { t: "text" }>): React.CSSProperties => {
+    const b = boxOf(it, geom);
+    const f = editFont(it);
+    const px = f.fontSize as number;
+    if (!coarse || px >= 16) return { ...pct(b), minHeight: "1.2em", ...f };
+    const k = px / 16;
+    return {
+      left: `${b.x / 2}%`,
+      top: `${b.y}%`,
+      width: `${b.w / 2 / k}%`,
+      height: `${b.h / k}%`,
+      minHeight: "1.2em",
+      ...f,
+      fontSize: 16,
+      transform: `scale(${k})`,
+    };
+  };
   /** Schrift des Textfelds auf der Seite: genau wie im Buch gesetzt */
   const editFont = (it: Extract<FreeItem, { t: "text" }>): React.CSSProperties => {
     const st = TEXT_ROLE[it.role];
@@ -998,7 +1042,10 @@ export function Stage({
           >
             Raster {gridOn ? "aus" : "an"}
           </TextButton>
-          {free && <TextButton onClick={onReset}>Auf Vorschlag zurücksetzen</TextButton>}
+          {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
+          <TextButton onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
+            Auf Vorschlag zurücksetzen
+          </TextButton>
         </span>
       </header>
 
@@ -1204,7 +1251,7 @@ export function Stage({
                                 vectorEffect="non-scaling-stroke"
                                 pointerEvents={filled || pth.fill ? "all" : "stroke"}
                                 className={isSel ? "cursor-move" : "cursor-pointer"}
-                                style={{ touchAction: isSel ? "none" : "auto" }}
+                                style={{ touchAction: "none" }}
                                 onPointerDown={(e) => startDrag(e, it, null)}
                                 onDoubleClick={(e) => e.stopPropagation()}
                                 onContextMenu={(e) => {
@@ -1230,7 +1277,7 @@ export function Stage({
                       <div
                         key={it.id}
                         className="absolute"
-                        style={{ ...pct(b), touchAction: isSel ? "none" : "auto" }}
+                        style={{ ...pct(b), touchAction: "none" }}
                       >
                         <button
                           type="button"
@@ -1365,8 +1412,9 @@ export function Stage({
                       }}
                       onBlur={() => setEditing(null)}
                       spellCheck
-                      className="absolute m-0 resize-none overflow-hidden border-0 bg-transparent p-0 outline-2 outline-mark select-text [caret-color:var(--mark)] [-webkit-user-select:text]"
-                      style={{ ...pct(boxOf(editItem, geom)), minHeight: "1.2em", ...editFont(editItem) }}
+                      data-page-text
+                      className="absolute m-0 origin-top-left resize-none overflow-hidden border-0 bg-transparent p-0 outline-2 outline-mark select-text [caret-color:var(--mark)] [-webkit-user-select:text]"
+                      style={pageTextStyle(editItem)}
                     />
                   )}
                 </div>
@@ -1376,7 +1424,10 @@ export function Stage({
           {(shelf.length > 0 || elsewhere.length > 0) && (
             <section aria-label="Alle Fotos" className="mt-5">
               <p className="text-on-table text-sm font-semibold">
-                Alle Fotos <span className="text-on-table-2 font-normal">· ziehen oder antippen legt sie auf die Seite, von anderen Doppelseiten wandern sie herüber</span>
+                Alle Fotos{" "}
+                <span className="text-on-table-2 font-normal">
+                  · {coarse ? "antippen legt sie auf die Seite" : "ziehen oder antippen legt sie auf die Seite"}, von anderen Doppelseiten wandern sie herüber
+                </span>
               </p>
               <ul tabIndex={0} aria-label="Fotos des Buchs" className="mt-2 flex gap-2 overflow-x-auto pb-2">
                 {[...shelf.map((photo) => ({ photo, spread: -1 })), ...elsewhere].map(({ photo: ph, spread }) => (
@@ -1386,13 +1437,13 @@ export function Stage({
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-photo", ph.key)}
                       onClick={() => addPhoto(ph.key, curPage)}
-                      aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "aus der Ablage" : `von Doppelseite ${spread + 1}`}`}
+                      aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "beiseitegelegt" : `von Doppelseite ${spread + 1}`}`}
                       className="group block text-left"
                     >
                       <span className="relative block h-16 w-16">
                         <Image src={ph.thumb} alt="" fill sizes="64px" className="object-cover transition-opacity duration-150 group-hover:opacity-80" draggable={false} />
                       </span>
-                      <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? "Ablage" : `Doppelseite ${spread + 1}`}</span>
+                      <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? "Beiseite" : `Doppelseite ${spread + 1}`}</span>
                     </button>
                   </li>
                 ))}
@@ -1401,7 +1452,8 @@ export function Stage({
           )}
           {coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              Antippen wählt, dann ziehen verschiebt. Die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.
+              Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.
+              Lange drücken zeigt alles, was mit dem Element geht.
             </p>
           ) : (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
@@ -1544,7 +1596,7 @@ export function Stage({
           )}
           {shown.length > 1 && (
             <div className="slip text-ink space-y-2 p-5">
-              <p className="text-sm font-semibold">Ebenen</p>
+              <p className="text-sm font-semibold">Was oben liegt</p>
               <p className="text-ink-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
               <ol className="space-y-px">
                 {[...shown].reverse().map((it) => (
@@ -1572,7 +1624,7 @@ export function Stage({
         </aside>
       </div>
 
-      {menu && <ContextMenu x={menu.cx} y={menu.cy} entries={menuEntries()} onClose={() => setMenu(null)} />}
+      {menu && <ContextMenu x={menu.cx} y={menu.cy} sheet={coarse} entries={menuEntries()} onClose={() => setMenu(null)} />}
       {cropItem && cropItem.t === "photo" && photos.get(cropItem.key) && (
         <CropDialog
           photo={{ ...photos.get(cropItem.key)!, ...(cropItem.crop ?? {}) }}
@@ -1625,7 +1677,7 @@ function PhotoPanel({
           Ausschnitt …
         </button>
         <button type="button" className="text-ink-2 underline underline-offset-4" onClick={onRemove}>
-          Löschen (in die Ablage)
+          Aus dem Buch nehmen
         </button>
       </div>
       <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} up={up} down={down} />
@@ -1661,17 +1713,29 @@ function LayerButtons({
 
 type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; disabled?: boolean; run: () => void };
 
-/** Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt */
-function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
+/**
+ * Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt.
+ * Mit dem Finger (sheet) ein Blatt von unten mit 48px-Zeilen und ohne Tastenkürzel, weg vom Daumen.
+ */
+function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; sheet: boolean; entries: MenuEntry[]; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    setPos({ left: Math.max(8, Math.min(x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, innerHeight - r.height - 8)) });
-    el.querySelector<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]")?.focus();
-  }, [x, y]);
+    if (!sheet) {
+      const r = el.getBoundingClientRect();
+      setPos({ left: Math.max(8, Math.min(x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, innerHeight - r.height - 8)) });
+    }
+    el.querySelector<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]")?.focus({ preventScroll: true });
+  }, [x, y, sheet]);
+  // der Klick, den der Browser nach dem Loslassen schickt, darf keinen Eintrag treffen
+  const armed = useRef(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => (armed.current = true), 350);
+    return () => window.clearTimeout(id);
+  }, []);
+  const early = () => !armed.current;
   const move = (e: React.KeyboardEvent) => {
     const list = Array.from(ref.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]") ?? []);
     const i = list.indexOf(document.activeElement as HTMLButtonElement);
@@ -1687,7 +1751,7 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
   return (
     <div
       className="fixed inset-0 z-[690]"
-      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+      onPointerDown={(e) => e.target === e.currentTarget && !early() && onClose()}
       onContextMenu={(e) => {
         e.preventDefault();
         onClose();
@@ -1698,8 +1762,10 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
         role="menu"
         aria-label="Aktionen"
         onKeyDown={move}
-        className="slip text-ink fixed min-w-56 py-1.5 text-sm shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)]"
-        style={pos}
+        className={`slip text-ink fixed py-1.5 shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)] ${
+          sheet ? "inset-x-0 bottom-0 max-h-[70svh] overflow-y-auto overscroll-contain pb-[max(0.375rem,env(safe-area-inset-bottom))] text-base" : "min-w-56 text-sm"
+        }`}
+        style={sheet ? undefined : pos}
       >
         {entries.map((en, i) =>
           en === "sep" ? (
@@ -1712,16 +1778,17 @@ function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries
               aria-checked={en.checked}
               disabled={en.disabled}
               onClick={() => {
+                if (early()) return;
                 onClose();
                 en.run();
               }}
-              className="hover:bg-ink/8 focus-visible:bg-ink/8 flex min-h-8 disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 px-3 text-left focus-visible:outline-none"
+              className={`hover:bg-ink/8 focus-visible:bg-ink/8 flex disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 text-left focus-visible:outline-none ${sheet ? "min-h-12 px-5" : "min-h-8 px-3"}`}
             >
               <span aria-hidden className="w-3 text-center">
                 {en.checked ? "✓" : ""}
               </span>
               <span className="flex-1">{en.label}</span>
-              {en.hint && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
+              {en.hint && !sheet && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
             </button>
           ),
         )}
@@ -1981,13 +2048,36 @@ function TextToolbar({
   const btn = "flex h-8 min-w-8 items-center justify-center px-1.5 text-sm hover:bg-ink/8";
   const on = "bg-ink text-paper hover:bg-ink";
   const colors = [...SWATCHES, { label: "Einband", value: cloth }];
+  // im Bildschirm halten: am Handy ragte die Leiste über die Seitenkante, „Fett“ und Farben waren nicht erreichbar (iPhone-Workshop, Befund 6)
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.translate = "";
+    el.style.maxWidth = "";
+    // Grenzen: Bildschirm mit 16px Rand, dazu ein Vorfahr, der waagerecht beschneidet (schmal: nur eine Seite sichtbar)
+    let lo = 16;
+    let hi = innerWidth - 16;
+    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      if (getComputedStyle(p).overflowX === "visible") continue;
+      const c = p.getBoundingClientRect();
+      lo = Math.max(lo, c.left);
+      hi = Math.min(hi, c.right);
+      break;
+    }
+    if (el.offsetWidth > hi - lo) el.style.maxWidth = `${hi - lo}px`;
+    const r = el.getBoundingClientRect();
+    const dx = r.right > hi ? hi - r.right : r.left < lo ? lo - r.left : 0;
+    if (dx) el.style.translate = `${dx}px 0`;
+  });
   return (
     <div
+      ref={ref}
       role="toolbar"
       aria-label="Text gestalten"
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="slip text-ink absolute z-[65] flex max-w-[min(560px,92vw)] select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
+      className="slip text-ink absolute z-[65] flex max-w-[min(560px,calc(100vw-32px))] select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
       style={{ left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
     >
       <label className="sr-only" htmlFor={`font-${item.id}`}>

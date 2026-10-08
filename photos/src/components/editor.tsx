@@ -145,7 +145,7 @@ export function Editor() {
   const [undoNotice, setUndoNotice] = useState<string | null>(null);
   useEffect(() => {
     if (!undoNotice) return;
-    const id = window.setTimeout(() => setUndoNotice(null), 6000);
+    const id = window.setTimeout(() => setUndoNotice(null), 10000);
     return () => window.clearTimeout(id);
   }, [undoNotice]);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
@@ -489,6 +489,7 @@ export function Editor() {
       };
     });
     setSel(null);
+    setUndoNotice(`Doppelseite ${i + 1} entfernt${book.spreads[i]?.keys.length ? ", die Fotos sind beiseitegelegt" : ""}.`);
   };
   /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz; freie Seiten bekommen es in die erste freie Zelle */
   const movePhoto = (key: string, to: number) =>
@@ -575,7 +576,7 @@ export function Editor() {
    * Frei gestaltete Seiten und Textseiten behalten ihre Form; auf der Bühne bleibt die Doppelseite stehen.
    */
   const shelvePhoto = (key: string, close = true) => {
-    setUndoNotice("In die Ablage gelegt.");
+    setUndoNotice("Beiseitegelegt, nicht mehr im Buch.");
     update((b) => {
       let gap = false;
       const next = {
@@ -715,7 +716,10 @@ export function Editor() {
         <section aria-label="Doppelseiten" className="min-w-0">
           {/* Fotos */}
           <div className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6">
-            <p className="text-on-table text-lg font-semibold">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</p>
+            <p className="text-on-table text-lg font-semibold">
+              <span className="pointer-coarse:hidden">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</span>
+              <span className="hidden pointer-coarse:inline">{book.photos.length ? "Weitere Fotos vom Handy" : "Fotos vom Handy"}</span>
+            </p>
             <p className="text-on-table-2 max-w-[60ch] text-sm leading-relaxed">
               Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen
               werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone.
@@ -853,8 +857,8 @@ export function Editor() {
                           <TextButton
                             className={HIT}
                             onClick={() => removeSpread(i)}
-                            aria-label={`Doppelseite ${i + 1} entfernen, Fotos in die Ablage`}
-                            title="Doppelseite entfernen, Fotos in die Ablage"
+                            aria-label={`Doppelseite ${i + 1} entfernen, die Fotos werden beiseitegelegt`}
+                            title="Doppelseite entfernen, die Fotos werden beiseitegelegt"
                           >
                             ×
                           </TextButton>
@@ -945,8 +949,8 @@ export function Editor() {
           {/* Ablage: hochgeladen, gerade nicht im Buch */}
           {shelf.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-on-table text-lg font-semibold">Ablage</h2>
-              <p className="text-on-table-2 mt-1 text-[13px]">Nicht im Buch. Auf eine Doppelseite ziehen oder zurücklegen.</p>
+              <h2 className="text-on-table text-lg font-semibold">Beiseitegelegt</h2>
+              <p className="text-on-table-2 mt-1 text-[13px]">Nicht im Buch. „Ins Buch“ legt ein Foto zurück.</p>
               <ul className="mt-3 flex flex-wrap gap-3">
                 {shelf.map((p) => (
                   <li key={p.key} className="flex flex-col items-start gap-1">
@@ -955,7 +959,7 @@ export function Editor() {
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-photo", p.key)}
                       onClick={() => setSel({ type: "photo", key: p.key })}
-                      aria-label={`Foto aus der Ablage auswählen: ${p.title || "ohne Titel"}`}
+                      aria-label={`Beiseitegelegtes Foto auswählen: ${p.title || "ohne Titel"}`}
                       className="relative h-20 w-20"
                     >
                       <Image src={p.thumb} alt="" fill sizes="80px" className="object-cover" />
@@ -989,7 +993,7 @@ export function Editor() {
               />
             </label>
             <fieldset>
-              <legend className="text-ink-2 mb-2 text-[13px]">Leinen</legend>
+              <legend className="text-ink-2 mb-2 text-[13px]">Farbe des Einbands</legend>
               <div className="flex flex-wrap gap-2">
                 {(Object.keys(CLOTHS) as ClothId[]).map((id) => (
                   <button
@@ -1075,7 +1079,7 @@ export function Editor() {
                       setSel(null);
                     }}
                   >
-                    In die Ablage
+                    Beiseitelegen
                   </button>
                 )}
               </div>
@@ -1100,7 +1104,7 @@ export function Editor() {
                 </div>
               )}
               {!selPhoto.shelved && (
-                <p className="text-ink-2 text-[12px]">Ziehen auf eine andere Doppelseite verschiebt das Foto auch. Tastatur: Alt + ← / → , Entf legt es in die Ablage.</p>
+                <p className="text-ink-2 text-[12px] pointer-coarse:hidden">Ziehen auf eine andere Doppelseite verschiebt das Foto auch. Tastatur: Alt + ← / → , Entf legt es beiseite.</p>
               )}
             </div>
           )}
@@ -1152,13 +1156,24 @@ export function Editor() {
 
           {!selPhoto && !selSpread && data && (
             <p className="text-on-table-2 text-sm leading-relaxed">
-              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben. Doppelklick auf eine Doppelseite öffnet sie zum
-              Gestalten. Fotos und Doppelseiten lassen sich ziehen.
+              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben.{" "}
+              <span className="pointer-coarse:hidden">Doppelklick auf eine Doppelseite öffnet sie zum Gestalten. Fotos und Doppelseiten lassen sich ziehen.</span>
+              <span className="hidden pointer-coarse:inline">„Gestalten“ öffnet eine Doppelseite zum freien Anordnen.</span>
             </p>
           )}
         </aside>
       </div>
 
+      {/* Telefon: Rückgängig in Daumennähe; der Kopf scrollt dort weg (iPhone-Workshop, Befund 8). Zettel und Blätter haben Vorrang */}
+      {undoState.past > 0 && !undoNotice && !notice && !selPhoto && !selSpread?.text && (
+        <button
+          type="button"
+          onClick={undo}
+          className="slip text-ink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-[500] flex min-h-12 items-center gap-2 px-4 text-sm font-semibold shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)] md:hidden"
+        >
+          <span aria-hidden>↶</span> Rückgängig
+        </button>
+      )}
       {undoNotice && !notice && (
         <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
           <span>{undoNotice}</span>
