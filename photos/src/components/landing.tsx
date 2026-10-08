@@ -97,7 +97,7 @@ function Cap({ items, x, y, right = false }: { items: [number, string, "wide"?][
   return (
     <p
       className={`text-ink-2 absolute w-max max-w-[62cqw] ${right ? "text-right" : ""}`}
-      style={{ top: `${y}cqw`, [right ? "right" : "left"]: `${right ? 100 - x : x}cqw`, fontSize: "max(9px, 3.1cqw)", lineHeight: 1.375 }}
+      style={{ top: `${y}cqw`, [right ? "right" : "left"]: `${right ? 100 - x : x}cqw`, fontSize: "max(9px, 2.2cqw)", lineHeight: 1.375 }}
     >
       {items.map(([no, title, wide], k) => (
         <span key={no} className={`whitespace-nowrap ${k ? "ml-[1.2em]" : ""} ${wide ? "hidden md:inline" : ""}`}>
@@ -381,8 +381,11 @@ function Workbench() {
               <div className="relative">
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
-                    <Cap items={[[1, "Drachenbaum", "wide"], [2, "Erst mittags offen"]]} x={88} y={62} right />
-                    <Cap items={[[3, "Eingerollt"], [4, "Platt"]]} x={88} y={130} right />
+                    {/* jede Unterschrift steht bündig unter ihrem Bild; das randlose Bild links bekommt seine unten am Bund */}
+                    <Cap items={[[2, "Erst mittags offen"]]} x={12} y={61.5} />
+                    <Cap items={[[3, "Eingerollt"]]} x={12} y={127.5} />
+                    <Cap items={[[4, "Platt"]]} x={52} y={127.5} />
+                    <Cap items={[[1, "Drachenbaum, links"]]} x={12} y={137} />
                   </div>
                 </PageFace>
               </div>
