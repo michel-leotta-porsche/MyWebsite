@@ -1,9 +1,24 @@
 "use client";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { deleteUser, getAuth, GoogleAuthProvider, reauthenticateWithPopup, signInWithPopup, signOut, type User } from "firebase/auth";
+import {
+  deleteUser,
+  getAuth,
+  GoogleAuthProvider,
+  OAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  revokeAccessToken,
+  signInWithCredential,
+  signInWithPopup,
+  signOut,
+  updateProfile,
+  type User,
+} from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+
+import { IS_APP } from "@/lib/app-mode";
 
 // Öffentliche Web-Konfiguration (kein Geheimnis): der Zugriff wird über firestore.rules und storage.rules geregelt
 const config = {
@@ -39,22 +54,110 @@ export const db = () => {
 };
 export const storage = () => getStorage(app());
 
+/** Anbieter fürs Anmelden. Apple verlangt (Richtlinie 4.8) „Mit Apple anmelden“ gleichrangig neben Google */
+export type SignInProvider = "google.com" | "apple.com";
+
 const google = () => {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   return provider;
 };
+const apple = () => {
+  const provider = new OAuthProvider("apple.com");
+  provider.addScope("email");
+  provider.addScope("name");
+  provider.setCustomParameters({ locale: "de_DE" });
+  return provider;
+};
+const webProvider = (p: SignInProvider) => (p === "apple.com" ? apple() : google());
 
-export async function signIn() {
-  return signInWithPopup(auth(), google());
+/**
+ * In der iOS-App gibt es kein Popup: Google und Apple melden nativ an (Plugin), angemeldet wird dann mit
+ * dem Ergebnis im Web-SDK, damit Firestore und Storage dieselbe Anmeldung sehen wie auf der Website.
+ * authorizationCode braucht es nur, um Apples Token beim Löschen des Kontos zu widerrufen.
+ */
+async function nativeCredential(p: SignInProvider) {
+  const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+  if (p === "apple.com") {
+    const r = await FirebaseAuthentication.signInWithApple({ skipNativeAuth: true });
+    const credential = new OAuthProvider("apple.com").credential({ idToken: r.credential?.idToken, rawNonce: r.credential?.nonce });
+    return { credential, appleCode: r.credential?.authorizationCode, name: r.user?.displayName ?? undefined };
+  }
+  const r = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+  return { credential: GoogleAuthProvider.credential(r.credential?.idToken), appleCode: undefined, name: undefined };
 }
+
+/**
+ * Apple gibt den Namen nur beim allerersten Anmelden heraus und nur an die App, nicht an Firebase:
+ * dann gleich ins Konto schreiben, sonst stünde in Büchern und Zetteln „Ich“.
+ */
+async function keepAppleName(user: User, name?: string) {
+  if (!user.displayName && name?.trim()) await updateProfile(user, { displayName: name.trim() }).catch(() => {});
+}
+
+export async function signIn(provider: SignInProvider = "google.com") {
+  if (IS_APP) {
+    const n = await nativeCredential(provider);
+    const cred = await signInWithCredential(auth(), n.credential);
+    await keepAppleName(cred.user, n.name);
+    return cred;
+  }
+  return signInWithPopup(auth(), webProvider(provider));
+}
+
+/** Absendername ändern (Profil), z. B. wenn Apple keinen Namen geliefert hat */
+export const renameUser = async (user: User, name: string) => {
+  if (process.env.NEXT_PUBLIC_FUJI_MOCK === "1") return;
+  await updateProfile(user, { displayName: name });
+};
+
+/** Womit diese Person angemeldet ist; ältere Konten haben nur Google */
+export const providerOf = (user: User): SignInProvider =>
+  user.providerData?.some((p) => p.providerId === "apple.com") ? "apple.com" : "google.com";
+
+/** Was es braucht, um Apples Token zu widerrufen: im Web ein Access-Token, in der App ein Autorisierungscode */
+export type AppleRevoke = { accessToken?: string; code?: string };
 
 /**
  * Konto löschen verlangt eine frische Anmeldung (sonst auth/requires-recent-login). Deshalb erst neu anmelden,
  * dann die Daten löschen, zuletzt den Nutzer: so bleibt nie ein Konto ohne Daten oder Daten ohne Konto halb stehen.
- * Mit Sign in with Apple kommt hier später der Widerruf des Apple-Tokens dazu (revokeAccessToken).
+ * Bei Apple liefert die frische Anmeldung zugleich, was zum Widerruf des Tokens nötig ist (Richtlinie 5.1.1(v)).
  */
-export const confirmIdentity = (user: User) => reauthenticateWithPopup(user, google());
-export const deleteAccountUser = (user: User) => deleteUser(user);
-export const signOutNow = () => signOut(auth());
+export async function confirmIdentity(user: User): Promise<AppleRevoke> {
+  const p = providerOf(user);
+  if (IS_APP) {
+    const n = await nativeCredential(p);
+    await reauthenticateWithCredential(user, n.credential);
+    return { code: n.appleCode };
+  }
+  const res = await reauthenticateWithPopup(user, webProvider(p));
+  return p === "apple.com" ? { accessToken: OAuthProvider.credentialFromResult(res)?.accessToken } : {};
+}
+
+/**
+ * Apples Token widerrufen. Das Web-SDK kann nur Access-Tokens; den Code aus der App nimmt dieselbe
+ * Schnittstelle als tokenType CODE an, so wie es das native iOS-SDK auch tut.
+ */
+async function revokeApple(user: User, r: AppleRevoke) {
+  if (r.accessToken) return revokeAccessToken(auth(), r.accessToken);
+  if (!r.code) return;
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v2/accounts:revokeToken?key=${config.apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ providerId: "apple.com", tokenType: "CODE", token: r.code, idToken: await user.getIdToken() }),
+  });
+  if (!res.ok) throw new Error(`revokeToken ${res.status}`);
+}
+
+/** Zuletzt: Apple-Zugang widerrufen (ein Fehler dabei hält das Löschen nicht auf), dann das Konto löschen */
+export async function deleteAccountUser(user: User, revoke: AppleRevoke = {}) {
+  await revokeApple(user, revoke).catch((e) => console.warn("Apple-Widerruf fehlgeschlagen", e));
+  await deleteUser(user);
+  if (IS_APP) await import("@capacitor-firebase/authentication").then((m) => m.FirebaseAuthentication.signOut()).catch(() => {});
+}
+
+export async function signOutNow() {
+  await signOut(auth());
+  if (IS_APP) await import("@capacitor-firebase/authentication").then((m) => m.FirebaseAuthentication.signOut()).catch(() => {});
+}
 export type { User };

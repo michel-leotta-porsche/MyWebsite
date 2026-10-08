@@ -8,7 +8,8 @@ import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-
 import { Library } from "@/components/books";
 import { Shelf, Table } from "@/components/table";
 import { signInError } from "@/lib/errors";
-import { signIn } from "@/lib/firebase";
+import { signIn, type SignInProvider } from "@/lib/firebase";
+import { SignInButtons } from "@/components/sign-in-buttons";
 import { ReportDialog } from "@/components/report-dialog";
 import { isAbusive } from "@/lib/note-filter";
 import { blockSender, keepInInbox, leaveNote, loadShare, toBookData, watchBlocked, type Blocked, type Share } from "@/lib/store";
@@ -32,6 +33,8 @@ export function GuestBook() {
   const [failed, setFailed] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
   const [signInFailed, setSignInFailed] = useState<string | null>(null);
+  const [keeping, setKeeping] = useState(false);
+  const [signingIn, setSigningIn] = useState<SignInProvider | null>(null);
   const [reporting, setReporting] = useState(false);
   const [blocked, setBlocked] = useState<Blocked[] | null>(null);
 
@@ -151,24 +154,12 @@ export function GuestBook() {
                   <span>…</span>
                 )
               ) : (
-                <TextButton
-                  onClick={() => {
-                    setSignInFailed(null);
-                    signIn().catch((e) => setSignInFailed(signInError(e)));
-                  }}
-                >
-                  In mein Bücherzimmer legen
-                </TextButton>
+                <TextButton onClick={() => setKeeping(true)}>In mein Bücherzimmer legen</TextButton>
               )}
               {!mine && (
                 <TextButton className="text-on-table-2 ml-5" onClick={() => setReporting(true)}>
                   Melden
                 </TextButton>
-              )}
-              {!user && signInFailed && (
-                <span role="alert" className="text-on-table mt-1 block">
-                  {signInFailed}
-                </span>
               )}
             </p>
           }
@@ -176,6 +167,38 @@ export function GuestBook() {
           <Shelf feature books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
         </Table>
       </Library>
+      {keeping && !user && (
+        <SlipDialog label="In dein Bücherzimmer legen" onClose={() => setKeeping(false)}>
+          <p className="text-sm leading-relaxed">
+            Mit einem Konto liegt „{share.book?.title || "dieses Buch"}“ in deinem Bücherzimmer unter „Für dich“, und du kannst eigene Bücher machen.
+          </p>
+          <div className="bg-table mt-4 p-4">
+            <SignInButtons
+              busy={signingIn}
+              onPick={(p) => {
+                setSignInFailed(null);
+                setSigningIn(p);
+                signIn(p)
+                  .then(() => setKeeping(false))
+                  .catch((e) => setSignInFailed(signInError(e)))
+                  .finally(() => setSigningIn(null));
+              }}
+            />
+          </div>
+          {signInFailed && (
+            <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
+              {signInFailed}
+            </p>
+          )}
+          <p className="text-ink-2 mt-3 text-[13px]">
+            Es gelten die{" "}
+            <Link href="/nutzungsbedingungen" className="underline decoration-mark decoration-2 underline-offset-4">
+              Nutzungsbedingungen
+            </Link>
+            .
+          </p>
+        </SlipDialog>
+      )}
       {writing && (
         <SlipDialog label={`Zettel an ${share.fromName}`} onClose={() => setWriting(false)}>
           {sent ? (

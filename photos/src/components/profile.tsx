@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { linkClass, RequireUser, RoomNav, RoomTitle, SlipDialog, TextButton } from "@/components/app-ui";
+import { inputClass, linkClass, RequireUser, RoomNav, RoomTitle, SlipDialog, TextButton } from "@/components/app-ui";
 import { OPERATOR } from "@/components/legal";
-import { confirmIdentity, deleteAccountUser, signOutNow, type User } from "@/lib/firebase";
+import { confirmIdentity, deleteAccountUser, providerOf, renameUser, signOutNow, type AppleRevoke, type User } from "@/lib/firebase";
 import { friendlyError, signInError } from "@/lib/errors";
 import { setSessionHint } from "@/lib/session-hint";
 import { isAdmin } from "@/lib/admin";
@@ -36,8 +36,7 @@ export function Profile() {
   );
 }
 
-const PROVIDERS: Record<string, string> = { "google.com": "Google", "apple.com": "Apple" };
-const providerOf = (user: User) => PROVIDERS[user.providerData?.[0]?.providerId ?? ""] ?? "Google";
+const PROVIDER_NAMES = { "google.com": "Google", "apple.com": "Apple" } as const;
 
 const since = (user: User) => {
   const t = user.metadata?.creationTime;
@@ -53,6 +52,8 @@ function Card({ user }: { user: User }) {
   const [gifts, setGifts] = useState<Share[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(user.displayName);
   const [blocked, setBlocked] = useState<Blocked[]>([]);
   useEffect(() => watchBlocked(user.uid, setBlocked), [user.uid]);
 
@@ -91,7 +92,7 @@ function Card({ user }: { user: User }) {
 
       <div className="mx-auto w-full max-w-3xl flex-1 px-4 pt-14 pb-20 md:px-8 md:pt-20">
         <p className="text-on-table text-4xl leading-[0.95] font-bold tracking-[-0.03em] md:text-6xl" style={{ fontVariationSettings: '"wdth" 78, "opsz" 72' }}>
-          {user.displayName ?? "Ohne Namen"}
+          {name ?? "Ohne Namen"}
         </p>
         <p className="text-on-table-2 mt-3 text-base">
           {user.email}
@@ -152,9 +153,10 @@ function Card({ user }: { user: User }) {
             Konto
           </h2>
           <p className="text-on-table-2 mt-3 max-w-xl text-base leading-relaxed">
-            Angemeldet über {providerOf(user)}. Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
+            Angemeldet über {PROVIDER_NAMES[providerOf(user)]}. Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
           </p>
           <p className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
+            <TextButton onClick={() => setRenaming(true)}>Name ändern …</TextButton>
             <TextButton onClick={() => signOutNow().then(() => router.push("/"))}>Abmelden</TextButton>
             <TextButton className="text-on-table-2" onClick={() => setDeleting(true)}>
               Konto löschen …
@@ -210,6 +212,15 @@ function Card({ user }: { user: User }) {
           </p>
         </section>
       </div>
+      {renaming && (
+        <RenameDialog
+          user={user}
+          onClose={(n) => {
+            setRenaming(false);
+            if (n) setName(n);
+          }}
+        />
+      )}
       {deleting && <DeleteAccount user={user} counts={{ books: own?.length, photos, shares: shares?.length }} onClose={() => setDeleting(false)} />}
     </main>
   );
@@ -228,9 +239,10 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
 
   const run = async () => {
     setError(null);
+    let revoke: AppleRevoke = {};
     try {
       setStep("Anmeldung bestätigen");
-      if (!mock) await confirmIdentity(user);
+      if (!mock) revoke = await confirmIdentity(user);
     } catch (e) {
       setStep(null);
       const msg = signInError(e);
@@ -240,7 +252,7 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
     try {
       await deleteAccountData(user.uid, (s) => setStep(`${s} werden gelöscht`));
       setStep("Konto wird gelöscht");
-      if (!mock) await deleteAccountUser(user);
+      if (!mock) await deleteAccountUser(user, revoke);
       setSessionHint(false);
       router.replace("/konto-geloescht");
     } catch (e) {
@@ -341,5 +353,54 @@ function Reports() {
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * Name, der als Absender auf Büchern und Zetteln steht. Apple gibt ihn nur beim ersten Anmelden heraus
+ * und nicht, wenn man ihn verbirgt; dann steht hier „Ohne Namen“ und man trägt ihn selbst ein.
+ */
+function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) => void }) {
+  const [name, setName] = useState(user.displayName ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SlipDialog label="Name ändern" onClose={() => !busy && onClose()}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!name.trim()) return;
+          setBusy(true);
+          renameUser(user, name.trim())
+            .then(() => onClose(name.trim()))
+            .catch((err) => {
+              setBusy(false);
+              setError(friendlyError(err));
+            });
+        }}
+      >
+        <label className="block text-[13px]">
+          <span className="text-ink-2">So steht es als Absender auf neuen Büchern und Zetteln</span>
+          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} autoComplete="name" className={inputClass} />
+        </label>
+        {error && (
+          <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
+          <button
+            type="submit"
+            disabled={busy || !name.trim()}
+            className="border-ink text-ink hover:bg-ink hover:text-paper min-h-11 border px-3 py-2 font-semibold transition-colors duration-150 disabled:opacity-50"
+          >
+            Speichern
+          </button>
+          <button type="button" disabled={busy} onClick={() => onClose()} className="min-h-11 underline decoration-mark decoration-2 underline-offset-4">
+            Abbrechen
+          </button>
+        </div>
+      </form>
+    </SlipDialog>
   );
 }

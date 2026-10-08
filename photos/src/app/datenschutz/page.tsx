@@ -36,11 +36,17 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection title="Anmelden mit Google">
+      <LegalSection title="Anmelden mit Apple oder Google">
         <p>
-          Wer Bücher machen will, meldet sich mit einem Google-Konto an (Firebase Authentication). Firebase speichert dazu deinen Namen, deine
-          E-Mail-Adresse, den Link zu deinem Profilbild und eine Nutzerkennung. Deinen Namen lege ich zu deinen Büchern, damit Gäste sehen, von wem
-          ein Buch kommt. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Für die Anmeldung lädt Calima Skripte von Google. Lesen geht ohne Konto.
+          Wer Bücher machen will, meldet sich mit einer Apple-ID oder einem Google-Konto an (Firebase Authentication). Firebase speichert dazu
+          deinen Namen, deine E-Mail-Adresse, bei Google den Link zu deinem Profilbild und eine Nutzerkennung. Bei Apple kannst du deine
+          E-Mail-Adresse verbergen, dann bekomme ich nur eine Weiterleitungsadresse von Apple. Deinen Namen lege ich zu deinen Büchern, damit
+          Gäste sehen, von wem ein Buch kommt; im Profil kannst du ihn ändern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Für die Anmeldung
+          lädt Calima Skripte von Google, in der App öffnet sich das Anmeldefenster von Apple bzw. Google. Lesen geht ohne Konto.
+        </p>
+        <p>
+          Löschst du dein Konto, widerrufe ich auch die Verbindung zu deiner Apple-ID; in deinen Apple-Einstellungen taucht Calima dann nicht mehr
+          auf.
         </p>
       </LegalSection>
 

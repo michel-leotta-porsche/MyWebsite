@@ -28,11 +28,15 @@ const SIGN_IN_MESSAGES: Record<string, string> = {
   "auth/too-many-requests": "Zu viele Versuche. Warte bitte einen Moment.",
   "auth/user-mismatch": "Das war ein anderes Konto. Wähle bitte das, mit dem du hier angemeldet bist.",
   "auth/user-disabled": "Dieses Konto ist gesperrt. Schreib mir, wenn das ein Irrtum ist.",
+  "auth/account-exists-with-different-credential":
+    "Mit dieser E-Mail-Adresse gibt es schon ein Konto über den anderen Anbieter. Melde dich bitte damit an.",
 };
 
 /** Fehler beim Anmelden in Alltagssprache; null, wenn die Person selbst abgebrochen hat */
 export function signInError(e: unknown): string | null {
   const code = typeof e === "object" && e && "code" in e ? String((e as { code: unknown }).code) : "";
   if (SIGN_IN_CANCELLED.includes(code)) return null;
+  // Abbruch in der App: das native Fenster meldet sich ohne auth/-Code (Apple: Fehler 1001, Google: „canceled“)
+  if (!code.startsWith("auth/") && /cancel|1001/i.test(String((e as Error)?.message ?? e))) return null;
   return SIGN_IN_MESSAGES[code] ?? "Die Anmeldung hat nicht geklappt. Versuch es bitte nochmal.";
 }

@@ -11,6 +11,7 @@
     "ios:build": "node scripts/ios-build.mjs"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.5.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3",
     "exifr": "^7.1.3",

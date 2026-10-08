@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal";
-import { FrameButton, hitClass, linkClass, Wordmark } from "@/components/ui-base";
+import { SignInButtons } from "@/components/sign-in-buttons";
+import { hitClass, linkClass, Wordmark } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
-import { signIn, type User } from "@/lib/firebase";
+import { signIn, type SignInProvider, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Textknöpfe mit Unterstrich, Rahmenknopf, Anmeldung.
@@ -71,6 +72,7 @@ export function RequireUser({ title, text, children }: { title: string; text: Re
 /** Leerer Tisch mit Anmeldung */
 export function SignInTable({ title, children }: { title: string; children?: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<SignInProvider | null>(null);
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
       <header className="flex items-baseline justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
@@ -82,14 +84,18 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
         </h1>
         <div className="text-on-table-2 mt-3 text-base leading-relaxed">{children}</div>
         <div className="mt-8">
-          <FrameButton
-            onClick={() => {
+          <SignInButtons
+            busy={busy}
+            onPick={(p) => {
               setError(null);
-              signIn().catch((e) => setError(signInError(e)));
+              setBusy(p);
+              // angemeldet wechselt RequireUser von selbst in den Raum
+              signIn(p).catch((e) => {
+                setBusy(null);
+                setError(signInError(e));
+              });
             }}
-          >
-            Mit Google anmelden
-          </FrameButton>
+          />
           {error && (
             <p role="alert" className="text-on-table mt-3 text-sm">
               {error}
