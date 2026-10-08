@@ -70,6 +70,9 @@ function SheetClose({ onClose }: { onClose: () => void }) {
 
 /** Klickfläche kleiner Leistenknöpfe: 24px, mit dem Finger 44px hoch (WCAG 2.5.8, UX-Kritik K3) */
 const HIT = "inline-flex min-h-6 min-w-6 items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-9";
+/** runder Symbolknopf in der Leiste über einer Doppelseite */
+const ROUND =
+  "grid size-8 place-items-center rounded-full text-on-table-2 transition-colors duration-150 hover:bg-on-table/10 hover:text-on-table disabled:opacity-35 disabled:hover:bg-transparent pointer-coarse:size-11";
 
 /** Eine Doppelseite bleibt, solange etwas auf ihr liegt */
 const keepSpread = (s: SpreadDraft) => s.keys.length > 0 || !!s.text || !!s.pages?.some((p) => p.items.length);
@@ -879,54 +882,57 @@ export function Editor() {
                             <Lock on={!!s.pinned || !!s.text} />
                           </button>
                         </span>
-                        <span className="flex flex-wrap items-center gap-x-3">
-                          <TextButton className={HIT} onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
+                        <span className="flex flex-wrap items-center gap-x-1.5">
+                          <button type="button" className={buttonClass("quiet", "sm", "min-h-8")} onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
                             Gestalten
-                          </TextButton>
+                          </button>
                           {!s.text && s.keys.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setDevelop(s.keys[0])}
                               aria-label={`Fotos von Doppelseite ${i + 1} bearbeiten`}
                               title="Fotos bearbeiten: Looks, Vorschläge, Feinschliff"
-                              className={`${HIT} text-on-table-2 hover:text-on-table`}
+                              className={ROUND}
                             >
                               <SlidersHorizontal aria-hidden className="size-4" />
                             </button>
                           )}
                           {!s.pages && variantsOf(s, auto).length > 1 && (
-                            <TextButton
-                              className={HIT}
+                            <button
+                              type="button"
+                              className={buttonClass("quiet", "sm", "min-h-8")}
                               onClick={() => cycle(i)}
                               aria-label={`Anderes Layout für Doppelseite ${i + 1}, jetzt ${s.layout + 1} von ${variantsOf(s, auto).length}`}
                               title={`Layout ${s.layout + 1} von ${variantsOf(s, auto).length}`}
                             >
                               Anderes Layout
-                            </TextButton>
+                            </button>
                           )}
                           <span className="flex items-center gap-x-1">
-                            <TextButton className={HIT} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
+                            <button type="button" className={ROUND} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
                               <ChevronLeft aria-hidden className="size-4" />
-                            </TextButton>
-                            <TextButton
-                              className={HIT}
+                            </button>
+                            <button
+                              type="button"
+                              className={ROUND}
                               onClick={() => moveSpread(i, i + 1)}
                               disabled={i === book.spreads.length - 1}
                               aria-label={`Doppelseite ${i + 1} nach hinten`}
                             >
                               <ChevronRight aria-hidden className="size-4" />
-                            </TextButton>
+                            </button>
                           </span>
                           {/* Entfernen mit Strich und Abstand zu den Pfeilen, damit ein Fehltreffer nicht löscht */}
                           <span aria-hidden className="bg-on-table-2/40 h-4 w-px" />
-                          <TextButton
-                            className={HIT}
+                          <button
+                            type="button"
+                            className={ROUND}
                             onClick={() => removeSpread(i)}
                             aria-label={`Doppelseite ${i + 1} entfernen, die Fotos werden beiseitegelegt`}
                             title="Doppelseite entfernen, die Fotos werden beiseitegelegt"
                           >
                             <X aria-hidden className="size-4" />
-                          </TextButton>
+                          </button>
                         </span>
                       </div>
                       <div
