@@ -640,7 +640,7 @@ export function DevelopDialog({
 
         {/* Bühne: das Foto ganz sichtbar; auf dem Telefon bleibt es oben stehen */}
         <div className="bg-table sticky top-0 z-10 flex flex-col gap-2.5 px-4 pb-3 lg:static lg:min-h-0 lg:p-0">
-          <div className="grid h-[42svh] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1">
+          <div className="grid h-[40svh] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1">
             <div
               className="relative cursor-grab touch-pan-y select-none [-webkit-touch-callout:none]"
               style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}
@@ -697,7 +697,7 @@ export function DevelopDialog({
                       setNote(null);
                       setNaming(false);
                     }}
-                    className={`group relative h-16 flex-none outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
+                    className={`group relative h-12 flex-none lg:h-16 outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
                     style={{ aspectRatio: `${p.w} / ${p.h}` }}
                   >
                     {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
