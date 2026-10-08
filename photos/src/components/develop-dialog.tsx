@@ -62,7 +62,7 @@ const fieldClass =
 /** Wahl aus wenigen Möglichkeiten auf Papier: gewählt in Tinte (wie in der Bühne) */
 const chip = (on: boolean) =>
   `min-h-9 min-w-11 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-11 ${on ? "bg-ink text-paper" : "bg-ink/6 text-ink shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] hover:bg-ink/10"}`;
-const groupTitle = "text-ink mb-2 text-[15px] font-bold tracking-[-0.01em]";
+const groupTitle = "text-ink mb-2.5 text-[15px] font-bold tracking-[-0.01em]";
 
 /* ---------- LUT-Speicher: dieselbe Bearbeitung wird nicht zweimal gerechnet ---------- */
 
@@ -176,7 +176,7 @@ const LutThumb = memo(function LutThumb({ img, edit, className }: { img: ImageDa
 
 function Tile({ img, edit, name, txt, pressed, onClick, disabled }: { img?: ImageData; edit: PhotoEdit; name: string; txt: string; pressed: boolean; onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1.5 text-left disabled:opacity-40" lang="de">
+    <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1 text-left disabled:opacity-40" lang="de">
       <span className={`bg-paper-shade relative block aspect-[4/5] w-full outline-2 outline-offset-2 transition-[outline-color] duration-150 ${pressed ? "outline-ink" : "outline-transparent"}`}>
         {img && <LutThumb img={img} edit={edit} className="block size-full object-cover transition-transform duration-500 ease-out motion-safe:group-hover:-translate-y-[3px]" />}
         {pressed && (
@@ -186,7 +186,7 @@ function Tile({ img, edit, name, txt, pressed, onClick, disabled }: { img?: Imag
         )}
       </span>
       <b className="text-sm font-semibold break-words hyphens-auto max-sm:text-xs">{name}</b>
-      <small className="text-ink-2 text-xs leading-snug max-sm:hidden">{txt}</small>
+      <small className="text-ink-2 line-clamp-2 min-h-[2lh] text-xs leading-snug max-sm:hidden">{txt}</small>
     </button>
   );
 }
@@ -225,19 +225,19 @@ function Slider({
         <span aria-hidden className={`size-2 rounded-full border-[1.5px] ${changed ? "border-ink bg-mark" : "border-ink-2"}`} />
         {label}
       </label>
-      <output htmlFor={id} className="text-ink-2 text-xs tabular-nums">
-        {format(value)}
-      </output>
       <button
         type="button"
         onClick={() => onChange(zero)}
         disabled={!changed}
         title={`${label} zurücksetzen`}
-        className={`text-ink-2 hover:text-ink hover:bg-ink/8 -my-2.5 -mr-2.5 grid size-11 place-items-center rounded-full transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
+        className={`text-ink-2 hover:text-ink hover:bg-ink/8 -my-2.5 -ml-1 grid size-11 place-items-center rounded-full transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
       >
         <RotateCcw aria-hidden className="size-4" />
         <span className="sr-only">{label} zurücksetzen</span>
       </button>
+      <output htmlFor={id} className="text-ink-2 text-xs tabular-nums">
+        {format(value)}
+      </output>
       <input
         id={id}
         type="range"
@@ -248,7 +248,7 @@ function Slider({
         onFocus={onFocus}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(zero)}
-        className="range col-span-3 m-0 h-9 w-full"
+        className="range col-span-3 m-0 h-8 w-full pointer-coarse:h-9"
         style={{ "--fill": fill } as React.CSSProperties}
       />
     </div>
@@ -737,6 +737,36 @@ export function DevelopDialog({
   const aspect = photo.w / photo.h;
   const tileImg = loaded[photo.key]?.tile;
 
+  // Fotos der Doppelseite: auf dem Telefon als Streifen unter dem Foto, am Desktop senkrecht direkt links daneben,
+  // damit das Foto die ganze Höhe bekommt
+  const strip = (className: string, thumb: string) =>
+    photos.length > 1 && (
+      <div role="group" aria-label="Fotos dieser Doppelseite" className={`flex gap-3 ${className}`}>
+        {photos.map((p) => {
+          const on = p.key === photo.key;
+          const img = loaded[p.key]?.thumb;
+          return (
+            <button
+              key={p.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => {
+                setSel(p.key);
+                setNote(null);
+                setNaming(false);
+              }}
+              className={`group relative ${thumb} min-w-11 flex-none outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
+              style={{ aspectRatio: `${p.w} / ${p.h}` }}
+            >
+              {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
+              {!on && <span aria-hidden className="bg-paper/55 absolute inset-0 transition-opacity duration-150 group-hover:opacity-50" />}
+              <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung` : `${nameOf(p)} bearbeiten`}</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+
   return (
     <dialog
       ref={dialog}
@@ -750,10 +780,10 @@ export function DevelopDialog({
         else close();
       }}
     >
-      <div className="flex h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-7 lg:gap-y-3.5 lg:p-4">
+      <div className="flex h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-5 lg:px-8 lg:pt-5 lg:pb-6">
         <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:col-span-2 lg:p-0">
           <h2 className="text-xl font-bold tracking-[-0.02em]">Bearbeiten</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 lg:gap-3">
             <Button size="sm" onClick={close} className="pl-2.5">
               <X aria-hidden />
               Abbrechen
@@ -766,98 +796,76 @@ export function DevelopDialog({
         </header>
 
         {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen */}
-        <div className="bg-table flex flex-none flex-col gap-2 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:p-0">
-          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1">
-            <div
-              className="relative cursor-grab touch-pan-y select-none [-webkit-touch-callout:none]"
-              style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}
-              onPointerDown={onDown}
-              onPointerMove={onMove}
-              onPointerUp={onUp}
-              onPointerCancel={onUp}
-              onContextMenu={(e) => e.preventDefault()}
-              role="img"
-              aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein.`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
-              {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
-              <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
-              <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
-              {failed && !shown && (
-                <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
-                  <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
-                  <p className="text-ink-2 mt-0.5 text-xs">{failed}</p>
-                  <Button
-                    variant="paper"
-                    size="sm"
-                    onClick={() => {
-                      setFailed(null);
-                      setAttempt((n) => n + 1);
-                    }}
-                  >
-                    Noch einmal laden
-                  </Button>
-                </div>
-              )}
-              {compare && (
-                <>
-                  <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${split * 100}%` }}>
-                    <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-sm shadow-[0_2px_8px_rgb(12_10_8/0.4)]">
-                      ⟷
-                    </span>
-                  </div>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
-                    vorher
-                  </span>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
-                    nachher
-                  </span>
-                </>
-              )}
-              <div aria-hidden className={`pointer-events-none absolute inset-0 z-[5] grid place-items-center transition-opacity duration-150 ${big ? "opacity-100" : "opacity-0"}`}>
-                {big && (
-                  <div className="text-center">
-                    <span className="text-paper block text-[clamp(28px,7vw,56px)] leading-none font-bold [text-shadow:0_2px_16px_rgb(12_10_8/0.7)]" style={{ fontVariationSettings: '"wdth" 75' }}>
-                      {big.value}
-                    </span>
-                    <small className="text-paper mt-1 block text-sm font-semibold [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
+        <div className="bg-table flex flex-none flex-col gap-2 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0">
+          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]">
+            <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}>
+              {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
+              <div
+                className="absolute inset-0 cursor-grab touch-pan-y select-none [-webkit-touch-callout:none]"
+                onPointerDown={onDown}
+                onPointerMove={onMove}
+                onPointerUp={onUp}
+                onPointerCancel={onUp}
+                onContextMenu={(e) => e.preventDefault()}
+                role="img"
+                aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein.`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
+                {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
+                <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
+                <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+                {failed && !shown && (
+                  <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
+                    <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
+                    <p className="text-ink-2 mt-0.5 text-xs">{failed}</p>
+                    <Button
+                      variant="paper"
+                      size="sm"
+                      onClick={() => {
+                        setFailed(null);
+                        setAttempt((n) => n + 1);
+                      }}
+                    >
+                      Noch einmal laden
+                    </Button>
                   </div>
                 )}
+                {compare && (
+                  <>
+                    <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${split * 100}%` }}>
+                      <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-sm shadow-[0_2px_8px_rgb(12_10_8/0.4)]">
+                        ⟷
+                      </span>
+                    </div>
+                    <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
+                      vorher
+                    </span>
+                    <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
+                      nachher
+                    </span>
+                  </>
+                )}
+                <div aria-hidden className={`pointer-events-none absolute inset-0 z-[5] grid place-items-center transition-opacity duration-150 ${big ? "opacity-100" : "opacity-0"}`}>
+                  {big && (
+                    <div className="text-center">
+                      <span className="text-paper block text-[clamp(28px,7vw,56px)] leading-none font-bold [text-shadow:0_2px_16px_rgb(12_10_8/0.7)]" style={{ fontVariationSettings: '"wdth" 75' }}>
+                        {big.value}
+                      </span>
+                      <small className="text-paper mt-1 block text-sm font-semibold [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
+          {strip("overflow-x-auto px-1 py-1.5 lg:hidden", "h-14")}
 
-          {photos.length > 1 && (
-            <div role="group" aria-label="Fotos dieser Doppelseite" className="flex gap-3 overflow-x-auto px-1 py-1.5 lg:justify-center">
-              {photos.map((p) => {
-                const on = p.key === photo.key;
-                const img = loaded[p.key]?.thumb;
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => {
-                      setSel(p.key);
-                      setNote(null);
-                      setNaming(false);
-                    }}
-                    className={`group relative h-14 min-w-11 flex-none lg:h-16 outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
-                    style={{ aspectRatio: `${p.w} / ${p.h}` }}
-                  >
-                    {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
-                    {!on && <span aria-hidden className="bg-paper/55 absolute inset-0 transition-opacity duration-150 group-hover:opacity-50" />}
-                    <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung` : `${nameOf(p)} bearbeiten`}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
           <div className="flex flex-wrap items-center gap-2 lg:justify-center">
             <button
               type="button"
               aria-pressed={compare}
               disabled={!shown}
+              title="Auch: M oder \ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter"
               onClick={() => {
                 setCompare((c) => !c);
                 setSplit(0.5);
@@ -874,11 +882,9 @@ export function DevelopDialog({
             </button>
           </div>
           {/* immer da, damit Screenreader Fehler und Fortschritt hören */}
-          <p role="status" className={`min-h-[1.3em] text-[13px] lg:text-center ${error ? "text-on-table font-semibold" : "text-on-table-2"}`}>
+          {/* am Desktop steht der Hinweis auf dem Zettel beim Werkzeug; hier bleiben nur Fehler und Fortschritt sichtbar */}
+          <p role="status" className={`min-h-[1.3em] text-[13px] lg:text-center ${error ? "text-on-table font-semibold" : "text-on-table-2"} ${error || busy ? "" : "lg:sr-only"}`}>
             {error ?? busy ?? hint}
-          </p>
-          <p aria-hidden className="text-on-table-2 hidden text-center text-[11px] lg:block">
-            M oder \ halten: Original · 1–4: Reiter · Halten auf dem Foto: Original
           </p>
         </div>
 
@@ -886,17 +892,17 @@ export function DevelopDialog({
         <section
           aria-label="Werkzeuge"
           inert={!shown || !!busy}
-          className={`slip text-ink max-lg:rounded-t-tool lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:p-4 ${!shown || busy ? "opacity-60" : ""}`}
+          className={`slip text-ink max-lg:rounded-t-tool lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:max-h-full lg:flex-none lg:self-start lg:px-5 lg:pt-5 lg:pb-5 ${!shown || busy ? "opacity-60" : ""}`}
         >
           {photos.length > 1 && (
-            <p className="text-ink-2 text-sm">
+            <p className="text-ink-2 text-sm lg:sr-only">
               Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
             </p>
           )}
           <div
             role="tablist"
             aria-label="Werkzeuge"
-            className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-4 pb-1"
+            className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-4 pb-1 lg:-top-5 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
             onKeyDown={(e) => {
               // Pfeiltasten wandern zwischen den Reitern (Muster der ARIA-Tabs)
               const i = TABS.findIndex(([t]) => t === tab);
@@ -935,14 +941,17 @@ export function DevelopDialog({
             </div>
           </div>
 
+          <p aria-hidden className="text-ink-2 -mt-1 text-[13px] leading-snug max-lg:hidden">
+            {hint}
+          </p>
           <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`}>
             {tab === "s" && (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile
                   img={tileImg}
                   edit={sugg.auto}
                   name="Auto"
-                  txt="Tonwerte und Weißabgleich aus dem Foto"
+                  txt="Licht und Farbe automatisch"
                   pressed={edit.origin === "auto"}
                   disabled={!me}
                   onClick={() => me && act((e) => ({ ...e, ...autoEdit(me), origin: "auto", moodFrom: undefined }))}
@@ -951,7 +960,7 @@ export function DevelopDialog({
                   img={tileImg}
                   edit={sugg.match}
                   name="Angleichen"
-                  txt={others.length ? "an die anderen Fotos der Doppelseite" : "braucht ein zweites Foto auf der Seite"}
+                  txt={others.length ? "an die Nachbarfotos" : "braucht ein zweites Foto auf der Seite"}
                   pressed={edit.origin === "match"}
                   disabled={!me || !otherStats.length}
                   onClick={() => me && act((e) => ({ ...e, transfer: matchTransfer(me, otherStats), levels: null, origin: "match", moodFrom: undefined }))}
@@ -976,12 +985,11 @@ export function DevelopDialog({
                     act((e) => ({ ...e, transfer: moodTransfer(me, moodSt), levels: null, origin: "mood", moodFrom: nameOf(moodSrc) }));
                   }}
                 />
-                <Tile img={tileImg} edit={neutralEdit()} name="Original" txt="alles zurück" pressed={isNeutral(edit)} onClick={() => act(() => neutralEdit())} />
               </div>
             )}
 
             {tab === "l" && (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile img={tileImg} edit={{ ...edit, look: null }} name="Ohne Look" txt="nimmt den Look weg" pressed={!edit.look} onClick={() => edit.look && act((e) => ({ ...e, look: null }))} />
                 {LOOKS.map((L) => (
                   <Tile
@@ -995,7 +1003,7 @@ export function DevelopDialog({
                   />
                 ))}
                 {edit.look && (
-                  <div className="col-span-full mt-1">
+                  <div className="slip col-span-full sticky -bottom-4 z-[2] -mx-4 mt-1 border-t border-ink/10 px-4 pt-3 pb-2 lg:-bottom-5 lg:-mx-5 lg:px-5">
                     <Slider
                       id="dv-amount"
                       label={`Stärke ${lookOf(edit.look)?.name ?? ""}`}
@@ -1013,7 +1021,7 @@ export function DevelopDialog({
             )}
 
             {tab === "f" && (
-              <div className="grid gap-x-[22px] gap-y-2.5 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="grid gap-x-[22px] gap-y-2.5 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-4">
                 {FINE.map(([k, name, fmt, min, max]) => (
                   <Slider
                     key={k}
@@ -1037,7 +1045,7 @@ export function DevelopDialog({
             )}
 
             {tab === "r" && (
-              <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-7">
                 <div className="sm:col-span-2 lg:col-span-1">
                   <h3 className={groupTitle}>
                     <label htmlFor="dv-preset">Rezept</label>
@@ -1119,7 +1127,7 @@ export function DevelopDialog({
                   />
                 </div>
                 <WbPad r={edit.rec.wbR} b={edit.rec.wbB} onChange={(wbR, wbB) => liveRec({ wbR, wbB })} />
-                <div className="grid content-start gap-2.5">
+                <div className="grid content-start gap-2.5 lg:gap-4">
                   <h3 className={groupTitle}>Ton und Farbe</h3>
                   {(
                     [
