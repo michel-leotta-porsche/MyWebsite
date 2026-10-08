@@ -398,7 +398,8 @@ export function Carousel({
                       onClick={() => go(i)}
                       aria-label={`${s.book?.title ?? "Neues Buch"}, ${i + 1} von ${slides.length}`}
                       aria-current={i === near}
-                      className="group grid h-6 w-5 place-items-center"
+                      // Trefferfläche 44 hoch, die Reihe bleibt so flach wie die Punkte
+                      className="group -my-2.5 grid h-11 w-7 place-items-center"
                     >
                       <span aria-hidden className={`room-dot ${i === near ? "is-on" : ""}`} />
                     </button>

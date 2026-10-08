@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { books as sampleBooks, type BookData } from "@/content/books";
-import { Ellipsis, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronRight, Ellipsis, EyeOff, Flag, Gift, Pencil, RotateCw, Trash2 } from "lucide-react";
 
-import { RequireUser, RoomNav, TextButton, Wordmark } from "@/components/app-ui";
+import { RequireUser, RoomNav, Wordmark } from "@/components/app-ui";
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { ListGroup, ListRow } from "@/components/ui/list";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Sheet } from "@/components/ui/sheet";
 import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
@@ -51,15 +53,12 @@ export function BookRoom() {
 
 /** bundled: mitgeliefert (Beispielbuch oder Michels Bände), lässt sich nur weglegen */
 type Item = { book: BookData; stored?: StoredBook; gift?: Share; bundled?: true };
-type More = { stored: StoredBook } | { gift: Share } | { bundled: BookData };
 
 function Room({ user }: { user: User }) {
   const room = useRoom(user.uid);
-  const [more, setMore] = useState<More | null>(null);
   const [returns, setReturns] = useState<{ book: BookData; stored: StoredBook } | null>(null);
   const [sharing, setSharing] = useState<StoredBook | null>(null);
   const [reporting, setReporting] = useState<Share | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [emptying, setEmptying] = useState(false);
@@ -109,10 +108,15 @@ function Room({ user }: { user: User }) {
 
   const zoneError = (text: string | undefined, zone: "own" | "gifts") =>
     text && (
-      <p role="alert" className="text-on-table text-sm">
-        Konnte {zone === "own" ? "deine Bücher" : "die Bücher von Freunden"} nicht laden: {text}{" "}
-        <TextButton onClick={() => room.retry(zone)}>Nochmal versuchen</TextButton>
-      </p>
+      <div role="alert" className="text-on-table flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        <span>
+          Konnte {zone === "own" ? "deine Bücher" : "die Bücher von Freunden"} nicht laden: {text}
+        </span>
+        <Button size="sm" onClick={() => room.retry(zone)}>
+          <RotateCw aria-hidden />
+          Nochmal versuchen
+        </Button>
+      </div>
     );
 
   // bis die Bücher da sind, hält ein unsichtbarer Platz die Höhe eines Buchs
@@ -216,9 +220,23 @@ function Room({ user }: { user: User }) {
                 )
               }
             >
-              <IconButton label="Mehr" onClick={() => setMore({ bundled: b })}>
-                <Ellipsis aria-hidden />
-              </IconButton>
+              <Menu
+                trigger={
+                <IconButton label="Mehr">
+                  <Ellipsis aria-hidden />
+                </IconButton>
+              }
+              >
+                <MenuItem
+                  icon={<Archive aria-hidden />}
+                  onClick={() => {
+                    shelf.putAway(b.id);
+                    undoable(`„${b.title}“ liegt nicht mehr in deinem Zimmer.`, () => shelf.putBack(b.id));
+                  }}
+                >
+                  Aus dem Zimmer nehmen
+                </MenuItem>
+              </Menu>
             </Panel>
           );
         }
@@ -256,9 +274,21 @@ function Room({ user }: { user: User }) {
                 Hinlegen für …
               </Button>}
             {s && (
-              <IconButton label="Mehr" onClick={() => setMore({ stored: s })}>
-                <Ellipsis aria-hidden />
-              </IconButton>
+              <Menu
+                trigger={
+                <IconButton label="Mehr">
+                  <Ellipsis aria-hidden />
+                </IconButton>
+              }
+              >
+                <MenuItem icon={<Gift aria-hidden />} onClick={() => setSharing(s)}>
+                  Hinlegen für …
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem danger icon={<Trash2 aria-hidden />} onClick={() => undoable(`„${s.title || "Ohne Titel"}“ liegt im Papierkorb.`, room.toTrash(s))}>
+                  In den Papierkorb
+                </MenuItem>
+              </Menu>
             )}
           </Panel>
         );
@@ -278,7 +308,7 @@ function Room({ user }: { user: User }) {
             const b = await importBook(f, user.uid, user.displayName ?? "Ich");
             router.push(`/neu?id=${b.id}`);
           } catch (err) {
-            setError(friendlyError(err));
+            notify(friendlyError(err));
           }
         }}
       />
@@ -297,9 +327,24 @@ function Room({ user }: { user: User }) {
         if (!slide.book || !g) return null;
         return (
           <Panel title={slide.book.title} meta={`von ${g.fromName} · ${slide.book.plates.length} Tafeln`} book={slide.book}>
-            <IconButton label="Mehr" onClick={() => setMore({ gift: g })}>
-              <Ellipsis aria-hidden />
-            </IconButton>
+            <Menu
+              trigger={
+              <IconButton label="Mehr">
+                <Ellipsis aria-hidden />
+              </IconButton>
+            }
+            >
+              <MenuItem icon={<Archive aria-hidden />} onClick={() => undoable(`„${g.book.title || "Ohne Titel"}“ liegt nicht mehr in deinem Zimmer.`, room.dropGift(g))}>
+                Aus dem Zimmer nehmen
+              </MenuItem>
+              <MenuItem icon={<Flag aria-hidden />} onClick={() => setReporting(g)}>
+                Melden …
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem danger icon={<EyeOff aria-hidden />} onClick={() => room.block(g)}>
+                Bücher von {g.fromName} ausblenden
+              </MenuItem>
+            </Menu>
           </Panel>
         );
       }}
@@ -334,49 +379,63 @@ function Room({ user }: { user: User }) {
           </div>
           {giftsFirst ? [forYou, fromYou] : [fromYou, forYou]}
           {putAway.length > 0 && (
-            <section aria-label="Weggelegt" className="text-on-table-2 text-sm">
-              <h2>Weggelegt</h2>
-              <ul className="mt-2 max-w-xl">
+            <section aria-labelledby="weggelegt-h" className="grid max-w-xl gap-2">
+              <h2 id="weggelegt-h" className="text-on-table-2 text-sm">
+                Weggelegt
+              </h2>
+              <ListGroup>
                 {putAway.map((b) => (
-                  <li key={b.id} className="flex items-baseline justify-between gap-4 border-t border-on-table-2/25 py-2.5">
-                    <span className="text-on-table min-w-0 truncate">
-                      {b.title} <span className="text-on-table-2">· {owner ? "mitgeliefert" : "Beispiel"}</span>
-                    </span>
-                    <TextButton onClick={() => shelf.putBack(b.id)}>Zurücklegen</TextButton>
-                  </li>
+                  <ListRow
+                    key={b.id}
+                    lead={<Archive aria-hidden />}
+                    title={b.title}
+                    detail={owner ? "Mitgeliefert" : "Beispiel"}
+                    trail={
+                      <IconButton label={`${b.title} zurücklegen`} onClick={() => shelf.putBack(b.id)}>
+                        <ArchiveRestore aria-hidden />
+                      </IconButton>
+                    }
+                  />
                 ))}
-              </ul>
+              </ListGroup>
             </section>
           )}
           {trash.length > 0 && (
-            <section aria-label="Papierkorb" className="text-on-table-2 text-sm">
-              <TextButton className="text-on-table-2" aria-expanded={showTrash} onClick={() => setShowTrash((v) => !v)}>
+            <section aria-label="Papierkorb" className="grid max-w-xl justify-items-start gap-3">
+              <Button size="sm" aria-expanded={showTrash} onClick={() => setShowTrash((v) => !v)}>
+                <Trash2 aria-hidden />
                 Papierkorb ({trash.length})
-              </TextButton>
+              </Button>
               {showTrash && (
                 <>
-                  <p className="mt-2 max-w-xl text-[13px]">Bücher im Papierkorb liegen nirgends aus, ihre geteilten Links zeigen nichts mehr.</p>
-                  <ul className="mt-4 max-w-xl">
+                  <p className="text-on-table-2 text-[13px]">Bücher im Papierkorb liegen nirgends aus, ihre geteilten Links zeigen nichts mehr.</p>
+                  <ListGroup className="w-full">
                     {trash.map((b) => (
-                      <li key={b.id} className="flex items-baseline justify-between gap-4 border-t border-on-table-2/25 py-2.5">
-                        <span className="text-on-table min-w-0 truncate">
-                          {b.title || "Ohne Titel"} <span className="text-on-table-2">· {b.photos.filter((p) => !p.shelved).length} Fotos</span>
-                        </span>
-                        <TextButton onClick={() => room.restore(b)}>Zurücklegen</TextButton>
-                      </li>
+                      <ListRow
+                        key={b.id}
+                        title={<span className="block truncate">{b.title || "Ohne Titel"}</span>}
+                        detail={fotos(b.photos.filter((p) => !p.shelved).length)}
+                        trail={
+                          <IconButton label={`${b.title || "Ohne Titel"} zurücklegen`} onClick={() => room.restore(b)}>
+                            <ArchiveRestore aria-hidden />
+                          </IconButton>
+                        }
+                      />
                     ))}
-                    <li className="border-t border-on-table-2/25 pt-3">
-                      <TextButton onClick={() => setConfirmEmpty(true)}>Papierkorb leeren …</TextButton>
-                    </li>
-                  </ul>
+                    <ListRow
+                      danger
+                      lead={<Trash2 aria-hidden />}
+                      title="Papierkorb leeren …"
+                      onClick={() => {
+                        // kein Hinweis von vorhin soll über „Endgültig löschen“ liegen
+                        notify.dismiss();
+                        setConfirmEmpty(true);
+                      }}
+                    />
+                  </ListGroup>
                 </>
               )}
             </section>
-          )}
-          {error && (
-            <p role="alert" className="text-on-table text-sm">
-              {error}
-            </p>
           )}
           {returns && (
             <ReturnsDialog
@@ -392,85 +451,6 @@ function Room({ user }: { user: User }) {
         </Table>
       </Library>
 
-      {more && (
-        <RoomSheet
-          title={("stored" in more ? more.stored.title : "gift" in more ? more.gift.book.title : more.bundled.title) || "Ohne Titel"}
-          onClose={() => setMore(null)}
-        >
-          {"bundled" in more ? (
-            <Actions>
-              <Action
-                onClick={() => {
-                  const b = more.bundled;
-                  setMore(null);
-                  shelf.putAway(b.id);
-                  undoable(`„${b.title}“ liegt nicht mehr in deinem Zimmer.`, () => shelf.putBack(b.id));
-                }}
-                hint="Unten bei „Weggelegt“ lässt es sich zurücklegen"
-              >
-                Aus dem Zimmer nehmen
-              </Action>
-            </Actions>
-          ) : "stored" in more ? (
-            <Actions>
-              <Action
-                onClick={() => {
-                  setSharing(more.stored);
-                  setMore(null);
-                }}
-                hint="Ein persönlicher Link pro Person, jederzeit zurückziehbar"
-              >
-                Hinlegen für …
-              </Action>
-              <Action
-                onClick={() => {
-                  const s = more.stored;
-                  setMore(null);
-                  undoable(`„${s.title || "Ohne Titel"}“ liegt im Papierkorb.`, room.toTrash(s));
-                }}
-                hint="Von dort lässt es sich zurücklegen"
-              >
-                In den Papierkorb
-              </Action>
-            </Actions>
-          ) : (
-            <Actions>
-              <p className="text-ink-2 text-sm">
-                Für {more.gift.to}, von {more.gift.fromName}.
-              </p>
-              <Action
-                onClick={() => {
-                  const g = more.gift;
-                  setMore(null);
-                  undoable(`„${g.book.title || "Ohne Titel"}“ liegt nicht mehr in deinem Zimmer.`, room.dropGift(g));
-                }}
-                hint={`Nur aus deinem Zimmer; bei ${more.gift.fromName} bleibt das Buch`}
-              >
-                Aus dem Zimmer nehmen
-              </Action>
-              <Action
-                onClick={() => {
-                  setReporting(more.gift);
-                  setMore(null);
-                }}
-                hint="Wenn das Buch gegen die Nutzungsbedingungen verstößt"
-              >
-                Melden …
-              </Action>
-              <Action
-                onClick={() => {
-                  const g = more.gift;
-                  setMore(null);
-                  room.block(g);
-                }}
-                hint={`Alle Bücher von ${more.gift.fromName} verschwinden; im Profil zurücknehmbar`}
-              >
-                Bücher von {more.gift.fromName} ausblenden
-              </Action>
-            </Actions>
-          )}
-        </RoomSheet>
-      )}
       {reporting && (
         <ReportDialog share={reporting} reporter={user.uid} onClose={() => setReporting(null)} onBlock={() => room.block(reporting)} />
       )}
@@ -560,6 +540,7 @@ function whereOf(s: Spread | undefined): string {
   return `bei ${s.to.length <= 2 ? s.to.join(" und ") : `${s.to.slice(0, 2).join(", ")} +${s.to.length - 2}`}`;
 }
 
+const fotos = (n: number) => (n === 1 ? "Ein Foto" : `${n} Fotos`);
 const earWord = (n: number) => (n === 1 ? "Eselsohr" : "Eselsohren");
 const plateOf = (book: BookData, no?: number) => (no ? book.plates.find((p) => p.no === no) : undefined);
 
@@ -597,7 +578,7 @@ function Panel({
 }) {
   const { open } = useContext(OpenBook);
   return (
-    <div className="mx-auto grid w-full max-w-md gap-1">
+    <div className="mx-auto grid w-full max-w-lg gap-1">
       <h3 className="text-on-table text-[28px] leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
         {title}
       </h3>
@@ -647,12 +628,13 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
   const head = [notes.length && `${notes.length} Zettel`, ears.length && `${ears.length} ${earWord(ears.length)}`, fresh && `${fresh} neu`].filter(Boolean).join(" · ");
   return (
     <div className="mt-6 grid gap-4">
-      <p className="text-on-table-2 flex items-baseline justify-between gap-3 text-[13px]">
+      <div className="text-on-table-2 flex items-center justify-between gap-3 text-[13px]">
         <span>{head}</span>
-        <TextButton className="text-on-table-2" onClick={onAll}>
+        <Button size="sm" onClick={onAll}>
           Alle
-        </TextButton>
-      </p>
+          <ChevronRight aria-hidden />
+        </Button>
+      </div>
       {notes.length > 0 && (
         <button
           type="button"
@@ -733,7 +715,7 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
       <p className="text-ink-2 text-sm">
         {[notes && `${notes} Zettel`, ears && `${ears} ${earWord(ears)}`].filter(Boolean).join(" · ")} · {whereOf(spread)}
       </p>
-      <ul className="mt-3">
+      <ListGroup paper className="mt-3" label="Zettel und Eselsohren">
         {items.map((n) => (
           <FeedbackRow
             key={`${n.token}-${n.id}`}
@@ -745,7 +727,7 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
             }}
           />
         ))}
-      </ul>
+      </ListGroup>
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <Button
           variant="ink"
@@ -768,26 +750,29 @@ function FeedbackRow({ book, n, onPlate }: { book: BookData; n: Feedback; onPlat
   const when = n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
   const place = n.no ? `Tafel ${n.no}` : null;
   const sub = [n.who, place, when].filter(Boolean).join(" · ");
+  // Eselsohren führen ins Buch (Pfeil), Zettel bleiben Zettel in Handschrift
   return n.kind === "ear" ? (
-    <li className="border-t border-ink/15">
-      <button type="button" onClick={() => n.no && onPlate(n.no)} className="group flex w-full items-center gap-3 py-2.5 text-left">
-        <EarThumb book={book} no={n.no} className="h-12 w-9" cut="bg-[var(--slip)]" />
-        <span className="text-sm">
+    <ListRow
+      paper
+      lead={<EarThumb book={book} no={n.no} className="h-12 w-9" cut="bg-[var(--slip)]" />}
+      title={
+        <span className="font-normal">
           <span className="font-semibold">{n.who}</span> hat {place ?? "eine Tafel"} geknickt
-          <span className="text-ink-2 block text-xs">
-            {when ? `${when} · ` : ""}
-            <span className="underline decoration-transparent decoration-2 underline-offset-4 group-hover:decoration-mark">dort aufschlagen</span>
-          </span>
         </span>
-      </button>
-    </li>
+      }
+      detail={when ? `${when} · dort aufschlagen` : "Dort aufschlagen"}
+      onClick={n.no ? () => onPlate(n.no!) : undefined}
+    />
   ) : (
-    <li className="border-t border-ink/15 py-2.5">
-      <p className="text-[22px] leading-[1.05]" style={{ fontFamily: "var(--font-hand), cursive" }}>
-        „{n.text}“
-      </p>
-      <p className="text-ink-2 mt-1 text-xs">{sub}</p>
-    </li>
+    <ListRow
+      paper
+      title={
+        <span className="block text-[22px] leading-[1.05] font-normal" style={{ fontFamily: "var(--font-hand), cursive" }}>
+          „{n.text}“
+        </span>
+      }
+      detail={sub}
+    />
   );
 }
 
@@ -816,21 +801,5 @@ function SampleBand() {
     <span aria-hidden className="sample-band">
       Beispiel
     </span>
-  );
-}
-
-function Actions({ children }: { children: ReactNode }) {
-  return <div className="grid gap-1">{children}</div>;
-}
-
-/** Eine Zeile im Zettel: Handlung groß, was sie bewirkt klein darunter */
-function Action({ onClick, hint, children }: { onClick: () => void; hint: string; children: ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="group grid border-t border-ink/15 py-3 text-left first:border-t-0">
-      <span className="text-ink font-semibold underline decoration-transparent decoration-2 underline-offset-4 transition-colors duration-150 group-hover:decoration-mark">
-        {children}
-      </span>
-      <span className="text-ink-2 text-[13px]">{hint}</span>
-    </button>
   );
 }
