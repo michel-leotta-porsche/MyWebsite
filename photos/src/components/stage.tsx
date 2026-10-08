@@ -21,11 +21,13 @@ import {
   type AbsStroke,
   type PathEl,
 } from "@/content/shapes";
-import { BringToFront, ChevronDown, ChevronLeft, ChevronUp, Copy, Crop, Grid3x3, Plus, Redo2, RotateCcw, SendToBack, SlidersHorizontal, Trash, Undo2 } from "lucide-react";
+import { BringToFront, Captions, CaptionsOff, Check, ChevronDown, ChevronLeft, ChevronUp, Copy, Crop, Ellipsis, Grid3x3, Images, Layers, PenLine, Plus, Redo2, RotateCcw, SendToBack, Shapes, SlidersHorizontal, Trash, Type, Undo2 } from "lucide-react";
 
 import { Button, buttonClass, IconButton as ToolIcon, ToolGroup } from "@/components/ui/button";
 import { Field, noteClass } from "@/components/ui/field";
+import { Menu, MenuItem } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/segmented";
+import { Sheet } from "@/components/ui/sheet";
 import { CropDialog } from "@/components/crop-dialog";
 import { PageView } from "@/components/page-view";
 import {
@@ -192,7 +194,6 @@ export function Stage({
   /** Handy: offenes Fach der Leiste unten (null = zugeklappt) */
   const [dock, setDock] = useState<Dock | null>("photos");
   /** Handy: Menü hinter „…“ im Kopf */
-  const [moreOpen, setMoreOpen] = useState(false);
   /** Foto aus „Alle Fotos“ mit dem Finger auf die Seite ziehen (HTML-Drag gibt es auf dem iPhone nicht) */
   const pull = useRef<{ key: string; id: number; sx: number; sy: number; active: boolean } | null>(null);
   const pulled = useRef(false);
@@ -1461,7 +1462,7 @@ export function Stage({
             aria-label={`Breite ${ps.label}`}
             title={ps.label}
             onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
-            className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150 ${pen.s === ps.s ? "bg-on-table/16 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.4)]" : "hover:bg-on-table/8"}`}
+            className={`flex size-9 items-center justify-center rounded-full transition-colors duration-150 pointer-coarse:size-11 ${pen.s === ps.s ? "bg-on-table/16 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.4)]" : "hover:bg-on-table/8"}`}
           >
             <span aria-hidden className="bg-on-table block rounded-full" style={{ width: 4 + ps.s * 6, height: 4 + ps.s * 6 }} />
           </button>
@@ -1480,20 +1481,39 @@ export function Stage({
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
       {phone ? (
         // Handy: eine schlanke Zeile; Raster, Ebenen und Zurücksetzen stehen hinter „…“
-        <header className="sticky top-0 z-30 flex items-center gap-1 bg-table/95 px-1 pt-[env(safe-area-inset-top)]">
-          <button type="button" data-stage-first onClick={onClose} className="text-on-table flex h-11 w-11 shrink-0 items-center justify-center">
-            <span className="sr-only">Zur Übersicht</span>
-            <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]">
-              <path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" strokeWidth={1.8} />
-            </svg>
-          </button>
+        <header className="sticky top-0 z-30 flex items-center gap-1.5 bg-table/95 px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]">
+          <ToolIcon label="Zur Übersicht" data-stage-first onClick={onClose} className="!bg-transparent !shadow-none">
+            <ChevronLeft aria-hidden />
+          </ToolIcon>
           <span className="text-on-table min-w-0 flex-1 truncate font-semibold">Doppelseite {index + 1}</span>
           {onDevelop && firstKey && (
-            <IconButton label="Fotos bearbeiten" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)} d="M4 7h9 M17 7h3 M15 4.5v5 M4 17h3 M11 17h9 M9 14.5v5" />
+            <ToolIcon label="Fotos bearbeiten" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>
+              <SlidersHorizontal aria-hidden />
+            </ToolIcon>
           )}
-          <IconButton label="Rückgängig" disabled={!canUndo} onClick={onUndo} d="M9 5L4 10l5 5 M4 10h11a5 5 0 010 10h-3" />
-          <IconButton label="Wiederholen" disabled={!canRedo} onClick={onRedo} d="M15 5l5 5-5 5 M20 10H9a5 5 0 000 10h3" />
-          <IconButton label="Mehr" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((o) => !o)} dots />
+          <ToolGroup label="Verlauf">
+            <ToolIcon label="Rückgängig" disabled={!canUndo} onClick={onUndo}>
+              <Undo2 aria-hidden />
+            </ToolIcon>
+            <ToolIcon label="Wiederholen" disabled={!canRedo} onClick={onRedo}>
+              <Redo2 aria-hidden />
+            </ToolIcon>
+          </ToolGroup>
+          <Menu trigger={<ToolIcon label="Mehr"><Ellipsis aria-hidden /></ToolIcon>}>
+            <MenuItem icon={<Grid3x3 aria-hidden />} onClick={toggleGrid}>
+              {gridOn ? "Raster ausblenden" : "Raster zeigen"}
+            </MenuItem>
+            {shown.length > 1 && (
+              <MenuItem icon={<Layers aria-hidden />} onClick={() => setLayersOpen(true)}>
+                Ebenen
+              </MenuItem>
+            )}
+            {free && (
+              <MenuItem icon={<RotateCcw aria-hidden />} onClick={onReset}>
+                Auf Vorschlag zurücksetzen
+              </MenuItem>
+            )}
+          </Menu>
         </header>
       ) : (
       <header className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 bg-table/95 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 backdrop-blur-sm md:px-8">
@@ -1553,23 +1573,10 @@ export function Stage({
               <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
             </div>
           )}
-          {phone && layersOpen && shown.length > 1 && (
-            <div className="fixed inset-0 z-[85]" onPointerDown={(e) => e.target === e.currentTarget && setLayersOpen(false)}>
-              <div
-                role="dialog"
-                aria-label="Ebenen"
-                className="slip text-ink fixed inset-x-0 bottom-0 max-h-[55vh] overflow-y-auto px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-18px_36px_-14px_rgb(12_10_8/0.8)]"
-              >
-                <div className="mb-1 flex items-baseline justify-between">
-                  <p className="text-sm font-semibold">Ebenen</p>
-                  <button type="button" className="min-h-11 px-2 text-sm underline underline-offset-4" onClick={() => setLayersOpen(false)}>
-                    Fertig
-                  </button>
-                </div>
-                <p className="text-ink-2 mb-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
-                {layerList()}
-              </div>
-            </div>
+          {phone && shown.length > 1 && (
+            <Sheet open={layersOpen} onOpenChange={setLayersOpen} title="Ebenen" description="Oben liegt vorn. Antippen wählt, auch was verdeckt ist.">
+              {layerList()}
+            </Sheet>
           )}
           {cropping ? (
             <div className="mb-4 flex min-h-9 items-center gap-x-2 overflow-hidden" role="toolbar" aria-label="Zuschneiden">
@@ -1580,17 +1587,16 @@ export function Stage({
               <Button size="sm" className="shrink-0" onClick={() => setCropMsg("cancel")}>
                 Abbrechen
               </Button>
-              <Button
-                size="sm"
-                className="shrink-0"
+              <ToolIcon
+                label="Ausschnitt genauer einstellen"
                 onClick={() => {
                   const id = cropping;
                   setCropMsg("cancel");
                   setCrop(id);
                 }}
               >
-                Mehr …
-              </Button>
+                <Ellipsis aria-hidden />
+              </ToolIcon>
               <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
             </div>
           ) : phone ? null : (
@@ -1914,30 +1920,40 @@ export function Stage({
             <nav aria-label="Werkzeuge" className={`bg-table-deep border-on-table/15 ${landscape ? "relative" : "sticky bottom-0"} z-[75] -mx-4 mt-4 border-t pb-[env(safe-area-inset-bottom)] md:-mx-8`}>
               {selTray?.t === "photo" && (
                 <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label="Foto">
-                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+                  <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
                     {onDevelop && (
-                      <button type="button" onClick={() => onDevelop(selTray.key)} className="bg-on-table text-table min-h-11 shrink-0 px-4 text-sm font-semibold">
-                        Bearbeiten …
-                      </button>
+                      <Button size="sm" onClick={() => onDevelop(selTray.key)} className="shrink-0">
+                        <SlidersHorizontal aria-hidden />
+                        Bearbeiten
+                      </Button>
                     )}
-                    {[
-                      { label: "Ausschnitt …", run: () => setCropping(selTray.id) },
-                      { label: selTray.caption === "auto" ? "Unterschrift aus" : "Unterschrift an", run: () => commit(items.map((i) => (i.id === selTray.id ? { ...i, caption: selTray.caption === "auto" ? "off" : "auto" } : i))) },
-                      { label: "Nach vorn", run: () => layer(selTray.id, "up"), off: !canLayer(selTray.id, "up") },
-                      { label: "Nach hinten", run: () => layer(selTray.id, "down"), off: !canLayer(selTray.id, "down") },
-                      { label: "Duplizieren", run: () => duplicate(selTray) },
-                      { label: "Aus dem Buch", run: () => remove(selTray) },
-                    ].map((a) => (
-                      <button
-                        key={a.label}
-                        type="button"
-                        disabled={a.off}
-                        onClick={a.run}
-                        className="border-on-table/60 text-on-table min-h-11 shrink-0 border px-3 text-sm disabled:opacity-35"
+                    <ToolGroup label="Foto">
+                      <ToolIcon label="Ausschnitt" onClick={() => setCropping(selTray.id)}>
+                        <Crop aria-hidden />
+                      </ToolIcon>
+                      <ToolIcon
+                        label={selTray.caption === "auto" ? "Unterschrift aus" : "Unterschrift an"}
+                        aria-pressed={selTray.caption === "auto"}
+                        onClick={() => commit(items.map((i) => (i.id === selTray.id ? { ...i, caption: selTray.caption === "auto" ? "off" : "auto" } : i)))}
                       >
-                        {a.label}
-                      </button>
-                    ))}
+                        {selTray.caption === "auto" ? <Captions aria-hidden /> : <CaptionsOff aria-hidden />}
+                      </ToolIcon>
+                      <ToolIcon label="Aus dem Buch nehmen" onClick={() => remove(selTray)}>
+                        <Trash aria-hidden />
+                      </ToolIcon>
+                    </ToolGroup>
+                    {/* seltener gebraucht: Ebene und Duplizieren hinter „Mehr“ */}
+                    <Menu align="end" trigger={<ToolIcon label="Mehr zum Foto"><Ellipsis aria-hidden /></ToolIcon>}>
+                      <MenuItem icon={<BringToFront aria-hidden />} disabled={!canLayer(selTray.id, "up")} onClick={() => layer(selTray.id, "up")}>
+                        Nach vorn
+                      </MenuItem>
+                      <MenuItem icon={<SendToBack aria-hidden />} disabled={!canLayer(selTray.id, "down")} onClick={() => layer(selTray.id, "down")}>
+                        Nach hinten
+                      </MenuItem>
+                      <MenuItem icon={<Copy aria-hidden />} onClick={() => duplicate(selTray)}>
+                        Duplizieren
+                      </MenuItem>
+                    </Menu>
                   </div>
                   <p className="text-on-table-2 mt-2 text-[13px]">Ziehen verschiebt, zwei Finger ändern die Größe.</p>
                 </div>
@@ -1991,21 +2007,25 @@ export function Stage({
                   )}
                 </div>
               )}
-              <div className="grid grid-cols-4">
-                {(Object.keys(DOCKS) as Dock[]).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    aria-pressed={!selTray && activeDock === d}
-                    onClick={() => openDock(d)}
-                    className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[12px] transition-colors duration-150 ${!selTray && activeDock === d ? "text-on-table shadow-[inset_0_2px_var(--mark)]" : "text-on-table-2"}`}
-                  >
-                    <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round">
-                      {DOCKS[d].icon}
-                    </svg>
-                    {DOCKS[d].label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-4 px-2 pt-1.5 pb-1">
+                {(Object.keys(DOCKS) as Dock[]).map((d) => {
+                  const on = !selTray && activeDock === d;
+                  const Icon = DOCKS[d].icon;
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => openDock(d)}
+                      className={`flex min-h-12 flex-col items-center justify-center gap-0.5 text-[12px] font-semibold transition-colors duration-150 ${on ? "text-on-table" : "text-on-table-2"}`}
+                    >
+                      <span aria-hidden className={`grid h-7 w-14 place-items-center rounded-full transition-colors duration-150 ${on ? "bg-on-table/14" : ""}`}>
+                        <Icon className="size-[20px]" strokeWidth={1.75} />
+                      </span>
+                      {DOCKS[d].label}
+                    </button>
+                  );
+                })}
               </div>
             </nav>
           )}
@@ -2202,34 +2222,6 @@ export function Stage({
         </aside>
       </div>
 
-      {/* Handy: Menü hinter „…“; liegt außerhalb des Kopfs, damit es auch die Leiste unten überdeckt */}
-      {phone && moreOpen && (
-        <>
-          <div className="fixed inset-0 z-[84]" onPointerDown={() => setMoreOpen(false)} />
-          <div role="menu" aria-label="Mehr" onKeyDown={(e) => e.key === "Escape" && setMoreOpen(false)} className="slip text-ink fixed top-[calc(env(safe-area-inset-top)+44px)] right-2 z-[85] w-64 shadow-[0_18px_36px_-10px_rgb(12_10_8/0.8)]">
-            {[
-              { label: gridOn ? "Raster ausblenden" : "Raster zeigen", run: toggleGrid, show: true },
-              { label: "Ebenen", run: () => setLayersOpen(true), show: shown.length > 1 },
-              { label: "Auf Vorschlag zurücksetzen", run: onReset, show: free },
-            ]
-              .filter((m) => m.show)
-              .map((m) => (
-                <button
-                  key={m.label}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    m.run();
-                  }}
-                  className="border-ink/10 block min-h-12 w-full border-t px-4 text-left first:border-t-0"
-                >
-                  {m.label}
-                </button>
-              ))}
-          </div>
-        </>
-      )}
       {menu && <ContextMenu x={menu.cx} y={menu.cy} sheet={coarse} entries={menuEntries()} onClose={() => setMenu(null)} />}
       {cropItem && cropItem.t === "photo" && photos.get(cropItem.key) && (
         <CropDialog
@@ -2402,14 +2394,18 @@ function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; 
         role="menu"
         aria-label="Aktionen"
         onKeyDown={move}
-        className={`slip text-ink fixed py-1.5 shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)] ${
-          sheet ? "inset-x-0 bottom-0 max-h-[70svh] overflow-y-auto overscroll-contain pb-[max(0.375rem,env(safe-area-inset-bottom))] text-base" : "min-w-56 text-sm"
+        className={`slip text-ink fixed overflow-hidden ${
+          sheet
+            ? "inset-x-0 bottom-0 max-h-[70svh] overflow-y-auto overscroll-contain rounded-t-cut px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
+            : "min-w-56 rounded-tool py-1.5 text-sm shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]"
         }`}
         style={sheet ? undefined : pos}
       >
+        {/* Handy: Blatt von unten mit Griff wie die anderen Blätter */}
+        {sheet && <div aria-hidden className="bg-ink/20 mx-auto mb-2 h-[5px] w-10 rounded-full" />}
         {entries.map((en, i) =>
           en === "sep" ? (
-            <div key={i} role="separator" className="my-1.5 border-t border-ink/15" />
+            <div key={i} role="separator" className="bg-ink/12 mx-2 my-1 h-px" />
           ) : (
             <button
               key={i}
@@ -2422,10 +2418,10 @@ function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; 
                 onClose();
                 en.run();
               }}
-              className={`hover:bg-ink/8 focus-visible:bg-ink/8 flex disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 text-left focus-visible:outline-none ${sheet ? "min-h-12 px-5" : "min-h-8 px-3"}`}
+              className={`hover:bg-ink/8 focus-visible:bg-ink/8 flex disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 text-left focus-visible:outline-none ${sheet ? "min-h-12 rounded-full px-3" : "min-h-8 px-3"}`}
             >
-              <span aria-hidden className="w-3 text-center">
-                {en.checked ? "✓" : ""}
+              <span aria-hidden className="grid w-4 place-items-center">
+                {en.checked && <Check className="size-4" />}
               </span>
               <span className="flex-1">{en.label}</span>
               {en.hint && !sheet && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
@@ -2734,7 +2730,7 @@ function TextToolbar({
   const pt = Math.round(m.size * PT);
   const setPt = (v: number) => onLook({ size: Math.min(40, Math.max(1.6, v / PT)) }, `size-${item.id}`);
   const above = box.y > 9;
-  const btn = "flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 text-sm transition-colors duration-150 hover:bg-ink/8";
+  const btn = "flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 text-sm pointer-coarse:h-11 pointer-coarse:min-w-11 transition-colors duration-150 hover:bg-ink/8";
   const on = "bg-ink text-paper hover:bg-ink";
   const colors = [...SWATCHES, { label: "Einband", value: cloth }];
   // im Bildschirm halten: am Handy ragte die Leiste über die Seitenkante, „Fett“ und Farben waren nicht erreichbar (iPhone-Workshop, Befund 6)
@@ -2776,7 +2772,7 @@ function TextToolbar({
         id={`font-${item.id}`}
         value={m.font}
         onChange={(e) => onLook({ font: e.target.value === "grotesk" ? null : (e.target.value as FontKey) })}
-        className="bg-ink/6 h-8 rounded-full border-0 px-3 text-sm shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
+        className="bg-ink/6 h-8 rounded-full border-0 px-3 text-sm pointer-coarse:h-11 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
         style={{ fontFamily: FONTS[m.font].css }}
       >
         {(Object.keys(FONTS) as FontKey[]).map((f) => (
@@ -2799,7 +2795,7 @@ function TextToolbar({
           max={170}
           value={pt}
           onChange={(e) => e.target.value && setPt(Number(e.target.value))}
-          className="bg-ink/6 h-8 w-12 rounded-full border-0 text-center text-sm tabular-nums shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
+          className="bg-ink/6 h-8 w-12 rounded-full border-0 pointer-coarse:h-11 text-center text-sm tabular-nums shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
         />
         <button type="button" className={btn} aria-label="größer" onClick={() => setPt(pt + (pt >= 24 ? 4 : 1))}>
           +
@@ -2845,12 +2841,12 @@ function TextToolbar({
               aria-label={`Farbe ${c.label}`}
               aria-pressed={active}
               onClick={() => onLook({ color: c.value })}
-              className={`h-6 w-6 rounded-cut border ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
+              className={`size-6 rounded-cut border pointer-coarse:size-11 ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
               style={{ background: c.value ?? "var(--ink)" }}
             />
           );
         })}
-        <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-cut border border-ink/30" title="Eigene Farbe">
+        <label className="relative size-6 cursor-pointer overflow-hidden rounded-cut pointer-coarse:size-11 border border-ink/30" title="Eigene Farbe">
           <span className="sr-only">Eigene Farbe</span>
           <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
           <input
@@ -2947,7 +2943,7 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label="keine Fläche"
           title="keine"
           onClick={() => onPick(null)}
-          className={`relative h-7 w-7 overflow-hidden rounded-cut border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`relative size-7 overflow-hidden rounded-cut pointer-coarse:size-11 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
         >
           <svg aria-hidden viewBox="0 0 10 10" className="absolute inset-0 h-full w-full">
             <line x1={1} y1={9} x2={9} y2={1} stroke="#cc7048" strokeWidth={1} />
@@ -2962,7 +2958,7 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label={`Farbe ${c.label}`}
           aria-pressed={value?.toLowerCase() === c.value.toLowerCase()}
           onClick={() => onPick(c.value)}
-          className={`h-7 w-7 rounded-cut border border-ink/30 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`size-7 rounded-cut border border-ink/30 pointer-coarse:size-11 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
           style={{ background: c.value }}
         />
       ))}
@@ -2975,44 +2971,12 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
   );
 }
 
-const DOCKS: Record<Dock, { label: string; icon: React.ReactNode }> = {
-  photos: {
-    label: "Fotos",
-    icon: (
-      <>
-        <rect x={3} y={5} width={18} height={14} />
-        <path d="M3 16l5-5 4 4 3-3 6 6" />
-      </>
-    ),
-  },
-  text: { label: "Text", icon: <path d="M5 6V4h14v2 M12 4v16 M9 20h6" /> },
-  draw: { label: "Zeichnen", icon: <path d="M4 20c3-1 5-6 9-10l4-4 2 2-4 4c-4 4-8 6-11 8z M15 6l2 2" /> },
-  shapes: {
-    label: "Formen",
-    icon: (
-      <>
-        <rect x={3} y={11} width={10} height={9} />
-        <circle cx={16} cy={8} r={5} />
-      </>
-    ),
-  },
+const DOCKS: Record<Dock, { label: string; icon: typeof Images }> = {
+  photos: { label: "Fotos", icon: Images },
+  text: { label: "Text", icon: Type },
+  draw: { label: "Zeichnen", icon: PenLine },
+  shapes: { label: "Formen", icon: Shapes },
 };
-
-/** Knopf nur mit Zeichen (Kopf auf dem Handy); der Name steht für Screenreader daneben */
-function IconButton({ label, d, dots, ...rest }: { label: string; d?: string; dots?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button type="button" title={label} className="text-on-table flex h-11 w-11 shrink-0 items-center justify-center disabled:opacity-35" {...rest}>
-      <span className="sr-only">{label}</span>
-      <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]">
-        {dots ? (
-          [5, 12, 19].map((cx) => <circle key={cx} cx={cx} cy={12} r={1.8} fill="currentColor" />)
-        ) : (
-          <path d={d} fill="none" stroke="currentColor" strokeWidth={1.7} />
-        )}
-      </svg>
-    </button>
-  );
-}
 
 const TOOL_INFO: Record<Tool, { label: string; key: string }> = {
   select: { label: "Auswahl", key: "V" },
@@ -3041,7 +3005,7 @@ function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; on
       aria-label={`${info.label} (${info.key})`}
       title={`${info.label} (${info.key})`}
       onClick={onClick}
-      className={`flex size-10 items-center justify-center rounded-full transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${active ? "bg-on-table text-table" : "text-on-table hover:bg-on-table/10"}`}
+      className={`flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${active ? "bg-on-table text-table" : "text-on-table hover:bg-on-table/10"}`}
     >
       <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
         {icon[tool]}
