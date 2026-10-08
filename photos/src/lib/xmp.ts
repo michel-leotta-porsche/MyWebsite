@@ -101,7 +101,7 @@ export function toPreset(xmp: string, name: string): string {
    crs:SupportsSceneReferred="True" crs:SupportsOutputReferred="True" crs:HasSettings="True"
    crs:ProcessVersion="15.4" ${attrs.join(" ")}>
    <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">${esc}</rdf:li></rdf:Alt></crs:Name>
-   <crs:Group><rdf:Alt><rdf:li xml:lang="x-default">Fujiventura</rdf:li></rdf:Alt></crs:Group>
+   <crs:Group><rdf:Alt><rdf:li xml:lang="x-default">Calima</rdf:li></rdf:Alt></crs:Group>
    ${curves.join("\n   ")}
   </rdf:Description>
  </rdf:RDF>

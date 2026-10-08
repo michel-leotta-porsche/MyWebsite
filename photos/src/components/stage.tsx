@@ -72,7 +72,7 @@ const HANDLES: { e: Edges; cls: string; cursor: string; name: string }[] = [
 /** Zwischenablage der Bühne; bleibt über Doppelseiten hinweg, gilt für jede Art von Element */
 let clipboard: { item: SpreadItem; marker: string } | null = null;
 const markerOf = (it: SpreadItem) =>
-  it.t === "text" ? it.text : it.t === "photo" ? `[Fujiventura: Foto ${it.key}]` : it.t === "shape" ? `[Fujiventura: ${SHAPES[it.kind].label}]` : "[Fujiventura: Zeichnung]";
+  it.t === "text" ? it.text : it.t === "photo" ? `[Calima: Foto ${it.key}]` : it.t === "shape" ? `[Calima: ${SHAPES[it.kind].label}]` : "[Calima: Zeichnung]";
 /** Element in die Zwischenablage legen; gibt den Text zurück, der in die Zwischenablage des Systems geht */
 function remember(it: SpreadItem) {
   clipboard = { item: structuredClone(it), marker: markerOf(it) };

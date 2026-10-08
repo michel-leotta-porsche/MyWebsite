@@ -31,7 +31,7 @@ export function Wordmark({ href = "/" }: { href?: string }) {
       className="text-on-table text-lg font-bold tracking-[-0.02em]"
       style={{ fontVariationSettings: '"wdth" 80' }}
     >
-      Fujiventura
+      Calima
     </Link>
   );
 }

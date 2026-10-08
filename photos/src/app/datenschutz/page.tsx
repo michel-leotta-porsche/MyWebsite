@@ -4,8 +4,8 @@ import Link from "next/link";
 import { LegalPage, LegalSection, Mail, OPERATOR } from "@/components/legal";
 
 export const metadata: Metadata = {
-  title: "Datenschutz · Fujiventura",
-  description: "Welche Daten Fujiventura verarbeitet, wo deine Fotos liegen und wie du sie löschst.",
+  title: "Datenschutz · Calima",
+  description: "Welche Daten Calima verarbeitet, wo deine Fotos liegen und wie du sie löschst.",
 };
 
 const inline = "text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline focus-visible:underline";

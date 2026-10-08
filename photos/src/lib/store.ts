@@ -154,7 +154,7 @@ export function toBookData(b: StoredBook): BookData {
       b.title || "Ohne Titel",
       `${numberWord(used.size)} Fotografien.`,
       `Fotografie: ${b.ownerName}`,
-      "Gebunden auf Fujiventura.",
+      "Gebunden mit Calima.",
       `© ${year} ${b.ownerName}`,
     ],
     aspect: b.aspect,
@@ -242,13 +242,14 @@ export async function listVersions(bookId: string): Promise<Version[]> {
 
 /** Ganzes Projekt als Datei; die Fotos bleiben im Konto und sind über ihre Links erreichbar */
 export function exportBook(b: StoredBook): Blob {
+  // Formatkennung bleibt aus der Zeit vor der Umbenennung, damit ältere Buchdateien weiter laden
   const data = { format: "fujiventura-buch", schema: SCHEMA, exportedAt: new Date().toISOString(), book: b };
   return new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
 }
 
 export async function importBook(file: File, owner: string, ownerName: string): Promise<StoredBook> {
   const data = JSON.parse(await file.text());
-  if (data?.format !== "fujiventura-buch" || !data.book) throw new Error("Keine Fujiventura-Buchdatei");
+  if (data?.format !== "fujiventura-buch" || !data.book) throw new Error("Keine Calima-Buchdatei");
   // als neues Buch im eigenen Konto: neue Kennung, man selbst ist Macher
   const b = migrate({ ...(data.book as StoredBook), id: newId(), owner, ownerName });
   await saveBook(b);

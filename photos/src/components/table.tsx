@@ -219,7 +219,7 @@ export function Table({
       <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-16 md:pt-6">
         {title ?? (
           <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-            Fujiventura
+            Calima
           </h1>
         )}
         {headerRight}

@@ -218,7 +218,7 @@ function Hero() {
         <SunAndShade light="sun" />
         <header ref={header} className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-4 md:px-8 md:pt-6">
           <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
-            Fujiventura
+            Calima
           </p>
           <nav aria-label="Auf dieser Seite" className="flex items-baseline gap-6 text-sm">
             <a href="#werkbank" className="text-on-table-2 decoration-mark hidden decoration-2 underline-offset-4 hover:text-on-table hover:underline md:inline">
@@ -558,7 +558,7 @@ function Closing() {
       <footer className="linen table-surface relative bg-table px-4 pb-10 text-sm text-on-table-2 md:px-8">
         <div className="border-on-table-2/25 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t pt-6">
           <p>
-            <span className="text-on-table font-semibold">Fujiventura</span> · Beispielfotos von Michel Leotta
+            <span className="text-on-table font-semibold">Calima</span> · Beispielfotos von Michel Leotta
           </p>
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <nav aria-label="Räume" className="flex gap-x-5">
