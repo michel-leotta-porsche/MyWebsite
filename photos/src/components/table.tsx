@@ -32,27 +32,32 @@ const featureSizes = (book: BookData) => (w: number) => {
 // Beim ersten Erscheinen in diesem Tab werden die Bücher einmal hingelegt; danach (z. B. nach dem Zuklappen) liegen sie einfach da
 let laidOnce = false;
 
-function ClosedBook({
+export function ClosedBook({
   book,
   index,
   actions,
   note,
   meta,
-  extra,
   feature = false,
-  row = false,
+  bare = false,
+  decor,
+  onPick,
+  className = "",
 }: {
   book: BookData;
   index: number;
   actions?: ReactNode;
   note?: string;
   meta?: ReactNode;
-  /** unter der Zeile mit den Daten, z. B. Zettel und Eselsohren von Freunden */
-  extra?: ReactNode;
   /** einzeln und groß, mit Knopf zum Aufschlagen (Gastlink) */
   feature?: boolean;
-  /** als Zeile im Regal: Einband links, alles andere daneben */
-  row?: boolean;
+  /** nur der Einband, ohne Zeilen darunter (Karussell im Bücherzimmer) */
+  bare?: boolean;
+  /** liegt mit auf dem Buch, z. B. Zettel, die oben herausschauen */
+  decor?: ReactNode;
+  /** vor dem Aufschlagen gefragt; true heißt erledigt, das Buch bleibt zu */
+  onPick?: () => boolean;
+  className?: string;
 }) {
   const { open, focusId } = useContext(OpenBook);
   const button = useRef<HTMLButtonElement>(null);
@@ -70,7 +75,7 @@ function ClosedBook({
 
   return (
     <li
-      className={`table-book relative ${arrive ? "arrive" : ""} ${row ? "shelf-row" : ""} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
+      className={`table-book relative ${arrive ? "arrive" : ""} ${className} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
       style={
         {
           ["--rot" as string]: `${ROT[index % ROT.length]}deg`,
@@ -82,14 +87,13 @@ function ClosedBook({
       <button
         ref={button}
         type="button"
-        onClick={() => open(book.id)}
+        onClick={() => !onPick?.() && open(book.id)}
         aria-label={`${book.title} aufschlagen, ${book.plates.length} Tafeln${note ? `, ${note}` : ""}`}
         className="group relative block text-left focus-visible:outline-offset-8"
       >
         <div className="lift relative" style={{ width: coverWidth(book), aspectRatio: `1 / ${book.aspect}` }}>
           {/* Zettel unter dem Einband: von wem das Buch kommt */}
           {note &&
-            !row &&
             (feature ? (
               // Am Unterrand festgemacht: der Zettel steckt immer gleich tief unter dem Einband, der Text bleibt darüber frei
               <span
@@ -104,6 +108,7 @@ function ClosedBook({
                 {note}
               </span>
             ))}
+          {decor}
           {/* Schatten auf dem Tisch, das Licht kommt von oben rechts; beim Anheben blendet ein weicherer dazu */}
           <div aria-hidden className="book-shadow-closed absolute inset-0" />
           <div
@@ -117,11 +122,11 @@ function ClosedBook({
             style={{ width: edge }}
           />
           <div aria-hidden className="absolute inset-0" style={{ viewTransitionName: `cover-${book.id}` }}>
-            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={feature ? featureSizes(book) : coverSizes(book)} />
+            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={feature || bare ? featureSizes(book) : coverSizes(book)} />
           </div>
         </div>
       </button>
-      {feature ? (
+      {bare ? null : feature ? (
         <div
           className="mt-6 grid w-[min(var(--info-w),calc(100vw-2rem))] justify-items-center gap-3 text-center text-sm flat:mt-0 flat:ml-[min(12rem,30vw)] flat:w-[min(var(--info-w),34vw)] flat:justify-items-start flat:text-left"
           style={{ ["--info-w" as string]: `max(${coverWidth(book)}, 16rem)` }}
@@ -146,10 +151,9 @@ function ClosedBook({
           </button>
         </div>
       ) : (
-        <div className={row ? "grid min-w-0 content-start gap-0.5 text-sm" : "mt-4 grid gap-0.5 text-sm"} style={row ? undefined : { width: coverWidth(book) }}>
-          <p className={`text-on-table leading-snug font-semibold tracking-[-0.01em] ${row ? "text-lg" : "text-base"}`}>{book.title}</p>
+        <div className="mt-4 grid gap-0.5 text-sm" style={{ width: coverWidth(book) }}>
+          <p className="text-on-table text-base leading-snug font-semibold tracking-[-0.01em]">{book.title}</p>
           <p className="text-on-table-2">{meta ?? `${book.plates.length} Tafeln`}</p>
-          {extra}
           {actions && <div className="book-actions mt-1.5 flex flex-wrap gap-x-4 gap-y-1">{actions}</div>}
         </div>
       )}
@@ -167,11 +171,9 @@ export function Shelf({
   books,
   note,
   meta,
-  extra,
   actions,
   tiles,
   feature = false,
-  rows = false,
   children,
 }: {
   id?: string;
@@ -179,10 +181,7 @@ export function Shelf({
   books: BookData[];
   note?: (book: BookData) => string | undefined;
   meta?: (book: BookData) => ReactNode;
-  extra?: (book: BookData) => ReactNode;
   actions?: (book: BookData) => ReactNode;
-  /** Regal: ein Buch pro Zeile, daneben was dazugehört (ab breiten Fenstern zwei Spalten) */
-  rows?: boolean;
   tiles?: ReactNode;
   /** ein einzelnes Buch groß und mittig, mit Knopf zum Aufschlagen (Gastlink) */
   feature?: boolean;
@@ -200,9 +199,9 @@ export function Shelf({
         </div>
       )}
       {(books.length > 0 || tiles) && (
-        <ul className={feature ? "flex justify-center pt-24 flat:pt-0" : rows ? "shelf-rows" : "shelf"}>
+        <ul className={feature ? "flex justify-center pt-24 flat:pt-0" : "shelf"}>
           {books.map((b, i) => (
-            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} extra={extra?.(b)} feature={feature} row={rows} />
+            <ClosedBook key={b.id} book={b} index={i} actions={actions?.(b)} note={note?.(b)} meta={meta?.(b)} feature={feature} />
           ))}
           {tiles}
         </ul>

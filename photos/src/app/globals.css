@@ -296,40 +296,53 @@ html.ohne-struktur .printed::after {
   }
 }
 
-/* Regal: ein Buch pro Zeile, gerade ausgerichtet; daneben Daten, Zettel und Knöpfe. Ab breiten Fenstern zwei Spalten */
-.shelf-rows {
-  --tw: min(34vw, 168px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+/* Bücherzimmer: Bücher zum Wischen, eines liegt groß in der Mitte, die Nachbarn schauen klein vom Rand herein */
+.carousel {
+  --tw: min(60vw, 260px);
+  --gap: 20px;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* oben Platz für die Zettel, die aus dem Buch schauen */
+  padding: 44px 0 14px;
+  margin-inline: -16px;
 }
-.table-book.shelf-row {
-  display: grid;
-  grid-template-columns: calc(var(--tw) + 8px) minmax(0, 1fr);
-  align-items: start;
-  column-gap: 18px;
-  padding-block: 22px;
-  border-top: 1px solid rgb(163 154 142 / 0.22);
-  transform: none;
-  --rot: 0deg !important;
+/* Ränder, damit auch das erste und letzte Buch in die Mitte rücken (Prozent hier: Breite der Reihe) */
+.carousel::before,
+.carousel::after {
+  content: "";
+  flex: 0 0 calc(50% - var(--tw) / 2 - 4px - var(--gap));
 }
-.shelf-rows > .shelf-row:first-child {
-  border-top: 0;
-  padding-top: 8px;
+.carousel::-webkit-scrollbar {
+  display: none;
 }
-@media (hover: hover) and (pointer: fine) {
-  .table-book.shelf-row .book-actions {
-    opacity: 1;
-  }
+.carousel > li {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  transition:
+    transform 500ms var(--ease-out),
+    opacity 500ms var(--ease-out);
+  transform-origin: 50% 100%;
 }
-@media (min-width: 1024px) {
-  .shelf-rows {
-    --tw: 168px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 56px;
-  }
-  .shelf-rows > .shelf-row:nth-child(2) {
-    border-top: 0;
-    padding-top: 8px;
+.carousel > li.is-before {
+  transform: scale(0.66);
+  transform-origin: 100% 100%;
+  opacity: 0.55;
+}
+.carousel > li.is-after {
+  transform: scale(0.66);
+  transform-origin: 0% 100%;
+  opacity: 0.55;
+}
+@media (min-width: 768px) {
+  .carousel {
+    --tw: 280px;
+    --gap: 40px;
+    margin-inline: -64px;
   }
 }
 
@@ -372,6 +385,9 @@ html.ohne-struktur .printed::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .carousel > li {
+    transition: none;
+  }
   .sway,
   .table-book.arrive .lift {
     animation: none;
