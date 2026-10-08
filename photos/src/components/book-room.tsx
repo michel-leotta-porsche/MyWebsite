@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { books as sampleBooks, type BookData } from "@/content/books";
-import { linkClass, RequireUser, RoomNav, SlipDialog, TextButton, UndoToast, Wordmark } from "@/components/app-ui";
+import { Ellipsis, Pencil } from "lucide-react";
+
+import { RequireUser, RoomNav, TextButton, Wordmark } from "@/components/app-ui";
+import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
+import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
 import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
@@ -51,7 +56,6 @@ function Room({ user }: { user: User }) {
   const [sharing, setSharing] = useState<StoredBook | null>(null);
   const [reporting, setReporting] = useState<Share | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [removed, setRemoved] = useState<{ text: string; at: number; undo: () => void } | null>(null);
   const [showTrash, setShowTrash] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [emptying, setEmptying] = useState(false);
@@ -178,9 +182,9 @@ function Room({ user }: { user: User }) {
                 </Link>
               }
             >
-              <TextButton className="text-on-table-2" onClick={() => importInput.current?.click()}>
+              <Button size="sm" onClick={() => importInput.current?.click()}>
                 Aus Datei öffnen
-              </TextButton>
+              </Button>
             </Panel>
           );
         const d = byId(slide.book.id);
@@ -209,15 +213,18 @@ function Room({ user }: { user: User }) {
             }
           >
             {s && (
-              <Link href={`/neu?id=${s.id}`} className={linkClass}>
+              <Link href={`/neu?id=${s.id}`} className={buttonClass("quiet", "sm")}>
+                <Pencil aria-hidden />
                 Bearbeiten
               </Link>
             )}
-            {s && !sp?.to.length && <TextButton onClick={() => setSharing(s)}>Hinlegen für …</TextButton>}
+            {s && !sp?.to.length && <Button size="sm" onClick={() => setSharing(s)}>
+                Hinlegen für …
+              </Button>}
             {s && (
-              <TextButton className="text-on-table-2" onClick={() => setMore({ stored: s })}>
-                Mehr …
-              </TextButton>
+              <IconButton label="Mehr" onClick={() => setMore({ stored: s })}>
+                <Ellipsis aria-hidden />
+              </IconButton>
             )}
           </Panel>
         );
@@ -256,9 +263,9 @@ function Room({ user }: { user: User }) {
         if (!slide.book || !g) return null;
         return (
           <Panel title={slide.book.title} meta={`von ${g.fromName} · ${slide.book.plates.length} Tafeln`} book={slide.book}>
-            <TextButton className="text-on-table-2" onClick={() => setMore({ gift: g })}>
-              Mehr …
-            </TextButton>
+            <IconButton label="Mehr" onClick={() => setMore({ gift: g })}>
+              <Ellipsis aria-hidden />
+            </IconButton>
           </Panel>
         );
       }}
@@ -337,7 +344,7 @@ function Room({ user }: { user: User }) {
       </Library>
 
       {more && (
-        <SlipDialog label={"stored" in more ? more.stored.title || "Ohne Titel" : more.gift.book.title || "Ohne Titel"} onClose={() => setMore(null)}>
+        <RoomSheet title={"stored" in more ? more.stored.title || "Ohne Titel" : more.gift.book.title || "Ohne Titel"} onClose={() => setMore(null)}>
           {"stored" in more ? (
             <Actions>
               <Action
@@ -353,7 +360,7 @@ function Room({ user }: { user: User }) {
                 onClick={() => {
                   const s = more.stored;
                   setMore(null);
-                  setRemoved({ text: `„${s.title || "Ohne Titel"}“ liegt im Papierkorb.`, at: Date.now(), undo: room.toTrash(s) });
+                  undoable(`„${s.title || "Ohne Titel"}“ liegt im Papierkorb.`, room.toTrash(s));
                 }}
                 hint="Von dort lässt es sich zurücklegen"
               >
@@ -369,7 +376,7 @@ function Room({ user }: { user: User }) {
                 onClick={() => {
                   const g = more.gift;
                   setMore(null);
-                  setRemoved({ text: `„${g.book.title || "Ohne Titel"}“ liegt nicht mehr in deinem Zimmer.`, at: Date.now(), undo: room.dropGift(g) });
+                  undoable(`„${g.book.title || "Ohne Titel"}“ liegt nicht mehr in deinem Zimmer.`, room.dropGift(g));
                 }}
                 hint={`Nur aus deinem Zimmer; bei ${more.gift.fromName} bleibt das Buch`}
               >
@@ -396,7 +403,7 @@ function Room({ user }: { user: User }) {
               </Action>
             </Actions>
           )}
-        </SlipDialog>
+        </RoomSheet>
       )}
       {reporting && (
         <ReportDialog share={reporting} reporter={user.uid} onClose={() => setReporting(null)} onBlock={() => room.block(reporting)} />
@@ -417,7 +424,7 @@ function Room({ user }: { user: User }) {
         />
       )}
       {confirmEmpty && (
-        <SlipDialog label="Papierkorb leeren" onClose={() => !emptying && setConfirmEmpty(false)}>
+        <RoomSheet title="Papierkorb leeren" onClose={() => !emptying && setConfirmEmpty(false)}>
           <p className="text-sm leading-relaxed">
             {trash.length === 1 ? "Ein Buch wird" : `${trash.length} Bücher werden`} endgültig gelöscht: mit allen Fotos, Zwischenständen und geteilten Links samt
             Zetteln der Gäste. Das lässt sich nicht rückgängig machen.
@@ -427,9 +434,9 @@ function Room({ user }: { user: User }) {
               <li key={b.id}>· {b.title || "Ohne Titel"}</li>
             ))}
           </ul>
-          <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-            <button
-              type="button"
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              variant="ink"
               disabled={emptying}
               onClick={async () => {
                 setEmptying(true);
@@ -437,18 +444,47 @@ function Room({ user }: { user: User }) {
                 setEmptying(false);
                 setConfirmEmpty(false);
               }}
-              className="border-ink bg-ink text-paper hover:bg-ink/85 border px-3 py-2 font-semibold disabled:opacity-60"
             >
               {emptying ? "Löscht …" : "Endgültig löschen"}
-            </button>
-            <button type="button" disabled={emptying} onClick={() => setConfirmEmpty(false)} className="underline decoration-mark decoration-2 underline-offset-4">
+            </Button>
+            <Button variant="paper" disabled={emptying} onClick={() => setConfirmEmpty(false)}>
               Abbrechen
-            </button>
+            </Button>
           </div>
-        </SlipDialog>
+        </RoomSheet>
       )}
-      {removed && <UndoToast key={removed.at} text={removed.text} onUndo={removed.undo} onClose={() => setRemoved(null)} />}
+      <Toaster />
     </main>
+  );
+}
+
+/** Hinweis unten mit Rückgängig, z. B. nach dem Wegräumen eines Buchs */
+function undoable(text: string, undo: () => void) {
+  notify(text, { action: { label: "Rückgängig", onClick: undo } });
+}
+
+/**
+ * Blatt von unten für Zimmer-Dialoge, die nur da sind, solange sie gebraucht werden: fährt beim Erscheinen hoch,
+ * beim Schließen (Wischen, Tippen daneben, Esc) erst wieder herunter und meldet sich dann ab.
+ */
+function RoomSheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return (
+    <Sheet
+      title={title}
+      open={open}
+      onOpenChange={(o) => {
+        if (o) return;
+        setOpen(false);
+        window.setTimeout(onClose, 420);
+      }}
+    >
+      {children}
+    </Sheet>
   );
 }
 
@@ -473,9 +509,8 @@ function EarThumb({ book, no, className = "h-10 w-[30px]", cut = "bg-table" }: {
   );
 }
 
-// die eine gefüllte Taste unter dem Buch: Papier auf Basalt
-const primaryClass =
-  "press bg-on-table text-table hover:bg-paper inline-flex h-11 items-center px-5 text-[15px] font-semibold transition-[background-color,scale] duration-150";
+// die eine gefüllte Taste unter dem Buch: Buchleinen (Gelb als Fläche nur hier)
+const primaryClass = buttonClass("cloth");
 
 /** Unter dem Buch in der Mitte: Titel, was dazugehört, Aufschlagen und weitere Knöpfe, darunter `after` */
 function Panel({
@@ -501,12 +536,12 @@ function Panel({
         {title}
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px]">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {primary ??
           (book && (
-            <button type="button" onClick={() => open(book.id)} className={primaryClass}>
+            <Button variant="cloth" onClick={() => open(book.id)}>
               Aufschlagen
-            </button>
+            </Button>
           ))}
         {children}
       </div>
@@ -628,7 +663,7 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
   const notes = items.filter((n) => n.kind === "note").length;
   const ears = items.length - notes;
   return (
-    <SlipDialog label={`Zurück von Freunden: ${book.title}`} onClose={onClose}>
+    <RoomSheet title={`Zurück von Freunden: ${book.title}`} onClose={onClose}>
       <p className="text-ink-2 text-sm">
         {[notes && `${notes} Zettel`, ears && `${ears} ${earWord(ears)}`].filter(Boolean).join(" · ")} · {whereOf(spread)}
       </p>
@@ -645,22 +680,21 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
           />
         ))}
       </ul>
-      <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-        <button
-          type="button"
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <Button
+          variant="ink"
           onClick={() => {
             onClose();
             open(book.id);
           }}
-          className="border-ink bg-ink text-paper hover:bg-ink/85 border px-3 py-2 font-semibold"
         >
           Buch aufschlagen
-        </button>
-        <button type="button" onClick={onManage} className="underline decoration-mark decoration-2 underline-offset-4">
+        </Button>
+        <Button variant="paper" onClick={onManage}>
           Links und Zettel verwalten …
-        </button>
+        </Button>
       </div>
-    </SlipDialog>
+    </RoomSheet>
   );
 }
 

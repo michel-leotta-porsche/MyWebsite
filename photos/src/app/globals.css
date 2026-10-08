@@ -322,9 +322,9 @@ html.ohne-struktur .printed::after {
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   touch-action: pan-x pan-y;
-  /* oben Platz für die Zettel, die aus dem Buch schauen, unten für den Schatten */
-  padding: 40px 0 22px;
-  margin-inline: -16px;
+  /* oben Platz für die Zettel, die aus dem Buch schauen, unten für den ganzen Schatten (sonst schneidet die Reihe ihn mit Kante ab) */
+  padding: 40px 0 56px;
+  margin: 0 -16px -34px;
 }
 .carousel::-webkit-scrollbar {
   display: none;
@@ -499,6 +499,7 @@ html.ohne-struktur .printed::after {
     linear-gradient(170deg, rgb(255 255 255 / 0.12), transparent 45%),
     var(--slip);
   box-shadow: 0 1px 1px rgb(12 10 8 / 0.4);
+  border-radius: var(--radius-cut) var(--radius-cut) 0 0;
 }
 /* Eselsohr auf dem Einband: Vorsatzpapier darunter, der Knick wirft Schatten */
 .cover-ear {
@@ -522,7 +523,7 @@ html.ohne-struktur .printed::after {
   clip-path: polygon(0 0, 100% 100%, 0 100%);
   filter: drop-shadow(-2px 3px 3px rgb(12 10 8 / 0.45));
 }
-/* Ein Zettel auf dem Tisch: Papier mit Licht von oben, gerissener Oberkante und Schatten aus Basalt */
+/* Ein Zettel auf dem Tisch: Papier mit Licht von oben und Schatten aus Basalt */
 .note-paper {
   position: relative;
   color: var(--ink);
@@ -532,7 +533,9 @@ html.ohne-struktur .printed::after {
   box-shadow:
     0 1px 1px rgb(12 10 8 / 0.5),
     0 12px 20px -10px rgb(12 10 8 / 0.7);
-  clip-path: polygon(0 3px, 8% 1px, 17% 3px, 26% 0, 35% 2px, 46% 1px, 55% 3px, 66% 0, 75% 2px, 86% 1px, 94% 3px, 100% 1px, 100% 100%, 0 100%);
+  /* Zettel sind zugeschnittenes Papier: leicht gerundet (Rundung nach Material, DESIGN.md) */
+  border-radius: var(--radius-cut);
+  overflow: hidden;
 }
 .note-paper.is-new::before {
   content: "";

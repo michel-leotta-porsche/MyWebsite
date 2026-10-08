@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 
 import type { BookData } from "@/content/books";
 import { ClosedBook } from "@/components/table";
+import { haptic } from "@/lib/haptics";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** Ein Platz im Karussell: ein Buch (mit dem, was darauf liegt) oder etwas anderes in Buchgröße, z. B. das leere Buch */
@@ -172,9 +173,13 @@ export function Carousel({
         spring = requestAnimationFrame(step);
       }
     };
+    let landed = paintRow(ul, reduce);
     const settle = () => {
       moving.current = false;
       const i = paintRow(ul, reduce);
+      // in der App ein leises Klicken, wenn ein anderes Buch eingerastet ist
+      if (i !== landed) haptic("select");
+      landed = i;
       setNear(i);
     };
     const onScroll = () => {
