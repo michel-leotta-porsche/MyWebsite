@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ChevronLeft, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,7 +21,7 @@ import { DevelopDialog } from "@/components/develop-dialog";
 import { PageView } from "@/components/page-view";
 import { ShareDialog } from "@/components/share-dialog";
 import { Stage } from "@/components/stage";
-import { relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
+import { pickCover, relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
 import { addKey, fromSpread, materialize, removeKey, toSpread, withPages, type SpreadItem } from "@/lib/free-layout";
 import { ingest } from "@/lib/ingest";
 import {
@@ -150,6 +150,18 @@ export function Editor() {
   const [preview, setPreview] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [history, setHistory] = useState(false);
+  const [coverSheet, setCoverSheet] = useState(false);
+  const coverStrip = useRef<HTMLUListElement>(null);
+  // das gewählte Titelbild steht beim Öffnen im Blick, auch wenn es weit hinten im Streifen liegt
+  useEffect(() => {
+    if (!coverSheet) return;
+    const t = window.setTimeout(() => {
+      const strip = coverStrip.current;
+      const on = strip?.querySelector<HTMLElement>("[aria-pressed=true]");
+      if (strip && on) strip.scrollLeft = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [coverSheet]);
   const [crop, setCrop] = useState<string | null>(null);
   const [develop, setDevelop] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
@@ -273,10 +285,14 @@ export function Editor() {
     const shelved = new Set(b.photos.filter((p) => p.shelved).map((p) => p.key));
     const { spreads, coverKey } = relayoutFree(b.spreads, autoPhotos(b.photos), shelved);
     const inBook = new Set(spreads.flatMap((s) => s.keys));
+    // ohne eigene Wahl: liegt ein Foto mit Stern im Buch, kommt eines davon auf den Einband
+    const starred = autoPhotos(b.photos).filter((p) => p.star && inBook.has(p.key));
+    const keep = b.coverKey && inBook.has(b.coverKey) && (b.coverPicked || !starred.length || starred.some((p) => p.key === b.coverKey));
     return {
       ...b,
       spreads,
-      coverKey: b.coverKey && inBook.has(b.coverKey) ? b.coverKey : coverKey,
+      coverKey: keep ? b.coverKey : starred.length ? pickCover(starred) : coverKey,
+      coverPicked: keep ? b.coverPicked : undefined,
       // frei gestaltete Seiten frieren das Format ein, sonst verrutscht, was man von Hand gesetzt hat
       aspect: b.aspectLocked ? b.aspect : aspectFor(b.photos),
     };
@@ -619,6 +635,8 @@ export function Editor() {
     update((b) => ({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, ...patch } : p)) }), tag);
   const setText = (i: number, patch: Partial<NonNullable<SpreadDraft["text"]>>) =>
     update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i && s.text ? { ...s, text: { ...s.text, ...patch } } : s))), `text-${i}`);
+  /** Titelbild von Hand: bleibt, bis man ein anderes wählt */
+  const setCover = (key: string) => update((b) => ({ ...b, coverKey: key, coverPicked: true }));
   const toggleStar = (key: string) =>
     update((b) => relayout({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, star: !p.star } : p)) }));
 
@@ -1054,13 +1072,16 @@ export function Editor() {
             {/* Einband als Vorschau: derselbe Satz wie im Buch (Titelbild, Titel, Zeile darunter, Name), ändert sich beim Tippen */}
             <div className="flex items-end gap-4">
               {data ? (
-                <div
-                  aria-hidden
-                  className="relative w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)]"
+                // Einband antippen öffnet das Blatt „Einband“ mit der Wahl des Titelbilds (Workshop Umschlag)
+                <button
+                  type="button"
+                  onClick={() => setCoverSheet(true)}
+                  aria-label="Einband: Titelbild wählen"
+                  className="relative w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-transform duration-150 ease-out active:scale-[0.97]"
                   style={{ aspectRatio: `1 / ${data.aspect}` }}
                 >
                   <PageView book={data} page={{ kind: "cover" }} side="right" sizes={() => "128px"} />
-                </div>
+                </button>
               ) : (
                 // noch ohne Fotos: nur Leinen mit Titel und Zeile darunter
                 <div
@@ -1077,9 +1098,17 @@ export function Editor() {
                   </span>
                 </div>
               )}
-              <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
-                Buch
-              </p>
+              <div className="space-y-2">
+                <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
+                  Buch
+                </p>
+                {data && (
+                  <button type="button" className={buttonClass("paper", "sm")} onClick={() => setCoverSheet(true)}>
+                    <ImagePlus aria-hidden />
+                    Titelbild …
+                  </button>
+                )}
+              </div>
             </div>
             <Field label="Titel" value={book.title} maxLength={40} onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
             <Field
@@ -1147,7 +1176,7 @@ export function Editor() {
                 <button
                   type="button"
                   className={buttonClass("paper", "sm")}
-                  onClick={() => update((b) => ({ ...b, coverKey: selPhoto.key }))}
+                  onClick={() => setCover(selPhoto.key)}
                   disabled={book.coverKey === selPhoto.key || !!selPhoto.shelved}
                 >
                   {book.coverKey === selPhoto.key ? "Auf dem Einband" : "Auf den Einband"}
@@ -1332,11 +1361,58 @@ export function Editor() {
           onClose={() => setHistory(false)}
         />
       )}
+      {data && (
+        <Sheet title="Einband" description="Tippe auf ein Foto, es kommt auf den Einband. Fotos mit Stern stehen vorn." open={coverSheet} onOpenChange={setCoverSheet}>
+          <div className="relative mx-auto w-[170px] shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)]" style={{ aspectRatio: `1 / ${data.aspect}` }}>
+            <PageView book={data} page={{ kind: "cover" }} side="right" sizes={() => "170px"} />
+          </div>
+          <p className="text-ink-2 mt-5 mb-2 text-[13px]">Titelbild</p>
+          <ul
+            ref={coverStrip}
+            className="relative -mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pt-1 pb-2"
+          >
+            {coverChoices(book).map((p, i) => {
+              const on = p.key === book.coverKey;
+              return (
+                <li key={p.key} className="shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    aria-label={`${p.title || `Foto ${i + 1}`}${p.star ? ", wichtig" : ""}`}
+                    onClick={() => !on && setCover(p.key)}
+                    className={`relative block h-24 outline-offset-2 ${on ? "outline-ink outline-2 outline-solid" : ""}`}
+                    style={{ aspectRatio: `${p.w} / ${p.h}` }}
+                  >
+                    <Image src={p.thumb} alt="" fill sizes="160px" className="object-cover" />
+                    {p.star && (
+                      <span aria-hidden className="bg-paper text-ink absolute top-1 left-1 grid size-5 place-items-center">
+                        <Star on />
+                      </span>
+                    )}
+                    {on && (
+                      <span aria-hidden className="bg-ink text-paper absolute right-1 bottom-1 grid size-6 place-items-center rounded-full">
+                        <Check className="size-4" />
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Sheet>
+      )}
       {sharing && book && (
         <ShareDialog book={book} onClose={() => setSharing(false)} onTitle={(title) => update((b) => ({ ...b, title }), "title")} />
       )}
     </main>
   );
+}
+
+/** Fotos im Buch für die Wahl des Titelbilds: in Buchreihenfolge, die mit Stern zuerst */
+function coverChoices(book: StoredBook) {
+  const byKey = new Map(book.photos.map((p) => [p.key, p]));
+  const inBook = [...new Set(book.spreads.flatMap((s) => s.keys))].flatMap((k) => byKey.get(k) ?? []).filter((p) => !p.shelved);
+  return [...inBook.filter((p) => p.star), ...inBook.filter((p) => !p.star)];
 }
 
 /** Tastenkürzel des Editors; hängt am Fenster, solange der Editor offen ist */

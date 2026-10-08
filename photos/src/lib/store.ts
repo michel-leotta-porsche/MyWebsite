@@ -81,6 +81,8 @@ export type StoredBook = {
   cloth: ClothId;
   aspect: number;
   coverKey: string;
+  /** Titelbild von Hand gewählt: die Automatik tauscht es nicht mehr aus */
+  coverPicked?: boolean;
   photos: StoredPhoto[];
   spreads: SpreadDraft[];
   /** gesetzt, sobald eine Doppelseite frei gestaltet ist: das Seitenformat ändert sich dann nicht mehr von selbst */
