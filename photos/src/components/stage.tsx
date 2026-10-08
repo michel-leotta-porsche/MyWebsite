@@ -181,9 +181,10 @@ export function Stage({
   const [cropping, setCropping] = useState<string | null>(null);
   /** Auftrag aus der Werkzeugleiste an den Zuschneide-Modus */
   const [cropMsg, setCropMsg] = useState<"done" | "cancel" | null>(null);
-  const [page, setPage] = useState<0 | 1>(0);
   const [width, setWidth] = useState(0);
   const [coarse, setCoarse] = useState(false);
+  /** kleiner Bildschirm (Handy hoch oder quer): eine Spalte, ganze Doppelseite mit Kamera */
+  const [phone, setPhone] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   useModal(dialog);
@@ -191,29 +192,94 @@ export function Stage({
   const drag = useRef<Drag | null>(null);
   const textArea = useRef<HTMLTextAreaElement>(null);
 
-  // Breite messen; schmal: eine Seite nach der anderen
+  // Breite messen; Handy: immer die ganze Doppelseite, Zoom über die Kamera
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
     ro.observe(el);
     const mq = window.matchMedia("(pointer: coarse)");
-    const onMq = () => setCoarse(mq.matches);
+    const small = window.matchMedia("(max-width: 639px), (max-height: 520px)");
+    const onMq = () => {
+      setCoarse(mq.matches);
+      setPhone(small.matches);
+    };
     onMq();
     mq.addEventListener("change", onMq);
+    small.addEventListener("change", onMq);
     return () => {
       ro.disconnect();
       mq.removeEventListener("change", onMq);
+      small.removeEventListener("change", onMq);
     };
   }, []);
 
-  const narrow = width > 0 && width < 640;
+  const narrow = phone || (width > 0 && width < 640);
   const vh = typeof window === "undefined" ? 900 : window.innerHeight;
-  // schmal: die Seite lässt unten Platz für die Werkzeuge
-  const pageW = narrow ? Math.min(width, (vh * 0.62) / data.aspect) : Math.min(width / 2, Math.max(220, (vh - 170) / data.aspect));
+  const landscape = narrow && typeof window !== "undefined" && window.innerWidth > vh;
+  // Handy hoch: die Doppelseite füllt die Breite; quer: nach der Höhe, damit sie ganz in den Bildschirm passt
+  const pageW = narrow
+    ? Math.min(width / 2, landscape ? (vh - 64) / data.aspect : Infinity)
+    : Math.min(width / 2, Math.max(220, (vh - 170) / data.aspect));
   const W = pageW * 2;
   const Hpx = pageW * data.aspect;
-  const toUnits = (dx: number, dy: number) => ({ x: (dx / W) * 200, y: (dy / Hpx) * 100 });
+
+  // ---- Kamera: Zoom und Ausschnitt der Doppelseite (nur auf dem Handy) ----
+  // Während einer Geste schreibt die Kamera direkt ins DOM (kein React-Render pro Bild); danach zieht `zoom` nach.
+  const cam = useRef({ s: 1, x: 0, y: 0 });
+  const camEl = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(1);
+  /** welche Voreinstellung gerade passt: ganze Doppelseite, linke oder rechte Seite, oder frei */
+  const [view, setView] = useState<"all" | 0 | 1 | null>("all");
+  /** Seite in der Bildmitte; dorthin legen die Knöpfe neue Texte und Fotos */
+  const [camPage, setCamPage] = useState<0 | 1>(0);
+  const clampCam = (v: { s: number; x: number; y: number }) => {
+    const s = Math.min(4, Math.max(1, v.s));
+    return { s, x: Math.min(0, Math.max(W - W * s, v.x)), y: Math.min(0, Math.max(Hpx - Hpx * s, v.y)) };
+  };
+  const applyCam = (v: { s: number; x: number; y: number }, animate = false) => {
+    const c = clampCam(v);
+    cam.current = c;
+    const el = camEl.current;
+    if (!el) return c;
+    el.style.transition = animate ? "transform 500ms var(--ease-out)" : "none";
+    el.style.transform = c.s === 1 ? "" : `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.s})`;
+    // Griffe bleiben auf dem Bildschirm gleich groß
+    el.style.setProperty("--inv", String(1 / c.s));
+    // vergrößert: der Rest der Doppelseite wird an der Kante abgeschnitten; ganz: Griffe dürfen überstehen
+    if (el.parentElement) el.parentElement.style.overflow = c.s > 1.001 ? "clip" : "visible";
+    return c;
+  };
+  /** Kamera übernehmen: React erfährt den Zoom und welche Seite im Bild ist */
+  const settleCam = (c: { s: number; x: number; y: number }) => {
+    setZoom(c.s);
+    const mid = ((W / 2 - c.x) / (W * c.s)) * 200;
+    setCamPage(c.s < 1.05 ? 0 : mid < 100 ? 0 : 1);
+    if (c.s < 1.05) return setView("all");
+    setView(Math.abs(c.s - 2) < 0.05 && (Math.abs(c.x) < 1 || Math.abs(c.x + W) < 1) ? (mid < 100 ? 0 : 1) : null);
+  };
+  const camTo = (target: "all" | 0 | 1, focusY = 50) => {
+    const c =
+      target === "all"
+        ? applyCam({ s: 1, x: 0, y: 0 }, true)
+        : applyCam({ s: 2, x: -target * W, y: Hpx / 2 - (focusY / 100) * Hpx * 2 }, true);
+    settleCam(c);
+  };
+  // anderer Bildschirm (Drehen, Fenster): wieder die ganze Doppelseite
+  const sizeKey = `${W}x${Hpx}`;
+  const [camSize, setCamSize] = useState(sizeKey);
+  if (camSize !== sizeKey) {
+    setCamSize(sizeKey);
+    setZoom(1);
+    setView("all");
+    setCamPage(0);
+  }
+  useEffect(() => {
+    applyCam({ s: 1, x: 0, y: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nur bei neuer Größe
+  }, [W, Hpx]);
+  /** Abstand auf dem Bildschirm → Doppelseiten-Einheiten (x 0..200, y 0..100), Zoom eingerechnet */
+  const toUnits = (dx: number, dy: number) => ({ x: (dx / (W * zoom)) * 200, y: (dy / (Hpx * zoom)) * 100 });
 
   const shown = items.map((i) => (draft && i.id === draft.id ? ({ ...i, box: draft.box, ...(i.t === "shape" && draft.from ? { from: draft.from } : {}) } as SpreadItem) : i));
   const selected = shown.find((i) => i.id === sel) ?? null;
@@ -265,9 +331,9 @@ export function Stage({
           : `Zeichnung, ${it.strokes.length} ${it.strokes.length === 1 ? "Strich" : "Striche"}`;
 
   // ---- Einrasten ----
-  // mit dem Finger schwächer: 4px statt 8px, damit das Foto nicht kleben bleibt und dann springt
-  const thX = ((coarse ? 4 : 8) / W) * 200;
-  const thY = ((coarse ? 4 : 8) / Hpx) * 100;
+  // 8 px auf dem Bildschirm, auch vergrößert; mit dem Finger 4 px, damit das Foto nicht kleben bleibt und dann springt
+  const thX = ((coarse ? 4 : 8) / (W * zoom)) * 200;
+  const thY = ((coarse ? 4 : 8) / (Hpx * zoom)) * 100;
   const targets = (id: string) => {
     const others = items.filter((i) => i.id !== id).map((i) => boxOf(i, geom));
     return {
@@ -455,7 +521,8 @@ export function Stage({
     if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < (d.touch ? 8 : 3)) return null;
     d.moved = true;
     window.clearTimeout(press.current);
-    const u = toUnits(clientX - d.sx, clientY - d.sy);
+    // fährt die Kamera während des Zugs mit, zählt ihr Weg mit
+    const u = toUnits(clientX - d.sx - (cam.current.x - dragCam.current.x), clientY - d.sy - (cam.current.y - dragCam.current.y));
     if (d.end !== undefined && it.t === "shape") {
       const r = moveEnd(it, d.box0, d.end, u.x, u.y, shiftKey, altKey);
       return { it, r, box: r.box, from: r.from };
@@ -539,8 +606,9 @@ export function Stage({
     setSay(`Kein Platz frei. Höchstens ${MAX_PHOTOS_PER_PAGE} Fotos pro Seite; sonst erst eine Aufteilung wählen oder ein Foto verkleinern.`);
   };
   const pointOf = (clientX: number, clientY: number) => {
+    // das Rechteck ist schon gezoomt; so stimmt der Punkt auch mitten in einer Kamerafahrt
     const r = layerEl.current!.getBoundingClientRect();
-    return toUnits(clientX - r.left, clientY - r.top);
+    return { x: ((clientX - r.left) / r.width) * 200, y: ((clientY - r.top) / r.height) * 100 };
   };
 
   // ---- Zeichnen: Stift, Radierer, Formen aufziehen ----
@@ -946,7 +1014,7 @@ export function Stage({
     return () => window.removeEventListener("keydown", onKey);
   }, [editing, crop, cropping, onClose, sel]);
 
-  const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : narrow ? page : 0;
+  const curPage: 0 | 1 = selected ? pageAt(selected.box.x + selected.box.w / 2) : camPage;
   useEffect(() => {
     latest.current = { selected, paste, remove, onItemKey, addTextWith: (t: string) => addText("body", curPage, undefined, t), tool, setTool };
   });
@@ -1011,6 +1079,156 @@ export function Stage({
     );
   const showGrid = gridOn || !!draft;
 
+  // ---- Gesten auf dem Handy: zwei Finger zoomen die Ansicht oder skalieren das gewählte Foto, Doppeltippen zoomt ----
+  // Alles läuft in der Capture-Phase am Bildausschnitt, also vor den Griffen und Elementen darunter.
+  const viewEl = useRef<HTMLDivElement>(null);
+  const touches = useRef(new Map<number, Pt>());
+  const gesture = useRef<
+    | { kind: "cam"; d0: number; m0: Pt; c0: { s: number; x: number; y: number }; r0: Pt }
+    | { kind: "pinch"; id: string; d0: number; m0: Pt; box0: Box; box?: Box }
+    | { kind: "pan"; m0: Pt; c0: { s: number; x: number; y: number } }
+    | { kind: "done" }
+    | null
+  >(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  const lastPointer = useRef("mouse");
+  /** Kamera beim Beginn eines Zugs; fährt sie am Rand mit, bleibt das Element trotzdem unter dem Finger */
+  const dragCam = useRef<Pt>({ x: 0, y: 0 });
+  const edge = useRef(0);
+  const two = () => {
+    const [a, b] = [...touches.current.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  };
+  /** Zieht man ein Element vergrößert an den Rand, fährt die Kamera mit */
+  const edgePan = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
+    cancelAnimationFrame(edge.current);
+    const v = viewEl.current;
+    if (!v || !drag.current?.moved || cam.current.s <= 1.001) return;
+    const r = v.getBoundingClientRect();
+    const m = 40;
+    const vx = clientX < r.left + m ? 1 : clientX > r.right - m ? -1 : 0;
+    const vy = clientY < r.top + m ? 1 : clientY > r.bottom - m ? -1 : 0;
+    if (!vx && !vy) return;
+    edge.current = requestAnimationFrame(() => {
+      const before = cam.current;
+      const c = applyCam({ ...before, x: before.x + vx * 8, y: before.y + vy * 8 });
+      if (c.x === before.x && c.y === before.y) return;
+      moveTo(clientX, clientY, shiftKey, altKey);
+      edgePan(clientX, clientY, shiftKey, altKey);
+    });
+  };
+  const onGestureDown = (e: React.PointerEvent) => {
+    lastPointer.current = e.pointerType;
+    dragCam.current = { x: cam.current.x, y: cam.current.y };
+    if (e.pointerType !== "touch" || !narrow || cropping) return;
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.current.size >= 2) {
+      // der zweite Finger gehört der Geste, nicht dem Element darunter
+      e.stopPropagation();
+      if (touches.current.size > 2) return;
+      window.clearTimeout(press.current);
+      held.current = null;
+      cancelAnimationFrame(frame.current);
+      cancelAnimationFrame(edge.current);
+      const { d, m } = two();
+      const dr = drag.current;
+      const it = dr && !dr.edges && dr.end === undefined ? items.find((i) => i.id === dr.id) : undefined;
+      drag.current = null;
+      last.current = null;
+      if (sketchRef.current) {
+        sketchRef.current = null;
+        setSketch(null);
+      }
+      setGuides({ xs: [], ys: [] });
+      if (it && it.t !== "text") {
+        gesture.current = { kind: "pinch", id: it.id, d0: d, m0: m, box0: boxOf(it, geom) };
+      } else {
+        setDraft(null);
+        const r = viewEl.current!.getBoundingClientRect();
+        gesture.current = { kind: "cam", d0: d, m0: m, c0: { ...cam.current }, r0: { x: r.left, y: r.top } };
+      }
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      return;
+    }
+    // ein Finger auf freiem Papier: Doppeltippen zoomt auf diese Seite und zurück; vergrößert verschiebt Ziehen die Ansicht
+    if (e.target !== layerEl.current || tool !== "select") return;
+    const now = e.timeStamp;
+    const t = lastTap.current;
+    if (t && now - t.t < 320 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 30) {
+      lastTap.current = null;
+      gesture.current = { kind: "done" };
+      if (cam.current.s > 1.05) camTo("all");
+      else {
+        const p = pointOf(e.clientX, e.clientY);
+        camTo(pageAt(p.x), p.y);
+      }
+      return;
+    }
+    lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+    if (cam.current.s > 1.001) {
+      gesture.current = { kind: "pan", m0: { x: e.clientX, y: e.clientY }, c0: { ...cam.current } };
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    }
+  };
+  const onGestureMove = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch" || !touches.current.has(e.pointerId)) {
+      if (drag.current) edgePan(e.clientX, e.clientY, e.shiftKey, e.altKey);
+      return;
+    }
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gesture.current;
+    if (!g) {
+      if (drag.current) edgePan(e.clientX, e.clientY, e.shiftKey, e.altKey);
+      return;
+    }
+    e.stopPropagation();
+    if (g.kind === "done") return;
+    if (g.kind === "pan") {
+      applyCam({ ...g.c0, x: g.c0.x + e.clientX - g.m0.x, y: g.c0.y + e.clientY - g.m0.y });
+      return;
+    }
+    if (touches.current.size < 2) return;
+    const { d, m } = two();
+    if (g.kind === "cam") {
+      // der Punkt zwischen den Fingern bleibt unter den Fingern
+      const s = Math.min(4, Math.max(1, (g.c0.s * d) / g.d0));
+      const lx = (g.m0.x - g.r0.x - g.c0.x) / g.c0.s;
+      const ly = (g.m0.y - g.r0.y - g.c0.y) / g.c0.s;
+      applyCam({ s, x: m.x - g.r0.x - lx * s, y: m.y - g.r0.y - ly * s });
+      return;
+    }
+    // Foto (oder Form) um seine Mitte skalieren, Seitenverhältnis bleibt; die Mitte wandert mit den Fingern
+    const it = items.find((i) => i.id === g.id);
+    if (!it) return;
+    const b0 = g.box0;
+    const w = Math.min(200, Math.max(minW(it), b0.w * (d / g.d0)));
+    const h = Math.min(100, b0.h * (w / b0.w));
+    const u = toUnits(m.x - g.m0.x, m.y - g.m0.y);
+    const cx = b0.x + b0.w / 2 + u.x;
+    const cy = b0.y + b0.h / 2 + u.y;
+    const box = { x: Math.min(200 - w, Math.max(0, cx - w / 2)), y: Math.min(100 - h, Math.max(0, cy - h / 2)), w, h };
+    g.box = box;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => setDraft({ id: g.id, box, original: false }));
+  };
+  const onGestureUp = (e: React.PointerEvent) => {
+    cancelAnimationFrame(edge.current);
+    if (e.pointerType !== "touch") return;
+    const had = touches.current.delete(e.pointerId);
+    const g = gesture.current;
+    if (!had || !g) return;
+    e.stopPropagation();
+    if (g.kind === "cam" || g.kind === "pan") settleCam(cam.current);
+    if (g.kind === "pinch") {
+      cancelAnimationFrame(frame.current);
+      setDraft(null);
+      const it = items.find((i) => i.id === g.id);
+      if (it && g.box) commit(items.map((i) => (i.id === g.id ? { ...i, box: g.box! } : i)), undefined, `${nameOf(it)}: ${where(g.box)}`);
+    }
+    // der andere Finger bleibt liegen: er tut nichts mehr, bis er losgelassen wird
+    gesture.current = touches.current.size ? { kind: "done" } : null;
+  };
+
   return (
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
@@ -1053,15 +1271,16 @@ export function Stage({
         {say}
       </p>
 
-      <div className="grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_300px] md:px-8">
+      <div className={`grid gap-8 px-4 pb-24 md:px-8 ${phone ? "" : "md:grid-cols-[minmax(0,1fr)_300px]"}`}>
         <div ref={wrap} className="min-w-0">
           {narrow && (
-            <div className="mb-3 flex gap-5 text-sm">
-              {([0, 1] as const).map((p) => (
-                <TextButton key={p} aria-pressed={page === p} className={page === p ? "font-semibold" : ""} onClick={() => setPage(p)}>
-                  {p === 0 ? "Linke Seite" : "Rechte Seite"}
+            <div className="mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm" role="group" aria-label="Ansicht">
+              {(["all", 0, 1] as const).map((v) => (
+                <TextButton key={v} aria-pressed={view === v} className={view === v ? "font-semibold" : ""} onClick={() => camTo(v)}>
+                  {v === "all" ? "Ganze Doppelseite" : v === 0 ? "Links" : "Rechts"}
                 </TextButton>
               ))}
+              <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
             </div>
           )}
           {cropping ? (
@@ -1142,9 +1361,15 @@ export function Stage({
           )}
           {width > 0 && (
             <div
-              className="book-shadow-open relative"
-              // Griffe dürfen über den Rand ragen; schmal wird nur waagerecht auf eine Seite beschnitten
-              style={{ width: narrow ? pageW : W, overflowX: narrow ? "clip" : "visible", overflowY: "visible" }}
+              ref={viewEl}
+              className={`book-shadow-open relative ${narrow ? "mx-auto" : ""}`}
+              // Bildausschnitt der Kamera; Griffe dürfen über den Rand ragen, vergrößert schneidet applyCam ab.
+              // Auf dem Handy gehören alle Finger auf der Doppelseite der Bühne (Scrollen geht daneben).
+              style={{ width: W, touchAction: narrow ? "none" : undefined }}
+              onPointerDownCapture={onGestureDown}
+              onPointerMoveCapture={onGestureMove}
+              onPointerUpCapture={onGestureUp}
+              onPointerCancelCapture={onGestureUp}
             >
               {/* Buchblock links und rechts, wie beim fertigen Buch */}
               {!narrow && (
@@ -1153,10 +1378,7 @@ export function Stage({
                   <div aria-hidden className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full w-[8px]" />
                 </>
               )}
-              <div
-                className="relative transition-transform duration-500 ease-out select-none"
-                style={{ width: W, height: Hpx, transform: narrow && page === 1 ? `translateX(${-pageW}px)` : undefined }}
-              >
+              <div ref={camEl} className="relative origin-top-left select-none" style={{ width: W, height: Hpx }}>
                 {(["left", "right"] as const).map((side, i) => (
                   <div key={side} className="absolute top-0" style={{ left: i * pageW, width: pageW, height: Hpx }}>
                     <MemoPage book={data} page={pages[i]} side={side} eager />
@@ -1208,7 +1430,8 @@ export function Stage({
                     openMenu(e.clientX, e.clientY, null);
                   }}
                   onDoubleClick={(e) => {
-                    if (e.target !== e.currentTarget) return;
+                    // auf dem Handy zoomt Doppeltippen (onGestureDown), statt Text anzulegen
+                    if (e.target !== e.currentTarget || (narrow && lastPointer.current === "touch")) return;
                     const at = pointOf(e.clientX, e.clientY);
                     addText("body", pageAt(at.x), at);
                   }}
@@ -1302,7 +1525,7 @@ export function Stage({
                       </div>
                     );
                   })}
-                  {selected?.t === "text" && !draft && (
+                  {!narrow && selected?.t === "text" && !draft && (
                     <TextToolbar
                       key={selected.id}
                       item={selected}
@@ -1351,7 +1574,7 @@ export function Stage({
                           aria-hidden
                           onPointerDown={(e) => startDrag(e, selected, {}, n as 0 | 1)}
                           className="absolute z-[66] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-                          style={{ left: `${pt.x / 2}%`, top: `${pt.y}%`, width: handle, height: handle, cursor: "crosshair", touchAction: "none" }}
+                          style={{ left: `${pt.x / 2}%`, top: `${pt.y}%`, width: handle, height: handle, cursor: "crosshair", touchAction: "none", scale: "var(--inv, 1)" }}
                         >
                           <span className="border-ink bg-paper block h-3 w-3 border" />
                         </span>
@@ -1369,7 +1592,7 @@ export function Stage({
                             aria-hidden
                             onPointerDown={(e) => startDrag(e, selected, { ...h.e })}
                             className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center ${h.cls}`}
-                            style={{ width: handle, height: handle, cursor: h.cursor, touchAction: "none" }}
+                            style={{ width: handle, height: handle, cursor: h.cursor, touchAction: "none", scale: "var(--inv, 1)" }}
                           >
                             <span className="border-ink bg-paper block h-2.5 w-2.5 border" />
                           </span>
@@ -1386,7 +1609,7 @@ export function Stage({
                         item={it}
                         photo={ph}
                         H={grid.H}
-                        pxPerUnit={pageW / 100}
+                        pxPerUnit={(pageW / 100) * zoom}
                         snapX={grid.xs}
                         snapY={grid.ys.map((y) => (y / 100) * grid.H)}
                         message={cropMsg}
@@ -1421,6 +1644,19 @@ export function Stage({
               </div>
             </div>
           )}
+          {/* Handy: die Text-Werkzeuge stehen fest unten in Daumenreichweite, nie abgeschnitten und nie mitgezoomt */}
+          {narrow && selected?.t === "text" && !draft && (
+            <div className="fixed inset-x-0 bottom-0 z-[80] px-2 pb-[max(8px,env(safe-area-inset-bottom))]">
+              <TextToolbar
+                key={selected.id}
+                docked
+                item={selected}
+                box={boxOf(selected, geom)}
+                cloth={data.cloth.base}
+                onLook={(patch, tag) => setLook(selected.id, patch, tag)}
+              />
+            </div>
+          )}
           {(shelf.length > 0 || elsewhere.length > 0) && (
             <section aria-label="Alle Fotos" className="mt-5">
               <p className="text-on-table text-sm font-semibold">
@@ -1450,6 +1686,11 @@ export function Stage({
               </ul>
             </section>
           )}
+          {narrow && coarse && (
+            <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
+              Zwei Finger zoomen und verschieben die Ansicht, Doppeltippen aufs freie Papier holt eine Seite groß und wieder zurück. Zwei Finger auf dem gewählten Foto ändern seine Größe.
+            </p>
+          )}
           {coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
               Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.
@@ -1465,7 +1706,7 @@ export function Stage({
           )}
         </div>
 
-        <aside className="space-y-5 md:sticky md:top-20 md:self-start">
+        <aside className={`space-y-5 ${phone ? "" : "md:sticky md:top-20 md:self-start"}`}>
           {selected?.t === "photo" && (
             <PhotoPanel
               item={selected}
@@ -1945,6 +2186,48 @@ function CropMode({
     drag.current = null;
   };
 
+  // Zwei Finger: das Bild im Rahmen zoomen und verschieben, wie in der Fotos-App
+  const fingers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d0: number; m0: { x: number; y: number }; p: { x: number; y: number }; I0: R; F0: R } | null>(null);
+  const two = () => {
+    const [a, b] = [...fingers.current.values()];
+    return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, m: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  };
+  const pinchDown = (e: React.PointerEvent) => {
+    if (e.pointerType !== "touch") return;
+    fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.current.size !== 2) return;
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = null;
+    const { d, m } = two();
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    // Drehpunkt in Seiteneinheiten
+    pinch.current = { d0: d, m0: m, p: { x: (m.x - r.left) / pxPerUnit, y: (m.y - r.top) / pxPerUnit }, I0: st.I, F0: st.F };
+  };
+  const pinchMove = (e: React.PointerEvent) => {
+    if (!fingers.current.has(e.pointerId)) return;
+    fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pc = pinch.current;
+    if (!pc) return;
+    e.stopPropagation();
+    if (fingers.current.size < 2) return;
+    const { d, m } = two();
+    const k = Math.min(6 * Math.max(pc.F0.w / pc.I0.w, 1), Math.max(0.2, d / pc.d0));
+    const dx = (m.x - pc.m0.x) / pxPerUnit;
+    const dy = (m.y - pc.m0.y) / pxPerUnit;
+    const I = { w: pc.I0.w * k, h: pc.I0.h * k, x: pc.p.x + (pc.I0.x - pc.p.x) * k + dx, y: pc.p.y + (pc.I0.y - pc.p.y) * k + dy };
+    setSt({ F: pc.F0, I: fitImage(I, pc.F0) });
+  };
+  const pinchUp = (e: React.PointerEvent) => {
+    if (!fingers.current.delete(e.pointerId)) return;
+    if (!pinch.current) return;
+    e.stopPropagation();
+    // der verbleibende Finger verschiebt nichts mehr, bis er losgelassen wird
+    drag.current = null;
+    if (!fingers.current.size) pinch.current = null;
+  };
+
   const pc = (r: R): React.CSSProperties => ({ left: `${r.x / 2}%`, top: `${(r.y / H) * 100}%`, width: `${r.w / 2}%`, height: `${(r.h / H) * 100}%` });
   const { F, I } = st;
   const frameHandles: { e: Edges; cls: string; cursor: string }[] = HANDLES.map((h) => ({ e: h.e, cls: h.cls, cursor: h.cursor }));
@@ -1957,6 +2240,10 @@ function CropMode({
   return (
     <div
       className="absolute inset-0 z-[60] select-none"
+      onPointerDownCapture={pinchDown}
+      onPointerMoveCapture={pinchMove}
+      onPointerUpCapture={pinchUp}
+      onPointerCancelCapture={pinchUp}
       onPointerMove={move}
       onPointerUp={up}
       onPointerCancel={up}
@@ -1993,7 +2280,7 @@ function CropMode({
               aria-hidden
               onPointerDown={(e) => begin(e, "frame", h.e)}
               className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center ${h.cls}`}
-              style={{ width: 28, height: 28, cursor: h.cursor }}
+              style={{ width: 28, height: 28, cursor: h.cursor, scale: "var(--inv, 1)" }}
             >
               <span className={`bg-ink block border border-paper ${corner ? "h-3 w-3" : h.e.l || h.e.r ? "h-5 w-1.5" : "h-1.5 w-5"}`} />
             </span>
@@ -2008,7 +2295,7 @@ function CropMode({
             aria-hidden
             onPointerDown={(e) => begin(e, "image", h.e)}
             className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center ${h.cls}`}
-            style={{ width: 28, height: 28, cursor: h.cursor }}
+            style={{ width: 28, height: 28, cursor: h.cursor, scale: "var(--inv, 1)" }}
           >
             <span className="bg-paper border-ink block h-3 w-3 border" />
           </span>
@@ -2034,10 +2321,13 @@ function TextToolbar({
   box,
   cloth,
   onLook,
+  docked,
 }: {
   item: Extract<FreeItem, { t: "text" }>;
   box: Box;
   cloth: string;
+  /** fest unten statt am Rahmen (Handy) */
+  docked?: boolean;
   onLook: (patch: Partial<Record<keyof TextLook, TextLook[keyof TextLook] | null>>, tag?: string) => void;
 }) {
   const m = textMetrics(item.role, item.look);
@@ -2052,7 +2342,7 @@ function TextToolbar({
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || docked) return;
     el.style.translate = "";
     el.style.maxWidth = "";
     // Grenzen: Bildschirm mit 16px Rand, dazu ein Vorfahr, der waagerecht beschneidet (schmal: nur eine Seite sichtbar)
@@ -2077,8 +2367,8 @@ function TextToolbar({
       aria-label="Text gestalten"
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="slip text-ink absolute z-[65] flex max-w-[min(560px,calc(100vw-32px))] select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)]"
-      style={{ left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
+      className={`slip text-ink flex select-text flex-wrap items-center gap-1 p-1 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)] ${docked ? "mx-auto w-fit max-w-full" : "absolute z-[65] max-w-[min(560px,calc(100vw-32px))]"}`}
+      style={docked ? undefined : { left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
     >
       <label className="sr-only" htmlFor={`font-${item.id}`}>
         Schriftart

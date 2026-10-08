@@ -1,5 +1,17 @@
 {
   "projects": {
     "default": "fujiventura"
+  },
+  "targets": {
+    "fujiventura": {
+      "hosting": {
+        "app": [
+          "calima"
+        ],
+        "alt": [
+          "fujiventura"
+        ]
+      }
+    }
   }
 }
