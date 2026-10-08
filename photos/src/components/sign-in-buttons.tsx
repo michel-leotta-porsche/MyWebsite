@@ -41,14 +41,18 @@ export function SignInButtons({
   busy = null,
   disabled = false,
   warm,
+  tone = "white",
   className = "",
 }: {
   onPick: (provider: SignInProvider) => void;
   busy?: SignInProvider | null;
   disabled?: boolean;
   warm?: () => void;
+  /** cloth: als Hauptknopf der Ansicht aus Buchleinen, nur solange es einen Anbieter gibt (mit Apple bleiben beide gleich, 4.8) */
+  tone?: "white" | "cloth";
   className?: string;
 }) {
+  const cloth = tone === "cloth" && OPTIONS.length === 1;
   return (
     <div className={`flex w-full max-w-[19rem] flex-col gap-3 ${className}`}>
       {OPTIONS.map((o) => (
@@ -59,11 +63,16 @@ export function SignInButtons({
           onClick={() => onPick(o.id)}
           onPointerDown={warm}
           onFocus={warm}
-          className="flex min-h-11 items-center justify-center gap-2.5 border border-white bg-white px-4 py-2.5 font-sans text-[16px] font-medium text-black transition-opacity duration-150 hover:opacity-90 disabled:opacity-60"
-          style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}
+          className={
+            cloth
+              ? // Logo auf weißem Grund, wie Google es auf farbigen Knöpfen verlangt
+                "linen relative flex min-h-12 items-center gap-3 overflow-hidden rounded-full bg-cloth py-1.5 pr-6 pl-1.5 text-[16px] font-semibold text-cloth-ink transition-transform duration-150 ease-out active:scale-[0.96] disabled:opacity-60"
+              : "flex min-h-11 items-center justify-center gap-2.5 rounded-full bg-white px-5 py-2.5 font-sans text-[16px] font-medium text-black transition-[opacity,transform] duration-150 ease-out hover:opacity-90 active:scale-[0.96] disabled:opacity-60"
+          }
+          style={cloth ? undefined : { fontFamily: "system-ui, -apple-system, sans-serif" }}
         >
-          {o.icon}
-          {busy === o.id ? "Einen Moment …" : o.label}
+          {cloth ? <span className="relative grid size-9 shrink-0 place-items-center rounded-full bg-white">{o.icon}</span> : o.icon}
+          <span className="relative">{busy === o.id ? "Einen Moment …" : o.label}</span>
         </button>
       ))}
     </div>
