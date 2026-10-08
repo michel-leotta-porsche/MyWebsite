@@ -23,7 +23,7 @@ import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } fr
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
-import type { NamedRecipe, PhotoEdit } from "@/lib/develop/model";
+import { cleanEdit, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
 
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
@@ -144,7 +144,8 @@ export function toBookData(b: StoredBook): BookData {
       fit: p.fit,
       recipe: p.recipe,
       camera: p.camera,
-      edit: p.edit,
+      // Bücher anderer (Links, Geschenke, Dateien) können beliebige Daten tragen: nur Bekanntes durchlassen
+      edit: cleanEdit(p.edit),
     };
   }
   const cloth = CLOTHS[b.cloth] ?? CLOTHS.ringelblume;
@@ -231,16 +232,27 @@ export async function uploadEdited(uid: string, bookId: string, key: string, blo
 
 // Eigene Rezepte im Profil: users/{uid}/recipes/{id}; im Testmodus nur im Browser
 const MOCK_RECIPES = "fuji:mock-recipes";
+// eigene Rezepte nur mit geprüften Werten übernehmen (alte oder fremd geschriebene Einträge)
+const cleanRecipe = (x: unknown): NamedRecipe | null => {
+  if (!x || typeof x !== "object") return null;
+  const r = x as Record<string, unknown>;
+  if (typeof r.id !== "string" || typeof r.name !== "string" || !r.name.trim()) return null;
+  return { id: r.id, name: r.name.slice(0, 40), txt: typeof r.txt === "string" ? r.txt.slice(0, 60) : "eigenes", v: cleanEdit({ rec: r.v })!.rec };
+};
 export async function myRecipes(uid: string): Promise<NamedRecipe[]> {
+  let raw: unknown[] = [];
   if (MOCK) {
     try {
-      return JSON.parse(localStorage.getItem(MOCK_RECIPES) ?? "[]") as NamedRecipe[];
-    } catch {
-      return [];
-    }
+      raw = JSON.parse(localStorage.getItem(MOCK_RECIPES) ?? "[]");
+    } catch {}
+  } else {
+    const snap = await getDocs(collection(db(), "users", uid, "recipes"));
+    raw = snap.docs.map((d) => d.data());
   }
-  const snap = await getDocs(collection(db(), "users", uid, "recipes"));
-  return snap.docs.map((d) => d.data() as NamedRecipe).sort((a, b) => a.name.localeCompare(b.name, "de"));
+  return (Array.isArray(raw) ? raw : [])
+    .map(cleanRecipe)
+    .filter((r): r is NamedRecipe => !!r)
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 export async function saveRecipe(uid: string, r: NamedRecipe) {
   if (MOCK) {
@@ -329,7 +341,7 @@ export async function trashBook(b: StoredBook, on: boolean) {
         pausedMock.set(s.token, s);
       } else {
         pausedMock.delete(s.token);
-        mem.shares.set(s.token, { ...s, book: { ...b, trashed: undefined } });
+        mem.shares.set(s.token, { ...s, book: forGuests({ ...b, trashed: undefined }) });
       }
     }
     return;
@@ -344,7 +356,7 @@ export async function trashBook(b: StoredBook, on: boolean) {
         fromName: s.fromName,
         to: s.to,
         bookId: b.id,
-        ...(on ? { paused: true } : { book: { ...b, trashed: null } }),
+        ...(on ? { paused: true } : { book: { ...forGuests(b), trashed: null } }),
         createdAt: serverTimestamp(),
       }),
     ),
@@ -548,11 +560,18 @@ export function watchMyBooks(uid: string, next: (books: StoredBook[]) => void, f
   return onSnapshot(q, (s) => next(s.docs.map((d) => fromDoc(d.data()))), fail);
 }
 
+/**
+ * Die Kopie im Link: ohne die unbearbeiteten Originale. Wer ein Foto bearbeitet, etwa schwarzweiß oder dunkler,
+ * soll den Gästen nicht trotzdem die alte Fassung mitschicken.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- orig bewusst weglassen
+const forGuests = (b: StoredBook): StoredBook => ({ ...b, photos: b.photos.map(({ orig: _orig, ...p }) => p) });
+
 /** Buch für jemanden hinlegen: ein Link mit Zufallsschlüssel und einer Kopie des Buchs */
 export async function shareBook(b: StoredBook, to: string): Promise<string> {
   const token = newId() + newId().slice(0, 8);
   if (MOCK) {
-    mem.shares.set(token, { token, owner: b.owner, fromName: b.ownerName, to, book: b });
+    mem.shares.set(token, { token, owner: b.owner, fromName: b.ownerName, to, book: forGuests(b) });
     keepMockShares();
     return token;
   }
@@ -561,7 +580,7 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
     owner: b.owner,
     fromName: b.ownerName,
     to,
-    book: b,
+    book: forGuests(b),
     bookId: b.id,
     createdAt: serverTimestamp(),
   });
@@ -581,7 +600,7 @@ const keepMockShares = () => {
  */
 export async function refreshShares(b: StoredBook, known?: Share[]) {
   if (b.trashed) return;
-  const book = { ...b, schema: SCHEMA };
+  const book = forGuests({ ...b, schema: SCHEMA });
   if (MOCK) {
     for (const s of mem.shares.values()) if ((s.bookId ?? s.book?.id) === b.id) mem.shares.set(s.token, { ...s, book: structuredClone(book) });
     keepMockShares();

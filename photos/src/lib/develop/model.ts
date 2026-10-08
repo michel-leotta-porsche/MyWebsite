@@ -75,8 +75,61 @@ export const recipeIsEmpty = (r: RecipeValues) => sameRecipe(r, REC0());
 
 /** Ändert die Bearbeitung etwas am Bild? */
 export function isNeutral(e: PhotoEdit | undefined | null): boolean {
-  if (!e) return true;
+  if (!e || typeof e !== "object" || !e.rec || typeof e.rec !== "object") return true;
   return !e.exposure && !e.contrast && !e.shadows && !e.warmth && !e.sat && !e.look && !e.levels && !e.transfer && recipeIsEmpty(e.rec);
+}
+
+/* ---------- Prüfen: Bearbeitungen aus fremden Büchern ---------- */
+
+const num = (v: unknown, lo: number, hi: number, d = 0) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+const oneOf = <T,>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
+const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+const nums = (v: unknown, n: number, lo: number, hi: number) =>
+  Array.isArray(v) && v.length === n && v.every((x) => typeof x === "number" && Number.isFinite(x)) ? v.map((x) => num(x, lo, hi)) : null;
+const LOOK_IDS = ["sommer", "kreide", "daemmerung", "salz", "kohle", "messing"] as const;
+
+/**
+ * Nur bekannte Felder in ihren Bereichen. Ein geteiltes Buch oder eine geöffnete Datei kann alles enthalten;
+ * so stürzt keine Ansicht ab und kein Zettel zeigt Unsinn.
+ */
+export function cleanEdit(e: unknown): PhotoEdit | undefined {
+  if (!e || typeof e !== "object") return undefined;
+  const x = e as Record<string, unknown>;
+  const r = (x.rec && typeof x.rec === "object" ? x.rec : {}) as Record<string, unknown>;
+  const lv = nums(x.levels, 2, 0, 1);
+  const t = (x.transfer && typeof x.transfer === "object" ? x.transfer : null) as Record<string, unknown> | null;
+  const lab = (v: unknown) => nums(v, 3, -200, 200) as [number, number, number] | null;
+  const transfer =
+    t && lab(t.mu) && lab(t.sd) && lab(t.muT) && lab(t.sdT)
+      ? { mu: lab(t.mu)!, sd: lab(t.sd)!, muT: lab(t.muT)!, sdT: lab(t.sdT)!, k: num(t.k, 0, 1) }
+      : null;
+  return {
+    exposure: num(x.exposure, -1, 1),
+    contrast: num(x.contrast, -1, 1),
+    shadows: num(x.shadows, 0, 1),
+    warmth: num(x.warmth, -1, 1),
+    sat: num(x.sat, -1, 1),
+    look: oneOf(x.look, [null, ...LOOK_IDS], null),
+    amount: num(x.amount, 0, 1, 0.8),
+    levels: lv && lv[1] > lv[0] ? (lv as [number, number]) : null,
+    transfer,
+    origin: oneOf(x.origin, [null, "auto", "match", "mood"] as const, null),
+    moodFrom: str(x.moodFrom, 60),
+    rec: {
+      film: oneOf(r.film, [null, ...LOOK_IDS], null),
+      wbR: Math.round(num(r.wbR, -9, 9)),
+      wbB: Math.round(num(r.wbB, -9, 9)),
+      hl: num(r.hl, -2, 4),
+      sh: num(r.sh, -2, 4),
+      color: Math.round(num(r.color, -4, 4)),
+      dr: oneOf(r.dr, [100, 200, 400] as const, 100),
+      cc: oneOf(r.cc, [0, 1, 2] as const, 0),
+      fxb: oneOf(r.fxb, [0, 1, 2] as const, 0),
+      grain: oneOf(r.grain, [0, 1, 2] as const, 0),
+      gsize: oneOf(r.gsize, ["klein", "groß"] as const, "klein"),
+    },
+    recName: str(x.recName, 40),
+  };
 }
 
 /* ---------- Farbe ---------- */
