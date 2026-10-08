@@ -1,9 +1,11 @@
 "use client";
 
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { plateName, plateOf, type BookData } from "@/content/books";
+import { buttonClass } from "@/components/ui/button-class";
 
 type Open = (no: number, trigger: HTMLElement) => void;
 const OpenContext = createContext<Open>(() => {});
@@ -258,12 +260,12 @@ export function PlateViewer({
               {p.note && <span className="ml-2">{p.note}</span>}
             </p>
             {/* „Zurück“ hieße hier zweierlei: zurück aus dem Buch oder zum vorigen Bild */}
-            <div className={`flex shrink-0 flex-wrap gap-1 ${box.side ? "-ml-2" : "-mr-2"}`}>
-              <button type="button" onClick={() => step(-1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
-                Voriges Bild
+            <div className="flex shrink-0 gap-2">
+              <button type="button" onClick={() => step(-1)} aria-label="Voriges Bild" title="Voriges Bild" className={buttonClass("quiet", "icon")}>
+                <ChevronLeft aria-hidden />
               </button>
-              <button type="button" onClick={() => step(1)} className="text-on-table px-2 py-1 decoration-mark decoration-2 underline-offset-4 hover:underline">
-                Nächstes Bild
+              <button type="button" onClick={() => step(1)} aria-label="Nächstes Bild" title="Nächstes Bild" className={buttonClass("quiet", "icon")}>
+                <ChevronRight aria-hidden />
               </button>
             </div>
           </div>
@@ -273,9 +275,11 @@ export function PlateViewer({
         ref={closeBtn}
         type="button"
         onClick={requestClose}
-        className="text-on-table absolute top-3 right-3 px-3 py-2 text-sm decoration-mark decoration-2 underline-offset-4 hover:underline md:top-5 md:right-6"
+        aria-label="Schließen"
+        title="Schließen"
+        className={buttonClass("quiet", "icon", "absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 md:top-5 md:right-6")}
       >
-        Schließen
+        <X aria-hidden />
       </button>
     </div>
   );
