@@ -10,7 +10,7 @@ const config = {
   apiKey: "AIzaSyCh1QxkXtljnVpeZNjZMghO2xFsDj6VygY",
   // Anmeldung über die eigene Domain: Safari trennt den Speicher fremder Domains, über firebaseapp.com
   // ginge der Zwischenstand der Google-Anmeldung verloren. Firebase Hosting liefert /__/auth/ hier selbst aus.
-  authDomain: "fujiventura.web.app",
+  authDomain: "calima.web.app",
   projectId: "fujiventura",
   storageBucket: "fujiventura.firebasestorage.app",
   messagingSenderId: "972013615891",

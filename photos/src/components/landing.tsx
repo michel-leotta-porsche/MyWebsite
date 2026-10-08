@@ -511,7 +511,7 @@ function Share() {
           <Cover photo={torii} title="Japan" author="Michel Leotta" className="absolute top-[2%] left-[4%] w-[54%] -rotate-[4deg]" />
           <Slip className="reveal-slip top-[10%] right-[2%] w-[46%] rotate-[3deg] text-[15px]">
             Für Jana, von Michel
-            <span className="text-ink-2 mt-1.5 block font-mono text-[11px] break-all">fujiventura.web.app/b?t=…</span>
+            <span className="text-ink-2 mt-1.5 block font-mono text-[11px] break-all">calima.web.app/b?t=…</span>
           </Slip>
           <Slip className="reveal-slip reveal-late right-[8%] bottom-[8%] w-[56%] -rotate-[2deg] text-[15px] leading-snug">
             <span className="text-ink-2 block text-xs">Zettel zu Tafel 7, von Jana</span>
