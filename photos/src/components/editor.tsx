@@ -1,17 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { plateOf, typeArea, type BookData, type Page } from "@/content/books";
 import { layoutPage, TEXT_STYLE } from "@/content/layout";
-import { inputClass, SignInTable, SlipDialog, TextButton } from "@/components/app-ui";
+import { inputClass, SignInTable, TextButton } from "@/components/app-ui";
 import { Book } from "@/components/book";
 import { buttonClass, Button, IconButton, ToolGroup } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
+import { ListGroup, ListRow } from "@/components/ui/list";
 import { Menu, MenuItem } from "@/components/ui/menu";
+import { Sheet } from "@/components/ui/sheet";
 import { Swatches } from "@/components/ui/swatches";
 import { notify, Toaster } from "@/components/ui/toaster";
 import { CropDialog } from "@/components/crop-dialog";
@@ -1335,9 +1337,11 @@ function Keys({ onKey }: { onKey: (e: KeyboardEvent) => void }) {
   return null;
 }
 
-/** Verlauf: Zwischenstände ansehen und zurückholen, eigenen Stand sichern, Projekt als Datei */
+/** Verlauf: Zwischenstände ansehen und zurückholen, eigenen Stand sichern, Projekt als Datei. Blatt von unten wie die übrigen Dialoge */
 function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onRestore: (v: Version) => void; onClose: () => void }) {
+  const [open, setOpen] = useState(false);
   const [list, setList] = useState<Version[] | null>(null);
+  const [all, setAll] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
@@ -1348,13 +1352,30 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
   useEffect(() => {
     load();
   }, [load]);
+  // erst nach dem Einhängen öffnen, damit das Blatt hochfährt
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
   const fileUrl = useMemo(() => URL.createObjectURL(exportBook(book)), [book]);
   useEffect(() => () => URL.revokeObjectURL(fileUrl), [fileUrl]);
 
+  // Schließen fährt das Blatt erst herunter, dann meldet es sich ab
+  const close = (then?: () => void) => {
+    setOpen(false);
+    window.setTimeout(() => (then ? then() : onClose()), 420);
+  };
+  const shown = list && !all ? list.slice(0, 8) : list;
+
   return (
-    <SlipDialog label="Verlauf" onClose={onClose}>
+    <Sheet
+      title="Verlauf"
+      description="Zwischenstände entstehen von selbst vor großen Änderungen und alle zehn Minuten."
+      open={open}
+      onOpenChange={(o) => !o && close()}
+    >
       <form
-        className="flex gap-2"
+        className="flex items-end gap-3"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -1364,38 +1385,51 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
           load();
         }}
       >
-        <label htmlFor="version-name" className="sr-only">
-          Name des Stands
-        </label>
-        <input id="version-name" className={inputClass} value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} placeholder="z. B. vor dem Umsortieren" />
-        <button type="submit" disabled={busy} className="border-ink text-ink hover:bg-ink hover:text-paper shrink-0 border px-3 text-sm font-semibold transition-colors duration-150">
-          Stand sichern
-        </button>
+        <Field label="Eigenen Stand benennen" className="min-w-0 flex-1" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
+        <Button type="submit" variant="paper" size="sm" disabled={busy} className="mb-1.5">
+          <BookmarkPlus aria-hidden />
+          Sichern
+        </Button>
       </form>
-      <ul className="mt-5 max-h-[40svh] space-y-0 overflow-y-auto" tabIndex={0} aria-label="Zwischenstände">
-        {list === null && <li className="text-ink-2 text-sm">Lade …</li>}
-        {list?.length === 0 && <li className="text-ink-2 text-sm">Noch keine Zwischenstände. Sie entstehen von selbst vor großen Änderungen und alle zehn Minuten.</li>}
-        {list?.map((v) => (
-          <li key={v.id} className="flex items-baseline justify-between gap-3 border-t border-ink/15 py-2.5">
-            <span className="min-w-0">
-              <span className={`block truncate text-sm ${v.auto ? "" : "font-semibold"}`}>{v.label}</span>
-              <span className="text-ink-2 text-[12px]">
-                {when(v)} · {v.book.spreads.length} Doppelseiten
-              </span>
-            </span>
-            <button type="button" onClick={() => onRestore(v)} className="shrink-0 text-sm underline decoration-mark decoration-2 underline-offset-4">
-              Zurückholen
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3 border-t border-ink/15 pt-4 text-sm">
+
+      <div className="mt-6">
+        {list === null && <p className="text-ink-2 text-sm">Lade …</p>}
+        {list?.length === 0 && <p className="text-ink-2 text-sm">Noch keine Zwischenstände.</p>}
+        {shown && shown.length > 0 && (
+          <ListGroup paper label="Zwischenstände">
+            {shown.map((v) => (
+              <ListRow
+                key={v.id}
+                paper
+                lead={v.auto ? <History aria-hidden /> : <Bookmark aria-hidden />}
+                title={<span className={`block truncate ${v.auto ? "font-normal" : ""}`}>{v.label}</span>}
+                detail={`${when(v)} · ${v.book.spreads.length} Doppelseiten`}
+                trail={
+                  // Telefon: nur das Symbol, damit Name und Datum Platz haben
+                  <Button variant="paper" size="sm" onClick={() => close(() => onRestore(v))} aria-label={`${v.label} vom ${when(v)} zurückholen`} className="max-sm:size-11 max-sm:px-0">
+                    <RotateCcw aria-hidden />
+                    <span className="max-sm:sr-only">Zurückholen</span>
+                  </Button>
+                }
+              />
+            ))}
+          </ListGroup>
+        )}
+        {list && !all && list.length > 8 && (
+          <Button variant="paper" size="sm" className="mt-3" onClick={() => setAll(true)}>
+            Ältere zeigen ({list.length - 8})
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className={buttonClass("paper", "sm")}>
+          <Download aria-hidden />
           Projekt als Datei sichern
         </a>
-        <span className="text-ink-2 text-[12px]">Öffnen über das Bücherzimmer</span>
+        <span className="text-ink-2 text-[13px]">Öffnen über das Bücherzimmer</span>
       </div>
-    </SlipDialog>
+    </Sheet>
   );
 }
 
