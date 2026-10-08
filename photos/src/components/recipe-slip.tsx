@@ -1,8 +1,10 @@
 "use client";
 
+import { ArrowLeft, Camera, Check, Download, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
+import { buttonClass } from "@/components/ui/button";
 import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
 import { describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
@@ -148,15 +150,20 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
           <div key={row.id} className="contents">
             <dt className="text-ink-2">
               {dial ? (
-                <label className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={checked.includes(row.id)}
-                    onChange={() => toggle(row.id)}
-                    className="h-4 w-4 accent-[var(--ink)]"
-                  />
+                <button type="button" role="checkbox" aria-checked={checked.includes(row.id)} onClick={() => toggle(row.id)} className="-my-1 flex min-h-7 cursor-pointer items-center gap-2 text-left">
+                  {/* Haken im Kreis wie in der Checkliste: gesetzt in Tinte, springt kurz auf */}
+                  <span
+                    aria-hidden
+                    className={`grid size-[18px] flex-none place-items-center rounded-full transition-colors duration-150 ${checked.includes(row.id) ? "bg-ink text-paper" : "shadow-[inset_0_0_0_1.5px_rgb(27_28_26/0.35)]"}`}
+                  >
+                    {checked.includes(row.id) && (
+                      <motion.span initial={reduce ? false : { scale: 0.4 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 22 }}>
+                        <Check className="size-3" strokeWidth={3} />
+                      </motion.span>
+                    )}
+                  </span>
                   {row.label}
-                </label>
+                </button>
               ) : (
                 row.label
               )}
@@ -165,15 +172,16 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
           </div>
         ))}
       </dl>
-      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => {
             if (!dial) setChecked(readChecks(recipe.name));
             setDial((d) => !d);
           }}
-          className="text-ink text-sm font-semibold underline decoration-mark decoration-2 underline-offset-4"
+          className={buttonClass("paper", "sm", "pl-2.5")}
         >
+          {dial ? done ? <Check aria-hidden /> : <ArrowLeft aria-hidden /> : <Camera aria-hidden />}
           {dial ? (done ? "Fertig. Auf C1 gespeichert?" : "Zurück zum Rezept") : "An der Kamera einstellen"}
         </button>
       </div>
@@ -260,12 +268,9 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
           </li>
         ))}
       </ul>
-      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
-        <a
-          href={href}
-          download={`${recipe.name}.xmp`}
-          className="text-ink text-sm font-semibold underline decoration-mark decoration-2 underline-offset-4"
-        >
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <a href={href} download={`${recipe.name}.xmp`} className={buttonClass("paper", "sm", "pl-2.5")}>
+          <Download aria-hidden />
           Preset laden (.xmp)
         </a>
         {recipe.source && (
@@ -362,7 +367,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       role="dialog"
       aria-label={`${kind} zu ${plateName(plate.no, plate.title)}`}
       tabIndex={0}
-      className={`slip text-ink fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:bottom-24 ${side === "left" ? "md:left-[max(24px,calc(50vw-560px))]" : "md:right-[max(24px,calc(50vw-560px))]"}`}
+      className={`slip text-ink rounded-cut fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:bottom-24 ${side === "left" ? "md:left-[max(24px,calc(50vw-560px))]" : "md:right-[max(24px,calc(50vw-560px))]"}`}
       style={phone ? { left: 12, bottom: 12 } : undefined}
       initial={reduce ? false : { y: 140, clipPath: "inset(100% 0 0 0)", rotate: 0 }}
       animate={{ y: 0, clipPath: "inset(0% 0 0 0)", rotate: phone ? -0.6 : side === "left" ? 1.6 : -1.6 }}
@@ -370,7 +375,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       transition={{ duration: 0.5, ease: EXPO }}
       onClick={(e) => e.stopPropagation()}
     >
-      <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-ink/15 pb-3">
+      <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-ink-2 text-[12px]">
             {kind} · Tafel {plate.no}
@@ -379,13 +384,8 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
             {title}
           </p>
         </div>
-        <button
-          ref={closeBtn}
-          type="button"
-          onClick={onClose}
-          className="text-ink -mr-2 px-2 py-1 text-sm underline decoration-mark decoration-2 underline-offset-4"
-        >
-          Schließen
+        <button ref={closeBtn} type="button" onClick={onClose} aria-label="Schließen" title="Schließen" className={buttonClass("paper", "icon", "-mt-1 -mr-1.5")}>
+          <X aria-hidden />
         </button>
       </header>
       {recipe?.kind === "fuji" && <FujiSlip recipe={recipe} reduce={reduce} />}

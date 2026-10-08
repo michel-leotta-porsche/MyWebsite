@@ -1315,7 +1315,7 @@ export function Stage({
 
   /** Ebenen: was oben liegt, steht oben; am Desktop in der Seitenleiste, am Handy in einem Blatt von unten */
   const layerList = () => (
-      <ol className="bg-ink/5 overflow-hidden rounded-tool">
+      <ol className="border-ink/15 border-y">
         {[...shown].reverse().map((it) => (
           <li key={it.id} className={`border-ink/8 flex items-center gap-1 pr-1 [&+&]:border-t ${it.id === sel ? "bg-ink/8" : ""}`}>
             <button
@@ -2133,15 +2133,9 @@ export function Stage({
                   }}
                 />
               </label>
-              <label className="flex items-center gap-2 text-[13px]">
-                <input
-                  type="checkbox"
-                  checked={!!selected.light}
-                  onChange={(e) => commit(items.map((i) => (i.id === selected.id && i.t === "text" ? { ...i, light: e.target.checked || undefined } : i)))}
-                  className="accent-[var(--ink)]"
-                />
-                Helle Schrift (für Text auf dunklen Fotos)
-              </label>
+              <Switch on={!!selected.light} onChange={(on) => commit(items.map((i) => (i.id === selected.id && i.t === "text" ? { ...i, light: on || undefined } : i)))}>
+                Helle Schrift <span className="text-ink-2">(für Text auf dunklen Fotos)</span>
+              </Switch>
               <LayerButtons
                 onLayer={(to) => layer(selected.id, to)}
                 onDuplicate={() => duplicate(selected)}
@@ -2182,10 +2176,9 @@ export function Stage({
                   </button>
                 ))}
                 {selected.kind !== "tape" && (
-                  <label className="ml-2 flex items-center gap-2 text-[13px]">
-                    <input type="checkbox" checked={!!selected.look.dashed} onChange={(e) => setShapeOf(selected.id, { dashed: e.target.checked || undefined })} className="accent-[var(--ink)]" />
+                  <Switch className="ml-2" on={!!selected.look.dashed} onChange={(on) => setShapeOf(selected.id, { dashed: on || undefined })}>
                     gestrichelt
-                  </label>
+                  </Switch>
                 )}
               </fieldset>
               <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
@@ -2265,12 +2258,9 @@ function PhotoPanel({
     <div className={panelClass}>
       <p className={panelTitle}>Foto</p>
       <Field label="Titel" value={photo?.title ?? ""} onChange={(e) => onTitle(e.target.value.slice(0, 50))} />
-      <label className="flex min-h-10 items-center gap-2.5 text-[14px]">
-        <input type="checkbox" checked={item.caption === "auto"} onChange={(e) => onCaption(e.target.checked ? "auto" : "off")} className="size-4 accent-[var(--ink)]" />
-        <span>
-          Unterschrift auf der Seite <span className="text-ink-2">(sonst im Kopf)</span>
-        </span>
-      </label>
+      <Switch on={item.caption === "auto"} onChange={(on) => onCaption(on ? "auto" : "off")}>
+        Unterschrift auf der Seite <span className="text-ink-2">(sonst im Kopf)</span>
+      </Switch>
       <div className="flex flex-wrap gap-2">
         <Button variant="paper" size="sm" className="pl-2.5" onClick={onCrop}>
           <Crop aria-hidden />
@@ -2297,6 +2287,18 @@ const toolPill = "bg-on-table/7 inline-flex rounded-full p-[3px] shadow-[inset_0
 /** Wahl aus wenigen Möglichkeiten auf Papier (Stil, Strich): gewählt in Tinte */
 const chip = (on: boolean) =>
   `min-h-9 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-11 ${on ? "bg-ink text-paper" : "bg-ink/6 text-ink shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] hover:bg-ink/10"}`;
+
+/** Ein/aus auf Papier: Schalter als Pille, an in Tinte; die ganze Zeile ist die Klickfläche */
+function Switch({ on, onChange, children, className = "" }: { on: boolean; onChange: (on: boolean) => void; children: React.ReactNode; className?: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className={`flex min-h-10 items-center gap-2.5 text-left text-[14px] pointer-coarse:min-h-11 ${className}`}>
+      <span aria-hidden className={`relative h-5 w-9 flex-none rounded-full transition-colors duration-150 ${on ? "bg-ink" : "bg-ink/10 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.2)]"}`}>
+        <span className={`bg-paper absolute top-0.5 left-0.5 size-4 rounded-full shadow-[0_1px_2px_rgb(12_10_8/0.35)] transition-transform duration-200 ease-out ${on ? "translate-x-4" : ""}`} />
+      </span>
+      <span>{children}</span>
+    </button>
+  );
+}
 
 /** Entfernen: leise, in Warnrot, mit Papierkorb */
 function RemoveButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
@@ -2765,22 +2767,21 @@ function TextToolbar({
       className={`slip text-ink flex select-text flex-wrap items-center gap-1 rounded-tool p-1.5 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)] ${docked ? "mx-auto w-fit max-w-full" : "absolute z-[65] max-w-[min(560px,calc(100vw-32px))]"}`}
       style={docked ? undefined : { left: `${Math.min(box.x, 150) / 2}%`, ...(above ? { bottom: `calc(${100 - box.y}% + 10px)` } : { top: `calc(${box.y + box.h}% + 10px)` }) }}
     >
-      <label className="sr-only" htmlFor={`font-${item.id}`}>
-        Schriftart
-      </label>
-      <select
-        id={`font-${item.id}`}
-        value={m.font}
-        onChange={(e) => onLook({ font: e.target.value === "grotesk" ? null : (e.target.value as FontKey) })}
-        className="bg-ink/6 h-8 rounded-full border-0 px-3 text-sm pointer-coarse:h-11 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
-        style={{ fontFamily: FONTS[m.font].css }}
+      <Menu
+        align="start"
+        trigger={
+          <button type="button" aria-label={`Schriftart: ${FONTS[m.font].label}`} className="bg-ink/6 flex h-8 items-center gap-1.5 rounded-full pr-2.5 pl-3 text-sm shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] pointer-coarse:h-11" style={{ fontFamily: FONTS[m.font].css }}>
+            {FONTS[m.font].label}
+            <ChevronDown aria-hidden className="size-3.5" />
+          </button>
+        }
       >
         {(Object.keys(FONTS) as FontKey[]).map((f) => (
-          <option key={f} value={f} style={{ fontFamily: FONTS[f].css }}>
-            {FONTS[f].label}
-          </option>
+          <MenuItem key={f} icon={<Check className={f === m.font ? "" : "invisible"} />} onClick={() => onLook({ font: f === "grotesk" ? null : f })}>
+            <span style={{ fontFamily: FONTS[f].css }}>{FONTS[f].label}</span>
+          </MenuItem>
         ))}
-      </select>
+      </Menu>
       <span className="mx-1 flex items-center" role="group" aria-label="Größe">
         <button type="button" className={btn} aria-label="kleiner" onClick={() => setPt(pt - (pt > 24 ? 4 : 1))}>
           −
@@ -2841,12 +2842,12 @@ function TextToolbar({
               aria-label={`Farbe ${c.label}`}
               aria-pressed={active}
               onClick={() => onLook({ color: c.value })}
-              className={`size-6 rounded-cut border pointer-coarse:size-11 ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
+              className={`size-6 rounded-full border pointer-coarse:size-11 ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
               style={{ background: c.value ?? "var(--ink)" }}
             />
           );
         })}
-        <label className="relative size-6 cursor-pointer overflow-hidden rounded-cut pointer-coarse:size-11 border border-ink/30" title="Eigene Farbe">
+        <label className="relative size-6 cursor-pointer overflow-hidden rounded-full pointer-coarse:size-11 border border-ink/30" title="Eigene Farbe">
           <span className="sr-only">Eigene Farbe</span>
           <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
           <input
@@ -2943,7 +2944,7 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label="keine Fläche"
           title="keine"
           onClick={() => onPick(null)}
-          className={`relative size-7 overflow-hidden rounded-cut pointer-coarse:size-11 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`relative size-7 overflow-hidden rounded-full pointer-coarse:size-11 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
         >
           <svg aria-hidden viewBox="0 0 10 10" className="absolute inset-0 h-full w-full">
             <line x1={1} y1={9} x2={9} y2={1} stroke="#cc7048" strokeWidth={1} />
@@ -2958,11 +2959,11 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
           aria-label={`Farbe ${c.label}`}
           aria-pressed={value?.toLowerCase() === c.value.toLowerCase()}
           onClick={() => onPick(c.value)}
-          className={`size-7 rounded-cut border border-ink/30 pointer-coarse:size-11 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
+          className={`size-7 rounded-full border border-ink/30 pointer-coarse:size-11 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
           style={{ background: c.value }}
         />
       ))}
-      <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-cut border border-ink/30" title="Eigene Farbe">
+      <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-ink/30 pointer-coarse:size-11" title="Eigene Farbe">
         <span className="sr-only">Eigene Farbe</span>
         <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
         <input type="color" value={value ?? "#1b1c1a"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
