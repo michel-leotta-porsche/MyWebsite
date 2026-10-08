@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { books as sampleBooks, type BookData } from "@/content/books";
 import { linkClass, RequireUser, RoomNav, SlipDialog, TextButton, UndoToast, Wordmark } from "@/components/app-ui";
@@ -17,6 +17,7 @@ import { IS_APP } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
+import { markSeen, seenSnapshot } from "@/lib/seen";
 
 /** Google-Konten, unter denen Michel angemeldet ist. Kein Schutz: die Fotos liegen ohnehin öffentlich unter /photos */
 const OWNER_EMAILS = ["michel.julian.leotta@gmail.com"];
@@ -58,6 +59,9 @@ function Room({ user }: { user: User }) {
   const importInput = useRef<HTMLInputElement>(null);
 
   const { own, gifts, trash } = room;
+  // was beim Betreten schon gesehen war; neu ist, was danach kam
+  const [seen] = useState(() => (typeof window === "undefined" ? null : seenSnapshot()));
+  const isNew = (bookId: string, n: Feedback) => !!seen && (n.at?.seconds ?? 0) > seen.at(bookId);
 
   // geteilte Bücher bekommen eine eigene Kennung, damit sie neben gleichnamigen eigenen liegen können
   const mine = useMemo(() => {
@@ -101,18 +105,34 @@ function Room({ user }: { user: User }) {
   // bis die Bücher da sind, hält ein unsichtbarer Platz die Höhe eines Buchs
   const placeholder = <div aria-hidden className="carousel" style={{ height: "calc(var(--tw) * 1.5 + 58px)" }} />;
 
+  // das leere Buch: ein Rohling in ungefärbtem Leinen, wie ein Band vor dem Bezug
   const newTile = (
     <Link
       href="/neu"
-      className="text-on-table-2 hover:text-on-table relative flex flex-col justify-between border border-dashed border-on-table-2/60 p-[9%] transition-colors duration-150"
+      className="group relative block"
       style={{ width: "var(--tw)", aspectRatio: "2 / 3" }}
+      aria-label="Neues Buch anlegen"
     >
-      <span className="text-sm">Leeres Buch</span>
-      <span className="text-on-table text-2xl leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-        Neues Buch anlegen
+      <span aria-hidden className="book-shadow-closed absolute inset-0" />
+      <span aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full" style={{ width: 4 }} />
+      <span className="linen bg-paper-shade absolute inset-0 grid content-end p-[11%]">
+        <span
+          className="text-cloth-ink/60 text-[clamp(22px,7vw,30px)] leading-[0.9] font-bold tracking-[-0.03em]"
+          style={{ fontVariationSettings: '"wdth" 78, "opsz" 96', textShadow: "0 1px 0 rgb(255 255 255 / 0.35)" }}
+        >
+          Neues
+          <br />
+          Buch
+        </span>
+        <span aria-hidden className="text-cloth-ink/50 absolute top-[9%] left-[11%] text-3xl font-light transition-transform duration-500 ease-out group-hover:rotate-90">
+          +
+        </span>
       </span>
     </Link>
   );
+
+  // wer noch nichts gemacht, aber etwas geschenkt bekommen hat, sieht zuerst das Geschenk
+  const giftsFirst = ownLoaded && mine.length === 0 && given.length > 0;
 
   const ownSlides: Slide[] = [
     ...mine.map((d) => {
@@ -122,28 +142,42 @@ function Room({ user }: { user: User }) {
         book: d.book,
         decor: sp && (
           <>
-            <SlipTabs names={sp.to} />
+            <SlipTabs names={sp.to} fresh={sp.items.filter((n) => isNew(d.book.id, n)).map((n) => n.who)} />
             {sp.ears > 0 && <CoverEar />}
           </>
         ),
       };
     }),
-    ...(ownLoaded ? [{ key: "neu", tile: newTile }] : []),
+    { key: "neu", tile: newTile },
   ];
+  // erst wenn gezählt ist, steht fest, welches Buch Neues hat; bis dahin hält ein Platz die Höhe
+  const ownReady = ownLoaded && room.spreadLoaded;
+  const freshOf = (d: Item) => (d.stored ? (room.spread[d.stored.id]?.items ?? []).filter((n) => isNew(d.book.id, n)) : []);
+  const newest = (d: Item) => freshOf(d)[0]?.at?.seconds ?? 0;
+  // in der Mitte liegt zuerst das Buch mit der neuesten ungesehenen Rückmeldung
+  const startAt = mine.reduce((best, d, i) => (newest(d) > (best < 0 ? 0 : newest(mine[best])) ? i : best), -1);
+  const fresh = mine.flatMap((d) => freshOf(d).map((n) => ({ n, title: d.book.title })));
 
   const fromYou = (
     <Carousel
       key="von-dir"
       id="von-dir"
       heading="Von dir"
-      slides={ownSlides}
+      showHeading={giftsFirst}
+      slides={ownReady ? ownSlides : []}
+      start={Math.max(0, startAt)}
       panel={(slide) => {
         if (!slide.book)
           return (
-            <Panel title="Neues Buch" meta={IS_APP ? "Fotos wählen, fertig." : "Fotos reinziehen, fertig."}>
-              <Link href="/neu" className={linkClass}>
-                Anlegen
-              </Link>
+            <Panel
+              title="Neues Buch"
+              meta={IS_APP ? "Fotos wählen, fertig." : "Fotos reinziehen, fertig."}
+              primary={
+                <Link href="/neu" className={primaryClass}>
+                  Fotos wählen
+                </Link>
+              }
+            >
               <TextButton className="text-on-table-2" onClick={() => importInput.current?.click()}>
                 Aus Datei öffnen
               </TextButton>
@@ -161,7 +195,17 @@ function Room({ user }: { user: User }) {
             after={
               s &&
               sp &&
-              sp.to.length > 0 && <Returns book={slide.book} spread={sp} onAll={() => setReturns({ book: slide.book!, stored: s })} />
+              sp.to.length > 0 && (
+                <Returns
+                  book={slide.book}
+                  spread={sp}
+                  isNew={(n) => isNew(slide.book!.id, n)}
+                  onAll={() => {
+                    markSeen(slide.book!.id);
+                    setReturns({ book: slide.book!, stored: s });
+                  }}
+                />
+              )
             }
           >
             {s && (
@@ -179,7 +223,7 @@ function Room({ user }: { user: User }) {
         );
       }}
     >
-      {!ownLoaded && placeholder}
+      {!ownReady && placeholder}
       <input
         ref={importInput}
         type="file"
@@ -227,9 +271,7 @@ function Room({ user }: { user: User }) {
     </Carousel>
   );
 
-  // wer noch nichts gemacht, aber etwas geschenkt bekommen hat, sieht zuerst das Geschenk
-  const giftsFirst = ownLoaded && mine.length === 0 && given.length > 0;
-  const count = ownLoaded && giftsLoaded ? stock(mine.length, given.length) : " ";
+  const count = !ownLoaded || !giftsLoaded ? "\u00a0" : fresh.length > 0 ? news(fresh) : stock(mine.length, given.length);
 
   return (
     <main>
@@ -431,17 +473,41 @@ function EarThumb({ book, no, className = "h-10 w-[30px]", cut = "bg-table" }: {
   );
 }
 
+// die eine gefüllte Taste unter dem Buch: Papier auf Basalt
+const primaryClass =
+  "press bg-on-table text-table hover:bg-paper inline-flex h-11 items-center px-5 text-[15px] font-semibold transition-[background-color,scale] duration-150";
+
 /** Unter dem Buch in der Mitte: Titel, was dazugehört, Aufschlagen und weitere Knöpfe, darunter `after` */
-function Panel({ title, meta, book, after, children }: { title: string; meta: string; book?: BookData; after?: ReactNode; children?: ReactNode }) {
+function Panel({
+  title,
+  meta,
+  book,
+  primary,
+  after,
+  children,
+}: {
+  title: string;
+  meta: string;
+  book?: BookData;
+  /** statt „Aufschlagen“ */
+  primary?: ReactNode;
+  after?: ReactNode;
+  children?: ReactNode;
+}) {
   const { open } = useContext(OpenBook);
   return (
-    <div className="grid gap-1 text-center">
-      <h3 className="text-on-table text-2xl leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+    <div className="mx-auto grid w-full max-w-md gap-1">
+      <h3 className="text-on-table text-[28px] leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
         {title}
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
-      <div className="mt-1.5 flex flex-wrap justify-center gap-x-5 gap-y-1 text-[15px]">
-        {book && <TextButton onClick={() => open(book.id)}>Aufschlagen</TextButton>}
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px]">
+        {primary ??
+          (book && (
+            <button type="button" onClick={() => open(book.id)} className={primaryClass}>
+              Aufschlagen
+            </button>
+          ))}
         {children}
       </div>
       {after}
@@ -449,58 +515,101 @@ function Panel({ title, meta, book, after, children }: { title: string; meta: st
   );
 }
 
-/** Was Freunde im Buch zurückgelassen haben: die neuesten Zettel in Handschrift, die Eselsohren als kleine Tafeln */
-function Returns({ book, spread, onAll }: { book: BookData; spread: Spread; onAll: () => void }) {
+const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null);
+
+/**
+ * Was Freunde im Buch zurückgelassen haben, ohne Kästchenreihe: höchstens zwei Zettel als kleiner Stapel,
+ * die Eselsohren als Abzüge, die übereinander liegen. Ein Abzug schlägt das Buch an seiner Tafel auf.
+ * Liegt das Buch 1,5 s in der Mitte, gilt es als gesehen (die Markierung „neu“ bleibt bis zum nächsten Besuch).
+ */
+function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Spread; isNew: (n: Feedback) => boolean; onAll: () => void }) {
   const { open } = useContext(OpenBook);
   const notes = spread.items.filter((n) => n.kind === "note");
   const ears = spread.items.filter((n) => n.kind === "ear");
-  const head = [notes.length && `${notes.length} Zettel`, ears.length && `${ears.length} ${earWord(ears.length)}`].filter(Boolean).join(" · ");
+  const fresh = spread.items.filter(isNew).length;
+  useEffect(() => {
+    const id = window.setTimeout(() => markSeen(book.id), 1500);
+    return () => window.clearTimeout(id);
+  }, [book.id]);
+
+  if (spread.items.length === 0)
+    return (
+      <div className="mt-6">
+        <div className="note-paper w-[86%] -rotate-1 px-4 pt-3 pb-3.5">
+          <p className="text-ink-2 text-[21px] leading-[1.05]" style={{ fontFamily: "var(--font-hand), cursive" }}>
+            Noch nichts zurück. Zettel und Eselsohren landen hier.
+          </p>
+        </div>
+      </div>
+    );
+
+  const head = [notes.length && `${notes.length} Zettel`, ears.length && `${ears.length} ${earWord(ears.length)}`, fresh && `${fresh} neu`].filter(Boolean).join(" · ");
   return (
-    <div className="border-on-table-2/40 mt-5 grid gap-3 border-t pt-3 text-left">
+    <div className="mt-6 grid gap-4">
       <p className="text-on-table-2 flex items-baseline justify-between gap-3 text-[13px]">
-        <span>{head || "Noch keine Zettel oder Eselsohren"}</span>
-        {spread.items.length > 0 && (
-          <TextButton className="text-on-table-2" onClick={onAll}>
-            Alle ansehen
-          </TextButton>
-        )}
+        <span>{head}</span>
+        <TextButton className="text-on-table-2" onClick={onAll}>
+          Alle
+        </TextButton>
       </p>
-      {notes.slice(0, 3).map((n, i) => (
+      {notes.length > 0 && (
         <button
-          key={`${n.token}-${n.id}`}
           type="button"
           onClick={onAll}
-          aria-label={`Zettel von ${n.who}: ${n.text}`}
-          className="slip text-ink relative w-full px-3 pt-2 pb-2.5 text-left shadow-[2px_4px_10px_-4px_rgb(12_10_8/0.7)]"
-          style={{ rotate: `${[-0.8, 0.6, -0.4][i]}deg` }}
+          className="press relative grid text-left"
+          aria-label={`Zettel von ${notes[0].who}: ${notes[0].text}. Alle Rückmeldungen ansehen`}
         >
-          <span className="line-clamp-4 text-[22px] leading-[1.02]" style={{ fontFamily: "var(--font-hand), cursive" }}>
-            „{n.text}“
-          </span>
-          <span className="text-ink-2 mt-1.5 block text-xs">{[n.who, n.no && `Tafel ${n.no}`].filter(Boolean).join(" · ")}</span>
+          {notes.slice(0, 2).map((n, i) => (
+            <span
+              key={`${n.token}-${n.id}`}
+              className={`note-paper col-start-1 row-start-1 block w-[86%] px-4 pt-3 pb-3 ${isNew(n) ? "is-new" : ""}`}
+              style={i === 0 ? { rotate: "-1deg", zIndex: 2 } : { rotate: "1.5deg", translate: "14px 12px", zIndex: 1 }}
+              aria-hidden={i > 0}
+            >
+              <span className="line-clamp-2 text-[23px] leading-[1.02]" style={{ fontFamily: "var(--font-hand), cursive" }}>
+                „{n.text}“
+              </span>
+              <span className="text-ink-2 mt-1.5 block text-xs">{[n.who, n.no && `Tafel ${n.no}`, shortDate(n)].filter(Boolean).join(" · ")}</span>
+            </span>
+          ))}
         </button>
-      ))}
-      {notes.length > 3 && (
-        <TextButton className="text-on-table-2 justify-self-start text-sm" onClick={onAll}>
-          {notes.length - 3} weitere Zettel
-        </TextButton>
       )}
       {ears.length > 0 && (
-        <ul className="flex gap-3 overflow-x-auto pb-1">
-          {ears.map((e) => (
-            <li key={`${e.token}-${e.id}`} className="w-[72px] shrink-0">
-              <button type="button" onClick={() => open(book.id)} className="grid gap-1 text-left" aria-label={`${e.who}, Eselsohr bei Tafel ${e.no}, Buch aufschlagen`}>
-                <EarThumb book={book} no={e.no} className="h-24 w-[72px]" />
-                <span className="text-on-table-2 text-[11px] leading-tight">
-                  {e.who}
-                  {e.no ? ` · Tafel ${e.no}` : ""}
-                </span>
+        <ul className={`flex items-end ${notes.length > 1 ? "mt-3" : ""}`}>
+          {ears.slice(0, 3).map((e, i) => (
+            <li key={`${e.token}-${e.id}`} className={i > 0 ? "-ml-6" : ""} style={{ rotate: `${[-3, 2, -1.5][i]}deg`, zIndex: 3 - i }}>
+              <button type="button" onClick={() => open(book.id, e.no)} className="press ear-print" aria-label={`${e.who} hat Tafel ${e.no} geknickt. Dort aufschlagen`}>
+                <EarPhoto book={book} no={e.no} />
               </button>
             </li>
           ))}
+          <li className="text-on-table-2 ml-4 self-center text-[13px] leading-snug">
+            {ears.length > 3 && (
+              <span className="text-on-table block text-xl" style={{ fontFamily: "var(--font-hand), cursive" }}>
+                +{ears.length - 3}
+              </span>
+            )}
+            {earLine(ears)}
+          </li>
         </ul>
       )}
     </div>
+  );
+}
+
+/** „Flo hat Tafel 3 geknickt“, bei mehreren „Flo und Anna haben Ecken geknickt“ */
+function earLine(ears: Feedback[]) {
+  const who = [...new Set(ears.map((e) => e.who))];
+  if (ears.length === 1) return `${who[0]} hat Tafel ${ears[0].no} geknickt`;
+  return `${who.length <= 2 ? who.join(" und ") : `${who.slice(0, 2).join(", ")} +${who.length - 2}`} ${who.length === 1 ? "hat" : "haben"} Ecken geknickt`;
+}
+
+function EarPhoto({ book, no }: { book: BookData; no?: number }) {
+  const plate = plateOf(book, no);
+  return (
+    <span aria-hidden className="bg-paper-shade relative block aspect-[3/4] overflow-hidden">
+      {plate && <Image src={plate.thumb} alt="" fill sizes="64px" className="object-cover" />}
+    </span>
   );
 }
 
@@ -517,7 +626,15 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
       </p>
       <ul className="mt-3">
         {items.map((n) => (
-          <FeedbackRow key={`${n.token}-${n.id}`} book={book} n={n} />
+          <FeedbackRow
+            key={`${n.token}-${n.id}`}
+            book={book}
+            n={n}
+            onPlate={(no) => {
+              onClose();
+              open(book.id, no);
+            }}
+          />
         ))}
       </ul>
       <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
@@ -539,17 +656,22 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
   );
 }
 
-function FeedbackRow({ book, n }: { book: BookData; n: Feedback }) {
+function FeedbackRow({ book, n, onPlate }: { book: BookData; n: Feedback; onPlate: (no: number) => void }) {
   const when = n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
   const place = n.no ? `Tafel ${n.no}` : null;
   const sub = [n.who, place, when].filter(Boolean).join(" · ");
   return n.kind === "ear" ? (
-    <li className="flex items-center gap-3 border-t border-ink/15 py-2.5">
-      <EarThumb book={book} no={n.no} className="h-12 w-9" cut="bg-[var(--slip)]" />
-      <span className="text-sm">
-        <span className="font-semibold">{n.who}</span> hat {place ? `bei ${place}` : ""} ein Eselsohr gemacht
-        {when && <span className="text-ink-2 block text-xs">{when}</span>}
-      </span>
+    <li className="border-t border-ink/15">
+      <button type="button" onClick={() => n.no && onPlate(n.no)} className="group flex w-full items-center gap-3 py-2.5 text-left">
+        <EarThumb book={book} no={n.no} className="h-12 w-9" cut="bg-[var(--slip)]" />
+        <span className="text-sm">
+          <span className="font-semibold">{n.who}</span> hat {place ?? "eine Tafel"} geknickt
+          <span className="text-ink-2 block text-xs">
+            {when ? `${when} · ` : ""}
+            <span className="underline decoration-transparent decoration-2 underline-offset-4 group-hover:decoration-mark">dort aufschlagen</span>
+          </span>
+        </span>
+      </button>
     </li>
   ) : (
     <li className="border-t border-ink/15 py-2.5">
@@ -559,6 +681,17 @@ function FeedbackRow({ book, n }: { book: BookData; n: Feedback }) {
       <p className="text-ink-2 mt-1 text-xs">{sub}</p>
     </li>
   );
+}
+
+/** Was neu ist, in einer Zeile: „2 neue Zettel bei Fuerte“, „1 neuer Zettel und 2 neue Eselsohren in 2 Büchern“ */
+function news(fresh: { n: Feedback; title: string }[]) {
+  const notes = fresh.filter((f) => f.n.kind === "note").length;
+  const ears = fresh.length - notes;
+  const titles = [...new Set(fresh.map((f) => f.title))];
+  const what = [notes && `${notes} ${notes === 1 ? "neuer Zettel" : "neue Zettel"}`, ears && `${ears} ${ears === 1 ? "neues Eselsohr" : "neue Eselsohren"}`]
+    .filter(Boolean)
+    .join(" und ");
+  return titles.length === 1 ? `${what} bei ${titles[0]}` : `${what} in ${titles.length} Büchern`;
 }
 
 /** Bestand in einer Zeile: „Fünf Bücher: drei von dir, zwei für dich.“ */

@@ -7,7 +7,8 @@ import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
 
 /** Aufschlagen eines Bands; kommt aus der Library, damit Tisch und Reihen nichts vom Hash oder der View Transition wissen */
-export const OpenBook = createContext<{ open: (id: string) => void; focusId: string | null }>({ open: () => {}, focusId: null });
+/** `plate`: gleich an dieser Tafel aufschlagen (z. B. vom Eselsohr eines Freundes aus) */
+export const OpenBook = createContext<{ open: (id: string, plate?: number) => void; focusId: string | null }>({ open: () => {}, focusId: null });
 
 // Wie die Bücher in einer Reihe liegen: auf derselben Tischkante, nur leicht gedreht
 const ROT = [-1.5, 1, -0.8, 1.4, -1.2, 0.6];

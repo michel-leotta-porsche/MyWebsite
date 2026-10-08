@@ -296,6 +296,7 @@ export function Book({
   book,
   mode,
   autoOpen,
+  startPlate,
   onClose,
   extra,
   ears,
@@ -305,6 +306,8 @@ export function Book({
   mode: Mode;
   /** Einband nach dem Hinlegen von selbst aufschlagen */
   autoOpen: boolean;
+  /** statt beim Titel gleich an dieser Tafel aufschlagen */
+  startPlate?: number;
   /** Buch zurück auf den Tisch legen */
   onClose: () => void;
   /** Zusätzliche Knöpfe in der Kopfzeile, z. B. Zettel schreiben */
@@ -460,10 +463,10 @@ export function Book({
 
   // Vom Tisch aufgeschlagen: der Einband öffnet sich von selbst, wenn das Buch liegt
   useEffect(() => {
-    if (!autoOpen || reduce) return;
-    const id = window.setTimeout(() => goTo(1), 420);
+    if (!autoOpen || (reduce && !startPlate)) return;
+    const id = window.setTimeout(() => goTo(startPlate ? stepForPlate(startPlate) : 1), reduce ? 0 : 420);
     return () => window.clearTimeout(id);
-  }, [autoOpen, goTo, reduce]);
+  }, [autoOpen, goTo, reduce, startPlate, stepForPlate]);
 
   // Rezeptzettel: gehört zur aufgeschlagenen Doppelseite und schließt sich beim Weiterblättern
   const [slip, setSlip] = useState<{ no: number; k: number } | null>(null);

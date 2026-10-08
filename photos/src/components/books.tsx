@@ -14,7 +14,7 @@ let LoadedBook: BookComponent | null = null;
 let loading: Promise<unknown> | null = null;
 const loadBook = () => (loading ??= import("@/components/book").then((m) => (LoadedBook = m.Book)));
 
-type View = { id: string; auto: boolean } | null;
+type View = { id: string; auto: boolean; plate?: number } | null;
 
 // Der Hash ist der Zustand: welches Buch liegt offen
 const HASH = "fuji:hash";
@@ -59,6 +59,8 @@ export function Library({
   const hash = useSyncExternalStore(subscribeHash, readHash, () => "");
   // vom Tisch genommen: der Einband schlägt sich von selbst auf; per Link oder Zurück-Taste nicht
   const [autoId, setAutoId] = useState<string | null>(null);
+  // Tafel, an der das Buch aufgehen soll; gilt nur für das eine Aufschlagen
+  const [startPlate, setStartPlate] = useState<number | undefined>(undefined);
   const view: View = books.some((b) => b.id === hash) ? { id: hash, auto: autoId === hash } : null;
   const reduce = useReducedMotion();
   const [bookReady, setBookReady] = useState(LoadedBook !== null);
@@ -69,6 +71,7 @@ export function Library({
       const run = () => {
         flushSync(() => {
           setAutoId(next?.auto ? next.id : null);
+          setStartPlate(next?.plate);
           if (push) history.pushState(null, "", next ? `#${next.id}` : location.pathname + location.search);
           window.dispatchEvent(new Event(HASH));
         });
@@ -135,6 +138,7 @@ export function Library({
         // auch auf dem Telefon die ganze Doppelseite, wie das Buch auf der Startseite
         mode="spread"
         autoOpen={view?.auto ?? false}
+        startPlate={view?.auto ? startPlate : undefined}
         onClose={close}
         extra={bookExtra}
         ears={Array.isArray(ears) ? ears : ears?.[book.id]}
@@ -146,7 +150,7 @@ export function Library({
   return (
     <>
       {before}
-      <OpenBook value={{ open: (id) => change({ id, auto: true }), focusId: returnTo }}>{children}</OpenBook>
+      <OpenBook value={{ open: (id, plate) => change({ id, auto: true, plate }), focusId: returnTo }}>{children}</OpenBook>
       {footer}
     </>
   );

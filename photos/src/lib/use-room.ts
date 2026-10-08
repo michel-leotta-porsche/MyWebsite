@@ -64,6 +64,7 @@ export function useRoom(uid: string) {
   const [errors, setErrors] = useState<Partial<Record<Zone, string>>>({});
   const [attempt, setAttempt] = useState({ own: 0, gifts: 0 });
   const [spread, setSpread] = useState<Record<string, Spread>>({});
+  const [spreadLoaded, setSpreadLoaded] = useState(false);
   const [spreadRun, setSpreadRun] = useState(0);
 
   const fail = (zone: Zone) => (e: unknown) => setErrors((x) => ({ ...x, [zone]: friendlyError(e) }));
@@ -101,7 +102,8 @@ export function useRoom(uid: string) {
     let alive = true;
     spreadOf(uid)
       .then((s) => alive && setSpread(s))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => alive && setSpreadLoaded(true));
     return () => {
       alive = false;
     };
@@ -131,6 +133,8 @@ export function useRoom(uid: string) {
     },
     /** Buch-Kennung → bei wem es liegt, Zettel, Eselsohren */
     spread,
+    /** einmal gezählt (auch wenn es fehlschlug): erst dann steht fest, welches Buch Neues hat */
+    spreadLoaded,
     /** neu zählen, z. B. nachdem das Buch jemandem hingelegt wurde */
     recount: () => setSpreadRun((n) => n + 1),
     errors,
