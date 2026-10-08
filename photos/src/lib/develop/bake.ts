@@ -43,14 +43,35 @@ const mainMake = (w: number, h: number) => Object.assign(document.createElement(
 const mainEncode = (c: OffscreenCanvas | HTMLCanvasElement) =>
   new Promise<Blob>((ok, fail) => (c as HTMLCanvasElement).toBlob((b) => (b ? ok(b) : fail(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", 0.86));
 
+// Hauptthread: kann fetch das Original nicht holen, lädt ein img-Element mit CORS
+const mainLoad = async (url: string) => {
+  try {
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await createImageBitmap(await res.blob());
+  } catch {
+    return new Promise<HTMLImageElement>((ok, fail) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => img.decode().then(() => ok(img), () => ok(img));
+      img.onerror = () => fail(new Error("Original lädt nicht"));
+      img.src = url;
+    });
+  }
+};
+const onMain = (job: BakeJob) => bake(job, mainMake, mainEncode, mainLoad);
+
 /** Ein Foto mit seinem LUT neu rechnen, drei Größen wie beim Hochladen */
 export function bakePhoto(job: Omit<BakeJob, "sizes">): Promise<BakeResult> {
   const full: BakeJob = { ...job, sizes: SIZES };
   const w = getWorker();
-  if (!w) return bake(full, mainMake, mainEncode);
+  if (!w) return onMain(full);
   const id = ++seq;
   return new Promise((ok, fail) => {
     waiting.set(id, { ok, fail });
     w.postMessage({ id, job: full });
-  }).catch(() => bake(full, mainMake, mainEncode)) as Promise<BakeResult>;
+  }).catch((e) => {
+    console.warn("[bearbeiten] Worker", e instanceof Error ? e.message : e);
+    return onMain(full);
+  }) as Promise<BakeResult>;
 }

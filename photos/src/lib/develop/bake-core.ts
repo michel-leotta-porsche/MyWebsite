@@ -9,18 +9,40 @@ export type BakeResult = { w: number; h: number; blobs: { large: Blob; page: Blo
 type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
 type Ctx = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
-export async function bake(job: BakeJob, make: (w: number, h: number) => AnyCanvas, encode: (c: AnyCanvas) => Promise<Blob>): Promise<BakeResult> {
-  const res = await fetch(job.url, { mode: "cors", credentials: "omit" });
-  if (!res.ok) throw new Error("Original nicht erreichbar");
-  const bmp = await createImageBitmap(await res.blob());
-  const s = Math.min(1, job.sizes.large / Math.max(bmp.width, bmp.height));
-  const w = Math.round(bmp.width * s);
-  const h = Math.round(bmp.height * s);
+type Source = ImageBitmap | HTMLImageElement;
+const fetchBitmap = async (url: string): Promise<Source> => {
+  const res = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!res.ok) throw new Error(`Original nicht erreichbar (HTTP ${res.status})`);
+  return createImageBitmap(await res.blob());
+};
+const free = (c: AnyCanvas) => {
+  c.width = 0;
+  c.height = 0;
+};
+function ctxOf(c: AnyCanvas, read = false): Ctx {
+  const ctx = c.getContext("2d", read ? { willReadFrequently: true } : undefined) as Ctx | null;
+  // Safari gibt null zurück, wenn der Speicher für Zeichenflächen voll ist
+  if (!ctx) throw new Error("Kein Speicher für eine Zeichenfläche");
+  return ctx;
+}
+
+export async function bake(
+  job: BakeJob,
+  make: (w: number, h: number) => AnyCanvas,
+  encode: (c: AnyCanvas) => Promise<Blob>,
+  load: (url: string) => Promise<Source> = fetchBitmap,
+): Promise<BakeResult> {
+  const bmp = await load(job.url);
+  const bw = "naturalWidth" in bmp ? bmp.naturalWidth : bmp.width;
+  const bh = "naturalHeight" in bmp ? bmp.naturalHeight : bmp.height;
+  const s = Math.min(1, job.sizes.large / Math.max(bw, bh));
+  const w = Math.round(bw * s);
+  const h = Math.round(bh * s);
   const large = make(w, h);
-  const ctx = large.getContext("2d", { willReadFrequently: true }) as Ctx;
+  const ctx = ctxOf(large, true);
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bmp, 0, 0, w, h);
-  bmp.close();
+  if ("close" in bmp) bmp.close();
   // in Streifen, damit nie zwei volle Pixelpuffer gleichzeitig im Speicher liegen
   const STRIP = 256;
   for (let y = 0; y < h; y += STRIP) {
@@ -33,7 +55,7 @@ export async function bake(job: BakeJob, make: (w: number, h: number) => AnyCanv
   const shrink = (from: AnyCanvas, long: number) => {
     const k = Math.min(1, long / Math.max(from.width, from.height));
     const c = make(Math.round(from.width * k), Math.round(from.height * k));
-    const x = c.getContext("2d") as Ctx;
+    const x = ctxOf(c);
     x.imageSmoothingQuality = "high";
     x.drawImage(from, 0, 0, c.width, c.height);
     return c;
@@ -41,9 +63,11 @@ export async function bake(job: BakeJob, make: (w: number, h: number) => AnyCanv
   const page = shrink(large, job.sizes.page);
   const thumb = shrink(page, job.sizes.thumb);
   const [bl, bp, bt] = await Promise.all([encode(large), encode(page), encode(thumb)]);
+  free(large);
+  free(page);
   // mittlere Farbe für die automatische Folge, wie beim Hochladen
   const tiny = make(12, 12);
-  const tx = tiny.getContext("2d", { willReadFrequently: true }) as Ctx;
+  const tx = ctxOf(tiny, true);
   tx.drawImage(thumb, 0, 0, 12, 12);
   const d = tx.getImageData(0, 0, 12, 12).data;
   let r = 0;
@@ -55,5 +79,7 @@ export async function bake(job: BakeJob, make: (w: number, h: number) => AnyCanv
     b += d[i + 2];
   }
   const n = d.length / 4;
+  free(thumb);
+  free(tiny);
   return { w, h, blobs: { large: bl, page: bp, thumb: bt }, color: toLab(r / n / 255, g / n / 255, b / n / 255) };
 }

@@ -70,20 +70,65 @@ function lutFor(e: PhotoEdit, n: number, key = JSON.stringify(e)): Uint8Array {
 
 /* ---------- Bilder laden ---------- */
 
-async function bitmapOf(url: string): Promise<ImageBitmap> {
-  const res = await fetch(url, { mode: "cors", credentials: "omit" });
-  if (!res.ok) throw new Error("Foto nicht erreichbar");
-  return createImageBitmap(await res.blob());
+type Pic = ImageBitmap | HTMLImageElement;
+const sizeOf = (p: Pic): [number, number] => ("naturalWidth" in p ? [p.naturalWidth, p.naturalHeight] : [p.width, p.height]);
+const release = (p: Pic) => "close" in p && p.close();
+
+/** Kurzer Grund für die Fehlermeldung, damit ein Bericht vom Telefon zeigt, was schiefging */
+export const reasonOf = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e)).slice(0, 120);
+
+function viaElement(url: string) {
+  return new Promise<HTMLImageElement>((ok, fail) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.onload = () => img.decode().then(() => ok(img), () => ok(img));
+    img.onerror = () => fail(new Error("Bild lädt nicht"));
+    img.src = url;
+  });
 }
 
-function pixelsOf(bmp: ImageBitmap, maxW: number): ImageData {
-  const s = Math.min(1, maxW / bmp.width);
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, Math.round(bmp.width * s));
-  c.height = Math.max(1, Math.round(bmp.height * s));
-  const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  ctx.drawImage(bmp, 0, 0, c.width, c.height);
-  return ctx.getImageData(0, 0, c.width, c.height);
+/**
+ * Foto entpackt laden: erst über fetch und createImageBitmap (außerhalb des Hauptthreads),
+ * scheitert das (Safari meldet dann nur „Load failed“), über ein img-Element mit CORS.
+ */
+async function pictureOf(url: string): Promise<Pic> {
+  try {
+    const res = await fetch(url, { mode: "cors", credentials: "omit" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await createImageBitmap(await res.blob());
+  } catch (e) {
+    console.warn("[bearbeiten] fetch/createImageBitmap", reasonOf(e));
+    return viaElement(url);
+  }
+}
+
+// Eine Zeichenfläche für alle kleinen Abzüge statt einer pro Bild. Safari begrenzt den Speicher aller
+// Canvas einer Seite und gibt ihn erst spät frei; ist er voll, liefert getContext null.
+let scratch: HTMLCanvasElement | null = null;
+function scratchCtx(w: number, h: number) {
+  scratch ??= document.createElement("canvas");
+  scratch.width = w;
+  scratch.height = h;
+  const ctx = scratch.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Kein Speicher für eine Zeichenfläche");
+  return ctx;
+}
+/** Speicher der Zeichenfläche sofort freigeben (Safari wartet sonst auf die Speicherbereinigung) */
+export const freeCanvas = (c: HTMLCanvasElement | OffscreenCanvas | null | undefined) => {
+  if (!c) return;
+  c.width = 0;
+  c.height = 0;
+};
+
+function pixelsOf(pic: Pic, maxW: number): ImageData {
+  const [w0, h0] = sizeOf(pic);
+  const s = Math.min(1, maxW / w0);
+  const w = Math.max(1, Math.round(w0 * s));
+  const h = Math.max(1, Math.round(h0 * s));
+  const ctx = scratchCtx(w, h);
+  ctx.drawImage(pic, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
 }
 
 /** Größe des eingerechneten großen Bilds, damit die Körnung in der Vorschau gleich groß ist */
@@ -104,8 +149,12 @@ const LutThumb = memo(function LutThumb({ img, edit, className }: { img: ImageDa
     c.height = img.height;
     const out = new ImageData(img.width, img.height);
     applyLut(img.data, out.data, lutFor(JSON.parse(k) as PhotoEdit, FAST, k), FAST);
-    c.getContext("2d")!.putImageData(out, 0, 0);
+    c.getContext("2d")?.putImageData(out, 0, 0);
   }, [img, k]);
+  useEffect(() => {
+    const c = ref.current;
+    return () => freeCanvas(c);
+  }, []);
   return <canvas ref={ref} aria-hidden className={className} />;
 });
 
@@ -310,7 +359,7 @@ export function DevelopDialog({
   const canvas = useRef<HTMLCanvasElement>(null);
   const ghost = useRef<HTMLCanvasElement>(null);
   const previewer = useRef<Previewer | null>(null);
-  const bitmaps = useRef(new Map<string, Promise<ImageBitmap>>());
+  const bitmaps = useRef(new Map<string, Promise<Pic>>());
 
   const photo = photos.find((p) => p.key === sel) ?? photos[0];
   const edit = edits[photo.key];
@@ -334,14 +383,18 @@ export function DevelopDialog({
   useEffect(() => {
     let live = true;
     for (const p of photos) {
-      bitmapOf(p.orig?.thumb ?? p.thumb)
-        .then((bmp) => {
-          const thumb = pixelsOf(bmp, 360);
-          const tile = pixelsOf(bmp, 160);
-          bmp.close();
+      pictureOf(p.orig?.thumb ?? p.thumb)
+        .then((pic) => {
+          const thumb = pixelsOf(pic, 360);
+          const tile = pixelsOf(pic, 160);
+          release(pic);
           if (live) setLoaded((m) => ({ ...m, [p.key]: { thumb, tile, st: stats(thumb.data) } }));
         })
-        .catch(() => {});
+        .catch((e) => {
+          console.warn("[bearbeiten] Abzug", reasonOf(e));
+          if (live) setError(`Die kleinen Vorschauen ließen sich nicht laden (${reasonOf(e)}).`);
+        })
+        .finally(() => freeCanvas(scratch));
     }
     myRecipes(uid)
       .then((r) => live && setOwn(r))
@@ -353,14 +406,25 @@ export function DevelopDialog({
 
   // Vorschau: ein WebGL-Kontext für den ganzen Dialog
   useEffect(() => {
-    const p = createPreviewer(canvas.current!);
-    previewer.current = p;
+    const c = canvas.current!;
+    const g = ghost.current;
     const maps = bitmaps.current;
+    let p: Previewer | null = null;
+    try {
+      p = createPreviewer(c);
+      previewer.current = p;
+    } catch (e) {
+      // in einem Rückruf, damit kein setState direkt im Effekt läuft
+      queueMicrotask(() => setError(`Die Vorschau ließ sich nicht starten (${reasonOf(e)}).`));
+    }
     return () => {
-      p.dispose();
+      p?.dispose();
       previewer.current = null;
-      for (const b of maps.values()) b.then((x) => x.close()).catch(() => {});
+      for (const b of maps.values()) b.then(release).catch(() => {});
       maps.clear();
+      freeCanvas(c);
+      freeCanvas(g);
+      freeCanvas(scratch);
     };
   }, []);
 
@@ -369,14 +433,17 @@ export function DevelopDialog({
     let live = true;
     let b = bitmaps.current.get(photo.key);
     if (!b) {
-      b = bitmapOf(photo.orig?.src ?? photo.src);
+      b = pictureOf(photo.orig?.src ?? photo.src);
       bitmaps.current.set(photo.key, b);
     }
-    b.then((bmp) => {
+    b.then((pic) => {
       if (!live || !previewer.current) return;
-      previewer.current.setImage(bmp, fullOf(photo));
+      previewer.current.setImage(pic, fullOf(photo));
       setReady(photo.key);
-    }).catch(() => live && setError("Das Foto ließ sich nicht laden."));
+    }).catch((e) => {
+      console.warn("[bearbeiten] Foto", reasonOf(e));
+      if (live) setError(`Das Foto ließ sich nicht laden (${reasonOf(e)}).`);
+    });
     return () => {
       live = false;
     };
@@ -580,9 +647,10 @@ export function DevelopDialog({
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
         patches[p.key] = { edit: e, orig, src: urls.page, large: urls.large, thumb: urls.thumb, color: out.color };
       }
-    } catch {
+    } catch (e) {
+      console.warn("[bearbeiten] Einrechnen", reasonOf(e));
       setBusy(null);
-      setError("Einrechnen hat nicht geklappt. Prüfe die Verbindung und versuch es noch einmal.");
+      setError(`Einrechnen hat nicht geklappt (${reasonOf(e)}). Versuch es noch einmal.`);
       return;
     }
     setBusy(null);

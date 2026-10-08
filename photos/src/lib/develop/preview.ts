@@ -45,11 +45,14 @@ void main() {
 
 export interface Previewer {
   /** Bild setzen; full = Breite und Höhe des Bilds beim Einrechnen (für gleich große Körnung) */
-  setImage(src: ImageBitmap | HTMLCanvasElement, full: [number, number]): void;
+  setImage(src: ImageBitmap | HTMLImageElement | HTMLCanvasElement, full: [number, number]): void;
   draw(s: PreviewState): void;
   dispose(): void;
   readonly gpu: boolean;
 }
+
+type Src = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+const dims = (s: Src): [number, number] => ("naturalWidth" in s ? [s.naturalWidth, s.naturalHeight] : [s.width, s.height]);
 
 export function createPreviewer(canvas: HTMLCanvasElement): Previewer {
   return glPreviewer(canvas) ?? cpuPreviewer(canvas);
@@ -93,9 +96,10 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
     gpu: true,
     setImage(src, f) {
       full = f;
-      canvas.width = src.width;
-      canvas.height = src.height;
-      gl.viewport(0, 0, src.width, src.height);
+      const [w, h] = dims(src);
+      canvas.width = w;
+      canvas.height = h;
+      gl.viewport(0, 0, w, h);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, imgTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -136,7 +140,9 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
 }
 
 function cpuPreviewer(canvas: HTMLCanvasElement): Previewer {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  // Safari: kein WebGL2 und kein Speicher mehr für eine Zeichenfläche
+  if (!ctx) throw new Error("Weder WebGL2 noch eine Zeichenfläche verfügbar");
   let src: ImageData | null = null;
   let out: ImageData | null = null;
   let full: [number, number] = [1, 1];
@@ -144,11 +150,12 @@ function cpuPreviewer(canvas: HTMLCanvasElement): Previewer {
     gpu: false,
     setImage(img, f) {
       full = f;
-      canvas.width = img.width;
-      canvas.height = img.height;
+      const [w, h] = dims(img);
+      canvas.width = w;
+      canvas.height = h;
       ctx.drawImage(img, 0, 0);
-      src = ctx.getImageData(0, 0, img.width, img.height);
-      out = new ImageData(img.width, img.height);
+      src = ctx.getImageData(0, 0, w, h);
+      out = new ImageData(w, h);
     },
     draw(s) {
       if (!src || !out) return;
