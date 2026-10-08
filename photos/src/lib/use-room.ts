@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { friendlyError } from "@/lib/errors";
 import {
+  blockSender,
   deleteBookForever,
   dropFromInbox,
   keepInInbox,
   mySharesOf,
   notesOf,
   trashBook,
+  watchBlocked,
   watchInbox,
   watchMyBooks,
+  type Blocked,
   type Share,
   type StoredBook,
 } from "@/lib/store";
@@ -50,6 +53,7 @@ async function spreadOf(uid: string): Promise<Record<string, Spread>> {
 export function useRoom(uid: string) {
   const [books, setBooks] = useState<StoredBook[] | null>(null);
   const [gifts, setGifts] = useState<Share[] | null>(null);
+  const [blocked, setBlocked] = useState<Blocked[]>([]);
   const [errors, setErrors] = useState<Partial<Record<Zone, string>>>({});
   const [attempt, setAttempt] = useState({ own: 0, gifts: 0 });
   const [spread, setSpread] = useState<Record<string, Spread>>({});
@@ -82,6 +86,9 @@ export function useRoom(uid: string) {
     [uid, attempt.gifts],
   );
 
+  useEffect(() => watchBlocked(uid, setBlocked), [uid]);
+  const visibleGifts = useMemo(() => gifts?.filter((g) => !blocked.some((b) => b.uid === g.owner)) ?? null, [gifts, blocked]);
+
   // Nur eine Zugabe an den Büchern: schlägt das Laden fehl, fehlt die Zeile einfach
   useEffect(() => {
     let alive = true;
@@ -107,7 +114,14 @@ export function useRoom(uid: string) {
     /** null solange noch nichts da ist */
     own: books?.filter((b) => !b.trashed) ?? null,
     trash: (books ?? []).filter((b) => b.trashed).sort((a, b) => (b.trashed ?? 0) - (a.trashed ?? 0)),
-    gifts,
+    /** ohne Bücher von ausgeblendeten Personen */
+    gifts: visibleGifts,
+    /** Alle Bücher dieser Person ausblenden (App Store 1.2: Blockieren) */
+    async block(g: Share) {
+      const tokens = (gifts ?? []).filter((x) => x.owner === g.owner).map((x) => x.token);
+      setBlocked((list) => [...list, { uid: g.owner, name: g.fromName }]);
+      await blockSender(uid, g.owner, g.fromName, tokens).catch(fail("gifts"));
+    },
     /** Buch-Kennung → bei wem es liegt, Zettel, Eselsohren */
     spread,
     /** neu zählen, z. B. nachdem das Buch jemandem hingelegt wurde */

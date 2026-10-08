@@ -9,7 +9,9 @@ import { Library } from "@/components/books";
 import { Shelf, Table } from "@/components/table";
 import { signInError } from "@/lib/errors";
 import { signIn } from "@/lib/firebase";
-import { keepInInbox, leaveNote, loadShare, toBookData, type Share } from "@/lib/store";
+import { ReportDialog } from "@/components/report-dialog";
+import { isAbusive } from "@/lib/note-filter";
+import { blockSender, keepInInbox, leaveNote, loadShare, toBookData, watchBlocked, type Blocked, type Share } from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 
@@ -30,6 +32,13 @@ export function GuestBook() {
   const [failed, setFailed] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
   const [signInFailed, setSignInFailed] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [blocked, setBlocked] = useState<Blocked[] | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    return watchBlocked(user.uid, setBlocked);
+  }, [user]);
 
   useEffect(() => {
     if (!token) return;
@@ -42,13 +51,14 @@ export function GuestBook() {
     };
   }, [token]);
 
-  // angemeldet: das Buch bleibt im eigenen Bücherzimmer liegen
+  const hidden = !!share && !!blocked?.some((b) => b.uid === share.owner);
+  // angemeldet: das Buch bleibt im eigenen Bücherzimmer liegen (außer die Person ist ausgeblendet)
   useEffect(() => {
-    if (!user || !share || kept) return;
+    if (!user || !share || kept || blocked === null || hidden) return;
     keepInInbox(user.uid, share)
       .then(() => setKept(true))
       .catch(() => {});
-  }, [kept, share, user]);
+  }, [kept, share, user, blocked, hidden]);
 
   const book = useMemo<BookData | null>(() => {
     if (!share) return null;
@@ -64,7 +74,10 @@ export function GuestBook() {
   if (share === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
   if (!share || !book) return <Empty text="Dieses Buch liegt hier nicht mehr. Vielleicht wurde der Link zurückgezogen." />;
 
+  if (hidden && !reporting) return <Empty text={`Bücher von ${share.fromName} hast du ausgeblendet. Im Profil kannst du das zurücknehmen.`} />;
+
   const from = user?.displayName ?? share.to;
+  const mine = !!user && user.uid === share.owner;
 
   const toggleEar = (no: number) => {
     if (!token || earsSent.includes(no)) return;
@@ -116,6 +129,11 @@ export function GuestBook() {
                 </span>
               )}
               <TextButton onClick={() => setWriting(true)}>Zettel</TextButton>
+              {!mine && (
+                <TextButton className="text-on-table-2" onClick={() => setReporting(true)}>
+                  Melden
+                </TextButton>
+              )}
             </>
           );
         }}
@@ -142,6 +160,11 @@ export function GuestBook() {
                   In mein Bücherzimmer legen
                 </TextButton>
               )}
+              {!mine && (
+                <TextButton className="text-on-table-2 ml-5" onClick={() => setReporting(true)}>
+                  Melden
+                </TextButton>
+              )}
               {!user && signInFailed && (
                 <span role="alert" className="text-on-table mt-1 block">
                   {signInFailed}
@@ -163,6 +186,10 @@ export function GuestBook() {
                 e.preventDefault();
                 if (!text.trim() || !token) return;
                 setFailed(null);
+                if (isAbusive(text)) {
+                  setFailed("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
+                  return;
+                }
                 leaveNote(token, { kind: "note", text: text.trim(), from })
                   .then(() => setSent(text.trim()))
                   .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
@@ -197,6 +224,14 @@ export function GuestBook() {
             </form>
           )}
         </SlipDialog>
+      )}
+      {reporting && (
+        <ReportDialog
+          share={share}
+          reporter={user?.uid ?? null}
+          onClose={() => setReporting(false)}
+          onBlock={user ? () => blockSender(user.uid, share.owner, share.fromName, [share.token]) : undefined}
+        />
       )}
     </main>
   );

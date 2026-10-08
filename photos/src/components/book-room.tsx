@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { books as sampleBooks, type BookData } from "@/content/books";
 import { linkClass, RequireUser, RoomNav, SlipDialog, TextButton, UndoToast, Wordmark } from "@/components/app-ui";
 import { Library } from "@/components/books";
+import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
 import { Shelf, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
@@ -41,6 +42,7 @@ function Room({ user }: { user: User }) {
   const room = useRoom(user.uid);
   const [more, setMore] = useState<More | null>(null);
   const [sharing, setSharing] = useState<StoredBook | null>(null);
+  const [reporting, setReporting] = useState<Share | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ text: string; at: number; undo: () => void } | null>(null);
   const [showTrash, setShowTrash] = useState(false);
@@ -293,9 +295,31 @@ function Room({ user }: { user: User }) {
               >
                 Aus dem Zimmer nehmen
               </Action>
+              <Action
+                onClick={() => {
+                  setReporting(more.gift);
+                  setMore(null);
+                }}
+                hint="Wenn das Buch gegen die Nutzungsbedingungen verstößt"
+              >
+                Melden …
+              </Action>
+              <Action
+                onClick={() => {
+                  const g = more.gift;
+                  setMore(null);
+                  room.block(g);
+                }}
+                hint={`Alle Bücher von ${more.gift.fromName} verschwinden; im Profil zurücknehmbar`}
+              >
+                Bücher von {more.gift.fromName} ausblenden
+              </Action>
             </Actions>
           )}
         </SlipDialog>
+      )}
+      {reporting && (
+        <ReportDialog share={reporting} reporter={user.uid} onClose={() => setReporting(null)} onBlock={() => room.block(reporting)} />
       )}
       {sharing && (
         <ShareDialog

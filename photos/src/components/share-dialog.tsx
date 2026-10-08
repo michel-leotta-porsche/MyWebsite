@@ -4,7 +4,9 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { inputClass, SlipDialog } from "@/components/app-ui";
 import { SITE_URL } from "@/lib/share-meta";
-import { mySharesOf, notesOf, refreshShares, shareBook, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
+import Link from "next/link";
+
+import { acceptTerms, deleteNote, mySharesOf, notesOf, refreshShares, shareBook, termsAccepted, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
 
 // In der iOS-App ist die eigene Adresse capacitor://localhost; geteilt wird immer eine Web-Adresse
 const linkFor = (token: string) => `${location.protocol.startsWith("http") ? location.origin : SITE_URL}/b?t=${token}`;
@@ -27,6 +29,19 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   const [notes, setNotes] = useState<Record<string, Note[]>>({});
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  // Vor dem ersten Teilen einmal den Nutzungsbedingungen zustimmen (App Store 1.2); null solange unbekannt
+  const [agreed, setAgreed] = useState<boolean | null>(null);
+  const [agreeNow, setAgreeNow] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    termsAccepted(book.owner)
+      .then((ok) => alive && setAgreed(ok))
+      .catch(() => alive && setAgreed(false));
+    return () => {
+      alive = false;
+    };
+  }, [book.owner]);
+  const mustAgree = agreed === false && !agreeNow;
 
   // Links aus der Zeit, als sie noch beim Stand des Teilens stehen blieben, holen beim Öffnen auf
   const catchUp = useEffectEvent((mine: Share[]) => refreshShares(book, mine).catch(() => {}));
@@ -48,9 +63,13 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   }, [book.id, book.owner]);
 
   const create = async () => {
-    if (!to.trim() || (needsTitle && !title.trim())) return;
+    if (!to.trim() || (needsTitle && !title.trim()) || mustAgree) return;
     setBusy(true);
     try {
+      if (agreed === false) {
+        await acceptTerms(book.owner);
+        setAgreed(true);
+      }
       const named = needsTitle ? { ...book, title: title.trim() } : book;
       if (needsTitle) await onTitle?.(named.title);
       const token = await shareBook(named, to.trim());
@@ -125,12 +144,24 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
         />
         <button
           type="submit"
-          disabled={busy || !to.trim() || (needsTitle && !title.trim())}
+          disabled={busy || !to.trim() || (needsTitle && !title.trim()) || mustAgree || agreed === null}
           className="border-ink text-ink hover:bg-ink hover:text-paper shrink-0 border px-3 text-sm font-semibold transition-colors duration-150 disabled:opacity-50"
         >
           Link erstellen
         </button>
       </form>
+      {agreed === false && (
+        <label className="mt-2 flex min-h-11 items-center gap-3 text-[13px]">
+          <input type="checkbox" checked={agreeNow} onChange={(e) => setAgreeNow(e.target.checked)} className="accent-ink" />
+          <span>
+            Ich teile nur, woran ich die Rechte habe, und halte mich an die{" "}
+            <Link href="/nutzungsbedingungen" className="underline decoration-mark decoration-2 underline-offset-4">
+              Nutzungsbedingungen
+            </Link>
+            .
+          </span>
+        </label>
+      )}
       <p className="text-ink-2 mt-2 text-[13px]">
         Hinlegen heißt: Jede Person bekommt einen eigenen Link zum Teilen, ohne Konto. Der Link zeigt dieses Buch und sonst nichts.
       </p>
@@ -157,9 +188,22 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
               </span>
             </div>
             {(notes[s.token] ?? []).map((n) => (
-              <p key={n.id} className="text-ink-2 mt-1 text-[13px]">
-                {n.kind === "ear" ? `Eselsohr bei Tafel ${n.no}` : `„${n.text}“`}
-                {n.from ? ` · ${n.from}` : ""}
+              <p key={n.id} className="text-ink-2 mt-1 flex items-baseline justify-between gap-3 text-[13px]">
+                <span className="min-w-0">
+                  {n.kind === "ear" ? `Eselsohr bei Tafel ${n.no}` : `„${n.text}“`}
+                  {n.from ? ` · ${n.from}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotes((all) => ({ ...all, [s.token]: (all[s.token] ?? []).filter((x) => x.id !== n.id) }));
+                    deleteNote(s.token, n.id).catch(() => {});
+                  }}
+                  className="shrink-0 underline underline-offset-4"
+                  aria-label={n.kind === "ear" ? `Eselsohr bei Tafel ${n.no} entfernen` : `Zettel von ${n.from || "Gast"} entfernen`}
+                >
+                  Entfernen
+                </button>
               </p>
             ))}
           </li>

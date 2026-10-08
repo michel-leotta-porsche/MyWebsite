@@ -41,7 +41,7 @@ export default function Page() {
 
       <LegalSection title="Melden und Folgen">
         <p>
-          Wer etwas Unzulässiges sieht, meldet es an <Mail /> (siehe <Link href="/hilfe" className={inline}>Hilfe</Link>). Ich prüfe Meldungen
+          Wer etwas Unzulässiges sieht, meldet es mit „Melden“ im Buch oder an <Mail /> (siehe <Link href="/hilfe" className={inline}>Hilfe</Link>). Ich prüfe Meldungen
           innerhalb von 24 Stunden. Verstößt ein Inhalt gegen diese Bedingungen, entferne ich ihn und sperre das Konto, von dem er kommt.
           Strafbare Inhalte melde ich den Behörden.
         </p>
