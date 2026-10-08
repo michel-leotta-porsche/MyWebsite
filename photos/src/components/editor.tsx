@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, Type, Undo2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -738,10 +738,23 @@ export function Editor() {
               </Menu>
             </span>
           </ToolGroup>
-          <Button variant="cloth" size="sm" disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="pointer-coarse:min-h-11 md:min-h-11 md:px-5">
-            <Gift aria-hidden />
-            Hinlegen<span className="max-md:hidden"> für …</span>
-          </Button>
+          <span className="flex items-center gap-2">
+            {/* Bildbearbeitung (Looks, Vorschläge, Feinschliff): das gewählte Foto, sonst das erste des Buchs */}
+            <Button
+              size="sm"
+              disabled={!book.photos.length}
+              onClick={() => setDevelop(selPhoto?.key ?? book.spreads.find((s) => s.keys.length)?.keys[0] ?? book.photos[0].key)}
+              className="pointer-coarse:min-h-11 max-md:min-w-11 max-md:px-0 md:min-h-11 md:px-5"
+            >
+              <SlidersHorizontal aria-hidden />
+              {/* Telefon: nur das Zeichen, sonst passt „Hinlegen“ nicht mehr in die Zeile */}
+              <span className="max-md:sr-only">Bearbeiten</span>
+            </Button>
+            <Button variant="cloth" size="sm" disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="pointer-coarse:min-h-11 md:min-h-11 md:px-5">
+              <Gift aria-hidden />
+              Hinlegen<span className="max-md:hidden"> für …</span>
+            </Button>
+          </span>
         </div>
       </header>
 
@@ -870,6 +883,17 @@ export function Editor() {
                           <TextButton className={HIT} onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
                             Gestalten
                           </TextButton>
+                          {!s.text && s.keys.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setDevelop(s.keys[0])}
+                              aria-label={`Fotos von Doppelseite ${i + 1} bearbeiten`}
+                              title="Fotos bearbeiten: Looks, Vorschläge, Feinschliff"
+                              className={`${HIT} text-on-table-2 hover:text-on-table`}
+                            >
+                              <SlidersHorizontal aria-hidden className="size-4" />
+                            </button>
+                          )}
                           {!s.pages && variantsOf(s, auto).length > 1 && (
                             <TextButton
                               className={HIT}
