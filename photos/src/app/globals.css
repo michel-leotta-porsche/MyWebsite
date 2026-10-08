@@ -533,6 +533,25 @@ html.ohne-struktur .printed::after {
   clip-path: polygon(0 0, 100% 100%, 0 100%);
   filter: drop-shadow(-2px 3px 3px rgb(12 10 8 / 0.45));
 }
+/* Aufkleber auf dem Beispielbuch: zugeschnittenes Papier (Rundung nach Material), schräg über die Ecke geklebt */
+.sample-band {
+  position: absolute;
+  z-index: 15;
+  top: 3.5%;
+  right: -6px;
+  padding: 5px 9px 4px;
+  rotate: 4deg;
+  border-radius: var(--radius-cut);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow:
+    0 1px 1px rgb(12 10 8 / 0.4),
+    0 6px 10px -6px rgb(12 10 8 / 0.6);
+}
 /* Ein Zettel auf dem Tisch: Papier mit Licht von oben und Schatten aus Basalt */
 .note-paper {
   position: relative;
