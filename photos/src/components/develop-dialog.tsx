@@ -2,7 +2,10 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { inputClass } from "@/components/app-ui";
+import { Check, ChevronDown, Columns2, RotateCcw, Trash, X } from "lucide-react";
+import { motion } from "motion/react";
+
+import { Button, buttonClass } from "@/components/ui/button";
 import { bakePhoto } from "@/lib/develop/bake";
 import {
   applyLut,
@@ -53,7 +56,13 @@ const LEVEL: [0 | 1 | 2, string][] = [
   [1, "Schwach"],
   [2, "Stark"],
 ];
-const linkBtn = "inline-flex min-h-11 items-center underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40";
+// Feld auf Papier für Auswahl und Namen: Pille mit feiner Kontur, wie die Chips
+const fieldClass =
+  "bg-ink/6 text-ink placeholder:text-ink-2 min-h-11 rounded-full border-0 px-4 text-[15px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
+/** Wahl aus wenigen Möglichkeiten auf Papier: gewählt in Tinte (wie in der Bühne) */
+const chip = (on: boolean) =>
+  `min-h-9 min-w-11 rounded-full px-3.5 text-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-11 ${on ? "bg-ink text-paper" : "bg-ink/6 text-ink shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] hover:bg-ink/10"}`;
+const groupTitle = "text-ink mb-2 text-[15px] font-bold tracking-[-0.01em]";
 
 /* ---------- LUT-Speicher: dieselbe Bearbeitung wird nicht zweimal gerechnet ---------- */
 
@@ -83,7 +92,11 @@ function viaElement(url: string) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.decoding = "async";
-    img.onload = () => img.decode().then(() => ok(img), () => ok(img));
+    img.onload = () =>
+      img.decode().then(
+        () => ok(img),
+        () => ok(img),
+      );
     img.onerror = () => fail(new Error("Bild lädt nicht"));
     img.src = url;
   });
@@ -164,8 +177,13 @@ const LutThumb = memo(function LutThumb({ img, edit, className }: { img: ImageDa
 function Tile({ img, edit, name, txt, pressed, onClick, disabled }: { img?: ImageData; edit: PhotoEdit; name: string; txt: string; pressed: boolean; onClick: () => void; disabled?: boolean }) {
   return (
     <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1.5 text-left disabled:opacity-40" lang="de">
-      <span className={`block aspect-[4/5] w-full bg-paper-shade outline-2 outline-offset-2 ${pressed ? "outline-ink" : "outline-transparent"}`}>
+      <span className={`bg-paper-shade relative block aspect-[4/5] w-full outline-2 outline-offset-2 transition-[outline-color] duration-150 ${pressed ? "outline-ink" : "outline-transparent"}`}>
         {img && <LutThumb img={img} edit={edit} className="block size-full object-cover transition-transform duration-500 ease-out motion-safe:group-hover:-translate-y-[3px]" />}
+        {pressed && (
+          <span aria-hidden className="bg-ink text-paper absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full">
+            <Check className="size-3" strokeWidth={3} />
+          </span>
+        )}
       </span>
       <b className="text-sm font-semibold break-words hyphens-auto max-sm:text-xs">{name}</b>
       <small className="text-ink-2 text-xs leading-snug max-sm:hidden">{txt}</small>
@@ -200,6 +218,7 @@ function Slider({
   onChange: (v: number) => void;
 }) {
   const changed = Math.abs(value - zero) > 0.001;
+  const fill = `${((value - min) / (max - min)) * 100}%`;
   return (
     <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 text-sm">
       <label htmlFor={id} className={`flex cursor-pointer items-center gap-2 ${active ? "font-bold" : ""}`}>
@@ -214,9 +233,9 @@ function Slider({
         onClick={() => onChange(zero)}
         disabled={!changed}
         title={`${label} zurücksetzen`}
-        className={`text-ink-2 hover:text-ink -my-2.5 -mr-2.5 grid size-11 place-items-center text-base leading-none transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
+        className={`text-ink-2 hover:text-ink hover:bg-ink/8 -my-2.5 -mr-2.5 grid size-11 place-items-center rounded-full transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
       >
-        <span aria-hidden>↺</span>
+        <RotateCcw aria-hidden className="size-4" />
         <span className="sr-only">{label} zurücksetzen</span>
       </button>
       <input
@@ -229,7 +248,8 @@ function Slider({
         onFocus={onFocus}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(zero)}
-        className="col-span-3 m-0 h-9 w-full accent-ink"
+        className="range col-span-3 m-0 h-9 w-full"
+        style={{ "--fill": fill } as React.CSSProperties}
       />
     </div>
   );
@@ -238,16 +258,10 @@ function Slider({
 function Chips<T extends string | number | null>({ label, opts, cur, onPick }: { label: string; opts: [T, string][]; cur: T; onPick: (v: T) => void }) {
   return (
     <div>
-      <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">{label}</h3>
+      <h3 className={groupTitle}>{label}</h3>
       <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
         {opts.map(([v, txt]) => (
-          <button
-            key={String(v)}
-            type="button"
-            aria-pressed={cur === v}
-            onClick={() => onPick(v)}
-            className={`min-h-11 min-w-11 border px-3 text-[13px] ${cur === v ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
-          >
+          <button key={String(v)} type="button" aria-pressed={cur === v} onClick={() => onPick(v)} className={chip(cur === v)}>
             {txt}
           </button>
         ))}
@@ -270,12 +284,12 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
   };
   return (
     <div>
-      <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">Weißabgleich-Verschiebung</h3>
+      <h3 className={groupTitle}>Weißabgleich-Verschiebung</h3>
       <div className="flex flex-wrap items-center gap-3.5">
         <div
           ref={pad}
           aria-hidden
-          className="wbpad border-ink relative size-[152px] flex-none cursor-crosshair touch-none border"
+          className="wbpad relative size-[152px] flex-none cursor-crosshair touch-none overflow-hidden rounded-cut shadow-[inset_0_0_0_1px_rgb(27_28_26/0.3)]"
           onPointerDown={(e) => {
             drag.current = true;
             e.currentTarget.setPointerCapture(e.pointerId);
@@ -316,15 +330,13 @@ function Ask({ text, yes, no, onYes, onNo }: { text: string; yes: string; no: st
   useEffect(() => first.current?.focus(), []);
   return (
     <div className="fixed inset-0 z-[20] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:items-center">
-      <div role="alertdialog" aria-modal="true" aria-label={text} className="slip text-ink relative w-full max-w-sm p-5">
-        <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          {text}
-        </p>
-        <div className="mt-5 flex flex-wrap justify-end gap-3 text-sm">
-          <button ref={first} type="button" onClick={onNo} className="border-ink min-h-11 border px-4 font-semibold">
+      <div role="alertdialog" aria-modal="true" aria-label={text} className="slip text-ink rounded-tool relative w-full max-w-sm p-5 shadow-[0_24px_48px_-20px_rgb(12_10_8/0.8)]">
+        <p className="text-[17px] font-bold tracking-[-0.01em]">{text}</p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button ref={first} type="button" onClick={onNo} className={buttonClass("paper", "sm")}>
             {no}
           </button>
-          <button type="button" onClick={onYes} className="bg-ink text-paper min-h-11 px-4 font-semibold">
+          <button type="button" onClick={onYes} className={buttonClass("ink", "sm")}>
             {yes}
           </button>
         </div>
@@ -740,16 +752,16 @@ export function DevelopDialog({
     >
       <div className="flex h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-7 lg:gap-y-3.5 lg:p-4">
         <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:col-span-2 lg:p-0">
-          <h2 className="text-2xl font-bold tracking-[-0.03em]" style={{ fontVariationSettings: '"wdth" 78' }}>
-            Bearbeiten
-          </h2>
-          <div className="flex items-center gap-5 text-sm">
-            <button type="button" onClick={close} className={linkBtn}>
+          <h2 className="text-xl font-bold tracking-[-0.02em]">Bearbeiten</h2>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={close} className="pl-2.5">
+              <X aria-hidden />
               Abbrechen
-            </button>
-            <button type="button" onClick={finish} disabled={!!busy} className="bg-mark text-ink min-h-11 px-4 font-semibold disabled:opacity-60">
+            </Button>
+            <Button variant="cloth" size="sm" onClick={finish} disabled={!!busy} className="pl-3 md:min-h-11 md:px-5">
+              <Check aria-hidden />
               {busy ? "Speichert …" : "Fertig"}
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -772,30 +784,32 @@ export function DevelopDialog({
               <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
               <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
               {failed && !shown && (
-                <div className="bg-paper text-ink absolute inset-x-2 bottom-2 z-[6] p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
+                <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
                   <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
                   <p className="text-ink-2 mt-0.5 text-xs">{failed}</p>
-                  <button
-                    type="button"
-                    className={linkBtn}
+                  <Button
+                    variant="paper"
+                    size="sm"
                     onClick={() => {
                       setFailed(null);
                       setAttempt((n) => n + 1);
                     }}
                   >
                     Noch einmal laden
-                  </button>
+                  </Button>
                 </div>
               )}
               {compare && (
                 <>
                   <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${split * 100}%` }}>
-                    <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-[30px] -translate-x-1/2 -translate-y-1/2 place-items-center text-sm">⟷</span>
+                    <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-sm shadow-[0_2px_8px_rgb(12_10_8/0.4)]">
+                      ⟷
+                    </span>
                   </div>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-semibold text-[10px] tracking-[0.08em] uppercase">
+                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
                     vorher
                   </span>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-semibold text-[10px] tracking-[0.08em] uppercase">
+                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
                     nachher
                   </span>
                 </>
@@ -806,7 +820,7 @@ export function DevelopDialog({
                     <span className="text-paper block text-[clamp(28px,7vw,56px)] leading-none font-bold [text-shadow:0_2px_16px_rgb(12_10_8/0.7)]" style={{ fontVariationSettings: '"wdth" 75' }}>
                       {big.value}
                     </span>
-                    <small className="text-paper mt-1 block font-semibold text-[11px] tracking-[0.08em] uppercase [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
+                    <small className="text-paper mt-1 block text-sm font-semibold [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
                   </div>
                 )}
               </div>
@@ -839,7 +853,7 @@ export function DevelopDialog({
               })}
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-x-[18px] text-sm lg:justify-center">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-center">
             <button
               type="button"
               aria-pressed={compare}
@@ -849,11 +863,13 @@ export function DevelopDialog({
                 setSplit(0.5);
                 setNote(null);
               }}
-              className={`${linkBtn} ${compare ? "font-bold" : ""}`}
+              className={buttonClass("quiet", "sm", `pl-2.5 ${compare ? "!bg-on-table !text-table" : ""}`)}
             >
+              <Columns2 aria-hidden />
               Vorher / nachher
             </button>
-            <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit) || !!busy} className={linkBtn}>
+            <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit) || !!busy} className={buttonClass("quiet", "sm", "pl-2.5")}>
+              <RotateCcw aria-hidden />
               Foto zurücksetzen
             </button>
           </div>
@@ -870,14 +886,17 @@ export function DevelopDialog({
         <section
           aria-label="Werkzeuge"
           inert={!shown || !!busy}
-          className={`slip text-ink relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pt-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:p-4 ${!shown || busy ? "opacity-60" : ""}`}
+          className={`slip text-ink max-lg:rounded-t-tool lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:p-4 ${!shown || busy ? "opacity-60" : ""}`}
         >
           {photos.length > 1 && (
             <p className="text-ink-2 text-sm">
               Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
             </p>
           )}
-          <div role="tablist" aria-label="Werkzeuge" className="bg-[var(--slip)] sticky -top-4 z-[2] -mx-4 -mt-1.5 flex flex-wrap gap-x-[18px] border-b border-ink/15 px-4 pt-1.5"
+          <div
+            role="tablist"
+            aria-label="Werkzeuge"
+            className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-4 pb-1"
             onKeyDown={(e) => {
               // Pfeiltasten wandern zwischen den Reitern (Muster der ARIA-Tabs)
               const i = TABS.findIndex(([t]) => t === tab);
@@ -889,23 +908,31 @@ export function DevelopDialog({
               document.getElementById(`dv-tab-${t}`)?.focus();
             }}
           >
-            {TABS.map(([t, name]) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                id={`dv-tab-${t}`}
-                aria-selected={tab === t}
-                aria-controls={tab === t ? `dv-pane-${t}` : undefined}
-                tabIndex={tab === t ? 0 : -1}
-                onClick={() => switchTab(t)}
-                className={`relative min-h-11 pt-2.5 pb-3 text-[17px] leading-none font-bold tracking-[-0.02em] ${tab === t ? "text-ink" : "text-ink-2"}`}
-                style={{ fontVariationSettings: '"wdth" 80' }}
-              >
-                {name}
-                {tab === t && <span aria-hidden className="bg-mark absolute inset-x-0 -bottom-px h-[3px]" />}
-              </button>
-            ))}
+            <div className="bg-ink/6 flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]">
+              {TABS.map(([t, name]) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`dv-tab-${t}`}
+                  aria-selected={tab === t}
+                  aria-controls={tab === t ? `dv-pane-${t}` : undefined}
+                  tabIndex={tab === t ? 0 : -1}
+                  onClick={() => switchTab(t)}
+                  className={`relative min-h-9 min-w-0 flex-auto rounded-full px-2 text-[13px] font-semibold transition-colors duration-150 pointer-coarse:min-h-11 sm:text-sm ${tab === t ? "text-paper" : "text-ink-2 hover:text-ink"}`}
+                >
+                  {tab === t && (
+                    <motion.span
+                      layoutId="dv-tab"
+                      aria-hidden
+                      className="bg-ink absolute inset-0 rounded-full"
+                      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 38 }}
+                    />
+                  )}
+                  <span className="relative">{name}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`}>
@@ -1012,40 +1039,43 @@ export function DevelopDialog({
             {tab === "r" && (
               <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1">
                 <div className="sm:col-span-2 lg:col-span-1">
-                  <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  <h3 className={groupTitle}>
                     <label htmlFor="dv-preset">Rezept</label>
                   </h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <select
-                      id="dv-preset"
-                      className={`${inputClass} min-h-[42px] flex-[1_1_200px] min-w-0`}
-                      value={recMatch ? recMatch.id : recEmpty ? "" : "cur"}
-                      onChange={(e) => pickRecipe(e.target.value)}
-                    >
-                      <option value="">Ohne Rezept</option>
-                      <optgroup label="Voreingestellt">
-                        {PRESETS.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name} · {r.txt}
-                          </option>
-                        ))}
-                      </optgroup>
-                      {own.length > 0 && (
-                        <optgroup label="Eigene">
-                          {own.map((r) => (
+                    <span className="relative flex min-w-0 flex-[1_1_200px]">
+                      <select
+                        id="dv-preset"
+                        className={`${fieldClass} w-full min-w-0 appearance-none pr-10`}
+                        value={recMatch ? recMatch.id : recEmpty ? "" : "cur"}
+                        onChange={(e) => pickRecipe(e.target.value)}
+                      >
+                        <option value="">Ohne Rezept</option>
+                        <optgroup label="Voreingestellt">
+                          {PRESETS.map((r) => (
                             <option key={r.id} value={r.id}>
-                              {r.name}
+                              {r.name} · {r.txt}
                             </option>
                           ))}
                         </optgroup>
-                      )}
-                      {!recMatch && !recEmpty && <option value="cur">{recLabel}</option>}
-                      <option value="save">Aktuelle Werte als Rezept speichern …</option>
-                    </select>
+                        {own.length > 0 && (
+                          <optgroup label="Eigene">
+                            {own.map((r) => (
+                              <option key={r.id} value={r.id}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {!recMatch && !recEmpty && <option value="cur">{recLabel}</option>}
+                        <option value="save">Aktuelle Werte als Rezept speichern …</option>
+                      </select>
+                      <ChevronDown aria-hidden className="text-ink pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2" />
+                    </span>
                     {recMatch && own.some((r) => r.id === recMatch.id) && (
                       <button
                         type="button"
-                        className={`${linkBtn} text-sm`}
+                        className="text-danger hover:bg-danger/8 flex min-h-9 items-center gap-2 rounded-full px-2.5 text-sm font-semibold pointer-coarse:min-h-11"
                         onClick={() => {
                           const gone = recMatch;
                           setAsk({
@@ -1059,6 +1089,7 @@ export function DevelopDialog({
                           });
                         }}
                       >
+                        <Trash aria-hidden className="size-4" />
                         Löschen
                       </button>
                     )}
@@ -1089,7 +1120,7 @@ export function DevelopDialog({
                 </div>
                 <WbPad r={edit.rec.wbR} b={edit.rec.wbB} onChange={(wbR, wbB) => liveRec({ wbR, wbB })} />
                 <div className="grid content-start gap-2.5">
-                  <h3 className="text-ink-2 text-[11px] font-semibold tracking-[0.08em] uppercase">Ton und Farbe</h3>
+                  <h3 className={groupTitle}>Ton und Farbe</h3>
                   {(
                     [
                       ["hl", "Lichter", -2, 4, 0.5],
@@ -1127,7 +1158,6 @@ export function DevelopDialog({
               </div>
             )}
           </div>
-
         </section>
       </div>
       {ask && (
@@ -1169,12 +1199,12 @@ function SaveForm({ onSave, onCancel }: { onSave: (name: string) => void; onCanc
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="z. B. Michels Sommer"
-          className={`${inputClass} min-h-[42px] flex-[1_1_200px] min-w-0`}
+          className={`${fieldClass} min-w-0 flex-[1_1_200px]`}
         />
-        <button type="submit" className="bg-ink text-paper min-h-[42px] px-3.5 text-sm">
+        <button type="submit" className={buttonClass("ink", "sm")}>
           Speichern
         </button>
-        <button type="button" onClick={onCancel} className={`${linkBtn} text-sm`}>
+        <button type="button" onClick={onCancel} className={buttonClass("paper", "sm")}>
           Abbrechen
         </button>
       </div>
