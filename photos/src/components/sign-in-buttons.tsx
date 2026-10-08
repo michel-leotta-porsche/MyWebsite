@@ -21,10 +21,16 @@ const GOOGLE = (
   </svg>
 );
 
+/**
+ * Apple erst zeigen, wenn der Anbieter in Firebase eingerichtet ist (Services ID, Schlüssel), sonst
+ * scheitert die Anmeldung. Danach hier auf true stellen; die App braucht Apple vor der Einreichung (4.8).
+ */
+export const APPLE_READY = false;
+
 const OPTIONS = [
   { id: "apple.com", label: "Mit Apple anmelden", icon: APPLE },
   { id: "google.com", label: "Mit Google anmelden", icon: GOOGLE },
-] as const;
+].filter((o) => APPLE_READY || o.id !== "apple.com") as { id: SignInProvider; label: string; icon: React.ReactNode }[];
 
 /**
  * busy: der Anbieter, dessen Fenster gerade offen ist. warm: Firebase schon laden, wenn der Finger
