@@ -51,10 +51,12 @@ const EXTRA = 0.35;
 // Texturen erst vorbereiten, wenn das Buch so lange still liegt (ms): Zeichnen und Hochladen kosten
 // auf dem iPhone je Seite Dutzende Millisekunden und dürfen nie in ein laufendes Umblättern fallen
 const QUIET = 140;
-// Schafft ein Gerät beim Umblättern im Mittel weniger als etwa 40 Bilder pro Sekunde (ms pro Bild),
-// blättert es ab dem zweiten solchen Umblättern flach weiter
-const SLOW_FRAME = 25;
-const FLAT_KEY = "blaettern-flach";
+// Schafft ein Gerät beim Umblättern im Mittel weniger als etwa 22 Bilder pro Sekunde (ms pro Bild),
+// blättert es ab dem zweiten solchen Umblättern flach weiter. Nicht strenger: im Stromsparmodus
+// zeichnet das iPhone nur 30 Bilder pro Sekunde, das Blatt soll dort trotzdem gebogen bleiben.
+const SLOW_FRAME = 45;
+// neuer Name: wer mit der alten, zu strengen Grenze auf flach gefallen ist, bekommt die Biegung zurück
+const FLAT_KEY = "blaettern-flach-2";
 
 /** Grafik ohne GPU (Software-Renderer) oder schon einmal zu langsam gewesen: dann flach blättern */
 function weakDevice(gl: WebGLRenderingContext) {

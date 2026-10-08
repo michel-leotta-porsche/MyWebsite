@@ -443,7 +443,8 @@ export function Editor() {
   if (!book) return <main className="linen table-surface min-h-svh bg-table" />;
 
   if (preview && data && wide !== null)
-    return <Book book={data} mode={wide ? "spread" : "single"} autoOpen onClose={() => setPreview(false)} />;
+    // auch auf dem Telefon die ganze Doppelseite, wie das Buch auf der Startseite
+    return <Book book={data} mode="spread" autoOpen onClose={() => setPreview(false)} />;
 
   const byKey = new Map(book.photos.map((p) => [p.key, p]));
   const auto = new Map(autoPhotos(book.photos).map((p) => [p.key, p]));
