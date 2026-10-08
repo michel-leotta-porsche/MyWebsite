@@ -108,13 +108,17 @@ function viaElement(url: string) {
  */
 async function pictureOf(url: string): Promise<Pic> {
   try {
-    const res = await fetch(url, { mode: "cors", credentials: "omit" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await createImageBitmap(await res.blob());
+    return await viaFetch(url);
   } catch (e) {
     console.warn("[bearbeiten] fetch/createImageBitmap", reasonOf(e));
-    return viaElement(url);
+    // Der Browser kann eine Kopie ohne CORS-Freigabe im Cache halten (Fotos liegen ein Jahr dort): einmal frisch holen
+    return viaFetch(url, "reload").catch(() => viaElement(url));
   }
+}
+async function viaFetch(url: string, cache?: RequestCache) {
+  const res = await fetch(url, { mode: "cors", credentials: "omit", cache });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return createImageBitmap(await res.blob());
 }
 
 // Eine Zeichenfläche für alle kleinen Abzüge statt einer pro Bild. Safari begrenzt den Speicher aller
