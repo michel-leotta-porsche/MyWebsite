@@ -176,6 +176,12 @@ export function Stage({
   /** langes Drücken ist abgelaufen; das Menü öffnet erst beim Loslassen, damit der Finger keinen Eintrag auslöst */
   const held = useRef<{ cx: number; cy: number; id: string } | null>(null);
   const [say, setSay] = useState("");
+  /** sichtbarer Hinweis unter „Alle Fotos“, wenn ein Foto nicht auf die Doppelseite passt */
+  const [notice, setNotice] = useState("");
+  /** Foto aus „Alle Fotos“ mit dem Finger auf die Seite ziehen (HTML-Drag gibt es auf dem iPhone nicht) */
+  const pull = useRef<{ key: string; id: number; sx: number; sy: number; active: boolean } | null>(null);
+  const pulled = useRef(false);
+  const [pullGhost, setPullGhost] = useState<{ src: string; x: number; y: number } | null>(null);
   const [crop, setCrop] = useState<string | null>(null);
   /** Zuschneiden direkt auf der Seite (wie in PowerPoint) */
   const [cropping, setCropping] = useState<string | null>(null);
@@ -595,15 +601,26 @@ export function Stage({
         const h = (w / (photo.w / photo.h) / grid.H) * 100;
         // erst eine freie Stelle; ist keine frei, an den Zeiger (liegt dann obenauf)
         const box = placeNew(items, geom, pg, w, h, pg === p ? at : undefined) ?? (pg === p && at && cols === 2 ? snapAt(pg, at, w, h) : null);
-        if (box) {
-          const id = itemId();
-          commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, `Foto hinzugefügt: ${where(box)}`, [key]);
-          setSel(id);
-          return;
-        }
+        if (box) return put(box);
       }
     }
-    setSay(`Kein Platz frei. Höchstens ${MAX_PHOTOS_PER_PAGE} Fotos pro Seite; sonst erst eine Aufteilung wählen oder ein Foto verkleinern.`);
+    // keine Stelle frei (die Seiten sind schon ganz mit Fotos belegt): obenauf legen, am Finger oder mitten auf die Seite
+    const pg = order.find((o) => photosOnPage(items, o) < MAX_PHOTOS_PER_PAGE);
+    if (pg !== undefined) {
+      const w = 3 * grid.cw + 4;
+      const h = Math.min(100, (w / (photo.w / photo.h) / grid.H) * 100);
+      const c = at && pg === p ? at : { x: pg * 100 + 50, y: 50 };
+      return put(snapAt(pg, { x: c.x - w / 2, y: c.y - h / 2 }, w, h));
+    }
+    const msg = `Kein Platz mehr: höchstens ${MAX_PHOTOS_PER_PAGE} Fotos pro Seite. Erst ein Foto beiseitelegen.`;
+    setSay(msg);
+    setNotice(msg);
+    function put(box: Box) {
+      const id = itemId();
+      commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, `Foto hinzugefügt: ${where(box)}`, [key]);
+      setSel(id);
+      setNotice("");
+    }
   };
   const pointOf = (clientX: number, clientY: number) => {
     // das Rechteck ist schon gezoomt; so stimmt der Punkt auch mitten in einer Kamerafahrt
@@ -1662,7 +1679,7 @@ export function Stage({
               <p className="text-on-table text-sm font-semibold">
                 Alle Fotos{" "}
                 <span className="text-on-table-2 font-normal">
-                  · {coarse ? "antippen legt sie auf die Seite" : "ziehen oder antippen legt sie auf die Seite"}, von anderen Doppelseiten wandern sie herüber
+                  · {coarse ? "antippen oder nach oben auf die Seite ziehen" : "ziehen oder antippen legt sie auf die Seite"}, von anderen Doppelseiten wandern sie herüber
                 </span>
               </p>
               <ul tabIndex={0} aria-label="Fotos des Buchs" className="mt-2 flex gap-2 overflow-x-auto pb-2">
@@ -1672,9 +1689,48 @@ export function Stage({
                       type="button"
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-photo", ph.key)}
-                      onClick={() => addPhoto(ph.key, curPage)}
+                      onClick={() => {
+                        // nach einem Zug mit dem Finger kein zweites Hinlegen
+                        if (pulled.current) return void (pulled.current = false);
+                        addPhoto(ph.key, curPage);
+                      }}
+                      onPointerDown={(e) => {
+                        if (e.pointerType !== "touch") return;
+                        pulled.current = false;
+                        pull.current = { key: ph.key, id: e.pointerId, sx: e.clientX, sy: e.clientY, active: false };
+                      }}
+                      onPointerMove={(e) => {
+                        const pl = pull.current;
+                        if (!pl || pl.id !== e.pointerId) return;
+                        if (!pl.active) {
+                          const dx = e.clientX - pl.sx;
+                          const dy = e.clientY - pl.sy;
+                          // waagerecht scrollt die Leiste, nach oben gezogen wird das Foto gegriffen
+                          if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx)) return;
+                          pl.active = true;
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                        }
+                        setPullGhost({ src: ph.thumb, x: e.clientX, y: e.clientY });
+                      }}
+                      onPointerUp={(e) => {
+                        const pl = pull.current;
+                        pull.current = null;
+                        setPullGhost(null);
+                        if (!pl?.active) return;
+                        pulled.current = true;
+                        const r = layerEl.current?.getBoundingClientRect();
+                        if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+                          const at = pointOf(e.clientX, e.clientY);
+                          addPhoto(pl.key, pageAt(at.x), at);
+                        }
+                      }}
+                      onPointerCancel={() => {
+                        pull.current = null;
+                        setPullGhost(null);
+                      }}
+                      style={{ touchAction: "pan-x" }}
                       aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "beiseitegelegt" : `von Doppelseite ${spread + 1}`}`}
-                      className="group block text-left"
+                      className="group block text-left select-none [-webkit-touch-callout:none]"
                     >
                       <span className="relative block h-16 w-16">
                         <Image src={ph.thumb} alt="" fill sizes="64px" className="object-cover transition-opacity duration-150 group-hover:opacity-80" draggable={false} />
@@ -1684,7 +1740,22 @@ export function Stage({
                   </li>
                 ))}
               </ul>
+              {notice && (
+                <p role="status" className="text-on-table mt-1 text-[13px]">
+                  {notice}
+                </p>
+              )}
             </section>
+          )}
+          {pullGhost && (
+            // eslint-disable-next-line @next/next/no-img-element -- Vorschau unter dem Finger
+            <img
+              src={pullGhost.src}
+              alt=""
+              aria-hidden
+              className="pointer-events-none fixed z-[95] h-16 w-16 object-cover opacity-90 outline-2 outline-mark"
+              style={{ left: pullGhost.x, top: pullGhost.y, translate: "-50% -75%" }}
+            />
           )}
           {narrow && coarse && (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
