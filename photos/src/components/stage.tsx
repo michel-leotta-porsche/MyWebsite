@@ -178,6 +178,8 @@ export function Stage({
   const [say, setSay] = useState("");
   /** sichtbarer Hinweis unter „Alle Fotos“, wenn ein Foto nicht auf die Doppelseite passt */
   const [notice, setNotice] = useState("");
+  /** Handy: Blatt mit den Ebenen */
+  const [layersOpen, setLayersOpen] = useState(false);
   /** Foto aus „Alle Fotos“ mit dem Finger auf die Seite ziehen (HTML-Drag gibt es auf dem iPhone nicht) */
   const pull = useRef<{ key: string; id: number; sx: number; sy: number; active: boolean } | null>(null);
   const pulled = useRef(false);
@@ -250,6 +252,8 @@ export function Stage({
     if (!el) return c;
     el.style.transition = animate ? "transform 500ms var(--ease-out)" : "none";
     el.style.transform = c.s === 1 ? "" : `translate3d(${c.x}px, ${c.y}px, 0) scale(${c.s})`;
+    // vergrößert bleibt die Doppelseite eine eigene Ebene; Safari muss beim Verschieben nichts neu zeichnen
+    el.style.willChange = c.s === 1 ? "" : "transform";
     // Griffe bleiben auf dem Bildschirm gleich groß
     el.style.setProperty("--inv", String(1 / c.s));
     // vergrößert: der Rest der Doppelseite wird an der Kante abgeschnitten; ganz: Griffe dürfen überstehen
@@ -1108,6 +1112,8 @@ export function Stage({
     | null
   >(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** ein Finger auf freiem Papier: wann und wo er aufsetzte (ein Tippen zählt erst beim Loslassen) */
+  const tapDown = useRef<{ id: number; t: number; x: number; y: number } | null>(null);
   const lastPointer = useRef("mouse");
   /** Kamera beim Beginn eines Zugs; fährt sie am Rand mit, bleibt das Element trotzdem unter dem Finger */
   const dragCam = useRef<Pt>({ x: 0, y: 0 });
@@ -1138,8 +1144,13 @@ export function Stage({
     lastPointer.current = e.pointerType;
     dragCam.current = { x: cam.current.x, y: cam.current.y };
     if (e.pointerType !== "touch" || !narrow || cropping) return;
+    // der erste Finger einer neuen Berührung: was noch in der Liste steht, ist liegen geblieben
+    // (Safari meldet das Loslassen nicht immer hierher, etwa wenn darüber ein Menü aufging); sonst zoomte ein Finger allein
+    if (e.isPrimary) resetTouches();
     touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (touches.current.size >= 2) {
+      tapDown.current = null;
+      lastTap.current = null;
       // der zweite Finger gehört der Geste, nicht dem Element darunter
       e.stopPropagation();
       if (touches.current.size > 2) return;
@@ -1168,20 +1179,11 @@ export function Stage({
       return;
     }
     // ein Finger auf freiem Papier: Doppeltippen zoomt auf diese Seite und zurück; vergrößert verschiebt Ziehen die Ansicht
-    if (e.target !== layerEl.current || tool !== "select") return;
-    const now = e.timeStamp;
-    const t = lastTap.current;
-    if (t && now - t.t < 320 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 30) {
+    if (e.target !== layerEl.current || tool !== "select") {
       lastTap.current = null;
-      gesture.current = { kind: "done" };
-      if (cam.current.s > 1.05) camTo("all");
-      else {
-        const p = pointOf(e.clientX, e.clientY);
-        camTo(pageAt(p.x), p.y);
-      }
       return;
     }
-    lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+    tapDown.current = { id: e.pointerId, t: e.timeStamp, x: e.clientX, y: e.clientY };
     if (cam.current.s > 1.001) {
       gesture.current = { kind: "pan", m0: { x: e.clientX, y: e.clientY }, c0: { ...cam.current } };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -1228,10 +1230,61 @@ export function Stage({
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => setDraft({ id: g.id, box, original: false }));
   };
+  /** Zwei kurze Tipper aufs Papier, kaum bewegt, nah beieinander: Seite heranholen oder zurück */
+  const tapUp = (e: React.PointerEvent) => {
+    const d = tapDown.current;
+    tapDown.current = null;
+    if (!d || d.id !== e.pointerId || e.timeStamp - d.t > 250 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10) {
+      lastTap.current = null;
+      return;
+    }
+    const t = lastTap.current;
+    if (t && e.timeStamp - t.t < 350 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 30) {
+      lastTap.current = null;
+      if (cam.current.s > 1.05) camTo("all");
+      else {
+        const p = pointOf(e.clientX, e.clientY);
+        camTo(pageAt(p.x), p.y);
+      }
+      return;
+    }
+    lastTap.current = { t: e.timeStamp, x: e.clientX, y: e.clientY };
+  };
+  /** alle Finger vergessen und eine halbe Geste sauber beenden */
+  const resetTouches = () => {
+    touches.current.clear();
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g) return;
+    if (g.kind === "cam" || g.kind === "pan") settleCam(cam.current);
+    if (g.kind === "pinch") {
+      cancelAnimationFrame(frame.current);
+      setDraft(null);
+    }
+  };
+  const resetRef = useRef(resetTouches);
+  useEffect(() => {
+    resetRef.current = resetTouches;
+  });
+  // Auffangnetz: ein Finger, der außerhalb der Doppelseite losgelassen wird, verschwindet trotzdem aus der Liste
+  useEffect(() => {
+    const onEnd = (e: PointerEvent) => {
+      if (e.pointerType !== "touch" || !touches.current.delete(e.pointerId)) return;
+      if (!touches.current.size) resetRef.current();
+    };
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+    return () => {
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+    };
+  }, []);
   const onGestureUp = (e: React.PointerEvent) => {
     cancelAnimationFrame(edge.current);
     if (e.pointerType !== "touch") return;
     const had = touches.current.delete(e.pointerId);
+    if (had && e.type === "pointerup" && !touches.current.size) tapUp(e);
+    else tapDown.current = null;
     const g = gesture.current;
     if (!had || !g) return;
     e.stopPropagation();
@@ -1245,6 +1298,30 @@ export function Stage({
     // der andere Finger bleibt liegen: er tut nichts mehr, bis er losgelassen wird
     gesture.current = touches.current.size ? { kind: "done" } : null;
   };
+
+  /** Ebenen: was oben liegt, steht oben; am Desktop in der Seitenleiste, am Handy in einem Blatt von unten */
+  const layerList = () => (
+      <ol className="space-y-px">
+        {[...shown].reverse().map((it) => (
+          <li key={it.id} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSel(it.id)}
+              aria-pressed={it.id === sel}
+              className={`${phone ? "min-h-11" : "min-h-8"} min-w-0 flex-1 truncate border-l-2 px-2 text-left text-[13px] ${it.id === sel ? "border-mark font-semibold" : "border-transparent"}`}
+            >
+              {nameOf(it) || "Foto"}
+            </button>
+            <button type="button" aria-label="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className={`${phone ? "h-11 w-11" : "h-8 w-8"} text-sm disabled:opacity-30`}>
+              ↑
+            </button>
+            <button type="button" aria-label="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className={`${phone ? "h-11 w-11" : "h-8 w-8"} text-sm disabled:opacity-30`}>
+              ↓
+            </button>
+          </li>
+        ))}
+      </ol>
+  );
 
   return (
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
@@ -1298,6 +1375,29 @@ export function Stage({
                 </TextButton>
               ))}
               <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
+              {phone && shown.length > 1 && (
+                <TextButton className="ml-auto" aria-expanded={layersOpen} onClick={() => setLayersOpen((o) => !o)}>
+                  Ebenen
+                </TextButton>
+              )}
+            </div>
+          )}
+          {phone && layersOpen && shown.length > 1 && (
+            <div className="fixed inset-0 z-[85]" onPointerDown={(e) => e.target === e.currentTarget && setLayersOpen(false)}>
+              <div
+                role="dialog"
+                aria-label="Ebenen"
+                className="slip text-ink fixed inset-x-0 bottom-0 max-h-[55vh] overflow-y-auto px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-18px_36px_-14px_rgb(12_10_8/0.8)]"
+              >
+                <div className="mb-1 flex items-baseline justify-between">
+                  <p className="text-sm font-semibold">Ebenen</p>
+                  <button type="button" className="min-h-11 px-2 text-sm underline underline-offset-4" onClick={() => setLayersOpen(false)}>
+                    Fertig
+                  </button>
+                </div>
+                <p className="text-ink-2 mb-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
+                {layerList()}
+              </div>
             </div>
           )}
           {cropping ? (
@@ -1906,30 +2006,11 @@ export function Stage({
               </TextButton>
             </div>
           )}
-          {shown.length > 1 && (
+          {!phone && shown.length > 1 && (
             <div className="slip text-ink space-y-2 p-5">
               <p className="text-sm font-semibold">Was oben liegt</p>
               <p className="text-ink-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
-              <ol className="space-y-px">
-                {[...shown].reverse().map((it) => (
-                  <li key={it.id} className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSel(it.id)}
-                      aria-pressed={it.id === sel}
-                      className={`min-h-8 min-w-0 flex-1 truncate border-l-2 px-2 text-left text-[13px] ${it.id === sel ? "border-mark font-semibold" : "border-transparent"}`}
-                    >
-                      {nameOf(it) || "Foto"}
-                    </button>
-                    <button type="button" aria-label="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className="h-8 w-8 text-sm disabled:opacity-30">
-                      ↑
-                    </button>
-                    <button type="button" aria-label="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className="h-8 w-8 text-sm disabled:opacity-30">
-                      ↓
-                    </button>
-                  </li>
-                ))}
-              </ol>
+              {layerList()}
             </div>
           )}
 
