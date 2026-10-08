@@ -57,7 +57,7 @@ export function IconButton({ label, variant = "quiet", ...p }: Omit<Props, "size
 /** Mehrere Symbolknöpfe in einer Pille, z. B. Rückgängig, Ansehen, Mehr */
 export function ToolGroup({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div role="toolbar" aria-label={label} className="bg-on-table/7 inline-flex rounded-full shadow-[inset_0_0_0_1px_rgb(236_230_220/0.09)] [&>button]:bg-transparent [&>button]:shadow-none [&>button:active]:bg-on-table/12">
+    <div role="toolbar" aria-label={label} className="bg-on-table/7 inline-flex rounded-full shadow-[inset_0_0_0_1px_rgb(236_230_220/0.09)] [&_button]:bg-transparent [&_button]:shadow-none [&_button:active]:bg-on-table/12">
       {children}
     </div>
   );
