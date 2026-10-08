@@ -589,7 +589,7 @@ export function Book({
   const pullScale = useTransform(pull, [0, 240], [1, 0.9]);
   const pullT = useMotionTemplate`translateY(${pull}px) scale(${pullScale})`;
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 || reduce) return;
+    if (e.button !== 0) return;
     finger.stop();
     const k0 = Math.min(count, Math.round(swipe ? finger.get() : raw.get()));
     drag.current = { x0: e.clientX, y0: e.clientY, k0, moved: false, samples: [{ x: e.clientX, y: e.clientY, time: e.timeStamp }] };
@@ -601,6 +601,11 @@ export function Book({
     const dy = e.clientY - d.y0;
     if (!d.moved) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
+      // Doppelseite: senkrecht scrollt der Browser selbst (touch-action pan-y), das Ziehen endet hier
+      if (!swipe && Math.abs(dy) > Math.abs(dx)) {
+        drag.current = null;
+        return;
+      }
       d.moved = swipe && dy > Math.abs(dx) * 1.2 ? "y" : "x";
       bookRef.current.setPointerCapture(e.pointerId);
       curlR.set(0);
@@ -623,6 +628,8 @@ export function Book({
       return;
     }
     const target = Math.max(0, Math.min(count, dx < 0 ? d.k0 + s : d.k0 - s));
+    // weniger Bewegung: das Blatt folgt dem Finger nicht, beim Loslassen springt die Seite um
+    if (reduce) return;
     if (swipe) finger.set(target);
     else scrollToT(target);
   };
@@ -640,7 +647,8 @@ export function Book({
       return;
     }
     const v = (e.clientX - first.x) / dt; // px pro ms
-    const prog = (swipe ? finger.get() : raw.get()) - d.k0;
+    // weniger Bewegung: nur die Richtung des Wischens zählt
+    const prog = reduce ? -Math.sign(d.samples[d.samples.length - 1].x - d.x0) : (swipe ? finger.get() : raw.get()) - d.k0;
     let target = d.k0;
     if (prog > 0.28 || v < -0.35) target = d.k0 + 1;
     else if (prog < -0.28 || v > 0.35) target = d.k0 - 1;
@@ -790,7 +798,9 @@ export function Book({
               <motion.div style={{ transform: pullT }} className="relative">
                 <motion.div
                   ref={bookRef}
-                  className="relative cursor-grab active:cursor-grabbing"
+                  // Doppelseite: waagrecht wischen blättert, senkrecht scrollt die Seite. Ohne pan-y übernimmt
+                  // Safari auf dem iPhone jede Wischbewegung selbst und bricht das Ziehen ab.
+                  className={`relative cursor-grab active:cursor-grabbing ${swipe ? "" : "touch-pan-y"}`}
                   onDragStart={(e) => e.preventDefault()}
                   onPointerMove={onPointerMove}
                   onPointerLeave={onPointerLeave}

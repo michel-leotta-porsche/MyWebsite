@@ -264,9 +264,12 @@ export function PageCurl({
     state.current = st;
     const tex = textures.current;
     const verts = new Float32Array((SEGMENTS + 1) * 14);
-    // Bildabstände, solange WebGL ein Blatt biegt; nach jedem Umblättern ausgewertet
+    // Wartezeit vom Anfordern bis zum Zeichnen, solange WebGL ein Blatt biegt; nach jedem Umblättern ausgewertet.
+    // Nicht der Abstand zwischen zwei Bildern: beim langsamen Scrollen kommen die Bewegungen selbst nur
+    // alle paar Dutzend Millisekunden, das sagt nichts über das Gerät.
     let turnFrames: number[] = [];
     let lastFrame = 0;
+    let asked = 0;
     let slowTurns = 0;
     const judgeTurn = () => {
       const f = turnFrames.sort((a, b) => a - b);
@@ -354,10 +357,10 @@ export function PageCurl({
       });
       const now = performance.now();
       if (bent) {
-        // Pausen des Fingers zählen nicht als langsames Bild
-        if (lastFrame && now - lastFrame < 250) turnFrames.push(now - lastFrame);
+        if (asked) turnFrames.push(now - asked);
         lastFrame = now;
       } else if (lastFrame) judgeTurn();
+      asked = 0;
     };
 
     const measure = () => {
@@ -398,7 +401,9 @@ export function PageCurl({
     c.addEventListener("webglcontextlost", lost);
     const unsub = t.on("change", () => {
       lastMove.current = performance.now();
-      if (!frame.current) frame.current = requestAnimationFrame(() => render.current());
+      if (frame.current) return;
+      asked = performance.now();
+      frame.current = requestAnimationFrame(() => render.current());
     });
     return () => {
       ro.disconnect();
