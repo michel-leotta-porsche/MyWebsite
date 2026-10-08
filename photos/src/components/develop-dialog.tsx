@@ -6,6 +6,8 @@ import { BookmarkPlus, Check, ChevronDown, Columns2, Redo2, RotateCcw, Trash, Un
 import { motion } from "motion/react";
 
 import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { bakePhoto } from "@/lib/develop/bake";
 import {
   applyLut,
@@ -346,7 +348,7 @@ function Ask({ text, yes, no, onYes, onNo }: { text: string; yes: string; no: st
   useEffect(() => first.current?.focus(), []);
   return (
     <div className="fixed inset-0 z-[20] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:items-center">
-      <div role="alertdialog" aria-modal="true" aria-label={text} className="slip text-ink rounded-tool relative w-full max-w-sm p-5 shadow-[0_24px_48px_-20px_rgb(12_10_8/0.8)]">
+      <div role="alertdialog" aria-modal="true" aria-label={text} className="slip text-ink rounded-cut relative w-full max-w-sm p-5 shadow-[0_24px_48px_-20px_rgb(12_10_8/0.8)]">
         <p className="text-[17px] font-bold tracking-[-0.01em]">{text}</p>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button ref={first} type="button" onClick={onNo} className={buttonClass("paper", "sm")}>
@@ -1002,8 +1004,8 @@ export function DevelopDialog({
         else close();
       }}
     >
-      <div className="flex h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-5 lg:px-8 lg:pt-5 lg:pb-6">
-        <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:col-span-2 lg:p-0">
+      <div className="flex h-full flex-col flat:grid flat:grid-cols-[minmax(0,1fr)_minmax(300px,48%)] flat:grid-rows-[auto_minmax(0,1fr)] lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-5 lg:px-8 lg:pt-5 lg:pb-6">
+        <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] flat:col-span-2 lg:col-span-2 lg:p-0">
           <h2 className="text-xl font-bold tracking-[-0.02em]">Bearbeiten</h2>
           <div className="flex items-center gap-2 lg:gap-3">
             <ToolGroup label="Verlauf">
@@ -1026,9 +1028,9 @@ export function DevelopDialog({
           </div>
         </header>
 
-        {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen */}
-        <div className="bg-table flex flex-none flex-col gap-2 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0">
-          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]">
+        {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen. Quer stehen Foto und Werkzeuge nebeneinander */}
+        <div className="bg-table flex flex-none flex-col gap-2 flat:min-h-0 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0">
+          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]">
             <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}>
               {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
               <div
@@ -1107,44 +1109,53 @@ export function DevelopDialog({
               </div>
             </div>
           </div>
-          {strip("overflow-x-auto px-1 py-1.5 lg:hidden", "h-14")}
+          {/* Telefon: Fotos und Knöpfe in einer Zeile, damit für die Werkzeuge mehr Höhe bleibt */}
+          <div className="flex items-center gap-2 lg:contents">
+            {strip("min-w-0 flex-1 overflow-x-auto px-1 py-1.5 lg:hidden", "h-14")}
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-center">
-            <button
-              type="button"
-              aria-pressed={compare}
-              disabled={!shown}
-              title="Auch: M oder \ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter"
-              onClick={() => {
-                setCompare((c) => !c);
-                setSplit(toImage(0.5));
-                setNote(null);
-              }}
-              className={buttonClass("quiet", "sm", `pl-2.5 ${compare ? "!bg-on-table !text-table" : ""}`)}
-            >
-              <Columns2 aria-hidden />
-              Vorher / nachher
-            </button>
-            <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit) || !!busy} className={buttonClass("quiet", "sm", "pl-2.5")}>
-              <RotateCcw aria-hidden />
-              Foto zurücksetzen
-            </button>
-            {/* am Telefon genügen zwei Finger, die Leiste bleibt einzeilig */}
-            <button
-              type="button"
-              aria-pressed={view.z > 1.01}
-              disabled={!shown}
-              title="Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto"
-              onClick={() => toggleZoom()}
-              className={buttonClass("quiet", "sm", `pl-2.5 max-sm:hidden ${view.z > 1.01 ? "!bg-on-table !text-table" : ""}`)}
-            >
-              <ZoomIn aria-hidden />
-              Zoom
-            </button>
+            <div className="flex flex-none items-center gap-2 max-lg:ml-auto lg:flex-wrap lg:justify-center">
+              <button
+                type="button"
+                aria-pressed={compare}
+                disabled={!shown}
+                title="Auch: M oder \ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter"
+                onClick={() => {
+                  setCompare((c) => !c);
+                  setSplit(toImage(0.5));
+                  setNote(null);
+                }}
+                className={buttonClass("quiet", "sm", `pl-2.5 max-sm:min-w-11 max-sm:px-0 flat:min-w-11 flat:px-0 ${compare ? "!bg-on-table !text-table" : ""}`)}
+              >
+                <Columns2 aria-hidden />
+                <span className="max-sm:sr-only flat:sr-only">Vorher / nachher</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => act(() => neutralEdit())}
+                disabled={isNeutral(edit) || !!busy}
+                className={buttonClass("quiet", "sm", "pl-2.5 max-sm:min-w-11 max-sm:px-0 flat:min-w-11 flat:px-0")}
+              >
+                <RotateCcw aria-hidden />
+                <span className="max-sm:sr-only flat:sr-only">Foto zurücksetzen</span>
+              </button>
+              {/* am Telefon genügen zwei Finger, die Leiste bleibt einzeilig */}
+              <button
+                type="button"
+                aria-pressed={view.z > 1.01}
+                disabled={!shown}
+                title="Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto"
+                onClick={() => toggleZoom()}
+                className={buttonClass("quiet", "sm", `pl-2.5 max-sm:hidden flat:hidden ${view.z > 1.01 ? "!bg-on-table !text-table" : ""}`)}
+              >
+                <ZoomIn aria-hidden />
+                Zoom
+              </button>
+            </div>
           </div>
           {/* immer da, damit Screenreader Fehler und Fortschritt hören */}
-          {/* am Desktop steht der Hinweis auf dem Zettel beim Werkzeug; hier bleiben nur Fehler und Fortschritt sichtbar */}
-          <p role="status" className={`min-h-[1.3em] text-[13px] lg:text-center ${error ? "text-on-table font-semibold" : "text-on-table-2"} ${error || busy ? "" : "lg:sr-only"}`}>
+          {/* am Desktop steht der Hinweis auf dem Zettel beim Werkzeug; hier bleiben nur Fehler und Fortschritt sichtbar.
+              Am Telefon zeigt die Zeile nur, was gerade passiert ist; der Dauerhinweis kostet sonst Platz für die Werkzeuge */}
+          <p role="status" className={`text-[13px] lg:text-center ${error ? "text-on-table font-semibold" : "text-on-table-2"} ${error || busy ? "" : note || compare ? "lg:sr-only" : "sr-only"}`}>
             {error ?? busy ?? hint}
           </p>
         </div>
@@ -1153,10 +1164,10 @@ export function DevelopDialog({
         <section
           aria-label="Werkzeuge"
           inert={!shown || !!busy}
-          className={`slip text-ink max-lg:rounded-t-tool lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:max-h-full lg:flex-none lg:self-start lg:px-5 lg:pt-5 lg:pb-5 ${!shown || busy ? "opacity-60" : ""}`}
+          className={`slip text-ink max-lg:rounded-t-tool flat:!rounded-tr-none flat:min-h-0 lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:max-h-full lg:flex-none lg:self-start lg:px-5 lg:pt-5 lg:pb-5 ${!shown || busy ? "opacity-60" : ""}`}
         >
           {photos.length > 1 && (
-            <p className="text-ink-2 text-sm lg:sr-only">
+            <p className="sr-only">
               Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
             </p>
           )}
@@ -1343,35 +1354,35 @@ export function DevelopDialog({
                     <label htmlFor="dv-preset">Rezept</label>
                   </h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <span className="relative flex min-w-0 flex-[1_1_200px]">
-                      <select
-                        id="dv-preset"
-                        className={`${fieldClass} w-full min-w-0 appearance-none pr-10`}
-                        value={recMatch ? recMatch.id : recEmpty ? "" : "cur"}
-                        onChange={(e) => pickRecipe(e.target.value)}
-                      >
-                        <option value="">Ohne Rezept</option>
-                        <optgroup label="Voreingestellt">
-                          {PRESETS.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {r.name} · {r.txt}
-                            </option>
-                          ))}
-                        </optgroup>
-                        {own.length > 0 && (
-                          <optgroup label="Eigene">
-                            {own.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {!recMatch && !recEmpty && <option value="cur">{recLabel}</option>}
-                        <option value="save">Als eigenen Look speichern …</option>
-                      </select>
-                      <ChevronDown aria-hidden className="text-ink pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2" />
-                    </span>
+                    <Menu
+                      align="start"
+                      container={dialog}
+                      trigger={
+                        <button type="button" id="dv-preset" className={`${fieldClass} flex min-w-0 flex-[1_1_200px] items-center justify-between gap-2 text-left`}>
+                          <span className="truncate">{recEmpty ? "Ohne Rezept" : recLabel}</span>
+                          <ChevronDown aria-hidden className="size-4 flex-none" />
+                        </button>
+                      }
+                    >
+                      {[{ id: "", name: "Ohne Rezept", txt: "" }, ...PRESETS].map((r) => (
+                        <MenuItem key={r.id} icon={<Check className={(r.id ? recMatch?.id === r.id : recEmpty) ? "" : "invisible"} />} onClick={() => pickRecipe(r.id)}>
+                          <span>
+                            {r.name}
+                            {r.txt && <span className="text-ink-2"> · {r.txt}</span>}
+                          </span>
+                        </MenuItem>
+                      ))}
+                      {own.length > 0 && <MenuSeparator />}
+                      {own.map((r) => (
+                        <MenuItem key={r.id} icon={<Check className={recMatch?.id === r.id ? "" : "invisible"} />} onClick={() => pickRecipe(r.id)}>
+                          {r.name}
+                        </MenuItem>
+                      ))}
+                      <MenuSeparator />
+                      <MenuItem icon={<BookmarkPlus />} onClick={() => pickRecipe("save")}>
+                        Als eigenen Look speichern …
+                      </MenuItem>
+                    </Menu>
                     {recMatch && own.some((r) => r.id === recMatch.id) && (
                       <button
                         type="button"
@@ -1462,26 +1473,16 @@ function SaveForm({ onSave, onCancel }: { onSave: (name: string) => void; onCanc
         if (n) onSave(n);
       }}
     >
-      <label htmlFor="dv-rc-name" className="text-ink-2 text-[13px]">
-        Name für deinen Look
-      </label>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <input
-          id="dv-rc-name"
-          autoFocus
-          maxLength={40}
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="z. B. Michels Sommer"
-          className={`${fieldClass} min-w-0 flex-[1_1_200px]`}
-        />
-        <button type="submit" className={buttonClass("ink", "sm")}>
-          Speichern
-        </button>
-        <button type="button" onClick={onCancel} className={buttonClass("paper", "sm")}>
-          Abbrechen
-        </button>
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
+        <Field label="Name für deinen Look" autoFocus maxLength={40} required value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-[1_1_220px]" />
+        <div className="flex gap-2">
+          <button type="submit" className={buttonClass("ink", "sm")}>
+            Speichern
+          </button>
+          <button type="button" onClick={onCancel} className={buttonClass("paper", "sm")}>
+            Abbrechen
+          </button>
+        </div>
       </div>
     </form>
   );
