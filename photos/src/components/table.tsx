@@ -7,7 +7,8 @@ import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
 
 /** Aufschlagen eines Bands; kommt aus der Library, damit Tisch und Reihen nichts vom Hash oder der View Transition wissen */
-export const OpenBook = createContext<{ open: (id: string) => void; focusId: string | null }>({ open: () => {}, focusId: null });
+/** `plate`: gleich an dieser Tafel aufschlagen (z. B. vom Eselsohr eines Freundes aus) */
+export const OpenBook = createContext<{ open: (id: string, plate?: number) => void; focusId: string | null }>({ open: () => {}, focusId: null });
 
 // Wie die Bücher in einer Reihe liegen: auf derselben Tischkante, nur leicht gedreht
 const ROT = [-1.5, 1, -0.8, 1.4, -1.2, 0.6];
@@ -32,13 +33,17 @@ const featureSizes = (book: BookData) => (w: number) => {
 // Beim ersten Erscheinen in diesem Tab werden die Bücher einmal hingelegt; danach (z. B. nach dem Zuklappen) liegen sie einfach da
 let laidOnce = false;
 
-function ClosedBook({
+export function ClosedBook({
   book,
   index,
   actions,
   note,
   meta,
   feature = false,
+  bare = false,
+  decor,
+  onPick,
+  className = "",
 }: {
   book: BookData;
   index: number;
@@ -47,6 +52,13 @@ function ClosedBook({
   meta?: ReactNode;
   /** einzeln und groß, mit Knopf zum Aufschlagen (Gastlink) */
   feature?: boolean;
+  /** nur der Einband, ohne Zeilen darunter (Karussell im Bücherzimmer) */
+  bare?: boolean;
+  /** liegt mit auf dem Buch, z. B. Zettel, die oben herausschauen */
+  decor?: ReactNode;
+  /** vor dem Aufschlagen gefragt; true heißt erledigt, das Buch bleibt zu */
+  onPick?: () => boolean;
+  className?: string;
 }) {
   const { open, focusId } = useContext(OpenBook);
   const button = useRef<HTMLButtonElement>(null);
@@ -64,7 +76,7 @@ function ClosedBook({
 
   return (
     <li
-      className={`table-book relative ${arrive ? "arrive" : ""} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
+      className={`table-book relative ${arrive ? "arrive" : ""} ${className} ${feature ? "grid justify-items-center [--reserve:22rem] flat:flex flat:items-center flat:[--reserve:7.5rem]" : ""}`}
       style={
         {
           ["--rot" as string]: `${ROT[index % ROT.length]}deg`,
@@ -76,7 +88,7 @@ function ClosedBook({
       <button
         ref={button}
         type="button"
-        onClick={() => open(book.id)}
+        onClick={() => !onPick?.() && open(book.id)}
         aria-label={`${book.title} aufschlagen, ${book.plates.length} Tafeln${note ? `, ${note}` : ""}`}
         className="group relative block text-left focus-visible:outline-offset-8"
       >
@@ -97,6 +109,7 @@ function ClosedBook({
                 {note}
               </span>
             ))}
+          {decor}
           {/* Schatten auf dem Tisch, das Licht kommt von oben rechts; beim Anheben blendet ein weicherer dazu */}
           <div aria-hidden className="book-shadow-closed absolute inset-0" />
           <div
@@ -110,11 +123,11 @@ function ClosedBook({
             style={{ width: edge }}
           />
           <div aria-hidden className="absolute inset-0" style={{ viewTransitionName: `cover-${book.id}` }}>
-            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={feature ? featureSizes(book) : coverSizes(book)} />
+            <PageView book={book} page={{ kind: "cover" }} side="right" eager={index < 2} sizes={feature || bare ? featureSizes(book) : coverSizes(book)} />
           </div>
         </div>
       </button>
-      {feature ? (
+      {bare ? null : feature ? (
         <div
           className="mt-6 grid w-[min(var(--info-w),calc(100vw-2rem))] justify-items-center gap-3 text-center text-sm flat:mt-0 flat:ml-[min(12rem,30vw)] flat:w-[min(var(--info-w),34vw)] flat:justify-items-start flat:text-left"
           style={{ ["--info-w" as string]: `max(${coverWidth(book)}, 16rem)` }}

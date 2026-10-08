@@ -305,6 +305,297 @@ html.ohne-struktur .printed::after {
   }
 }
 
+/* Bücherzimmer: Bücher zum Wischen. Eines liegt groß unter der Lampe, die Nachbarn liegen im Halbschatten.
+   --p kommt je Buch aus der Scrollposition (0 = Mitte, 1 = ein Platz daneben), --side ist -1 links, 1 rechts. */
+.room-row {
+  display: grid;
+  gap: 18px;
+}
+.carousel {
+  --tw: min(52vw, 240px);
+  --gap: 20px;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--gap);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  /* oben Platz für die Zettel, die aus dem Buch schauen, unten für den ganzen Schatten (sonst schneidet die Reihe ihn mit Kante ab) */
+  padding: 40px 0 56px;
+  margin: 0 -16px -34px;
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+.carousel:focus-visible {
+  outline-offset: -4px;
+}
+/* Ränder, damit auch das erste und letzte Buch in die Mitte rücken (Prozent hier: Breite der Reihe) */
+.carousel::before,
+.carousel::after {
+  content: "";
+  flex: 0 0 calc(50% - var(--tw) / 2 - 4px - var(--gap));
+}
+/* Lage, Licht und Stapel setzt paintRow (room-carousel.tsx) direkt als transform und opacity: der Finger ist die Animation,
+   keine Transition, die hinterherhinkt, und keine CSS-Variable, die bei jedem Bild alle Stile neu berechnen lässt */
+.carousel > li {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+/* Ankommen: die Bücher gleiten nacheinander von rechts herein, sichtbar von Anfang an */
+.carousel > li.arrive .lift {
+  animation: slide-in 820ms var(--ease-out) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+@keyframes slide-in {
+  from {
+    transform: translate3d(56px, 4px, 0) rotate(3deg);
+  }
+}
+/* Glanz: ein Lichtstreif läuft über das Leinen, während sich das Buch dreht; liegt es still, ist er weg */
+.cover-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  overflow: hidden;
+  pointer-events: none;
+}
+.cover-sheen > span {
+  position: absolute;
+  inset: 0 -100%;
+  background: linear-gradient(100deg, transparent 42%, rgb(255 248 235 / 0.2) 50%, transparent 58%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+/* Halbschatten statt Ausgrauen: dunkelt nur den Einband ab */
+.cover-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: var(--table-deep);
+  opacity: 0;
+  /* eigene Ebene: sonst malt der Browser bei jeder Änderung den ganzen Einband neu */
+  will-change: opacity;
+}
+.room-lamp {
+  position: absolute;
+  inset: -40px -16px 0;
+  pointer-events: none;
+  /* läuft innerhalb der Fläche ganz aus, damit keine Kante entsteht */
+  background: radial-gradient(closest-side, rgb(255 228 190 / 0.16), rgb(255 228 190 / 0.05) 55%, transparent);
+  /* pendelt mit dem Schwung, als hinge sie an einem Kabel (Feder im Karussell) */
+  will-change: translate;
+}
+.room-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(163 154 142 / 0.4);
+  transition:
+    scale 240ms var(--ease-out),
+    background-color 160ms ease;
+}
+.room-dot.is-on {
+  background: var(--mark);
+  scale: 1.5;
+}
+.room-arrow {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .room-arrow {
+    position: absolute;
+    top: 45%;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    color: var(--on-table);
+    font-size: 20px;
+    transition:
+      translate 500ms var(--ease-out),
+      opacity 160ms ease;
+  }
+  .room-arrow:hover {
+    translate: var(--nudge, 0) 0;
+  }
+  .room-arrow.left-0 {
+    --nudge: -4px;
+  }
+  .room-arrow.right-0 {
+    --nudge: 4px;
+  }
+  .room-arrow:disabled {
+    opacity: 0.3;
+  }
+}
+.room-panel {
+  min-height: 12rem;
+}
+.room-panel-in {
+  animation: panel-in 260ms var(--ease-out) both;
+}
+/* Titel, Zeile, Knöpfe und Rückmeldungen kommen kurz nacheinander */
+.room-panel-in > * > * {
+  animation: rise 520ms var(--ease-out) both;
+}
+.room-panel-in > * > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.room-panel-in > * > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.room-panel-in > * > :nth-child(n + 4) {
+  animation-delay: 120ms;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+/* Zettel und Abzüge werden auf den Tisch gelegt: aus der Hand, leicht größer, dann liegen sie */
+.deal {
+  animation: deal 640ms var(--ease-out) both;
+  animation-delay: calc(160ms + var(--d, 0) * 70ms);
+}
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(-22px) scale(1.06);
+  }
+}
+/* Zettel, die oben aus dem Buch schauen: stecken mit dem Fuß unter dem Einband und wehen beim Wischen nach */
+.slip-tab {
+  position: absolute;
+  transform-origin: 50% 100%;
+  will-change: rotate;
+  top: -28px;
+  height: 46px;
+  width: 27%;
+  overflow: hidden;
+  padding: 3px 4px 0;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-hand), cursive;
+  font-size: 21px;
+  line-height: 1.1;
+  color: var(--ink);
+  background:
+    linear-gradient(to bottom, transparent 55%, rgb(12 10 8 / 0.28)),
+    linear-gradient(170deg, rgb(255 255 255 / 0.12), transparent 45%),
+    var(--slip);
+  box-shadow: 0 1px 1px rgb(12 10 8 / 0.4);
+  border-radius: var(--radius-cut) var(--radius-cut) 0 0;
+}
+/* Eselsohr auf dem Einband: Vorsatzpapier darunter, der Knick wirft Schatten */
+.cover-ear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  width: 18%;
+  aspect-ratio: 1;
+}
+.cover-ear-under {
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.cover-ear-fold {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(225deg, var(--paper-shade), #cfc6b6 70%);
+  clip-path: polygon(0 0, 100% 100%, 0 100%);
+  filter: drop-shadow(-2px 3px 3px rgb(12 10 8 / 0.45));
+}
+/* Ein Zettel auf dem Tisch: Papier mit Licht von oben und Schatten aus Basalt */
+.note-paper {
+  position: relative;
+  color: var(--ink);
+  background:
+    linear-gradient(170deg, rgb(255 255 255 / 0.1), transparent 40%, rgb(12 10 8 / 0.06)),
+    var(--slip);
+  box-shadow:
+    0 1px 1px rgb(12 10 8 / 0.5),
+    0 12px 20px -10px rgb(12 10 8 / 0.7);
+  /* Zettel sind zugeschnittenes Papier: leicht gerundet (Rundung nach Material, DESIGN.md) */
+  border-radius: var(--radius-cut);
+  overflow: hidden;
+}
+.note-paper.is-new::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--mark);
+}
+/* Eselsohr als kleiner Abzug: Foto mit Papierrand, oben rechts geknickt */
+.ear-print {
+  position: relative;
+  display: block;
+  width: 64px;
+  padding: 4px;
+  background: var(--paper);
+  box-shadow:
+    0 1px 1px rgb(12 10 8 / 0.5),
+    0 10px 16px -8px rgb(12 10 8 / 0.75);
+  transition: translate 160ms var(--ease-out);
+}
+.ear-print::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(225deg, var(--table) 50%, var(--paper-shade) 50%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ear-print:hover {
+    translate: 0 -4px;
+  }
+}
+.press:active {
+  scale: 0.97;
+}
+@media (min-width: 768px) {
+  .carousel {
+    --tw: 260px;
+    --gap: 32px;
+    margin-inline: -64px 0;
+  }
+  .room-lamp {
+    inset: -40px 0 0 -64px;
+  }
+}
+@media (min-width: 1024px) {
+  .room-row {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    align-items: center;
+    gap: 48px;
+  }
+  .carousel {
+    --tw: 280px;
+  }
+}
+
 /* Fahrplan-Linie: Haltepunkte der Bildfolge */
 .stop {
   transition:
@@ -344,6 +635,17 @@ html.ohne-struktur .printed::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cover-sheen {
+    display: none;
+  }
+  .room-panel-in,
+  .room-panel-in > * > *,
+  .deal,
+  .room-dot,
+  .room-arrow {
+    animation: none;
+    transition: none;
+  }
   .sway,
   .table-book.arrive .lift {
     animation: none;

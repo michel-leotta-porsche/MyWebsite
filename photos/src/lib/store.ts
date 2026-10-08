@@ -190,12 +190,17 @@ export const newId = () =>
 
 // Testmodus ohne Firebase: alles bleibt im Speicher dieser Seite
 const MOCK = process.env.NEXT_PUBLIC_FUJI_MOCK === "1";
-const mem = { books: new Map<string, StoredBook>(), shares: new Map<string, Share>() };
-// im Testmodus überleben geteilte Bücher einen Seitenwechsel (für den Test des Gastlinks)
+const mem = { books: new Map<string, StoredBook>(), shares: new Map<string, Share>(), notes: new Map<string, Note[]>() };
+// im Testmodus überleben geteilte Bücher einen Seitenwechsel (für den Test des Gastlinks);
+// Bücher und Zettel lassen sich für Bildschirmfotos vorab in den sessionStorage legen
 if (MOCK && typeof window !== "undefined") {
   try {
     const saved = JSON.parse(sessionStorage.getItem("fuji:mock-shares") ?? "[]") as Share[];
     saved.forEach((sh) => mem.shares.set(sh.token, sh));
+    const books = JSON.parse(sessionStorage.getItem("fuji:mock-books") ?? "[]") as StoredBook[];
+    books.forEach((b) => mem.books.set(b.id, b));
+    const notes = JSON.parse(sessionStorage.getItem("fuji:mock-notes") ?? "{}") as Record<string, Note[]>;
+    Object.entries(notes).forEach(([token, list]) => mem.notes.set(token, list));
   } catch {}
 }
 
@@ -637,7 +642,7 @@ export async function leaveNote(token: string, n: Omit<Note, "id" | "at">) {
 }
 
 export async function notesOf(token: string): Promise<Note[]> {
-  if (MOCK) return [];
+  if (MOCK) return mem.notes.get(token) ?? [];
   const s = await getDocs(query(collection(db(), "shares", token, "notes"), orderBy("at", "desc")));
   return s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Note, "id">) }));
 }
