@@ -1,5 +1,5 @@
 # Spielt die Foto-App (Calima) auf Firebase Hosting aus, Projekt fujiventura, nur das Ziel app (Site calima).
-# Nach jedem Merge auf den Hauptstand: live. Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
+# Live nur von Hand: unter Actions → Ausspielen → „Run workflow“ (Branch claude/project-thread-d5e0a0). Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
 # Den Export baut der predeploy in photos/firebase.json selbst (npm run export, danach check-export).
 #
 # Braucht zwei Repository-Secrets:
@@ -8,12 +8,9 @@
 name: Ausspielen
 
 on:
-  push:
-    branches: [claude/project-thread-d5e0a0]
-    paths: ["photos/**", ".github/workflows/ausspielen.yml"]
   pull_request:
     paths: ["photos/**", ".github/workflows/ausspielen.yml"]
-  # Knopf „Run workflow“ unter Actions: spielt den Hauptstand von Hand aus, ohne Merge
+  # Knopf „Run workflow“ unter Actions: spielt den Hauptstand live aus
   workflow_dispatch:
 
 permissions:
@@ -24,7 +21,8 @@ permissions:
 jobs:
   live:
     name: Live auf calima
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # nur der Hauptstand geht live, auch wenn beim Knopf ein anderer Branch gewählt ist
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/project-thread-d5e0a0'
     runs-on: ubuntu-latest
     # nie zwei Deploys gleichzeitig, und keiner wird mittendrin abgebrochen
     concurrency:
