@@ -1,0 +1,79 @@
+# Spielt die Foto-App (Calima) auf Firebase Hosting aus, Projekt fujiventura, nur das Ziel app (Site calima).
+# Nach jedem Merge auf den Hauptstand: live. Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
+# Den Export baut der predeploy in photos/firebase.json selbst (npm run export, danach check-export).
+#
+# Braucht zwei Repository-Secrets:
+#   FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA  Dienstkonto-JSON (legt `firebase init hosting:github` an)
+#   FUJI_IMPRESSUM_ADRESSE                Anschrift fürs Impressum, Zeilen mit | getrennt (wie in photos/.env.local)
+name: Ausspielen
+
+on:
+  push:
+    branches: [claude/project-thread-d5e0a0]
+    paths: ["photos/**", ".github/workflows/ausspielen.yml"]
+  pull_request:
+    paths: ["photos/**", ".github/workflows/ausspielen.yml"]
+  # Knopf „Run workflow“ unter Actions: spielt den Hauptstand von Hand aus, ohne Merge
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  live:
+    name: Live auf calima
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # nie zwei Deploys gleichzeitig, und keiner wird mittendrin abgebrochen
+    concurrency:
+      group: ausspielen-live
+      cancel-in-progress: false
+    env:
+      FUJI_IMPRESSUM_ADRESSE: ${{ secrets.FUJI_IMPRESSUM_ADRESSE }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: photos/package-lock.json
+      - run: npm ci
+        working-directory: photos
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA }}
+          projectId: fujiventura
+          target: app
+          channelId: live
+          entryPoint: photos
+
+  vorschau:
+    name: Vorschau-Link
+    # Secrets gibt es nur für PRs aus diesem Repo, nicht aus Forks
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ausspielen-vorschau-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      FUJI_IMPRESSUM_ADRESSE: ${{ secrets.FUJI_IMPRESSUM_ADRESSE }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: photos/package-lock.json
+      - run: npm ci
+        working-directory: photos
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA }}
+          projectId: fujiventura
+          target: app
+          expires: 7d
+          entryPoint: photos
