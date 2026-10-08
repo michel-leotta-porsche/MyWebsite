@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { hitClass } from "@/components/ui-classes";
 import { Wordmark } from "@/components/ui-base";
 
 // Impressum und Datenschutz: ein ruhiger Tisch mit einer Textspalte, gleicher Kopf wie die Räume.
@@ -20,7 +21,7 @@ export const OPERATOR = {
 export function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-8 md:pt-6">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
         <Wordmark />
         <LegalLinks />
       </header>
@@ -45,13 +46,13 @@ export function LegalSection({ title, children }: { title: string; children: Rea
 
 export function Mail() {
   return (
-    <a href={`mailto:${OPERATOR.email}`} className="text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline focus-visible:underline">
+    <a href={`mailto:${OPERATOR.email}`} className={`${hitClass} text-on-table decoration-mark decoration-2 underline-offset-4 hover:underline focus-visible:underline`}>
       {OPERATOR.email}
     </a>
   );
 }
 
-const small = "text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline";
+const small = `${hitClass} text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline`;
 
 /** Die beiden Pflichtlinks, für Fußzeilen und neben der Anmeldung */
 export function LegalLinks({ className = "" }: { className?: string }) {

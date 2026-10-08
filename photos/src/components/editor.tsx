@@ -687,7 +687,7 @@ export function Editor() {
       <Keys onKey={onKey} />
       {/* Telefon: zwei Zeilen, scrollt mit weg (verdeckt sonst die Doppelseiten); Wiederholen und Verlauf unter „Mehr“.
           Der Hauptknopf steht in beiden Größen rechts (#43) */}
-      <header className="z-30 flex flex-wrap items-center gap-x-5 gap-y-1 bg-table/95 px-4 py-3 text-sm md:sticky md:top-0 md:gap-x-6 md:px-8 md:py-4">
+      <header className="z-30 flex flex-wrap items-center gap-x-5 gap-y-1 bg-table/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 text-sm md:sticky md:top-0 md:gap-x-6 md:px-8 md:py-4">
         <span className="mr-auto flex items-baseline gap-5">
           <Wordmark />
           <Link href="/zimmer" className={`${linkClass} text-sm`}>
@@ -718,7 +718,7 @@ export function Editor() {
         </FrameButton>
       </header>
 
-      <div className={`grid gap-8 px-4 pb-24 md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
+      <div className={`grid gap-8 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
         <section aria-label="Doppelseiten" className="min-w-0">
           {/* Fotos */}
           <div className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6">
@@ -1009,7 +1009,7 @@ export function Editor() {
                     aria-pressed={book.cloth === id}
                     aria-label={CLOTHS[id].label}
                     title={CLOTHS[id].label}
-                    className={`linen relative h-9 w-9 ${book.cloth === id ? "outline-ink outline-2 outline-offset-2" : ""}`}
+                    className={`linen relative h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 ${book.cloth === id ? "outline-ink outline-2 outline-offset-2" : ""}`}
                     style={{ backgroundColor: CLOTHS[id].base }}
                   />
                 ))}
@@ -1184,7 +1184,7 @@ export function Editor() {
         </button>
       )}
       {undoNotice && !notice && (
-        <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
+        <div role="status" className="slip text-ink fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
           <span>{undoNotice}</span>
           <button
             type="button"
@@ -1199,7 +1199,7 @@ export function Editor() {
         </div>
       )}
       {notice && (
-        <div role="status" className="slip text-ink fixed right-4 bottom-4 z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
+        <div role="status" className="slip text-ink fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
           <span>{notice}</span>
           <button type="button" onClick={() => setNotice(null)} className="text-ink-2 shrink-0 underline underline-offset-4">
             Ok

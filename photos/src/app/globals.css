@@ -63,6 +63,13 @@ body {
 }
 
 @layer base {
+  /* iOS: langes Drücken auf ein Bild öffnet sonst „Bild sichern“ und Vorschau über der Oberfläche (in der App fehl am Platz) */
+  @media (pointer: coarse) {
+    img {
+      -webkit-touch-callout: none;
+    }
+  }
+
   /* Fokus in Einbandgelb auf dem Tisch; auf Papier setzen Elemente Tinte (outline-ink) */
   :focus-visible {
     outline: 2px solid var(--mark);

@@ -28,3 +28,8 @@ for (const name of INTERN) {
   for (const f of [`${name}.html`, `${name}.txt`, name]) await rm(path.join(out, f), { recursive: true, force: true });
 }
 console.log(`Interne Seiten entfernt: ${INTERN.map((n) => "/" + n).join(", ")}`);
+
+// public/photos sind nur Quellen für die Imports oben (Fassungen liegen in _next/static/media); per URL verlinkt sie niemand.
+// Ohne sie ist der Export rund 40 MB kleiner, das zählt vor allem für die iOS-App
+await rm(path.join(out, "photos"), { recursive: true, force: true });
+console.log("Originalfotos aus out/photos entfernt");

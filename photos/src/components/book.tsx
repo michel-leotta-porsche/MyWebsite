@@ -744,7 +744,7 @@ export function Book({
         <SunAndShade light={book.light} />
         {/* Kopf: bricht bei großer Schrift um, statt den Weg zurück aus dem Bild zu schieben.
             Quer liegt er über der Bühne, links und rechts neben dem Buch. */}
-        <header className="pointer-events-none relative z-20 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 pt-4 md:grid md:grid-cols-[1fr_auto_1fr] md:px-8 md:pt-6 flat:absolute flat:inset-x-0 flat:top-0 flat:grid flat:grid-cols-[calc(var(--side)-1rem)_1fr_calc(var(--side)-1rem)] flat:px-4 flat:pt-3 [&>*]:pointer-events-auto">
+        <header className="pointer-events-none relative z-20 flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:grid md:grid-cols-[1fr_auto_1fr] md:px-8 md:pt-6 flat:absolute flat:inset-x-0 flat:top-0 flat:grid flat:grid-cols-[calc(var(--side)-1rem)_1fr_calc(var(--side)-1rem)] flat:px-4 flat:pt-3 [&>*]:pointer-events-auto">
           <button
             type="button"
             onClick={onClose}

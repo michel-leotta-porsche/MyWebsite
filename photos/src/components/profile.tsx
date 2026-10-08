@@ -60,7 +60,7 @@ function Card({ user }: { user: User }) {
 
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-8 md:pt-6">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
         <RoomTitle>Profil</RoomTitle>
         <RoomNav />
       </header>

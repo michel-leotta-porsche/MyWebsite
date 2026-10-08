@@ -216,7 +216,7 @@ export function Table({
   return (
     <section aria-label={label ?? "Tisch mit Fotobüchern"} className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-4 md:px-16 md:pt-6">
+      <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-16 md:pt-6">
         {title ?? (
           <h1 className="text-on-table text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
             Calima

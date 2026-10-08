@@ -1325,7 +1325,7 @@ export function Stage({
 
   return (
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
-      <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 py-4 md:px-8">
+      <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 md:px-8">
         <span className="flex items-baseline gap-5">
           <TextButton data-stage-first onClick={onClose}>
             ← Zur Übersicht

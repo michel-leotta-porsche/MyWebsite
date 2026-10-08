@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
-import { FrameButton, linkClass, TextButton } from "@/components/ui-base";
+import { FrameButton, hitClass, linkClass, TextButton } from "@/components/ui-base";
 import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
+import { signInError } from "@/lib/errors";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
@@ -39,21 +40,28 @@ function useEnter() {
   const user = useLazyUser();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   useEffect(prefetchFirebaseWhenIdle, []);
   const enter = () => {
     const signing = signInNow();
     // Firebase noch nicht geladen: das Bücherzimmer zeigt dieselbe Anmeldung, dort öffnet sich das Fenster sicher
     if (!signing) return router.push("/zimmer");
     setBusy(true);
-    signing.then(() => router.push("/zimmer")).catch(() => setBusy(false));
+    setError(null);
+    signing
+      .then(() => router.push("/zimmer"))
+      .catch((e) => {
+        setBusy(false);
+        setError(signInError(e));
+      });
   };
   // Firebase schon laden, wenn der Finger oder Zeiger auf dem Knopf landet: beim Klick ist es dann meist da
   const warm = { onPointerEnter: loadFirebase, onPointerDown: loadFirebase, onFocus: loadFirebase };
-  return { user, busy, enter, warm };
+  return { user, busy, error, enter, warm };
 }
 
 function HeaderSession() {
-  const { user, busy, enter, warm } = useEnter();
+  const { user, busy, error, enter, warm } = useEnter();
   // solange Firebase prüft, bleibt die Stelle leer statt zu springen
   if (user === undefined) return <span className="text-sm">&nbsp;</span>;
   if (user)
@@ -63,16 +71,23 @@ function HeaderSession() {
       </Link>
     );
   return (
-    <TextButton className="text-sm" disabled={busy} onClick={enter} {...warm}>
-      Anmelden
-    </TextButton>
+    <span className="relative">
+      <TextButton className="text-sm" disabled={busy} onClick={enter} {...warm}>
+        Anmelden
+      </TextButton>
+      {error && (
+        <span role="alert" className="text-on-table absolute top-full right-0 mt-3 w-60 text-right text-sm">
+          {error}
+        </span>
+      )}
+    </span>
   );
 }
 
 const enterClass = "press px-6 py-3 text-base";
 
 function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
-  const { user, busy, enter, warm } = useEnter();
+  const { user, busy, error, enter, warm } = useEnter();
   if (user)
     return (
       <Link
@@ -82,10 +97,19 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
         Ins Bücherzimmer
       </Link>
     );
-  return (
+  const button = (
     <FrameButton className={enterClass} disabled={busy || user === undefined} onClick={enter} {...warm}>
       {busy ? "Einen Moment …" : label}
     </FrameButton>
+  );
+  if (!error) return button;
+  return (
+    <span className="inline-flex flex-col items-start gap-2">
+      {button}
+      <span role="alert" className="text-on-table max-w-xs text-sm">
+        {error}
+      </span>
+    </span>
   );
 }
 
@@ -215,7 +239,7 @@ function Hero() {
     >
       <div className="hero-stick linen table-surface sticky top-0 flex min-h-svh flex-col overflow-hidden bg-table">
         <SunAndShade light="sun" />
-        <header ref={header} className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-4 md:px-8 md:pt-6">
+        <header ref={header} className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
           <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
             Calima
           </p>
@@ -606,7 +630,7 @@ function Closing() {
           </p>
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
             <nav aria-label="Räume" className="flex gap-x-5">
-              <Link href="/zimmer" className="decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
+              <Link href="/zimmer" className={`${hitClass} decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline`}>
                 Bücherzimmer
               </Link>
             </nav>
