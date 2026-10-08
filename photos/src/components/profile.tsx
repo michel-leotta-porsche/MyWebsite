@@ -1,12 +1,13 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Ban, Check, Eye, EyeOff, Gift, Info, LifeBuoy, LogOut, Mail, PenLine, ScrollText, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { linkClass, RequireUser, RoomNav, RoomTitle, TextButton } from "@/components/app-ui";
-import { Button } from "@/components/ui/button";
+import { RequireUser, RoomNav, RoomTitle } from "@/components/app-ui";
+import { Button, buttonClass } from "@/components/ui/button";
+import { ListGroup, ListRow, StatusPill } from "@/components/ui/list";
 import { Field } from "@/components/ui/field";
 import { MountedSheet } from "@/components/ui/sheet";
 import { OPERATOR } from "@/components/legal";
@@ -39,6 +40,8 @@ export function Profile() {
     </RequireUser>
   );
 }
+
+const H2 = "text-on-table text-xl font-semibold tracking-[-0.01em]";
 
 const PROVIDER_NAMES = { "google.com": "Google", "apple.com": "Apple" } as const;
 
@@ -89,33 +92,49 @@ function Card({ user }: { user: User }) {
 
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
         <RoomTitle>Profil</RoomTitle>
         <RoomNav />
       </header>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 px-4 pt-14 pb-20 md:px-8 md:pt-20">
-        <p className="text-on-table text-4xl leading-[0.95] font-bold tracking-[-0.03em] md:text-6xl" style={{ fontVariationSettings: '"wdth" 78, "opsz" 72' }}>
-          {name ?? "Ohne Namen"}
-        </p>
-        <p className="text-on-table-2 mt-3 text-base">
-          {user.email}
-          {joined && <> · dabei seit {joined}</>}
-        </p>
+      <div className="mx-auto w-full max-w-2xl flex-1 px-4 pt-10 pb-20 md:px-8 md:pt-16">
+        <div className="flex items-center gap-4">
+          {/* Avatar: Kreis, getönt statt Gelb (rundung.md) */}
+          <span aria-hidden className="bg-on-table/10 text-on-table grid size-16 shrink-0 place-items-center rounded-full text-2xl font-bold shadow-[inset_0_0_0_1px_rgb(236_230_220/0.12)]">
+            {(name ?? "?").trim().charAt(0).toUpperCase() || "?"}
+          </span>
+          <div className="min-w-0">
+            <p className="text-on-table truncate text-4xl leading-[0.95] font-bold tracking-[-0.03em] md:text-5xl" style={{ fontVariationSettings: '"wdth" 78, "opsz" 72' }}>
+              {name ?? "Ohne Namen"}
+            </p>
+            <p className="text-on-table-2 mt-1.5 truncate text-sm">
+              Angemeldet mit {PROVIDER_NAMES[providerOf(user)]}
+              {user.email && <> · {user.email}</>}
+            </p>
+          </div>
+        </div>
 
-        <dl className="mt-12 grid grid-cols-2 gap-px bg-on-table-2/25 md:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="bg-table">
-              <Link href={s.href} className="group block px-1 py-5 md:px-4">
-                <dt className="text-on-table-2 text-sm">{s.label}</dt>
-                <dd className="text-on-table mt-1 text-4xl font-semibold tracking-[-0.02em]">
-                  {s.value ?? <span className="text-on-table-2">–</span>}
-                </dd>
-                <span aria-hidden className="mt-3 block h-[2px] w-full origin-left scale-x-0 bg-mark transition-transform duration-500 ease-out group-hover:scale-x-100" />
-              </Link>
-            </div>
-          ))}
-        </dl>
+        {/* Leseausweis: zugeschnittener Karton (rounded-cut), die Zahlen führen dorthin, wo die Dinge liegen */}
+        <section aria-labelledby="ausweis-h" className="slip text-ink mt-10 -rotate-[0.6deg] rounded-cut p-5 shadow-[0_24px_40px_-22px_rgb(12_10_8/0.9)] md:p-6">
+          <div className="border-ink/25 flex items-baseline justify-between gap-4 border-b border-dashed pb-3">
+            <h2 id="ausweis-h" className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+              Leseausweis
+            </h2>
+            {joined && <span className="text-ink-2 text-[13px]">seit {joined}</span>}
+          </div>
+          <dl className="mt-1 grid grid-cols-2 gap-x-6 md:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <Link href={s.href} className="block py-3 focus-visible:outline-ink">
+                  <dt className="text-ink-2 text-[13px]">{s.label}</dt>
+                  <dd className="mt-0.5 text-4xl font-bold tracking-[-0.03em] tabular-nums" style={{ fontVariationSettings: '"wdth" 80' }}>
+                    {s.value ?? <span className="text-ink-2">–</span>}
+                  </dd>
+                </Link>
+              </div>
+            ))}
+          </dl>
+        </section>
 
         {error && (
           <p role="alert" className="text-on-table mt-6 text-sm">
@@ -123,96 +142,81 @@ function Card({ user }: { user: User }) {
           </p>
         )}
 
-        <section id="hingelegt" aria-labelledby="hingelegt-h" className="mt-16 scroll-mt-8">
-          <h2 id="hingelegt-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+        <section id="hingelegt" aria-labelledby="hingelegt-h" className="mt-12 scroll-mt-8">
+          <h2 id="hingelegt-h" className={H2}>
             Hingelegt für
           </h2>
           {shares && shares.length === 0 && (
-            <p className="text-on-table-2 mt-3 text-base">
-              Noch niemand. Im Bücherzimmer legst du ein Buch über „Mehr …“ und „Hinlegen für …“ einem Freund hin.
-            </p>
+            <p className="text-on-table-2 mt-2 text-base">Noch niemand. Im Bücherzimmer legst du ein Buch über „Mehr …“ und „Hinlegen für …“ einem Freund hin.</p>
           )}
           {shares && shares.length > 0 && (
-            <ul className="mt-4 border-t border-on-table-2/40">
+            <ListGroup label="Hingelegt für" className="mt-3">
               {shares.map((s) => (
-                <li key={s.token} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-on-table-2/25 py-3 text-base">
-                  <span className="min-w-0">
-                    <span className="text-on-table">{s.to}</span>
-                    <span className="text-on-table-2"> · {titleOf.get(s.bookId ?? s.book?.id) ?? s.book?.title ?? "Ohne Titel"}</span>
-                    {s.paused && <span className="text-on-table-2"> · ruht, Buch im Papierkorb</span>}
-                  </span>
-                  {!s.paused && (
-                    <Link href={`/b?t=${s.token}`} className={`${linkClass} text-sm`}>
-                      Ansehen wie {s.to}
-                    </Link>
-                  )}
-                </li>
+                <ListRow
+                  key={s.token}
+                  lead={<Gift aria-hidden />}
+                  title={s.to}
+                  detail={titleOf.get(s.bookId ?? s.book?.id) ?? s.book?.title ?? "Ohne Titel"}
+                  trail={<StatusPill>{s.paused ? "ruht, im Papierkorb" : "liegt bereit"}</StatusPill>}
+                  href={s.paused ? undefined : `/b?t=${s.token}`}
+                />
               ))}
-            </ul>
+            </ListGroup>
           )}
         </section>
 
-        <section aria-labelledby="konto-h" className="mt-16">
-          <h2 id="konto-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+        <section aria-labelledby="konto-h" className="mt-12">
+          <h2 id="konto-h" className={H2}>
             Konto
           </h2>
-          <p className="text-on-table-2 mt-3 max-w-xl text-base leading-relaxed">
-            Angemeldet über {PROVIDER_NAMES[providerOf(user)]}. Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
-          </p>
-          <p className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
-            <TextButton onClick={() => setRenaming(true)}>Name ändern …</TextButton>
-            <TextButton onClick={() => signOutNow().then(() => router.push("/"))}>Abmelden</TextButton>
-            <TextButton className="text-on-table-2" onClick={() => setDeleting(true)}>
-              Konto löschen …
-            </TextButton>
+          <ListGroup label="Konto" className="mt-3">
+            <ListRow lead={<PenLine aria-hidden />} title="Name ändern" detail="Steht als Absender auf Büchern und Zetteln" onClick={() => setRenaming(true)} />
+            <ListRow lead={<LogOut aria-hidden />} title="Abmelden" onClick={() => signOutNow().then(() => router.push("/"))} />
+            <ListRow lead={<Trash2 aria-hidden />} title="Konto löschen" detail="Mit allen Büchern und Links" danger onClick={() => setDeleting(true)} />
+          </ListGroup>
+          <p className="text-on-table-2 mt-3 max-w-xl text-sm leading-relaxed">
+            Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
           </p>
         </section>
 
         {blocked.length > 0 && (
-          <section aria-labelledby="blocked-h" className="mt-16">
-            <h2 id="blocked-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+          <section aria-labelledby="blocked-h" className="mt-12">
+            <h2 id="blocked-h" className={H2}>
               Ausgeblendet
             </h2>
-            <p className="text-on-table-2 mt-3 max-w-xl text-base">Bücher dieser Personen landen nicht mehr in deinem Bücherzimmer.</p>
-            <ul className="mt-4 border-t border-on-table-2/40">
+            <p className="text-on-table-2 mt-2 max-w-xl text-sm">Bücher dieser Personen landen nicht mehr in deinem Bücherzimmer.</p>
+            <ListGroup label="Ausgeblendet" className="mt-3">
               {blocked.map((b) => (
-                <li key={b.uid} className="flex items-baseline justify-between gap-6 border-b border-on-table-2/25 py-3 text-base">
-                  <span className="text-on-table">{b.name || "Ohne Namen"}</span>
-                  <TextButton className="text-sm" onClick={() => unblockSender(user.uid, b.uid).catch(() => {})}>
-                    Wieder zeigen
-                  </TextButton>
-                </li>
+                <ListRow
+                  key={b.uid}
+                  lead={<EyeOff aria-hidden />}
+                  title={b.name || "Ohne Namen"}
+                  trail={
+                    <Button size="sm" onClick={() => unblockSender(user.uid, b.uid).catch(() => {})}>
+                      Wieder zeigen
+                    </Button>
+                  }
+                />
               ))}
-            </ul>
+            </ListGroup>
           </section>
         )}
 
         {isAdmin(user) && <Reports />}
 
-        <section aria-labelledby="hilfe-h" className="mt-16">
-          <h2 id="hilfe-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+        <section aria-labelledby="hilfe-h" className="mt-12">
+          <h2 id="hilfe-h" className={H2}>
             Rechtliches und Hilfe
           </h2>
-          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-base">
-            {[
-              ["/hilfe", "Hilfe"],
-              ["/nutzungsbedingungen", "Nutzungsbedingungen"],
-              ["/datenschutz", "Datenschutz"],
-              ["/impressum", "Impressum"],
-            ].map(([href, label]) => (
-              <li key={href}>
-                <Link href={href} className={`${linkClass} underline`}>
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <p className="text-on-table-2 mt-5 max-w-xl text-sm leading-relaxed">
-            Fragen, Fehler oder ein Inhalt, der nicht hierher gehört:{" "}
-            <a href={`mailto:${OPERATOR.email}`} className={`${linkClass} underline`}>
-              {OPERATOR.email}
-            </a>
-            . Calima ist nicht mit Fujifilm verbunden; FUJIFILM und FUJI sind Marken der FUJIFILM Corporation.
+          <ListGroup label="Rechtliches und Hilfe" className="mt-3">
+            <ListRow lead={<LifeBuoy aria-hidden />} title="Hilfe" href="/hilfe" />
+            <ListRow lead={<ScrollText aria-hidden />} title="Nutzungsbedingungen" href="/nutzungsbedingungen" />
+            <ListRow lead={<ShieldCheck aria-hidden />} title="Datenschutz" href="/datenschutz" />
+            <ListRow lead={<Info aria-hidden />} title="Impressum" href="/impressum" />
+            <ListRow lead={<Mail aria-hidden />} title="Schreib mir" detail={OPERATOR.email} href={`mailto:${OPERATOR.email}`} />
+          </ListGroup>
+          <p className="text-on-table-2 mt-3 max-w-xl text-sm leading-relaxed">
+            Für Fragen, Fehler oder einen Inhalt, der nicht hierher gehört. Calima ist nicht mit Fujifilm verbunden; FUJIFILM und FUJI sind Marken der FUJIFILM Corporation.
           </p>
         </section>
       </div>
@@ -313,8 +317,8 @@ function Reports() {
   const act = (id: string, run: () => Promise<void>) => run().then(() => done(id)).catch((e) => setError(friendlyError(e)));
 
   return (
-    <section aria-labelledby="reports-h" className="mt-16">
-      <h2 id="reports-h" className="text-on-table text-xl font-semibold tracking-[-0.01em]">
+    <section aria-labelledby="reports-h" className="mt-12">
+      <h2 id="reports-h" className={H2}>
         Meldungen
       </h2>
       {error && (
@@ -324,33 +328,42 @@ function Reports() {
       )}
       {reports && reports.length === 0 && <p className="text-on-table-2 mt-3 text-base">Keine offenen Meldungen.</p>}
       {reports && reports.length > 0 && (
-        <ul className="mt-4 border-t border-on-table-2/40">
+        <ListGroup label="Meldungen" className="mt-3">
           {reports.map((r) => (
-            <li key={r.id} className="border-b border-on-table-2/25 py-3 text-base">
-              <p className="text-on-table">
+            <li key={r.id} className="px-4 py-3.5 [&+li]:border-t [&+li]:border-on-table/8">
+              <p className="text-on-table font-semibold">
                 {REPORT_REASONS[r.reason] ?? r.reason} · „{r.title || "Ohne Titel"}“ von {r.fromName}
               </p>
               {r.text && <p className="text-on-table-2 mt-1 text-sm">„{r.text}“</p>}
-              <p className="text-on-table-2 mt-1 text-sm">
+              <p className="text-on-table-2 mt-1 text-[13px]">
                 {r.at ? new Date(r.at.seconds * 1000).toLocaleString("de-DE") : ""} · Macher-ID {r.owner}
               </p>
-              <p className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-                <Link href={`/b?t=${r.token}`} className={linkClass}>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href={`/b?t=${r.token}`} className={buttonClass("quiet", "sm")}>
+                  <Eye aria-hidden />
                   Ansehen
                 </Link>
-                <TextButton onClick={() => act(r.id, async () => {
-                  await takeDownShare(r.token);
-                  await closeReport(r.id);
-                })}>
+                <Button
+                  size="sm"
+                  className="text-danger-on-table"
+                  onClick={() =>
+                    act(r.id, async () => {
+                      await takeDownShare(r.token);
+                      await closeReport(r.id);
+                    })
+                  }
+                >
+                  <Ban aria-hidden />
                   Link sperren
-                </TextButton>
-                <TextButton className="text-on-table-2" onClick={() => act(r.id, () => closeReport(r.id))}>
+                </Button>
+                <Button size="sm" onClick={() => act(r.id, () => closeReport(r.id))}>
+                  <Check aria-hidden />
                   Erledigt, alles in Ordnung
-                </TextButton>
-              </p>
+                </Button>
+              </div>
             </li>
           ))}
-        </ul>
+        </ListGroup>
       )}
     </section>
   );

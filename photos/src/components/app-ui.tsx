@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal";
 import { SignInButtons } from "@/components/sign-in-buttons";
-import { hitClass, linkClass, Wordmark } from "@/components/ui-base";
+import { linkClass, Wordmark } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
 import { signIn, type SignInProvider, type User } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
@@ -34,22 +34,18 @@ export const ROOMS = [
   { href: "/profil", label: "Profil" },
 ] as const;
 
-/** Wege zwischen den Räumen; der aktuelle Raum trägt den gelben Unterstrich und ist kein Link */
+/** Wege zwischen den Räumen als Umschalter (Pille); der aktuelle Raum ist der helle Daumen und kein Link */
 export function RoomNav({ className = "" }: { className?: string }) {
   const path = usePathname();
   return (
-    <nav aria-label="Räume" className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${className}`}>
+    <nav aria-label="Räume" className={`bg-on-table/7 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(236_230_220/0.1)] ${className}`}>
       {ROOMS.map((r) =>
         path === r.href ? (
-          <span key={r.href} aria-current="page" className="text-on-table underline decoration-mark decoration-2 underline-offset-4">
+          <span key={r.href} aria-current="page" className={`${ROOM_TAB} bg-on-table text-table`}>
             {r.label}
           </span>
         ) : (
-          <Link
-            key={r.href}
-            href={r.href}
-            className={`${hitClass} text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline`}
-          >
+          <Link key={r.href} href={r.href} className={`${ROOM_TAB} text-on-table-2 hover:text-on-table`}>
             {r.label}
           </Link>
         ),
@@ -57,6 +53,8 @@ export function RoomNav({ className = "" }: { className?: string }) {
     </nav>
   );
 }
+
+const ROOM_TAB = "inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors duration-150 pointer-coarse:min-h-11";
 
 /**
  * Räume nur mit Anmeldung: solange Firebase prüft, liegt der leere Tisch da, ohne Konto die Anmeldung.

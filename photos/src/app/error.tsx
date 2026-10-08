@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { Wordmark } from "@/components/ui-base";
-import { linkClass } from "@/components/ui-classes";
+import { buttonClass } from "@/components/ui/button-class";
 
 /** Eigene Fehlerseite statt der englischen von Next: in der App gibt es keine Zurück-Taste des Browsers */
 export default function ErrorPage({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
@@ -22,11 +22,11 @@ export default function ErrorPage({ error, retry }: { error: Error & { digest?: 
           Da ist etwas schiefgegangen.
         </h1>
         <p className="text-on-table-2 mt-3 text-base leading-relaxed">Lade die Seite neu oder geh zurück ins Bücherzimmer.</p>
-        <p className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-base">
-          <button type="button" onClick={() => retry()} className={`${linkClass} min-h-11 underline`}>
+        <p className="mt-8 flex flex-wrap gap-2">
+          <button type="button" onClick={() => retry()} className={buttonClass("cloth")}>
             Noch einmal versuchen
           </button>
-          <Link href="/zimmer" className={`${linkClass} inline-flex min-h-11 items-center underline`}>
+          <Link href="/zimmer" className={buttonClass("quiet")}>
             Zum Bücherzimmer
           </Link>
         </p>
