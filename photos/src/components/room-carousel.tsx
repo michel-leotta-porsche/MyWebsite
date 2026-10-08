@@ -174,7 +174,7 @@ export function Carousel({
     };
     const settle = () => {
       moving.current = false;
-      const i = paint();
+      const i = paintRow(ul, reduce);
       setNear(i);
     };
     const onScroll = () => {
@@ -183,13 +183,13 @@ export function Carousel({
       if (!frame)
         frame = requestAnimationFrame(() => {
           frame = 0;
-          setNear(paint());
+          setNear(paintRow(ul, reduce));
         });
       // Safari kennt scrollend erst seit Kurzem: nach 120 ms Ruhe gilt die Reihe als eingerastet
       window.clearTimeout(rest);
       rest = window.setTimeout(settle, 120);
     };
-    const onResize = () => paint();
+    const onResize = () => paintRow(ul, reduce);
     ul.addEventListener("scroll", onScroll, { passive: true });
     ul.addEventListener("scrollend", settle);
     window.addEventListener("resize", onResize);
@@ -205,8 +205,8 @@ export function Carousel({
 
   // neue Bücher (z. B. nach dem Laden der Geschenke) bekommen ihre Größe sofort
   useEffect(() => {
-    paint();
-  }, [slides.length]);
+    if (list.current) paintRow(list.current, reduce);
+  }, [slides.length, reduce]);
 
   const go = (i: number) => {
     const ul = list.current;
