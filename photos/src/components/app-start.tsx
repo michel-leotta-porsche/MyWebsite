@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LegalLinks } from "@/components/legal";
-import { FrameButton, linkClass } from "@/components/ui-base";
+import { SignInButtons } from "@/components/sign-in-buttons";
+import { linkClass } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
-import { signIn } from "@/lib/firebase";
+import { signIn, type SignInProvider } from "@/lib/firebase";
 import { useUser } from "@/lib/use-user";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
@@ -20,7 +21,7 @@ import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 export function AppStart() {
   const user = useUser();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<SignInProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (user) router.replace("/zimmer");
@@ -35,7 +36,7 @@ export function AppStart() {
           alt=""
           sizes="(max-width: 768px) 50vw, 18rem"
           priority
-          className="h-[min(36svh,26rem)] w-auto -rotate-3 border-[6px] border-paper shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
+          className="h-[min(30svh,26rem)] w-auto -rotate-3 border-[6px] border-paper shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]"
         />
       </div>
       <div className="mx-auto w-full max-w-md">
@@ -44,21 +45,19 @@ export function AppStart() {
         </h1>
         <p className="text-on-table mt-4 text-lg leading-relaxed opacity-80">Ein paar Fotos werden ein Buch, das man wirklich umblättert. Freunde lesen per Link, ohne Konto.</p>
         <div className="mt-7">
-          <FrameButton
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
+          <SignInButtons
+            busy={busy}
+            onPick={(p) => {
+              setBusy(p);
               setError(null);
-              signIn()
+              signIn(p)
                 .then(() => router.replace("/zimmer"))
                 .catch((e) => {
-                  setBusy(false);
+                  setBusy(null);
                   setError(signInError(e));
                 });
             }}
-          >
-            Mit Google anmelden
-          </FrameButton>
+          />
           {error && (
             <p role="alert" className="text-on-table mt-3 text-sm">
               {error}

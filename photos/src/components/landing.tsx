@@ -5,13 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
-import { FrameButton, hitClass, linkClass, TextButton } from "@/components/ui-base";
+import { hitClass, linkClass } from "@/components/ui-base";
 import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
+import { SignInButtons } from "@/components/sign-in-buttons";
 import { signInError } from "@/lib/errors";
+import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
@@ -39,29 +41,28 @@ const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(
 function useEnter() {
   const user = useLazyUser();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<SignInProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(prefetchFirebaseWhenIdle, []);
-  const enter = () => {
-    const signing = signInNow();
+  const enter = (provider: SignInProvider) => {
+    const signing = signInNow(provider);
     // Firebase noch nicht geladen: das Bücherzimmer zeigt dieselbe Anmeldung, dort öffnet sich das Fenster sicher
     if (!signing) return router.push("/zimmer");
-    setBusy(true);
+    setBusy(provider);
     setError(null);
     signing
       .then(() => router.push("/zimmer"))
       .catch((e) => {
-        setBusy(false);
+        setBusy(null);
         setError(signInError(e));
       });
   };
   // Firebase schon laden, wenn der Finger oder Zeiger auf dem Knopf landet: beim Klick ist es dann meist da
-  const warm = { onPointerEnter: loadFirebase, onPointerDown: loadFirebase, onFocus: loadFirebase };
-  return { user, busy, error, enter, warm };
+  return { user, busy, error, enter, warm: () => void loadFirebase() };
 }
 
 function HeaderSession() {
-  const { user, busy, error, enter, warm } = useEnter();
+  const user = useLazyUser();
   // solange Firebase prüft, bleibt die Stelle leer statt zu springen
   if (user === undefined) return <span className="text-sm">&nbsp;</span>;
   if (user)
@@ -70,45 +71,36 @@ function HeaderSession() {
         Ins Bücherzimmer
       </Link>
     );
+  // zwei Anbieter passen nicht in den Kopf: die Anmeldung im Bücherzimmer zeigt beide
   return (
-    <span className="relative">
-      <TextButton className="text-sm" disabled={busy} onClick={enter} {...warm}>
-        Anmelden
-      </TextButton>
-      {error && (
-        <span role="alert" className="text-on-table absolute top-full right-0 mt-3 w-60 text-right text-sm">
-          {error}
-        </span>
-      )}
-    </span>
+    <Link href="/zimmer" className={`${linkClass} text-sm`}>
+      Anmelden
+    </Link>
   );
 }
 
 const enterClass = "press px-6 py-3 text-base";
 
-function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
+/** label: ein einzelner Link ins Bücherzimmer (Schluss der Seite); ohne label die Anmeldung mit Apple und Google */
+function EnterButton({ label }: { label?: string }) {
   const { user, busy, error, enter, warm } = useEnter();
-  if (user)
+  if (user || label)
     return (
       <Link
         href="/zimmer"
         className={`border-on-table text-on-table hover:bg-on-table hover:text-table inline-block border font-semibold transition-colors duration-150 ${enterClass}`}
       >
-        Ins Bücherzimmer
+        {user ? "Ins Bücherzimmer" : label}
       </Link>
     );
-  const button = (
-    <FrameButton className={enterClass} disabled={busy || user === undefined} onClick={enter} {...warm}>
-      {busy ? "Einen Moment …" : label}
-    </FrameButton>
-  );
-  if (!error) return button;
   return (
-    <span className="inline-flex flex-col items-start gap-2">
-      {button}
-      <span role="alert" className="text-on-table max-w-xs text-sm">
-        {error}
-      </span>
+    <span className="flex w-full flex-col items-start gap-2">
+      <SignInButtons busy={busy} disabled={user === undefined} onPick={enter} warm={warm} />
+      {error && (
+        <span role="alert" className="text-on-table max-w-xs text-sm">
+          {error}
+        </span>
+      )}
     </span>
   );
 }
@@ -263,7 +255,7 @@ function Hero() {
               <EnterButton />
             </div>
             <p className="text-on-table-2 mt-5 text-sm">
-              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung über Google, es gelten die{" "}
+              Kostenlos, ein Buch zum Blättern im Browser, kein Druck. Wer einen Link bekommt, liest ohne Konto. Anmeldung mit Apple oder Google, es gelten die{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
                 Nutzungsbedingungen
               </Link>{" "}
@@ -619,7 +611,7 @@ function Closing() {
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
             <EnterButton label="Erstes Buch anlegen" />
             <p className="text-on-table-2 text-sm">
-              Kostenlos, Anmeldung mit Google. Bücher sieht nur, wem du einen Link gibst.{" "}
+              Kostenlos, Anmeldung mit Apple oder Google. Bücher sieht nur, wem du einen Link gibst.{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
                 Nutzungsbedingungen
               </Link>

@@ -1,6 +1,8 @@
 "use client";
 
 import type { User } from "firebase/auth";
+
+import type { SignInProvider } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 
 import { hasSessionHint, setSessionHint } from "@/lib/session-hint";
@@ -53,12 +55,12 @@ export function prefetchFirebaseWhenIdle() {
 }
 
 /**
- * Mit Google anmelden, das Fenster öffnet sich noch im Tipp. Safari blockt es, wenn zwischen Tipp und Öffnen
+ * Mit Apple oder Google anmelden, das Fenster öffnet sich noch im Tipp. Safari blockt es, wenn zwischen Tipp und Öffnen
  * erst Code geladen wird; ist Firebase noch nicht da, gibt es null zurück und die Seite leitet zur Anmeldung weiter.
  */
-export function signInNow() {
+export function signInNow(provider: SignInProvider) {
   if (!loaded) return null;
-  return loaded.signIn().then((cred) => {
+  return loaded.signIn(provider).then((cred) => {
     setSessionHint(true);
     return cred;
   });
