@@ -10,10 +10,18 @@ type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
 type Ctx = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
 type Source = ImageBitmap | HTMLImageElement;
-const fetchBitmap = async (url: string): Promise<Source> => {
+/** Eingerechnet wird nur aus dem eigenen Speicher (oder im Testmodus aus dem Browser), nie von fremden Adressen */
+export const bakeable = (url: string) => url.startsWith("https://firebasestorage.googleapis.com/") || url.startsWith("blob:");
+/** große Fassung ist höchstens etwa 2 MB; mehr wäre eine fremde Datei, die beim Entpacken den Speicher sprengt */
+export const MAX_ORIGINAL = 12 * 1024 * 1024;
+
+export const fetchBitmap = async (url: string): Promise<Source> => {
+  if (!bakeable(url)) throw new Error("Original liegt nicht im eigenen Speicher");
   const res = await fetch(url, { mode: "cors", credentials: "omit" });
   if (!res.ok) throw new Error(`Original nicht erreichbar (HTTP ${res.status})`);
-  return createImageBitmap(await res.blob());
+  const blob = await res.blob();
+  if (blob.size > MAX_ORIGINAL) throw new Error("Original zu groß");
+  return createImageBitmap(blob);
 };
 const free = (c: AnyCanvas) => {
   c.width = 0;

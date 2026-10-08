@@ -2,7 +2,7 @@
 
 // Einrechnen anstoßen: im Worker, wenn der Browser OffscreenCanvas mit 2D und JPEG kann, sonst im Hauptthread.
 
-import { bake, type BakeJob, type BakeResult } from "@/lib/develop/bake-core";
+import { bake, bakeable, fetchBitmap, type BakeJob, type BakeResult } from "@/lib/develop/bake-core";
 import { SIZES } from "@/lib/ingest";
 
 let worker: Worker | null = null;
@@ -21,6 +21,16 @@ const workerReady = () =>
     }
   })();
 
+/** Worker verwerfen und alle Wartenden scheitern lassen; sie rechnen dann im Hauptthread weiter */
+function reset(why: string) {
+  worker?.terminate();
+  worker = null;
+  for (const [id, w] of waiting) {
+    waiting.delete(id);
+    w.fail(new Error(why));
+  }
+}
+
 function getWorker(): Worker | null {
   if (worker) return worker;
   if (!workerReady()) return null;
@@ -36,6 +46,12 @@ function getWorker(): Worker | null {
     if (e.data.out) w.ok(e.data.out);
     else w.fail(new Error(e.data.error ?? "Einrechnen fehlgeschlagen"));
   };
+  // startet der Worker nicht (alte Datei nach einem Deploy, strenge CSP, App-Hülle), meldet das nur dieses Ereignis
+  worker.onerror = (e) => {
+    e.preventDefault();
+    reset("Worker startet nicht");
+  };
+  worker.onmessageerror = () => reset("Worker-Antwort unlesbar");
   return worker;
 }
 
@@ -46,10 +62,9 @@ const mainEncode = (c: OffscreenCanvas | HTMLCanvasElement) =>
 // Hauptthread: kann fetch das Original nicht holen, lädt ein img-Element mit CORS
 const mainLoad = async (url: string) => {
   try {
-    const res = await fetch(url, { mode: "cors", credentials: "omit" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await createImageBitmap(await res.blob());
-  } catch {
+    return await fetchBitmap(url);
+  } catch (e) {
+    if (!bakeable(url)) throw e;
     return new Promise<HTMLImageElement>((ok, fail) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -67,8 +82,13 @@ export function bakePhoto(job: Omit<BakeJob, "sizes">): Promise<BakeResult> {
   const w = getWorker();
   if (!w) return onMain(full);
   const id = ++seq;
-  return new Promise((ok, fail) => {
-    waiting.set(id, { ok, fail });
+  return new Promise<BakeResult>((ok, fail) => {
+    // ein Foto braucht im Worker etwa eine Sekunde; antwortet er nicht, hängt sonst „Fertig“ für immer
+    const t = setTimeout(() => reset("Worker antwortet nicht"), 60_000);
+    waiting.set(id, {
+      ok: (r) => (clearTimeout(t), ok(r)),
+      fail: (e) => (clearTimeout(t), fail(e)),
+    });
     w.postMessage({ id, job: full });
   }).catch((e) => {
     console.warn("[bearbeiten] Worker", e instanceof Error ? e.message : e);

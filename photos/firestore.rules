@@ -55,33 +55,29 @@ service cloud.firestore {
     match /users/{uid}/recipes/{id} {
       allow read, delete: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
+        && id.matches('own-[0-9a-z]{1,16}')
         && request.resource.data.keys().hasOnly(['id', 'name', 'txt', 'v'])
-        && request.resource.data.name is string && request.resource.data.name.size() <= 40
-        && request.resource.data.v is map;
+        && request.resource.data.keys().hasAll(['id', 'name', 'v'])
+        && request.resource.data.id == id
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && (!('txt' in request.resource.data) || (request.resource.data.txt is string && request.resource.data.txt.size() <= 60))
+        && validRecipe(request.resource.data.v);
     }
 
-    // Meldungen zu geteilten Büchern (App Store 1.2): jeder darf melden, auch ohne Konto; lesen nur der Admin
-    match /reports/{id} {
-      allow create: if request.resource.data.keys().hasOnly(['token', 'owner', 'fromName', 'title', 'reason', 'text', 'reporter', 'at'])
-        && request.resource.data.token is string && request.resource.data.token.size() <= 64
-        && request.resource.data.owner is string && request.resource.data.owner.size() <= 128
-        && request.resource.data.reason in ['anstoessig', 'gewalt', 'belaestigung', 'rechte', 'anderes']
-        && request.resource.data.text is string && request.resource.data.text.size() <= 500
-        && request.resource.data.fromName is string && request.resource.data.fromName.size() <= 80
-        && request.resource.data.title is string && request.resource.data.title.size() <= 80
-        && (request.resource.data.reporter == null || (signedIn() && request.resource.data.reporter == request.auth.uid))
-        && request.resource.data.at == request.time;
-      allow read, delete: if isAdmin();
-    }
-
-    // Eigene Angaben: wann den Nutzungsbedingungen zugestimmt
-    match /users/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
-    }
-
-    // Personen, deren Bücher ich nicht mehr sehen will
-    match /users/{uid}/blocked/{sender} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+    // Rezeptwerte: dieselben Felder und Bereiche wie die Regler im Bearbeiten-Dialog
+    function validRecipe(v) {
+      return v is map
+        && v.keys().hasOnly(['film', 'wbR', 'wbB', 'hl', 'sh', 'color', 'dr', 'cc', 'fxb', 'grain', 'gsize'])
+        && v.keys().hasAll(['film', 'wbR', 'wbB', 'hl', 'sh', 'color', 'dr', 'cc', 'fxb', 'grain', 'gsize'])
+        && (v.film == null || v.film in ['sommer', 'kreide', 'daemmerung', 'salz', 'kohle', 'messing'])
+        && v.wbR is int && v.wbR >= -9 && v.wbR <= 9
+        && v.wbB is int && v.wbB >= -9 && v.wbB <= 9
+        && v.hl is number && v.hl >= -2 && v.hl <= 4
+        && v.sh is number && v.sh >= -2 && v.sh <= 4
+        && v.color is int && v.color >= -4 && v.color <= 4
+        && v.dr in [100, 200, 400]
+        && v.cc in [0, 1, 2] && v.fxb in [0, 1, 2] && v.grain in [0, 1, 2]
+        && v.gsize in ['klein', 'groß'];
     }
 
     // Bücher, die jemand für mich hingelegt hat

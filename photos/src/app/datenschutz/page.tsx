@@ -57,6 +57,11 @@ export default function Page() {
           zugeschnitten werden. Gespeichert wird davon nur ein Punkt im Bild und ob dort ein Gesicht ist, keine Merkmale eines Gesichts.
         </p>
         <p>
+          Bearbeitest du ein Foto, rechnet Calima es auf deinem Gerät neu und lädt die bearbeitete Fassung zusätzlich hoch. Das Original bleibt in
+          deinem Konto, damit du die Bearbeitung jederzeit zurücknehmen kannst; geteilte Links enthalten nur die bearbeitete Fassung. Eigene Rezepte
+          (Name und Einstellungen) speichere ich in Firestore, bis du sie löschst.
+        </p>
+        <p>
           Legst du ein Buch für jemanden hin, speichert Calima eine Kopie des Buchs beim Link, dazu den Namen, den du für die Person einträgst
           („Für Lena“), und deinen Namen als Absender. Ein Buch sieht nur, wer den Link dazu hat. Ziehst du einen Link zurück, kann ihn niemand
           mehr öffnen. Wer das Buch vorher geöffnet hat, kann die Bilder, die schon geladen waren, aber behalten. Wer angemeldet ist und ein Buch

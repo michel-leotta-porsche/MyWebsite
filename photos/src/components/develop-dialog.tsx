@@ -6,6 +6,7 @@ import { inputClass } from "@/components/app-ui";
 import { bakePhoto } from "@/lib/develop/bake";
 import {
   applyLut,
+  cleanEdit,
   autoEdit,
   buildLut,
   FINE,
@@ -52,7 +53,7 @@ const LEVEL: [0 | 1 | 2, string][] = [
   [1, "Schwach"],
   [2, "Stark"],
 ];
-const linkBtn = "underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40";
+const linkBtn = "inline-flex min-h-11 items-center underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-40";
 
 /* ---------- LUT-Speicher: dieselbe Bearbeitung wird nicht zweimal gerechnet ---------- */
 
@@ -205,7 +206,7 @@ function Slider({
         <span aria-hidden className={`size-2 rounded-full border-[1.5px] ${changed ? "border-ink bg-mark" : "border-ink-2"}`} />
         {label}
       </label>
-      <output htmlFor={id} className="text-ink-2 font-mono text-xs">
+      <output htmlFor={id} className="text-ink-2 text-xs tabular-nums">
         {format(value)}
       </output>
       <button
@@ -213,7 +214,7 @@ function Slider({
         onClick={() => onChange(zero)}
         disabled={!changed}
         title={`${label} zurücksetzen`}
-        className={`text-ink-2 hover:text-ink -my-1 grid size-7 place-items-center text-base leading-none transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
+        className={`text-ink-2 hover:text-ink -my-2.5 -mr-2.5 grid size-11 place-items-center text-base leading-none transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
       >
         <span aria-hidden>↺</span>
         <span className="sr-only">{label} zurücksetzen</span>
@@ -228,7 +229,7 @@ function Slider({
         onFocus={onFocus}
         onChange={(e) => onChange(Number(e.target.value))}
         onDoubleClick={() => onChange(zero)}
-        className="col-span-3 m-0 w-full accent-ink"
+        className="col-span-3 m-0 h-9 w-full accent-ink"
       />
     </div>
   );
@@ -237,7 +238,7 @@ function Slider({
 function Chips<T extends string | number | null>({ label, opts, cur, onPick }: { label: string; opts: [T, string][]; cur: T; onPick: (v: T) => void }) {
   return (
     <div>
-      <h3 className="text-ink-2 mb-1.5 font-mono text-[11px] font-normal tracking-[0.08em] uppercase">{label}</h3>
+      <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">{label}</h3>
       <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
         {opts.map(([v, txt]) => (
           <button
@@ -245,7 +246,7 @@ function Chips<T extends string | number | null>({ label, opts, cur, onPick }: {
             type="button"
             aria-pressed={cur === v}
             onClick={() => onPick(v)}
-            className={`min-h-[34px] border px-2.5 text-[13px] ${cur === v ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
+            className={`min-h-11 min-w-11 border px-3 text-[13px] ${cur === v ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
           >
             {txt}
           </button>
@@ -255,7 +256,10 @@ function Chips<T extends string | number | null>({ label, opts, cur, onPick }: {
   );
 }
 
-/** Weißabgleich-Verschiebung wie im Kameramenü: −9 bis +9, R nach rechts, B nach oben */
+/**
+ * Weißabgleich-Verschiebung wie im Kameramenü: −9 bis +9, R nach rechts, B nach oben.
+ * Das Feld ist für Finger und Maus; Tastatur und VoiceOver nehmen die zwei Regler darunter.
+ */
 function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number, b: number) => void }) {
   const pad = useRef<HTMLDivElement>(null);
   const drag = useRef(false);
@@ -264,20 +268,13 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
     const c = (v: number) => Math.min(1, Math.max(0, v));
     onChange(Math.round(c((e.clientX - q.left) / q.width) * 18 - 9), Math.round(9 - c((e.clientY - q.top) / q.height) * 18));
   };
-  const txt = `R ${signedStep(r)}, B ${signedStep(b)}`;
   return (
     <div>
-      <h3 className="text-ink-2 mb-1.5 font-mono text-[11px] font-normal tracking-[0.08em] uppercase">Weißabgleich-Verschiebung</h3>
+      <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">Weißabgleich-Verschiebung</h3>
       <div className="flex flex-wrap items-center gap-3.5">
         <div
           ref={pad}
-          tabIndex={0}
-          role="slider"
-          aria-label="Weißabgleich-Verschiebung, Pfeiltasten: links und rechts Rot, hoch und runter Blau"
-          aria-valuetext={txt}
-          aria-valuemin={-9}
-          aria-valuemax={9}
-          aria-valuenow={r}
+          aria-hidden
           className="wbpad border-ink relative size-[152px] flex-none cursor-crosshair touch-none border"
           onPointerDown={(e) => {
             drag.current = true;
@@ -286,22 +283,16 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
           }}
           onPointerMove={(e) => drag.current && at(e)}
           onPointerUp={() => (drag.current = false)}
+          onPointerCancel={() => (drag.current = false)}
           onDoubleClick={() => onChange(0, 0)}
-          onKeyDown={(e) => {
-            const m = ({ ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] } as Record<string, [number, number]>)[e.key];
-            if (!m) return;
-            e.preventDefault();
-            onChange(Math.max(-9, Math.min(9, r + m[0])), Math.max(-9, Math.min(9, b + m[1])));
-          }}
         >
           <span
-            aria-hidden
             className="bg-mark border-ink pointer-events-none absolute z-[1] -mt-[7px] -ml-[7px] size-3.5 rounded-full border-2"
             style={{ left: `${((r + 9) / 18) * 100}%`, top: `${((9 - b) / 18) * 100}%` }}
           />
         </div>
-        <div className="text-ink-2 font-mono text-[11px] leading-snug">
-          <b className="text-ink block text-[15px] font-medium">
+        <div className="text-ink-2 text-[11px] leading-snug">
+          <b className="text-ink block text-[15px] font-semibold tabular-nums">
             R {signedStep(r)} · B {signedStep(b)}
           </b>
           rechts mehr Rot
@@ -309,6 +300,33 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
           oben mehr Blau
           <br />
           Doppeltipp: Mitte
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1">
+        <Slider id="dv-wb-r" label="Rot" value={r} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(v, b)} />
+        <Slider id="dv-wb-b" label="Blau" value={b} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(r, v)} />
+      </div>
+    </div>
+  );
+}
+
+/** Rückfrage im Stil der App; window.confirm zeigt in der iOS-App englische Knöpfe */
+function Ask({ text, yes, no, onYes, onNo }: { text: string; yes: string; no: string; onYes: () => void; onNo: () => void }) {
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  return (
+    <div className="fixed inset-0 z-[20] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:items-center">
+      <div role="alertdialog" aria-modal="true" aria-label={text} className="slip text-ink relative w-full max-w-sm p-5">
+        <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
+          {text}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-3 text-sm">
+          <button ref={first} type="button" onClick={onNo} className="border-ink min-h-11 border px-4 font-semibold">
+            {no}
+          </button>
+          <button type="button" onClick={onYes} className="bg-ink text-paper min-h-11 px-4 font-semibold">
+            {yes}
+          </button>
         </div>
       </div>
     </div>
@@ -337,7 +355,7 @@ export function DevelopDialog({
   const reduce = useReducedMotion();
   // fester Stand beim Öffnen: der Editor rendert weiter, die Fotos ändern sich erst mit „Fertig“
   const [photos] = useState(given);
-  const [initial] = useState(() => Object.fromEntries(photos.map((p) => [p.key, p.edit ?? neutralEdit()])) as Record<string, PhotoEdit>);
+  const [initial] = useState(() => Object.fromEntries(photos.map((p) => [p.key, cleanEdit(p.edit) ?? neutralEdit()])) as Record<string, PhotoEdit>);
   const [edits, setEdits] = useState(initial);
   const [sel, setSel] = useState(start);
   const [tab, setTab] = useState<Tab>("s");
@@ -353,7 +371,11 @@ export function DevelopDialog({
   const [naming, setNaming] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ask, setAsk] = useState<{ text: string; yes: string; no: string; onYes: () => void } | null>(null);
+  const cancelled = useRef(false);
   const [moodIdx, setMoodIdx] = useState(0);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const dialog = useRef<HTMLDialogElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -362,6 +384,8 @@ export function DevelopDialog({
   const bitmaps = useRef(new Map<string, Promise<Pic>>());
 
   const photo = photos.find((p) => p.key === sel) ?? photos[0];
+  // Fotos ohne Titel heißen nach ihrer Stelle auf der Seite
+  const nameOf = (p: StoredPhoto) => p.title || `Foto ${photos.indexOf(p) + 1}`;
   const edit = edits[photo.key];
   const others = photos.filter((p) => p.key !== photo.key);
   const deferred = useDeferredValue(edits);
@@ -442,12 +466,14 @@ export function DevelopDialog({
       setReady(photo.key);
     }).catch((e) => {
       console.warn("[bearbeiten] Foto", reasonOf(e));
-      if (live) setError(`Das Foto ließ sich nicht laden (${reasonOf(e)}).`);
+      // beim nächsten Versuch neu holen
+      bitmaps.current.delete(photo.key);
+      if (live) setFailed(reasonOf(e));
     });
     return () => {
       live = false;
     };
-  }, [photo]);
+  }, [photo, attempt]);
 
   // zeichnen: sofort mit grobem LUT, kurz danach mit dem feinen
   const shown = ready === photo.key;
@@ -532,7 +558,9 @@ export function DevelopDialog({
 
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
-    const g = { x: e.clientX, y: e.clientY, w: el.clientWidth, v: 0, mode: null as NonNullable<typeof gesture.current>["mode"], t: 0 };
+    // Weg auf die Bühne bezogen, nicht aufs Foto: ein Hochformat wäre sonst überempfindlich
+    const stageW = el.parentElement?.clientWidth ?? el.clientWidth;
+    const g = { x: e.clientX, y: e.clientY, w: Math.max(stageW, 240), v: 0, mode: null as NonNullable<typeof gesture.current>["mode"], t: 0 };
     gesture.current = g;
     if (compare) {
       g.mode = "split";
@@ -547,7 +575,7 @@ export function DevelopDialog({
         setHolding(true);
         setBig({ value: "Original", label: "loslassen zeigt wieder bearbeitet" });
       }
-    }, 260);
+    }, 380);
   };
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const g = gesture.current;
@@ -559,16 +587,21 @@ export function DevelopDialog({
     }
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
-    if (!g.mode && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+    // erst nach 16px und flacher als 30°, sonst gewinnt das Scrollen
+    if (!g.mode && Math.hypot(dx, dy) > 16) {
+      if (Math.abs(dy) > Math.abs(dx) * 0.58) {
+        window.clearTimeout(g.t);
+        g.mode = "none";
+        return;
+      }
       window.clearTimeout(g.t);
       g.mode = "swipe";
       el.setPointerCapture(e.pointerId);
-      let t = tab;
+      const t = tab;
       if (t === "s") {
-        t = "f";
-        setTab("f");
-      }
-      if (t === "r") {
+        g.mode = "none";
+        setNote("Wischen stellt unter Looks und Feinschliff ein. Hier genügt ein Tipp auf einen Vorschlag.");
+      } else if (t === "r") {
         g.mode = "none";
         setNote("Im Rezept stellst du die Werte unten ein, wie an der Kamera.");
       } else if (t === "l" && !edit.look) {
@@ -585,7 +618,9 @@ export function DevelopDialog({
       setBig({ value: `${Math.round(v * 100)} %`, label: lookOf(edit.look)?.name ?? "" });
     } else {
       const [key, name, fmt, min, max] = fineOf(active);
-      const v = Math.min(max, Math.max(min, g.v + k * (max - min) * 0.8));
+      let v = Math.min(max, Math.max(min, g.v + k * (max - min) * 0.8));
+      // nahe der Mitte rastet der Wert auf null ein
+      if (min < 0 && Math.abs(v) < (max - min) * 0.015) v = 0;
       live({ [key]: v });
       setBig({ value: fmt(v), label: name });
     }
@@ -603,15 +638,17 @@ export function DevelopDialog({
   useEffect(() => {
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && !!t.closest("input, select, textarea, [role=slider]");
     const down = (e: KeyboardEvent) => {
-      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "\\" && !e.repeat) setHolding(true);
+      if (typing(e.target)) return;
+      // \ liegt auf deutschen Tastaturen hinter Alt (Mac) oder AltGr; deshalb ohne Prüfung der Zusatztasten
+      if ((e.key === "\\" || e.key === "m") && !e.repeat) setHolding(true);
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = ({ 1: "s", 2: "l", 3: "f", 4: "r" } as Record<string, Tab>)[e.key];
       if (t) {
         setTab(t);
         setNote(null);
       }
     };
-    const up = (e: KeyboardEvent) => e.key === "\\" && setHolding(false);
+    const up = (e: KeyboardEvent) => (e.key === "\\" || e.key === "m") && setHolding(false);
     document.addEventListener("keydown", down);
     document.addEventListener("keyup", up);
     return () => {
@@ -623,15 +660,20 @@ export function DevelopDialog({
   /* ----- Fertig: geänderte Fotos einrechnen und hochladen ----- */
 
   const close = () => {
-    if (busy) return;
-    if (dirty && !window.confirm("Änderungen verwerfen?")) return;
-    onClose();
+    if (busy) {
+      // Rechnen abbrechen: hochgeladene Dateien bleiben liegen, das Buch ändert sich nicht
+      cancelled.current = true;
+      return onClose();
+    }
+    if (!dirty) return onClose();
+    setAsk({ text: "Änderungen verwerfen?", yes: "Verwerfen", no: "Weiter bearbeiten", onYes: onClose });
   };
 
   const finish = async () => {
     const changed = photos.filter((p) => JSON.stringify(edits[p.key]) !== JSON.stringify(initial[p.key]));
     if (!changed.length) return onClose();
     setError(null);
+    cancelled.current = false;
     const patches: Record<string, DevelopPatch> = {};
     try {
       for (const [i, p] of changed.entries()) {
@@ -642,15 +684,18 @@ export function DevelopDialog({
           if (p.orig) patches[p.key] = { src: orig.src, large: orig.large, thumb: orig.thumb, color: orig.color, edit: undefined, orig: undefined };
           continue;
         }
-        setBusy(changed.length > 1 ? `Rechne Foto ${i + 1} von ${changed.length} ein …` : "Rechne das Foto ein …");
+        setBusy(changed.length > 1 ? `Speichere Foto ${i + 1} von ${changed.length} …` : "Speichere das Foto …");
         const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec });
+        if (cancelled.current) return;
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
+        if (cancelled.current) return;
         patches[p.key] = { edit: e, orig, src: urls.page, large: urls.large, thumb: urls.thumb, color: out.color };
       }
     } catch (e) {
+      if (cancelled.current) return;
       console.warn("[bearbeiten] Einrechnen", reasonOf(e));
       setBusy(null);
-      setError(`Einrechnen hat nicht geklappt (${reasonOf(e)}). Versuch es noch einmal.`);
+      setError(`Speichern hat nicht geklappt. Prüf die Verbindung und tipp noch einmal auf Fertig. (${reasonOf(e)})`);
       return;
     }
     setBusy(null);
@@ -685,30 +730,32 @@ export function DevelopDialog({
       ref={dialog}
       aria-label="Foto bearbeiten"
       lang="de"
-      className="bg-table text-on-table fixed inset-0 z-[700] m-0 h-full max-h-none w-full max-w-none overflow-y-auto overscroll-contain p-0 lg:overflow-hidden"
+      className="bg-table text-on-table fixed inset-0 z-[700] m-0 h-full max-h-none w-full max-w-none overflow-hidden overscroll-contain p-0"
       onCancel={(e) => {
         e.preventDefault();
-        close();
+        // Escape schließt zuerst die Rückfrage
+        if (ask) setAsk(null);
+        else close();
       }}
     >
-      <div className="flex min-h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-7 lg:gap-y-3.5 lg:p-4">
-        <header className="flex items-center justify-between gap-4 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 lg:col-span-2 lg:p-0">
+      <div className="flex h-full flex-col lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-7 lg:gap-y-3.5 lg:p-4">
+        <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:col-span-2 lg:p-0">
           <h2 className="text-2xl font-bold tracking-[-0.03em]" style={{ fontVariationSettings: '"wdth" 78' }}>
             Bearbeiten
           </h2>
           <div className="flex items-center gap-5 text-sm">
-            <button type="button" onClick={close} disabled={!!busy} className={linkBtn}>
+            <button type="button" onClick={close} className={linkBtn}>
               Abbrechen
             </button>
-            <button type="button" onClick={finish} disabled={!!busy} className="bg-mark text-ink min-h-10 px-4 font-semibold disabled:opacity-60">
-              {busy ? "Rechnet …" : "Fertig"}
+            <button type="button" onClick={finish} disabled={!!busy} className="bg-mark text-ink min-h-11 px-4 font-semibold disabled:opacity-60">
+              {busy ? "Speichert …" : "Fertig"}
             </button>
           </div>
         </header>
 
-        {/* Bühne: das Foto ganz sichtbar; auf dem Telefon bleibt es oben stehen */}
-        <div className="bg-table sticky top-0 z-10 flex flex-col gap-2.5 px-4 pb-3 lg:static lg:min-h-0 lg:p-0">
-          <div className="grid h-[40svh] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1">
+        {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen */}
+        <div className="bg-table flex flex-none flex-col gap-2 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:p-0">
+          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] lg:h-auto lg:min-h-0 lg:flex-1">
             <div
               className="relative cursor-grab touch-pan-y select-none [-webkit-touch-callout:none]"
               style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}
@@ -718,21 +765,37 @@ export function DevelopDialog({
               onPointerCancel={onUp}
               onContextMenu={(e) => e.preventDefault()}
               role="img"
-              aria-label={`${photo.title || "Foto"}, bearbeitet. Halten zeigt das Original, waagerecht wischen stellt ein.`}
+              aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein.`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
               {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
               <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
               <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+              {failed && !shown && (
+                <div className="bg-paper text-ink absolute inset-x-2 bottom-2 z-[6] p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
+                  <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
+                  <p className="text-ink-2 mt-0.5 text-xs">{failed}</p>
+                  <button
+                    type="button"
+                    className={linkBtn}
+                    onClick={() => {
+                      setFailed(null);
+                      setAttempt((n) => n + 1);
+                    }}
+                  >
+                    Noch einmal laden
+                  </button>
+                </div>
+              )}
               {compare && (
                 <>
                   <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${split * 100}%` }}>
                     <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-[30px] -translate-x-1/2 -translate-y-1/2 place-items-center text-sm">⟷</span>
                   </div>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-mono text-[10px] tracking-[0.08em] uppercase">
+                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-semibold text-[10px] tracking-[0.08em] uppercase">
                     vorher
                   </span>
-                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-mono text-[10px] tracking-[0.08em] uppercase">
+                  <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] bg-[rgb(12_10_8/0.6)] px-1.5 py-1 font-semibold text-[10px] tracking-[0.08em] uppercase">
                     nachher
                   </span>
                 </>
@@ -743,7 +806,7 @@ export function DevelopDialog({
                     <span className="text-paper block text-[clamp(28px,7vw,56px)] leading-none font-bold [text-shadow:0_2px_16px_rgb(12_10_8/0.7)]" style={{ fontVariationSettings: '"wdth" 75' }}>
                       {big.value}
                     </span>
-                    <small className="text-paper mt-1 block font-mono text-[11px] tracking-[0.08em] uppercase [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
+                    <small className="text-paper mt-1 block font-semibold text-[11px] tracking-[0.08em] uppercase [text-shadow:0_1px_8px_rgb(12_10_8/0.8)]">{big.label}</small>
                   </div>
                 )}
               </div>
@@ -751,7 +814,7 @@ export function DevelopDialog({
           </div>
 
           {photos.length > 1 && (
-            <div role="group" aria-label="Fotos dieser Doppelseite" className="flex gap-3 overflow-x-auto py-1.5 lg:justify-center">
+            <div role="group" aria-label="Fotos dieser Doppelseite" className="flex gap-3 overflow-x-auto px-1 py-1.5 lg:justify-center">
               {photos.map((p) => {
                 const on = p.key === photo.key;
                 const img = loaded[p.key]?.thumb;
@@ -765,30 +828,67 @@ export function DevelopDialog({
                       setNote(null);
                       setNaming(false);
                     }}
-                    className={`group relative h-12 flex-none lg:h-16 outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
+                    className={`group relative h-14 min-w-11 flex-none lg:h-16 outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
                     style={{ aspectRatio: `${p.w} / ${p.h}` }}
                   >
                     {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
                     {!on && <span aria-hidden className="bg-paper/55 absolute inset-0 transition-opacity duration-150 group-hover:opacity-50" />}
-                    <span className="sr-only">{on ? `${p.title || "Foto"}, in Bearbeitung` : `${p.title || "Foto"} bearbeiten`}</span>
+                    <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung` : `${nameOf(p)} bearbeiten`}</span>
                   </button>
                 );
               })}
             </div>
           )}
-          <p aria-hidden className="text-on-table-2 hidden font-mono text-[11px] lg:block">
-            Taste \ halten: Original · 1–4: Reiter · Halten auf dem Foto: Original
+          <div className="flex flex-wrap items-center gap-x-[18px] text-sm lg:justify-center">
+            <button
+              type="button"
+              aria-pressed={compare}
+              disabled={!shown}
+              onClick={() => {
+                setCompare((c) => !c);
+                setSplit(0.5);
+                setNote(null);
+              }}
+              className={`${linkBtn} ${compare ? "font-bold" : ""}`}
+            >
+              Vorher / nachher
+            </button>
+            <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit) || !!busy} className={linkBtn}>
+              Foto zurücksetzen
+            </button>
+          </div>
+          {/* immer da, damit Screenreader Fehler und Fortschritt hören */}
+          <p role="status" className={`min-h-[1.3em] text-[13px] lg:text-center ${error ? "text-on-table font-semibold" : "text-on-table-2"}`}>
+            {error ?? busy ?? hint}
+          </p>
+          <p aria-hidden className="text-on-table-2 hidden text-center text-[11px] lg:block">
+            M oder \ halten: Original · 1–4: Reiter · Halten auf dem Foto: Original
           </p>
         </div>
 
         {/* Werkzeuge */}
-        <section aria-label="Werkzeuge" className="slip text-ink relative flex flex-1 flex-col gap-3.5 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain">
+        <section
+          aria-label="Werkzeuge"
+          inert={!shown || !!busy}
+          className={`slip text-ink relative flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pt-4 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:p-4 ${!shown || busy ? "opacity-60" : ""}`}
+        >
           {photos.length > 1 && (
             <p className="text-ink-2 text-sm">
-              Du bearbeitest <b className="text-ink">{photo.title || "dieses Foto"}</b>. Ein anderes Foto antippen wechselt.
+              Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
             </p>
           )}
-          <div role="tablist" aria-label="Werkzeuge" className="bg-[var(--slip)] flex flex-wrap gap-x-[18px] border-b border-ink/15 lg:sticky lg:-top-4 lg:z-[2] lg:-mx-4 lg:-mt-1.5 lg:px-4 lg:pt-1.5">
+          <div role="tablist" aria-label="Werkzeuge" className="bg-[var(--slip)] sticky -top-4 z-[2] -mx-4 -mt-1.5 flex flex-wrap gap-x-[18px] border-b border-ink/15 px-4 pt-1.5"
+            onKeyDown={(e) => {
+              // Pfeiltasten wandern zwischen den Reitern (Muster der ARIA-Tabs)
+              const i = TABS.findIndex(([t]) => t === tab);
+              const j = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
+              if (j === null) return;
+              e.preventDefault();
+              const t = TABS[(j + TABS.length) % TABS.length][0];
+              switchTab(t);
+              document.getElementById(`dv-tab-${t}`)?.focus();
+            }}
+          >
             {TABS.map(([t, name]) => (
               <button
                 key={t}
@@ -796,9 +896,10 @@ export function DevelopDialog({
                 role="tab"
                 id={`dv-tab-${t}`}
                 aria-selected={tab === t}
-                aria-controls={`dv-pane-${t}`}
+                aria-controls={tab === t ? `dv-pane-${t}` : undefined}
+                tabIndex={tab === t ? 0 : -1}
                 onClick={() => switchTab(t)}
-                className={`relative pt-2.5 pb-3 text-[17px] leading-none font-bold tracking-[-0.02em] ${tab === t ? "text-ink" : "text-ink-2"}`}
+                className={`relative min-h-11 pt-2.5 pb-3 text-[17px] leading-none font-bold tracking-[-0.02em] ${tab === t ? "text-ink" : "text-ink-2"}`}
                 style={{ fontVariationSettings: '"wdth" 80' }}
               >
                 {name}
@@ -832,20 +933,20 @@ export function DevelopDialog({
                   img={tileImg}
                   edit={sugg.mood}
                   name="Stimmung übernehmen"
-                  txt={moodSrc ? `vom Foto ${moodSrc.title || "daneben"}` : "braucht ein zweites Foto auf der Seite"}
+                  txt={moodSrc ? `vom ${nameOf(moodSrc)}` : "braucht ein zweites Foto auf der Seite"}
                   pressed={edit.origin === "mood"}
                   disabled={!me || !moodSt}
                   onClick={() => {
                     if (!me || !moodSrc || !moodSt) return;
                     // noch einmal antippen nimmt die Stimmung des nächsten Fotos
-                    if (edit.origin === "mood" && edit.moodFrom === (moodSrc.title || "daneben") && others.length > 1) {
+                    if (edit.origin === "mood" && edit.moodFrom === nameOf(moodSrc) && others.length > 1) {
                       const next = others[(moodIdx + 1) % others.length];
                       const st = loaded[next.key]?.st;
                       setMoodIdx((i) => i + 1);
-                      if (st) act((e) => ({ ...e, transfer: moodTransfer(me, st), levels: null, origin: "mood", moodFrom: next.title || "daneben" }));
+                      if (st) act((e) => ({ ...e, transfer: moodTransfer(me, st), levels: null, origin: "mood", moodFrom: nameOf(next) }));
                       return;
                     }
-                    act((e) => ({ ...e, transfer: moodTransfer(me, moodSt), levels: null, origin: "mood", moodFrom: moodSrc.title || "daneben" }));
+                    act((e) => ({ ...e, transfer: moodTransfer(me, moodSt), levels: null, origin: "mood", moodFrom: nameOf(moodSrc) }));
                   }}
                 />
                 <Tile img={tileImg} edit={neutralEdit()} name="Original" txt="alles zurück" pressed={isNeutral(edit)} onClick={() => act(() => neutralEdit())} />
@@ -911,7 +1012,7 @@ export function DevelopDialog({
             {tab === "r" && (
               <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1">
                 <div className="sm:col-span-2 lg:col-span-1">
-                  <h3 className="text-ink-2 mb-1.5 font-mono text-[11px] font-normal tracking-[0.08em] uppercase">
+                  <h3 className="text-ink-2 mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">
                     <label htmlFor="dv-preset">Rezept</label>
                   </h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -946,9 +1047,16 @@ export function DevelopDialog({
                         type="button"
                         className={`${linkBtn} text-sm`}
                         onClick={() => {
-                          if (!window.confirm(`Rezept „${recMatch.name}“ löschen? Fotos, die es nutzen, bleiben, wie sie sind.`)) return;
-                          setOwn((o) => o.filter((r) => r.id !== recMatch.id));
-                          deleteRecipe(uid, recMatch.id).catch(() => {});
+                          const gone = recMatch;
+                          setAsk({
+                            text: `Rezept „${gone.name}“ löschen? Fotos, die es nutzen, bleiben, wie sie sind.`,
+                            yes: "Löschen",
+                            no: "Behalten",
+                            onYes: () => {
+                              setOwn((o) => o.filter((r) => r.id !== gone.id));
+                              deleteRecipe(uid, gone.id).catch(() => {});
+                            },
+                          });
                         }}
                       >
                         Löschen
@@ -959,7 +1067,9 @@ export function DevelopDialog({
                     <SaveForm
                       onCancel={() => setNaming(false)}
                       onSave={(name) => {
-                        const r: NamedRecipe = { id: `own-${Date.now().toString(36)}`, name, txt: "eigenes", v: { ...edit.rec } };
+                        // gleicher Name überschreibt das bestehende Rezept, statt ein zweites anzulegen
+                        const same = own.find((x) => x.name === name);
+                        const r: NamedRecipe = { id: same?.id ?? `own-${Date.now().toString(36)}`, name, txt: "eigenes", v: { ...edit.rec } };
                         setOwn((o) => [...o.filter((x) => x.name !== name), r]);
                         setEdit((e) => ({ ...e, recName: name }));
                         setNaming(false);
@@ -979,7 +1089,7 @@ export function DevelopDialog({
                 </div>
                 <WbPad r={edit.rec.wbR} b={edit.rec.wbB} onChange={(wbR, wbB) => liveRec({ wbR, wbB })} />
                 <div className="grid content-start gap-2.5">
-                  <h3 className="text-ink-2 font-mono text-[11px] font-normal tracking-[0.08em] uppercase">Ton und Farbe</h3>
+                  <h3 className="text-ink-2 text-[11px] font-semibold tracking-[0.08em] uppercase">Ton und Farbe</h3>
                   {(
                     [
                       ["hl", "Lichter", -2, 4, 0.5],
@@ -1018,33 +1128,20 @@ export function DevelopDialog({
             )}
           </div>
 
-          <p className="text-ink-2 min-h-[1.3em] text-[13px]" aria-live="polite">
-            {hint}
-          </p>
-          <div className="flex flex-wrap items-center gap-x-[18px] gap-y-2 text-sm">
-            <button
-              type="button"
-              aria-pressed={compare}
-              onClick={() => {
-                setCompare((c) => !c);
-                setSplit(0.5);
-                setNote(null);
-              }}
-              className={`${linkBtn} py-1.5 ${compare ? "font-bold" : ""}`}
-            >
-              Vorher / nachher vergleichen
-            </button>
-            <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit)} className={`${linkBtn} py-1.5`}>
-              Dieses Foto zurücksetzen
-            </button>
-          </div>
-          {(busy || error) && (
-            <p role="status" className={`text-sm ${error ? "text-ink font-semibold" : "text-ink-2"}`}>
-              {error ?? busy}
-            </p>
-          )}
         </section>
       </div>
+      {ask && (
+        <Ask
+          text={ask.text}
+          yes={ask.yes}
+          no={ask.no}
+          onNo={() => setAsk(null)}
+          onYes={() => {
+            setAsk(null);
+            ask.onYes();
+          }}
+        />
+      )}
     </dialog>
   );
 }
