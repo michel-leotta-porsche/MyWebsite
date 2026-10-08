@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, ChevronLeft, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -803,17 +803,33 @@ export function Editor() {
                 {dropHint}
               </p>
             )}
+            {pending.length > 0 &&
+              (() => {
+                const total = pending.filter((p) => p.error !== "kein Foto").length;
+                const done = pending.filter((p) => p.state === "fertig").length;
+                return (
+                  total > 0 && (
+                    <div className="w-full max-w-sm">
+                      <p className="text-on-table text-sm tabular-nums" aria-live="polite">
+                        {done} von {total} Fotos im Buch
+                      </p>
+                      {/* Fortschritt als Linie, die mit scaleX wächst (Signal, keine Fläche) */}
+                      <span aria-hidden className="bg-on-table/12 mt-2 block h-1 overflow-hidden rounded-full">
+                        <span className="bg-cloth block h-full origin-left rounded-full transition-transform duration-500 ease-out" style={{ transform: `scaleX(${done / total})` }} />
+                      </span>
+                    </div>
+                  )
+                );
+              })()}
             {pending.length > 0 && (
-              <p className="text-on-table text-sm tabular-nums" aria-live="polite">
-                {pending.filter((p) => p.state === "fertig").length} von {pending.filter((p) => p.error !== "kein Foto").length} Fotos im Buch
-              </p>
-            )}
-            {pending.length > 0 && (
-              <ul className="text-on-table-2 max-h-48 w-full space-y-1 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
+              <ul className="text-on-table-2 max-h-48 w-full space-y-1.5 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
                 {pending.map((p) => (
-                  <li key={p.key} className="flex justify-between gap-4">
-                    <span className="truncate">{p.name}</span>
-                    <span className={p.state === "fehler" ? "text-on-table" : ""}>
+                  <li key={p.key} className="flex items-center gap-2.5">
+                    <span aria-hidden className={`shrink-0 [&_svg]:size-4 ${p.state === "fehler" ? "text-danger-on-table" : p.state === "fertig" ? "text-on-table" : ""}`}>
+                      {p.state === "fertig" ? <Check /> : p.state === "fehler" ? <CircleAlert /> : <LoaderCircle className="motion-safe:animate-spin" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                    <span className={`shrink-0 ${p.state === "fehler" ? "text-on-table" : ""}`}>
                       {p.state === "lesen" ? "liest …" : p.state === "laden" ? "lädt hoch …" : p.state === "fertig" ? "fertig" : `Fehler: ${p.error}`}
                     </span>
                   </li>

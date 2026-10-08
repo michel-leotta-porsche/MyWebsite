@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -53,22 +54,24 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
           </p>
           <fieldset className="mt-3">
             <legend className="sr-only">Grund</legend>
-            {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
-              <label key={r} className="border-ink/10 flex min-h-12 items-center gap-3 border-b text-[15px] last:border-b-0">
-                <input type="radio" name="reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="accent-ink" />
-                {REPORT_REASONS[r]}
-              </label>
-            ))}
+            <div className="bg-ink/4 overflow-hidden rounded-tool shadow-[inset_0_0_0_1px_rgb(27_28_26/0.1)]">
+              {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
+                <CheckRow key={r} type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)}>
+                  {REPORT_REASONS[r]}
+                </CheckRow>
+              ))}
+            </div>
           </fieldset>
           <label htmlFor="report-text" className="text-ink-2 mt-2 block text-[13px]">
             Magst du kurz sagen, worum es geht? (freiwillig)
           </label>
           <textarea id="report-text" value={text} onChange={(e) => setText(e.target.value.slice(0, 500))} rows={3} className={noteClass} />
           {onBlock && (
-            <label className="mt-2 flex min-h-11 items-center gap-3 text-sm">
-              <input type="checkbox" checked={block} onChange={(e) => setBlock(e.target.checked)} className="accent-ink" />
-              Bücher von {share.fromName} nicht mehr zeigen
-            </label>
+            <div className="bg-ink/4 mt-3 overflow-hidden rounded-tool shadow-[inset_0_0_0_1px_rgb(27_28_26/0.1)]">
+              <CheckRow type="checkbox" checked={block} onChange={(v) => setBlock(v)}>
+                Bücher von {share.fromName} nicht mehr zeigen
+              </CheckRow>
+            </div>
           )}
           {error && (
             <p role="alert" className="text-ink mt-2 text-[13px] font-semibold">
@@ -76,7 +79,7 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
             </p>
           )}
           <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
-            <Link href="/nutzungsbedingungen" className="text-ink-2 text-[13px] underline decoration-mark decoration-2 underline-offset-4">
+            <Link href="/nutzungsbedingungen" className="text-ink-2 text-[13px] underline underline-offset-4">
               Nutzungsbedingungen
             </Link>
             <Button type="submit" variant="ink" disabled={!reason || state === "busy"}>
@@ -86,5 +89,21 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
         </form>
       )}
     </Sheet>
+  );
+}
+
+/** Auswahlzeile in einer Listengruppe auf Papier: das native Feld bleibt für Tastatur und Screenreader, sichtbar ist der Haken im Kreis */
+function CheckRow({ type, name, checked, onChange, children }: { type: "radio" | "checkbox"; name?: string; checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
+  return (
+    <label className="relative flex min-h-12 cursor-pointer items-center gap-3 px-4 text-[15px] has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-ink [&+label]:border-t [&+label]:border-ink/10">
+      <input type={type} name={name} checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span className="flex-1">{children}</span>
+      <span
+        aria-hidden
+        className="border-ink/30 peer-checked:bg-ink peer-checked:border-ink text-paper grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-150 [&_svg]:scale-0 [&_svg]:transition-transform [&_svg]:duration-200 peer-checked:[&_svg]:scale-100"
+      >
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
+    </label>
   );
 }
