@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ButtonHTMLAttributes } from "react";
 
 import { hitClass, linkClass } from "@/components/ui-classes";
+import { IS_APP } from "@/lib/app-mode";
 
 // Grundbausteine ohne Firebase: Landing und Rechtsseiten laden sie, ohne das SDK mitzuziehen.
 
@@ -24,7 +25,7 @@ export function FrameButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLB
   );
 }
 
-export function Wordmark({ href = "/" }: { href?: string }) {
+export function Wordmark({ href = IS_APP ? "/zimmer" : "/" }: { href?: string }) {
   return (
     <Link
       href={href}

@@ -11,6 +11,7 @@ import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
 import { Shelf, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
+import { IS_APP } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Spread } from "@/lib/use-room";
@@ -145,7 +146,7 @@ function Room({ user }: { user: User }) {
               </span>
             </Link>
             <div className="mt-4 grid gap-0.5 text-sm">
-              <p className="text-on-table-2">Fotos reinziehen, fertig.</p>
+              <p className="text-on-table-2">{IS_APP ? "Fotos wählen, fertig." : "Fotos reinziehen, fertig."}</p>
               <p className="mt-1.5">
                 <TextButton className="text-on-table-2" onClick={() => importInput.current?.click()}>
                   Aus Datei öffnen

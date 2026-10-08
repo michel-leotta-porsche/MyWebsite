@@ -29,7 +29,7 @@ export default function Page() {
       </LegalSection>
       <LegalSection title="Was Calima ist">
         <p>
-          Ein privates, nicht kommerzielles Projekt: Man baut aus eigenen Fotos ein Buch zum Blättern im Browser und teilt es per Link. Es gibt
+          Ein privates, nicht kommerzielles Projekt: Man baut aus eigenen Fotos ein Buch zum Blättern und teilt es per Link. Es gibt
           keine Bezahlung und keinen Druck.
         </p>
         <p>
