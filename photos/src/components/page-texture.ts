@@ -4,7 +4,7 @@ import { getImageProps, type StaticImageData } from "next/image";
 
 import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
 import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
-import { FOLD_STOPS, FOLD_WIDTH, foldColor, PRINT } from "@/lib/book-look";
+import { EDGE, FOLD_STOPS, FOLD_WIDTH, foldColor, PRINT } from "@/lib/book-look";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
 // Dieselbe Elementliste wie page-view.tsx (layoutPage), alle Maße in cqw = Seitenbreite / 100.
@@ -253,6 +253,22 @@ async function drawLayout(
           const oy = by + bh * el.focus[1];
           const z = el.zoom;
           ctx.drawImage(img, ox + (dx - ox) * z, oy + (dy - oy) * z, dw * z, dh * z);
+        }
+        // wie .print-edge: im Kasten geclippt, nur Kanten innerhalb der Seite (im Anschnitt liegt sie draußen)
+        if (layout.bg === "paper" && el.fit !== "contain") {
+          ctx.beginPath();
+          ctx.rect(bx, by, bw, bh);
+          ctx.clip();
+          const pad = 8;
+          const ex = el.x <= 0 ? bx - pad : bx;
+          const ey = el.y <= 0 ? by - pad : by;
+          const ex2 = el.x + el.w >= 100 ? bx + bw + pad : bx + bw;
+          const ey2 = by + bh >= H ? by + bh + pad : by + bh;
+          for (const [width, a] of [[2, EDGE.line], [6, EDGE.glow / 2]] as const) {
+            ctx.strokeStyle = `rgb(238 233 223 / ${a})`;
+            ctx.lineWidth = width;
+            ctx.strokeRect(ex, ey, ex2 - ex, ey2 - ey);
+          }
         }
         ctx.restore();
         return;
