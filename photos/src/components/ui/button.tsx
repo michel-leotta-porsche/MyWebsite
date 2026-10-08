@@ -5,9 +5,9 @@ import type { ButtonHTMLAttributes } from "react";
 import { haptic, type HapticKind } from "@/lib/haptics";
 
 // Knöpfe der Werkzeuge. Werkzeuge sind rund (Pille), Bücher bleiben eckig.
-// cloth: der eine Hauptknopf einer Ansicht, aus Buchleinen, ohne Glanz und Schein (Physical Light Rule). quiet: Nebenknöpfe auf dem Tisch. paper: auf Papier und Zettel.
+// cloth: der eine Hauptknopf einer Ansicht, aus Buchleinen, ohne Glanz und Schein (Physical Light Rule). quiet: Nebenknöpfe auf dem Tisch. paper: auf Papier und Zettel. danger: Endgültiges.
 
-export type ButtonVariant = "cloth" | "quiet" | "paper" | "ink";
+export type ButtonVariant = "cloth" | "quiet" | "paper" | "ink" | "danger";
 export type ButtonSize = "md" | "sm" | "icon";
 
 const VARIANT: Record<ButtonVariant, string> = {
@@ -16,6 +16,8 @@ const VARIANT: Record<ButtonVariant, string> = {
   quiet: "bg-on-table/8 text-on-table shadow-[inset_0_0_0_1px_rgb(236_230_220/0.12)] hover:bg-on-table/12 active:bg-on-table/16",
   paper: "bg-ink/6 text-ink shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] hover:bg-ink/10 active:bg-ink/14 focus-visible:outline-ink",
   ink: "bg-ink text-paper hover:bg-ink/90 focus-visible:outline-ink",
+  // Endgültiges auf Papier (Konto löschen); Papier auf danger 6.7:1
+  danger: "bg-danger text-paper hover:bg-danger/90 focus-visible:outline-ink",
 };
 
 const SIZE: Record<ButtonSize, string> = {

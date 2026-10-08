@@ -14,17 +14,6 @@ export function TextButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLBu
   return <button type="button" {...p} className={`${linkClass} ${className}`} />;
 }
 
-/** Der eine betonte Knopf einer Ansicht: Rahmen statt Fläche, das Gelb bleibt Signal */
-export function FrameButton({ className = "", ...p }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type="button"
-      {...p}
-      className={`border-on-table text-on-table hover:bg-on-table hover:text-table border px-4 py-2 pointer-coarse:min-h-11 text-sm font-semibold transition-colors duration-150 disabled:opacity-50 ${className}`}
-    />
-  );
-}
-
 export function Wordmark({ href = IS_APP ? "/zimmer" : "/" }: { href?: string }) {
   return (
     <Link

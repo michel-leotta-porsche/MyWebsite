@@ -1,10 +1,14 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { inputClass, linkClass, RequireUser, RoomNav, RoomTitle, SlipDialog, TextButton } from "@/components/app-ui";
+import { linkClass, RequireUser, RoomNav, RoomTitle, TextButton } from "@/components/app-ui";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { MountedSheet } from "@/components/ui/sheet";
 import { OPERATOR } from "@/components/legal";
 import { confirmIdentity, deleteAccountUser, providerOf, renameUser, signOutNow, type AppleRevoke, type User } from "@/lib/firebase";
 import { friendlyError, signInError } from "@/lib/errors";
@@ -263,7 +267,7 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
 
   const count = (v: number | undefined) => (v === undefined ? "" : ` (${v})`);
   return (
-    <SlipDialog label="Konto löschen" onClose={() => !busy && onClose()}>
+    <MountedSheet title="Konto löschen" onClose={onClose} locked={busy}>
       <p className="text-sm leading-relaxed">Gelöscht wird alles, was zu deinem Konto gehört:</p>
       <ul className="mt-2 text-sm leading-relaxed">
         <li>· deine Bücher{count(counts.books)} mit allen Fotos{count(counts.photos)}, Zwischenständen und dem Papierkorb</li>
@@ -279,20 +283,16 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
           {error}
         </p>
       )}
-      <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={run}
-          className="border-ink bg-ink text-paper hover:bg-ink/85 min-h-11 border px-3 py-2 font-semibold disabled:opacity-60"
-        >
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <Button variant="danger" disabled={busy} onClick={run}>
+          <Trash2 aria-hidden />
           {busy ? `${step} …` : "Konto endgültig löschen"}
-        </button>
-        <button type="button" disabled={busy} onClick={onClose} className="min-h-11 underline decoration-mark decoration-2 underline-offset-4">
+        </Button>
+        <Button variant="paper" disabled={busy} onClick={onClose}>
           Abbrechen
-        </button>
+        </Button>
       </div>
-    </SlipDialog>
+    </MountedSheet>
   );
 }
 
@@ -365,7 +365,7 @@ function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <SlipDialog label="Name ändern" onClose={() => !busy && onClose()}>
+    <MountedSheet title="Name ändern" description="So steht es als Absender auf neuen Büchern und Zetteln." onClose={() => onClose()} locked={busy}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -379,28 +379,21 @@ function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) 
             });
         }}
       >
-        <label className="block text-[13px]">
-          <span className="text-ink-2">So steht es als Absender auf neuen Büchern und Zetteln</span>
-          <input value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} autoComplete="name" className={inputClass} />
-        </label>
+        <Field label="Name" value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} autoComplete="name" />
         {error && (
           <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
             {error}
           </p>
         )}
-        <div className="mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-          <button
-            type="submit"
-            disabled={busy || !name.trim()}
-            className="border-ink text-ink hover:bg-ink hover:text-paper min-h-11 border px-3 py-2 font-semibold transition-colors duration-150 disabled:opacity-50"
-          >
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="ink" disabled={busy || !name.trim()}>
             Speichern
-          </button>
-          <button type="button" disabled={busy} onClick={() => onClose()} className="min-h-11 underline decoration-mark decoration-2 underline-offset-4">
+          </Button>
+          <Button variant="paper" disabled={busy} onClick={() => onClose()}>
             Abbrechen
-          </button>
+          </Button>
         </div>
       </form>
-    </SlipDialog>
+    </MountedSheet>
   );
 }
