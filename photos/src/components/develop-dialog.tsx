@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { BookmarkPlus, Check, ChevronDown, Columns2, Redo2, RotateCcw, Trash, Undo2, X } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, Columns2, Redo2, RotateCcw, Trash, Undo2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { motion } from "motion/react";
 
 import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
@@ -152,6 +152,20 @@ const fullOf = (p: StoredPhoto): [number, number] => {
   const s = Math.min(1, 2560 / Math.max(p.w, p.h));
   return [Math.round(p.w * s), Math.round(p.h * s)];
 };
+
+/* ---------- Zoom ---------- */
+
+/** Ausschnitt: Vergrößerung und Versatz in Bruchteilen der Bühne */
+type View = { z: number; x: number; y: number };
+const FIT: View = { z: 1, x: 0, y: 0 };
+const ZMAX = 8;
+// das Foto füllt die Bühne immer, kein Rand daneben
+const clampView = (v: View): View => {
+  const z = Math.min(ZMAX, Math.max(1, v.z));
+  return { z, x: Math.min(0, Math.max(1 - z, v.x)), y: Math.min(0, Math.max(1 - z, v.y)) };
+};
+/** neue Vergrößerung, die Stelle (fx, fy) auf der Bühne bleibt, wo sie ist */
+const zoomAt = (v: View, z: number, fx: number, fy: number): View => ({ z, x: fx - ((fx - v.x) / v.z) * z, y: fy - ((fy - v.y) / v.z) * z });
 
 /* ---------- Kleines Bild mit LUT, für Kacheln und den Streifen ---------- */
 
@@ -644,22 +658,92 @@ export function DevelopDialog({
     });
   const saveForm = naming && <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />;
 
+  /* ----- Zoom: Ausschnitt in Bruchteilen der Bühne, damit er Größenwechsel übersteht ----- */
+
+  // gilt nur für das Foto, auf dem gezoomt wurde; ein anderes Foto beginnt ganz
+  const [zoom, setZoom] = useState<View & { key: string; ease: boolean }>({ ...FIT, key: "", ease: false });
+  const view: View = zoom.key === photo.key ? zoom : FIT;
+  const viewNow = useRef(view);
+  viewNow.current = view;
+  const frame = useRef<HTMLDivElement>(null);
+  const look = (v: View, ease = false) => setZoom({ ...clampView(v), key: photo.key, ease });
+  // 100 %: ein Bildpunkt der Vorschau auf einen Punkt der Seite; mindestens doppelt, damit sich der Tipp lohnt
+  const fullZoom = () => {
+    const c = canvas.current;
+    const w = frame.current?.clientWidth ?? 0;
+    return Math.min(ZMAX, Math.max(2, c && w ? c.width / w : 2));
+  };
+  const zoomPct = (z: number) => {
+    const c = canvas.current;
+    const w = frame.current?.clientWidth ?? 0;
+    return c && w ? Math.round(((z * w) / c.width) * 100) : Math.round(z * 100);
+  };
+  // Doppeltipp, Doppelklick und der Knopf: zwischen ganz und nah an der Stelle
+  const toggleZoom = (fx = 0.5, fy = 0.5) => {
+    const v = viewNow.current;
+    look(v.z > 1.01 ? FIT : zoomAt(v, fullZoom(), fx, fy), !reduce);
+  };
+  // Mausrad und Trackpad: weich um den Zeiger
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const v = viewNow.current;
+      const z = Math.min(ZMAX, Math.max(1, v.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))));
+      setZoom({ ...clampView(zoomAt(v, z, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height)), key: photo.key, ease: false });
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [photo.key]);
+
   /* ----- Gesten auf dem Foto ----- */
 
-  const gesture = useRef<{ x: number; y: number; w: number; v: number; mode: "hold" | "swipe" | "split" | "none" | null; t: number } | null>(null);
+  type Mode = "hold" | "swipe" | "split" | "pan" | "pinch" | "none" | null;
+  const gesture = useRef<{ x: number; y: number; w: number; v: number; mode: Mode; t: number; t0: number; from: View } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; fx: number; fy: number; from: View } | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const fineOf = (k: FineKey) => FINE.find((f) => f[0] === k)!;
+  // Stelle auf der Bühne (0–1) in Stelle im Bild, für die Trennlinie bei Vorher/nachher
+  const toImage = (f: number) => Math.min(1, Math.max(0, (f - view.x) / view.z));
+  const where = (el: HTMLElement, x: number, y: number) => {
+    const r = el.getBoundingClientRect();
+    return [(x - r.left) / r.width, (y - r.top) / r.height] as const;
+  };
+  const pinchOf = (el: HTMLElement) => {
+    const [a, b] = [...pointers.current.values()];
+    const r = el.getBoundingClientRect();
+    return { d: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), fx: ((a.x + b.x) / 2 - r.left) / r.width, fy: ((a.y + b.y) / 2 - r.top) / r.height };
+  };
+  const endGesture = () => {
+    const g = gesture.current;
+    if (!g) return;
+    window.clearTimeout(g.t);
+    if (g.mode === "hold") setHolding(false);
+    if (g.mode && g.mode !== "split") setBig(null);
+  };
 
   const onDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    el.setPointerCapture(e.pointerId);
+    // zweiter Finger: aus jeder Geste wird Aufziehen
+    if (pointers.current.size === 2) {
+      endGesture();
+      pinch.current = { ...pinchOf(el), from: viewNow.current };
+      gesture.current = { x: e.clientX, y: e.clientY, w: 1, v: 0, mode: "pinch", t: 0, t0: 0, from: viewNow.current };
+      return;
+    }
+    if (pointers.current.size > 2) return;
     // Weg auf die Bühne bezogen, nicht aufs Foto: ein Hochformat wäre sonst überempfindlich
-    const stageW = el.parentElement?.clientWidth ?? el.clientWidth;
-    const g = { x: e.clientX, y: e.clientY, w: Math.max(stageW, 240), v: 0, mode: null as NonNullable<typeof gesture.current>["mode"], t: 0 };
+    const stageW = el.parentElement?.parentElement?.clientWidth ?? el.clientWidth;
+    const g = { x: e.clientX, y: e.clientY, w: Math.max(stageW, 240), v: 0, mode: null as Mode, t: 0, t0: performance.now(), from: viewNow.current };
     gesture.current = g;
     if (compare) {
       g.mode = "split";
-      el.setPointerCapture(e.pointerId);
-      const r = el.getBoundingClientRect();
-      setSplit(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+      setSplit(toImage(where(el, e.clientX, e.clientY)[0]));
       return;
     }
     g.t = window.setTimeout(() => {
@@ -671,16 +755,34 @@ export function DevelopDialog({
     }, 380);
   };
   const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const g = gesture.current;
     if (!g) return;
     const el = e.currentTarget;
-    if (g.mode === "split") {
-      const r = el.getBoundingClientRect();
-      return setSplit(Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+    const p = pinch.current;
+    if (g.mode === "pinch" && p && pointers.current.size >= 2) {
+      const now = pinchOf(el);
+      const z = Math.min(ZMAX, Math.max(1, (p.from.z * now.d) / p.d));
+      // der Punkt unter den Fingern bleibt unter den Fingern, auch wenn sie wandern
+      const v = zoomAt(p.from, z, p.fx, p.fy);
+      look({ z, x: v.x + now.fx - p.fx, y: v.y + now.fy - p.fy });
+      setBig({ value: `${zoomPct(z)} %`, label: "Zoom" });
+      return;
     }
+    if (g.mode === "split") return setSplit(toImage(where(el, e.clientX, e.clientY)[0]));
     const dx = e.clientX - g.x;
     const dy = e.clientY - g.y;
-    // erst nach 16px und flacher als 30°, sonst gewinnt das Scrollen
+    if (g.mode === "pan") {
+      const r = el.getBoundingClientRect();
+      return look({ z: g.from.z, x: g.from.x + dx / r.width, y: g.from.y + dy / r.height });
+    }
+    // gezoomt verschiebt ein Finger den Ausschnitt
+    if (!g.mode && view.z > 1.01 && Math.hypot(dx, dy) > 6) {
+      window.clearTimeout(g.t);
+      g.mode = "pan";
+      return;
+    }
+    // erst nach 16px und flacher als 30°
     if (!g.mode && Math.hypot(dx, dy) > 16) {
       if (Math.abs(dy) > Math.abs(dx) * 0.58) {
         window.clearTimeout(g.t);
@@ -689,7 +791,6 @@ export function DevelopDialog({
       }
       window.clearTimeout(g.t);
       g.mode = "swipe";
-      el.setPointerCapture(e.pointerId);
       const t = tab;
       if (t === "s") {
         g.mode = "none";
@@ -718,13 +819,43 @@ export function DevelopDialog({
       setBig({ value: fmt(v), label: name });
     }
   };
-  const onUp = () => {
+  const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const last = pointers.current.get(e.pointerId);
+    pointers.current.delete(e.pointerId);
     const g = gesture.current;
     if (!g) return;
-    window.clearTimeout(g.t);
-    if (g.mode === "hold") setHolding(false);
-    if (g.mode && g.mode !== "split") setBig(null);
+    if (g.mode === "pinch") {
+      // ein Finger bleibt liegen: weiter verschieben, ohne Sprung
+      const rest = [...pointers.current.values()][0];
+      if (pointers.current.size === 1 && rest) {
+        pinch.current = null;
+        setBig(null);
+        gesture.current = { ...g, x: rest.x, y: rest.y, mode: viewNow.current.z > 1.01 ? "pan" : "none", from: viewNow.current };
+      } else if (!pointers.current.size) {
+        pinch.current = null;
+        setBig(null);
+        gesture.current = null;
+      }
+      return;
+    }
+    endGesture();
     gesture.current = null;
+    // kurzer Tipp ohne Weg; zwei davon kurz hintereinander zoomen
+    if (e.type !== "pointerup" || !last || (g.mode && g.mode !== "split") || performance.now() - g.t0 > 300 || Math.hypot(last.x - g.x, last.y - g.y) > 10) return;
+    const t = lastTap.current;
+    const now = performance.now();
+    if (t && now - t.t < 350 && Math.hypot(t.x - last.x, t.y - last.y) < 30) {
+      lastTap.current = null;
+      const [fx, fy] = where(e.currentTarget, last.x, last.y);
+      toggleZoom(fx, fy);
+    } else lastTap.current = { t: now, x: last.x, y: last.y };
+  };
+
+  // Tastatur: + und − zoomen zur Mitte, 0 zeigt das ganze Foto
+  const zoomKeys = useRef((k: string) => void k);
+  zoomKeys.current = (k) => {
+    const v = viewNow.current;
+    look(k === "0" ? FIT : zoomAt(v, Math.min(ZMAX, Math.max(1, v.z * (k === "+" ? 1.5 : 1 / 1.5))), 0.5, 0.5), !reduce);
   };
 
   // Tastatur: \ halten zeigt das Original, 1–4 wechseln den Reiter
@@ -744,6 +875,7 @@ export function DevelopDialog({
       // \ liegt auf deutschen Tastaturen hinter Alt (Mac) oder AltGr; deshalb ohne Prüfung der Zusatztasten
       if ((e.key === "\\" || e.key === "m") && !e.repeat) setHolding(true);
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "+" || e.key === "-" || e.key === "0") return zoomKeys.current(e.key);
       const t = ({ 1: "s", 2: "l", 3: "f", 4: "r" } as Record<string, Tab>)[e.key];
       if (t) {
         setTab(t);
@@ -900,19 +1032,26 @@ export function DevelopDialog({
             <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}>
               {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
               <div
-                className="absolute inset-0 cursor-grab touch-pan-y select-none [-webkit-touch-callout:none]"
+                ref={frame}
+                className={`absolute inset-0 touch-none overflow-hidden select-none [-webkit-touch-callout:none] ${view.z > 1.01 ? "cursor-move" : "cursor-grab"}`}
                 onPointerDown={onDown}
                 onPointerMove={onMove}
                 onPointerUp={onUp}
                 onPointerCancel={onUp}
                 onContextMenu={(e) => e.preventDefault()}
                 role="img"
-                aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein.`}
+                aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein, zwei Finger oder Doppeltipp zoomen.`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
-                {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
-                <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
-                <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+                {/* Zoom: nur transform; das Bild hat volle Auflösung, die Vergrößerung zeigt echte Details */}
+                <div
+                  className={`absolute inset-0 origin-top-left ${zoom.ease && zoom.key === photo.key ? "ease-out transition-transform duration-500" : ""}`}
+                  style={{ transform: `translate(${view.x * 100}%, ${view.y * 100}%) scale(${view.z})` }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
+                  {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
+                  <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
+                  <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+                </div>
                 {failed && !shown && (
                   <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
                     <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
@@ -931,7 +1070,7 @@ export function DevelopDialog({
                 )}
                 {compare && (
                   <>
-                    <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${split * 100}%` }}>
+                    <div aria-hidden className="bg-paper pointer-events-none absolute inset-y-0 z-[4] -ml-px w-0.5" style={{ left: `${Math.min(1, Math.max(0, view.x + split * view.z)) * 100}%` }}>
                       <span className="bg-paper text-ink absolute top-1/2 left-1/2 grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-sm shadow-[0_2px_8px_rgb(12_10_8/0.4)]">
                         ⟷
                       </span>
@@ -943,6 +1082,17 @@ export function DevelopDialog({
                       nachher
                     </span>
                   </>
+                )}
+                {view.z > 1.01 && (
+                  <button
+                    type="button"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={() => look(FIT, !reduce)}
+                    className="text-on-table absolute right-2 bottom-2 z-[6] flex min-h-8 items-center gap-1.5 rounded-full bg-[rgb(12_10_8/0.6)] pr-3 pl-2 text-xs font-semibold tabular-nums pointer-coarse:min-h-10"
+                  >
+                    <ZoomOut aria-hidden className="size-4" />
+                    {zoomPct(view.z)} %<span className="sr-only">, ganzes Foto zeigen</span>
+                  </button>
                 )}
                 <div aria-hidden className={`pointer-events-none absolute inset-0 z-[5] grid place-items-center transition-opacity duration-150 ${big ? "opacity-100" : "opacity-0"}`}>
                   {big && (
@@ -967,7 +1117,7 @@ export function DevelopDialog({
               title="Auch: M oder \ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter"
               onClick={() => {
                 setCompare((c) => !c);
-                setSplit(0.5);
+                setSplit(toImage(0.5));
                 setNote(null);
               }}
               className={buttonClass("quiet", "sm", `pl-2.5 ${compare ? "!bg-on-table !text-table" : ""}`)}
@@ -978,6 +1128,18 @@ export function DevelopDialog({
             <button type="button" onClick={() => act(() => neutralEdit())} disabled={isNeutral(edit) || !!busy} className={buttonClass("quiet", "sm", "pl-2.5")}>
               <RotateCcw aria-hidden />
               Foto zurücksetzen
+            </button>
+            {/* am Telefon genügen zwei Finger, die Leiste bleibt einzeilig */}
+            <button
+              type="button"
+              aria-pressed={view.z > 1.01}
+              disabled={!shown}
+              title="Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto"
+              onClick={() => toggleZoom()}
+              className={buttonClass("quiet", "sm", `pl-2.5 max-sm:hidden ${view.z > 1.01 ? "!bg-on-table !text-table" : ""}`)}
+            >
+              <ZoomIn aria-hidden />
+              Zoom
             </button>
           </div>
           {/* immer da, damit Screenreader Fehler und Fortschritt hören */}
