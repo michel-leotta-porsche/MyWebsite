@@ -1,13 +1,19 @@
 "use client";
 
 import Image from "next/image";
+import { ChevronLeft, ChevronRight, Eye, Gift, History, ImagePlus, LayoutGrid, MoreHorizontal, Redo2, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { plateOf, typeArea, type BookData, type Page } from "@/content/books";
 import { layoutPage, TEXT_STYLE } from "@/content/layout";
-import { FrameButton, inputClass, linkClass, SignInTable, SlipDialog, TextButton, Wordmark } from "@/components/app-ui";
+import { inputClass, SignInTable, SlipDialog, TextButton } from "@/components/app-ui";
 import { Book } from "@/components/book";
+import { buttonClass, Button, IconButton, ToolGroup } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Menu, MenuItem } from "@/components/ui/menu";
+import { Swatches } from "@/components/ui/swatches";
+import { notify, Toaster } from "@/components/ui/toaster";
 import { CropDialog } from "@/components/crop-dialog";
 import { DevelopDialog } from "@/components/develop-dialog";
 import { PageView } from "@/components/page-view";
@@ -50,14 +56,14 @@ type Selection = { type: "photo"; key: string } | { type: "spread"; id: string }
 const MAX = 60;
 /** Unter 768px: Panel des Gewählten als Blatt am unteren Rand, direkt beim Foto statt weit darunter */
 const SHEET =
-  "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
+  "max-md:rounded-t-cut max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
 
 function SheetClose({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex justify-end md:hidden">
-      <button type="button" onClick={onClose} className="-my-2 min-h-11 px-2 text-sm underline decoration-mark decoration-2 underline-offset-4">
+      <Button variant="ink" size="sm" onClick={onClose} className="-my-1">
         Fertig
-      </button>
+      </Button>
     </div>
   );
 }
@@ -143,14 +149,13 @@ export function Editor() {
   const [develop, setDevelop] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const lastClick = useRef<{ i: number; at: number } | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  // Hinweis mit Rückgängig nach dem Ablegen; verschwindet nach ein paar Sekunden von selbst
-  const [undoNotice, setUndoNotice] = useState<string | null>(null);
-  useEffect(() => {
-    if (!undoNotice) return;
-    const id = window.setTimeout(() => setUndoNotice(null), 10000);
-    return () => window.clearTimeout(id);
-  }, [undoNotice]);
+  // Hinweise als Pille von unten (Sonner), nach dem Ablegen mit Rückgängig. Solange einer steht, weicht der Rückgängig-Knopf am Telefon
+  const [toastOpen, setToastOpen] = useState(false);
+  const say = useCallback((text: string, onUndo?: () => void) => {
+    setToastOpen(true);
+    const done = () => setToastOpen(false);
+    notify(text, { duration: onUndo ? 10000 : 6000, onDismiss: done, onAutoClose: done, ...(onUndo && { action: { label: "Rückgängig", onClick: onUndo } }) });
+  }, []);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -495,7 +500,7 @@ export function Editor() {
       };
     });
     setSel(null);
-    setUndoNotice(`Doppelseite ${i + 1} entfernt${book.spreads[i]?.keys.length ? ", die Fotos sind beiseitegelegt" : ""}.`);
+    say(`Doppelseite ${i + 1} entfernt${book.spreads[i]?.keys.length ? ", die Fotos sind beiseitegelegt" : ""}.`, undo);
   };
   /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz; freie Seiten bekommen es in die erste freie Zelle */
   const movePhoto = (key: string, to: number) =>
@@ -510,7 +515,7 @@ export function Editor() {
           if (target.pages) {
             const added = ph ? addKey(target, key, ph.w / ph.h, { aspect: b.aspect, bottom: bottomFor(b.aspect) }) : null;
             if (!added) {
-              setNotice("Auf dieser Doppelseite ist kein Platz frei. Öffne sie mit „Gestalten“ und mach Platz.");
+              say("Auf dieser Doppelseite ist kein Platz frei. Öffne sie mit „Gestalten“ und mach Platz.");
               return ss;
             }
             ss[to] = added;
@@ -582,7 +587,7 @@ export function Editor() {
    * Frei gestaltete Seiten und Textseiten behalten ihre Form; auf der Bühne bleibt die Doppelseite stehen.
    */
   const shelvePhoto = (key: string, close = true) => {
-    setUndoNotice("Beiseitegelegt, nicht mehr im Buch.");
+    say("Beiseitegelegt, nicht mehr im Buch.", undo);
     update((b) => {
       let gap = false;
       const next = {
@@ -687,41 +692,66 @@ export function Editor() {
       <Keys onKey={onKey} />
       {/* Telefon: zwei Zeilen, scrollt mit weg (verdeckt sonst die Doppelseiten); Wiederholen und Verlauf unter „Mehr“.
           Der Hauptknopf steht in beiden Größen rechts (#43) */}
-      <header className="z-30 flex flex-wrap items-center gap-x-5 gap-y-1 bg-table/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 text-sm md:sticky md:top-0 md:gap-x-6 md:px-8 md:py-4">
-        <span className="mr-auto flex items-baseline gap-5">
-          <Wordmark />
-          <Link href="/zimmer" className={`${linkClass} text-sm`}>
-            Ins Bücherzimmer
+      <header className="z-30 bg-table/95 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-3 md:sticky md:top-0 md:px-8 md:py-3">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/zimmer"
+            className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 pr-2 text-base font-medium transition-opacity duration-150 active:opacity-60"
+          >
+            <ChevronLeft aria-hidden className="size-5" />
+            Bücherzimmer
           </Link>
-        </span>
-        <span aria-live="polite" className="text-on-table-2">
-          {status}
-        </span>
-        <span aria-hidden className="basis-full md:hidden" />
-        <span className="text-on-table-2 flex items-center gap-x-5 max-md:mr-auto">
-          <TextButton disabled={!undoState.past} onClick={undo} title="Rückgängig (⌘Z)" className={HIT}>
-            Rückgängig
-          </TextButton>
-          <TextButton disabled={!undoState.future} onClick={redo} title="Wiederholen (⇧⌘Z)" className={`${HIT} max-md:hidden`}>
-            Wiederholen
-          </TextButton>
-          <TextButton onClick={() => setHistory(true)} className={`${HIT} max-md:hidden`}>
-            Verlauf
-          </TextButton>
-          <TextButton disabled={!data} onClick={() => setPreview(true)} className={HIT}>
-            Ansehen
-          </TextButton>
-          <MoreMenu canRedo={!!undoState.future} onRedo={redo} onHistory={() => setHistory(true)} />
-        </span>
-        <FrameButton disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="shrink-0">
-          Hinlegen für …
-        </FrameButton>
+          <span aria-live="polite" className="text-on-table-2 text-[13px]">
+            {status}
+          </span>
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <ToolGroup label="Bearbeiten">
+            <IconButton label="Rückgängig (⌘Z)" disabled={!undoState.past} onClick={undo}>
+              <Undo2 aria-hidden />
+            </IconButton>
+            <IconButton label="Wiederholen (⇧⌘Z)" disabled={!undoState.future} onClick={redo} className="max-md:hidden">
+              <Redo2 aria-hidden />
+            </IconButton>
+            <IconButton label="Verlauf" onClick={() => setHistory(true)} className="max-md:hidden">
+              <History aria-hidden />
+            </IconButton>
+            <IconButton label="Ansehen" disabled={!data} onClick={() => setPreview(true)}>
+              <Eye aria-hidden />
+            </IconButton>
+            {/* Telefon: Wiederholen und Verlauf hinter „Mehr“ (#43) */}
+            <span className="contents md:hidden">
+              <Menu
+                align="start"
+                trigger={
+                  <IconButton label="Mehr">
+                    <MoreHorizontal aria-hidden />
+                  </IconButton>
+                }
+              >
+                <MenuItem icon={<Redo2 aria-hidden />} disabled={!undoState.future} onClick={redo}>
+                  Wiederholen
+                </MenuItem>
+                <MenuItem icon={<History aria-hidden />} onClick={() => setHistory(true)}>
+                  Verlauf
+                </MenuItem>
+              </Menu>
+            </span>
+          </ToolGroup>
+          <Button variant="cloth" size="sm" disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="pointer-coarse:min-h-11 md:min-h-11 md:px-5">
+            <Gift aria-hidden />
+            Hinlegen<span className="max-md:hidden"> für …</span>
+          </Button>
+        </div>
       </header>
 
       <div className={`grid gap-8 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
         <section aria-label="Doppelseiten" className="min-w-0">
           {/* Fotos */}
-          <div className="border-on-table-2/50 flex flex-col items-start gap-3 border border-dashed p-6">
+          <div className="bg-on-table/5 flex flex-col items-start gap-3 rounded-tool p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)] md:p-6">
+            <span aria-hidden className="bg-on-table/8 text-on-table grid size-11 place-items-center rounded-full">
+              <ImagePlus className="size-5" />
+            </span>
             <p className="text-on-table text-lg font-semibold">
               <span className="pointer-coarse:hidden">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</span>
               <span className="hidden pointer-coarse:inline">{book.photos.length ? "Weitere Fotos vom Handy" : "Fotos vom Handy"}</span>
@@ -732,9 +762,9 @@ export function Editor() {
             </p>
             {/* die Grenze steht direkt am Knopf, nicht versteckt im Absatz (#44) */}
             <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <TextButton onClick={() => fileInput.current?.click()} aria-describedby="photo-limit" className="min-h-6">
+              <Button size="sm" onClick={() => fileInput.current?.click()} aria-describedby="photo-limit">
                 Fotos auswählen
-              </TextButton>
+              </Button>
               <span id="photo-limit" className="text-on-table-2 text-sm tabular-nums">
                 bis zu {MAX} Fotos{book.photos.length ? ` · ${book.photos.length >= MAX ? "Buch ist voll" : `noch ${MAX - book.photos.length} frei`}` : ""}
               </span>
@@ -779,17 +809,22 @@ export function Editor() {
             <>
               <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
                 <h2 className="text-on-table text-lg font-semibold">{book.spreads.length} Doppelseiten</h2>
-                <span className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                  <TextButton onClick={() => insertText(book.spreads.length)}>Textseite hinzufügen</TextButton>
-                  <TextButton
+                <span className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={() => insertText(book.spreads.length)}>
+                    <Type aria-hidden />
+                    Textseite
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={() => {
                       snapshot("vor „Automatisch gestalten“");
                       update(relayout);
                     }}
                     title="Fixierte Doppelseiten und Textseiten bleiben, wie sie sind"
                   >
+                    <LayoutGrid aria-hidden />
                     Automatisch gestalten
-                  </TextButton>
+                  </Button>
                 </span>
               </div>
               <p className="text-on-table-2 mt-1 text-[13px]">
@@ -847,7 +882,7 @@ export function Editor() {
                           )}
                           <span className="flex items-center gap-x-1">
                             <TextButton className={HIT} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
-                              ←
+                              <ChevronLeft aria-hidden className="size-4" />
                             </TextButton>
                             <TextButton
                               className={HIT}
@@ -855,7 +890,7 @@ export function Editor() {
                               disabled={i === book.spreads.length - 1}
                               aria-label={`Doppelseite ${i + 1} nach hinten`}
                             >
-                              →
+                              <ChevronRight aria-hidden className="size-4" />
                             </TextButton>
                           </span>
                           {/* Entfernen mit Strich und Abstand zu den Pfeilen, damit ein Fehltreffer nicht löscht */}
@@ -866,7 +901,7 @@ export function Editor() {
                             aria-label={`Doppelseite ${i + 1} entfernen, die Fotos werden beiseitegelegt`}
                             title="Doppelseite entfernen, die Fotos werden beiseitegelegt"
                           >
-                            ×
+                            <X aria-hidden className="size-4" />
                           </TextButton>
                         </span>
                       </div>
@@ -983,38 +1018,40 @@ export function Editor() {
         {/* Buch, gewähltes Foto, gewählte Textseite */}
         {/* Telefon: Buch-Angaben über den Doppelseiten, Werkzeuge des Gewählten als Blatt am unteren Rand (UX-Kritik K4) */}
         <aside className="space-y-6 max-md:order-first md:sticky md:top-20 md:self-start">
-          <div className="slip text-ink space-y-3 p-5">
-            <p className="text-sm font-semibold">Buch</p>
-            <label className="block text-[13px]">
-              <span className="text-ink-2">Titel</span>
-              <input className={inputClass} value={book.title} placeholder="z. B. Lissabon" onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
-            </label>
-            <label className="block text-[13px]">
-              <span className="text-ink-2">Zeile darunter</span>
-              <input
-                className={inputClass}
-                value={book.subtitle}
-                placeholder="automatisch: Anzahl der Fotos"
-                onChange={(e) => update((b) => ({ ...b, subtitle: e.target.value.slice(0, 60) }), "subtitle")}
-              />
-            </label>
-            <fieldset>
-              <legend className="text-ink-2 mb-2 text-[13px]">Farbe des Einbands</legend>
-              <div className="flex flex-wrap gap-2">
-                {(Object.keys(CLOTHS) as ClothId[]).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => update((b) => ({ ...b, cloth: id }))}
-                    aria-pressed={book.cloth === id}
-                    aria-label={CLOTHS[id].label}
-                    title={CLOTHS[id].label}
-                    className={`linen relative h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 ${book.cloth === id ? "outline-ink outline-2 outline-offset-2" : ""}`}
-                    style={{ backgroundColor: CLOTHS[id].base }}
-                  />
-                ))}
+          <div className="slip text-ink relative space-y-5 rounded-cut p-5">
+            {/* Einband als Vorschau: Titel und Leinen ändern sich, während man tippt und wählt */}
+            <div className="flex items-end gap-4">
+              <div
+                aria-hidden
+                className="linen relative aspect-[2/3] w-20 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-colors duration-500 ease-out"
+                style={{ backgroundColor: CLOTHS[book.cloth]?.base ?? CLOTHS.ringelblume.base, color: CLOTHS[book.cloth]?.ink ?? CLOTHS.ringelblume.ink }}
+              >
+                <span className="absolute inset-y-0 left-0 w-[5%] bg-[rgb(12_10_8/0.22)]" />
+                <span
+                  className="absolute right-1.5 bottom-2 left-2.5 line-clamp-3 text-[11px] leading-[0.95] font-bold tracking-[-0.03em] break-words"
+                  style={{ fontVariationSettings: '"wdth" 76' }}
+                >
+                  {book.title || "Ohne Titel"}
+                </span>
               </div>
-            </fieldset>
+              <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
+                Buch
+              </p>
+            </div>
+            <Field label="Titel" value={book.title} maxLength={40} onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
+            <Field
+              label="Zeile darunter"
+              hint="Leer lassen: Anzahl der Fotos"
+              value={book.subtitle}
+              maxLength={60}
+              onChange={(e) => update((b) => ({ ...b, subtitle: e.target.value.slice(0, 60) }), "subtitle")}
+            />
+            <Swatches
+              label="Farbe des Einbands"
+              items={(Object.keys(CLOTHS) as ClothId[]).map((id) => ({ id, label: CLOTHS[id].label, color: CLOTHS[id].base, ink: CLOTHS[id].ink }))}
+              value={book.cloth}
+              onChange={(id) => update((b) => ({ ...b, cloth: id as ClothId }))}
+            />
           </div>
 
           {selPhoto && (
@@ -1030,31 +1067,28 @@ export function Editor() {
                 type="button"
                 aria-pressed={!!selPhoto.star}
                 onClick={() => toggleStar(selPhoto.key)}
-                className={`flex items-center gap-2 border px-3 py-1.5 text-sm ${selPhoto.star ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
+                className={buttonClass(selPhoto.star ? "ink" : "paper", "sm")}
               >
                 <Star on={!!selPhoto.star} /> {selPhoto.star ? "Wichtig: kommt groß ins Buch" : "Als wichtig markieren"}
               </button>
-              <label className="block text-[13px]">
-                <span className="text-ink-2">Titel</span>
-                <input className={inputClass} value={selPhoto.title} onChange={(e) => setPhoto(selPhoto.key, { title: e.target.value.slice(0, 50) }, `t-${selPhoto.key}`)} />
-              </label>
-              <label className="block text-[13px]">
-                <span className="text-ink-2">Zusatz (Ort, Notiz)</span>
-                <input
-                  className={inputClass}
-                  value={selPhoto.note ?? ""}
-                  onChange={(e) => setPhoto(selPhoto.key, { note: e.target.value.slice(0, 50) || undefined }, `n-${selPhoto.key}`)}
-                />
-              </label>
-              <label className="block text-[13px]">
-                <span className="text-ink-2">Beschreibung für Screenreader</span>
-                <input className={inputClass} value={selPhoto.alt} onChange={(e) => setPhoto(selPhoto.key, { alt: e.target.value.slice(0, 200) }, `a-${selPhoto.key}`)} />
-              </label>
-              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <Field label="Titel" value={selPhoto.title} maxLength={50} onChange={(e) => setPhoto(selPhoto.key, { title: e.target.value.slice(0, 50) }, `t-${selPhoto.key}`)} />
+              <Field
+                label="Zusatz (Ort, Notiz)"
+                value={selPhoto.note ?? ""}
+                maxLength={50}
+                onChange={(e) => setPhoto(selPhoto.key, { note: e.target.value.slice(0, 50) || undefined }, `n-${selPhoto.key}`)}
+              />
+              <Field
+                label="Beschreibung für Screenreader"
+                value={selPhoto.alt}
+                maxLength={200}
+                onChange={(e) => setPhoto(selPhoto.key, { alt: e.target.value.slice(0, 200) }, `a-${selPhoto.key}`)}
+              />
+              <div className="flex flex-wrap gap-2">
                 {!selPhoto.shelved && (
                   <button
                     type="button"
-                    className="underline decoration-mark decoration-2 underline-offset-4"
+                    className={buttonClass("paper", "sm")}
                     onClick={() => {
                       const i = spreadOf(selPhoto.key);
                       if (i >= 0 && book.spreads[i].pages) openStage(i);
@@ -1064,25 +1098,25 @@ export function Editor() {
                     Ausschnitt …
                   </button>
                 )}
-                <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => setDevelop(selPhoto.key)}>
+                <button type="button" className={buttonClass("paper", "sm")} onClick={() => setDevelop(selPhoto.key)}>
                   Bearbeiten …
                 </button>
                 <button
                   type="button"
-                  className="underline decoration-mark decoration-2 underline-offset-4"
+                  className={buttonClass("paper", "sm")}
                   onClick={() => update((b) => ({ ...b, coverKey: selPhoto.key }))}
                   disabled={book.coverKey === selPhoto.key || !!selPhoto.shelved}
                 >
                   {book.coverKey === selPhoto.key ? "Auf dem Einband" : "Auf den Einband"}
                 </button>
                 {selPhoto.shelved ? (
-                  <button type="button" className="underline decoration-mark decoration-2 underline-offset-4" onClick={() => unshelvePhoto(selPhoto.key)}>
+                  <button type="button" className={buttonClass("paper", "sm")} onClick={() => unshelvePhoto(selPhoto.key)}>
                     Ins Buch
                   </button>
                 ) : (
                   <button
                     type="button"
-                    className="text-ink-2 underline underline-offset-4"
+                    className={buttonClass("paper", "sm", "text-ink-2")}
                     onClick={() => {
                       shelvePhoto(selPhoto.key);
                       setSel(null);
@@ -1093,10 +1127,10 @@ export function Editor() {
                 )}
               </div>
               {!selPhoto.shelved && spreadOf(selPhoto.key) >= 0 && (
-                <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-50"
+                    className={buttonClass("paper", "sm")}
                     disabled={spreadOf(selPhoto.key) <= 0}
                     onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) - 1)}
                   >
@@ -1104,7 +1138,7 @@ export function Editor() {
                   </button>
                   <button
                     type="button"
-                    className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-50"
+                    className={buttonClass("paper", "sm")}
                     disabled={spreadOf(selPhoto.key) >= book.spreads.length - 1}
                     onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) + 1)}
                   >
@@ -1122,15 +1156,13 @@ export function Editor() {
             <div className={`slip text-ink space-y-3 p-5 ${SHEET}`}>
               <SheetClose onClose={() => setSel(null)} />
               <p className="text-sm font-semibold">Textseite</p>
-              <label className="block text-[13px]">
-                <span className="text-ink-2">Überschrift (optional)</span>
-                <input
-                  className={inputClass}
-                  value={selSpread.text.heading ?? ""}
-                  placeholder="z. B. Drei Tage am Meer"
-                  onChange={(e) => setText(selSpreadIndex, { heading: e.target.value.slice(0, 60) })}
-                />
-              </label>
+              <Field
+                label="Überschrift (optional)"
+                hint="z. B. Drei Tage am Meer"
+                value={selSpread.text.heading ?? ""}
+                maxLength={60}
+                onChange={(e) => setText(selSpreadIndex, { heading: e.target.value.slice(0, 60) })}
+              />
               <label className="block text-[13px]">
                 <span className="text-ink-2">Text</span>
                 <textarea
@@ -1149,7 +1181,7 @@ export function Editor() {
                     type="button"
                     aria-pressed={(selSpread.text?.style ?? "text") === st}
                     onClick={() => setText(selSpreadIndex, { style: st })}
-                    className={`border px-3 py-1.5 ${(selSpread.text?.style ?? "text") === st ? "border-ink bg-ink text-paper" : "border-ink-2"}`}
+                    className={buttonClass((selSpread.text?.style ?? "text") === st ? "ink" : "paper", "sm")}
                   >
                     {st === "text" ? "Absatz" : "Groß"}
                   </button>
@@ -1173,39 +1205,17 @@ export function Editor() {
         </aside>
       </div>
 
-      {/* Telefon: Rückgängig in Daumennähe; der Kopf scrollt dort weg (iPhone-Workshop, Befund 8). Zettel und Blätter haben Vorrang */}
-      {undoState.past > 0 && !undoNotice && !notice && !selPhoto && !selSpread?.text && (
-        <button
-          type="button"
+      {/* Telefon: Rückgängig in Daumennähe; der Kopf scrollt dort weg (iPhone-Workshop, Befund 8). Hinweise und Blätter haben Vorrang */}
+      {undoState.past > 0 && !toastOpen && !selPhoto && !selSpread?.text && (
+        <Button
           onClick={undo}
-          className="slip text-ink fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-[500] flex min-h-12 items-center gap-2 px-4 text-sm font-semibold shadow-[0_18px_36px_-14px_rgb(12_10_8/0.8)] md:hidden"
+          className="bg-table-raised fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-[500] shadow-[0_18px_36px_-14px_rgb(0_0_0/0.8),inset_0_0_0_1px_rgb(236_230_220/0.1)] hover:bg-table-raised md:hidden"
         >
-          <span aria-hidden>↶</span> Rückgängig
-        </button>
+          <Undo2 aria-hidden />
+          Rückgängig
+        </Button>
       )}
-      {undoNotice && !notice && (
-        <div role="status" className="slip text-ink fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
-          <span>{undoNotice}</span>
-          <button
-            type="button"
-            onClick={() => {
-              undo();
-              setUndoNotice(null);
-            }}
-            className="shrink-0 underline decoration-mark decoration-2 underline-offset-4"
-          >
-            Rückgängig
-          </button>
-        </div>
-      )}
-      {notice && (
-        <div role="status" className="slip text-ink fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[640] flex max-w-sm items-baseline gap-4 p-4 text-sm">
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(null)} className="text-ink-2 shrink-0 underline underline-offset-4">
-            Ok
-          </button>
-        </div>
-      )}
+      <Toaster />
       {stageSpread && data && (
         <Stage
           data={data}
@@ -1286,48 +1296,6 @@ export function Editor() {
   );
 }
 
-/** Telefon: Wiederholen und Verlauf hinter „Mehr“, damit der Kopf zwei Zeilen hat (#43) */
-function MoreMenu({ canRedo, onRedo, onHistory }: { canRedo: boolean; onRedo: () => void; onHistory: () => void }) {
-  const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setOpen(false);
-      root.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    };
-    window.addEventListener("pointerdown", away);
-    window.addEventListener("keydown", esc);
-    return () => {
-      window.removeEventListener("pointerdown", away);
-      window.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-  const pick = (f: () => void) => () => {
-    setOpen(false);
-    f();
-  };
-  return (
-    <div ref={root} className="relative md:hidden">
-      <TextButton aria-expanded={open} aria-controls="editor-more" onClick={() => setOpen((o) => !o)} className={HIT}>
-        Mehr
-      </TextButton>
-      {open && (
-        <div id="editor-more" className="slip text-ink absolute top-full right-0 z-40 mt-2 flex w-44 flex-col border border-ink/15 p-2 text-sm shadow-[0_12px_24px_-8px_rgb(12_10_8/0.75)]">
-          <button type="button" disabled={!canRedo} onClick={pick(onRedo)} className="min-h-11 px-3 text-left disabled:opacity-50">
-            Wiederholen
-          </button>
-          <button type="button" onClick={pick(onHistory)} className="min-h-11 px-3 text-left">
-            Verlauf
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Tastenkürzel des Editors; hängt am Fenster, solange der Editor offen ist */
 function Keys({ onKey }: { onKey: (e: KeyboardEvent) => void }) {
   useEffect(() => {
@@ -1392,7 +1360,7 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
         ))}
       </ul>
       <div className="mt-5 flex flex-wrap items-baseline justify-between gap-3 border-t border-ink/15 pt-4 text-sm">
-        <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className="underline decoration-mark decoration-2 underline-offset-4">
+        <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className={buttonClass("paper", "sm")}>
           Projekt als Datei sichern
         </a>
         <span className="text-ink-2 text-[12px]">Öffnen über das Bücherzimmer</span>

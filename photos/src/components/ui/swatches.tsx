@@ -25,7 +25,7 @@ export function Swatches({ label, items, value, onChange }: { label: string; ite
           haptic("select");
           onChange(v as string);
         }}
-        className="flex flex-wrap gap-3"
+        className="flex flex-wrap gap-2.5"
       >
         {items.map((s) => (
           <Radio.Root
@@ -33,7 +33,7 @@ export function Swatches({ label, items, value, onChange }: { label: string; ite
             value={s.id}
             aria-label={s.label}
             title={s.label}
-            className="linen grid size-10 overflow-hidden place-items-center rounded-cut shadow-[inset_0_-2px_0_rgb(12_10_8/0.18)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] focus-visible:outline-ink active:scale-90 data-checked:scale-105 data-checked:shadow-[inset_0_-2px_0_rgb(12_10_8/0.18),0_0_0_2px_var(--paper),0_0_0_4px_var(--ink)] pointer-coarse:size-11"
+            className="linen grid size-9 overflow-hidden place-items-center rounded-cut shadow-[inset_0_-2px_0_rgb(12_10_8/0.18)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] focus-visible:outline-ink active:scale-90 data-checked:scale-105 data-checked:shadow-[inset_0_-2px_0_rgb(12_10_8/0.18),0_0_0_2px_var(--paper),0_0_0_4px_var(--ink)] pointer-coarse:size-11"
             style={{ backgroundColor: s.color, color: s.ink }}
           >
             <Radio.Indicator
