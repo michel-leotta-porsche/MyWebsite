@@ -23,20 +23,53 @@ const remember = (id: string, key: string) => {
   } catch {}
 };
 
-/** Größe und Licht jedes Buchs aus seinem Abstand zur Mitte; nur Stil am Buch selbst, kein React pro Frame. Gibt das mittlere zurück */
-function paintRow(ul: HTMLElement) {
+// Was je Buch beim Wischen bewegt wird; einmal gesucht und gemerkt
+type Parts = { rot: number; shade: HTMLElement | null; sheen: HTMLElement | null };
+const partsCache = new WeakMap<HTMLElement, Parts>();
+function partsOf(li: HTMLElement): Parts {
+  let p = partsCache.get(li);
+  if (!p) {
+    p = {
+      rot: parseFloat(li.style.getPropertyValue("--rot")) || 0,
+      shade: li.querySelector<HTMLElement>(".cover-shade"),
+      sheen: li.querySelector<HTMLElement>(".cover-sheen > span"),
+    };
+    partsCache.set(li, p);
+  }
+  return p;
+}
+
+/**
+ * Lage, Licht und Stapelreihenfolge jedes Buchs aus seinem Abstand zur Mitte. Gibt das mittlere zurück.
+ * Absichtlich ohne CSS-Variablen: eine Variable am Buch ließe den Browser bei jedem Bild alle Stile darunter neu
+ * berechnen (gemessen: der Großteil der Rechenzeit beim Wischen). transform und opacity direkt am Element
+ * erledigt die Grafikkarte. Erst alles messen, dann schreiben, sonst rechnet der Browser zwischendurch das Layout.
+ */
+function paintRow(ul: HTMLElement, flat: boolean) {
   const mid = ul.scrollLeft + ul.clientWidth / 2;
+  const items = Array.from(ul.children) as HTMLElement[];
+  const geo = items.map((li) => [li.offsetLeft + li.offsetWidth / 2 - mid, li.offsetWidth + 20]);
   let best = 0;
   let dist = Infinity;
-  Array.from(ul.children).forEach((el, i) => {
-    const li = el as HTMLElement;
-    const d = li.offsetLeft + li.offsetWidth / 2 - mid;
-    // bis zwei Plätze daneben: der zweite Nachbar liegt noch tiefer im Stapel
-    const p = Math.min(Math.abs(d) / (li.offsetWidth + 20), 2);
-    li.style.setProperty("--p", p.toFixed(3));
-    li.style.setProperty("--side", d < 0 ? "-1" : "1");
-    // je näher an der Mitte, desto weiter oben im Stapel
+  items.forEach((li, i) => {
+    const [d, w] = geo[i];
+    // 0 = Mitte, 1 = Nachbar, 2 = zweiter Nachbar (liegt noch tiefer im Stapel)
+    const p = Math.min(Math.abs(d) / w, 2);
+    const q = Math.min(p, 1);
+    const side = d < 0 ? -1 : 1;
+    const { rot, shade, sheen } = partsOf(li);
+    // Stapel: die Nachbarn rutschen unter das mittlere Buch; beim Wischen kippen sie leicht, das mittlere liegt fast gerade
+    li.style.transform =
+      `translate(${(side * -42 * p).toFixed(2)}%, ${(-6 * (1 - q)).toFixed(2)}px) scale(${(1 - 0.14 * p).toFixed(4)}) ` +
+      (flat ? "" : `perspective(1000px) rotateY(${(side * -14 * q).toFixed(2)}deg) `) +
+      `rotate(${(rot * (0.35 + 0.65 * q)).toFixed(2)}deg)`;
     li.style.zIndex = String(100 - Math.round(p * 40));
+    if (shade) shade.style.opacity = (0.4 * p).toFixed(3);
+    if (sheen) {
+      // Glanz nur während des Drehens, in der Mitte und ganz außen ist er weg
+      sheen.style.opacity = flat ? "0" : Math.max(0, p * (1 - p) * 4).toFixed(3);
+      sheen.style.transform = `translateX(${(side * (p - 0.5) * 26).toFixed(2)}%)`;
+    }
     if (Math.abs(d) < dist) {
       dist = Math.abs(d);
       best = i;
@@ -81,7 +114,7 @@ export function Carousel({
   // das Panel folgt dem Buch, das gerade am nächsten an der Mitte liegt, schon während des Wischens
   const current = clamp(near);
 
-  const paint = () => (list.current ? paintRow(list.current) : 0);
+  const paint = () => (list.current ? paintRow(list.current, reduce) : 0);
 
   // Beim ersten Zeigen (und nach dem Zuklappen eines Buchs) ohne Bewegung an den richtigen Platz
   useLayoutEffect(() => {
@@ -111,6 +144,7 @@ export function Carousel({
     let lastX = ul.scrollLeft;
     let lastT = performance.now();
     let spring = 0;
+    const lamp = row.querySelector<HTMLElement>(".room-lamp");
     const step = (t: number) => {
       const dt = Math.min((t - lastT) / 1000, 1 / 30);
       lastT = t;
@@ -118,12 +152,14 @@ export function Carousel({
       speed += (-300 * (lean - target) - 14 * speed) * dt;
       lean += speed * dt;
       target *= 0.85;
-      row.style.setProperty("--lean", lean.toFixed(2));
-      if (Math.abs(lean) > 0.02 || Math.abs(speed) > 0.05 || Math.abs(target) > 0.02) spring = requestAnimationFrame(step);
-      else {
-        spring = 0;
-        row.style.setProperty("--lean", "0");
-      }
+      const done = !(Math.abs(lean) > 0.02 || Math.abs(speed) > 0.05 || Math.abs(target) > 0.02);
+      if (done) lean = 0;
+      // direkt an Zetteln und Lampe, nicht als Variable an der Reihe (siehe paintRow)
+      row.querySelectorAll<HTMLElement>(".slip-tab").forEach((tab) => {
+        tab.style.rotate = `${(Number(tab.dataset.r) + lean * Number(tab.dataset.k)).toFixed(2)}deg`;
+      });
+      if (lamp) lamp.style.translate = `${(lean * 1.4).toFixed(2)}px 0`;
+      spring = done ? 0 : requestAnimationFrame(step);
     };
     const push = () => {
       const now = performance.now();
@@ -312,7 +348,10 @@ export function SlipTabs({ names, fresh = [] }: { names: string[]; fresh?: strin
           key={n}
           aria-hidden
           className="slip-tab"
-          style={{ left: `${9 + i * 29}%`, ["--r" as string]: `${[-2, 1.5, -1][i]}deg`, ["--k" as string]: [1, 0.8, 1.15][i], translate: `0 ${[0, 4, 1][i]}px` }}
+          // Grunddrehung und wie stark der Zettel beim Wischen nachweht (Feder im Karussell)
+          data-r={[-2, 1.5, -1][i]}
+          data-k={[1, 0.8, 1.15][i]}
+          style={{ left: `${9 + i * 29}%`, rotate: `${[-2, 1.5, -1][i]}deg`, translate: `0 ${[0, 4, 1][i]}px` }}
         >
           {fresh.includes(n) && <span className="bg-mark absolute inset-x-0 top-0 h-[3px]" />}
           {i === 2 && rest > 0 ? `+${rest + 1}` : n}

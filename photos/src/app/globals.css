@@ -338,21 +338,13 @@ html.ohne-struktur .printed::after {
   content: "";
   flex: 0 0 calc(50% - var(--tw) / 2 - 4px - var(--gap));
 }
+/* Lage, Licht und Stapel setzt paintRow (room-carousel.tsx) direkt als transform und opacity: der Finger ist die Animation,
+   keine Transition, die hinterherhinkt, und keine CSS-Variable, die bei jedem Bild alle Stile neu berechnen lässt */
 .carousel > li {
-  --p: 1;
-  --side: 1;
   flex: 0 0 auto;
   scroll-snap-align: center;
   transform-origin: 50% 100%;
-  /* der Finger ist die Animation: keine Transition, die hinterherhinkt */
-  /* Stapel: die Nachbarn rutschen unter das mittlere Buch, der zweite Nachbar noch ein Stück tiefer */
-  scale: calc(1 - 0.14 * var(--p));
-  translate: calc(var(--side) * -42% * var(--p)) calc(-6px * (1 - min(var(--p), 1)));
-  /* beim Wischen kippen sie leicht, das mittlere liegt fast gerade */
-  transform: perspective(1000px) rotateY(calc(var(--side) * -14deg * min(var(--p), 1))) rotate(calc(var(--rot) * (0.35 + 0.65 * min(var(--p), 1))));
-}
-.carousel > li:nth-child(-n + 3) {
-  will-change: scale, translate, transform;
+  will-change: transform;
 }
 /* Ankommen: die Bücher gleiten nacheinander von rechts herein, sichtbar von Anfang an */
 .carousel > li.arrive .lift {
@@ -376,8 +368,8 @@ html.ohne-struktur .printed::after {
   position: absolute;
   inset: 0 -100%;
   background: linear-gradient(100deg, transparent 42%, rgb(255 248 235 / 0.2) 50%, transparent 58%);
-  translate: calc(var(--side) * (var(--p) - 0.5) * 26%) 0;
-  opacity: max(0, calc(var(--p) * (1 - var(--p)) * 4));
+  opacity: 0;
+  will-change: transform, opacity;
 }
 /* Halbschatten statt Ausgrauen: dunkelt nur den Einband ab */
 .cover-shade {
@@ -386,7 +378,9 @@ html.ohne-struktur .printed::after {
   z-index: 30;
   pointer-events: none;
   background: var(--table-deep);
-  opacity: calc(0.4 * var(--p));
+  opacity: 0;
+  /* eigene Ebene: sonst malt der Browser bei jeder Änderung den ganzen Einband neu */
+  will-change: opacity;
 }
 .room-lamp {
   position: absolute;
@@ -394,8 +388,8 @@ html.ohne-struktur .printed::after {
   pointer-events: none;
   /* läuft innerhalb der Fläche ganz aus, damit keine Kante entsteht */
   background: radial-gradient(closest-side, rgb(255 228 190 / 0.16), rgb(255 228 190 / 0.05) 55%, transparent);
-  /* pendelt ein wenig mit dem Schwung, als hinge sie an einem Kabel */
-  translate: calc(var(--lean, 0) * 1.4px) 0;
+  /* pendelt mit dem Schwung, als hinge sie an einem Kabel (Feder im Karussell) */
+  will-change: translate;
 }
 .room-dot {
   display: block;
@@ -487,7 +481,7 @@ html.ohne-struktur .printed::after {
 .slip-tab {
   position: absolute;
   transform-origin: 50% 100%;
-  rotate: calc(var(--r) + var(--lean, 0) * var(--k, 1) * 1deg);
+  will-change: rotate;
   top: -28px;
   height: 46px;
   width: 27%;
@@ -638,9 +632,6 @@ html.ohne-struktur .printed::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .carousel > li {
-    transform: rotate(var(--rot));
-  }
   .cover-sheen {
     display: none;
   }
