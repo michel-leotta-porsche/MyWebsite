@@ -326,6 +326,16 @@ html.ohne-struktur .printed::after {
   padding: 40px 0 56px;
   margin: 0 -16px -34px;
 }
+@media (hover: hover) and (pointer: fine) {
+  .carousel {
+    cursor: grab;
+  }
+}
+.carousel.is-dragging {
+  scroll-snap-type: none;
+  cursor: grabbing;
+  user-select: none;
+}
 .carousel::-webkit-scrollbar {
   display: none;
 }
