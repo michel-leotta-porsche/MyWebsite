@@ -1315,7 +1315,7 @@ export function Stage({
           {width > 0 && (
             <div
               ref={viewEl}
-              className="book-shadow-open relative"
+              className={`book-shadow-open relative ${narrow ? "mx-auto" : ""}`}
               // Bildausschnitt der Kamera; Griffe dürfen über den Rand ragen, vergrößert schneidet applyCam ab.
               // Auf dem Handy gehören alle Finger auf der Doppelseite der Bühne (Scrollen geht daneben).
               style={{ width: W, touchAction: narrow ? "none" : undefined }}
