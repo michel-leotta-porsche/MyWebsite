@@ -17,8 +17,17 @@ export const FOLD_STOPS: readonly (readonly [number, number])[] = [
 // wash hebt das Schwarz an wie mattes Papier, grain legt die Papierfasern darüber (multiply).
 export const PRINT = { wash: 0.08, grain: 0.25 };
 
-/** CSS-Variablen für `.printed` (globals.css) */
-export const printedStyle = { ["--wash" as string]: PRINT.wash, ["--grain" as string]: PRINT.grain };
+// Kante eines gedruckten Fotos: die Farbe läuft am Rand ein wenig ins Papier aus, statt hart abzubrechen.
+// line: 1px Papierton direkt an der Kante, glow: ein paar Pixel weicher Übergang nach innen.
+export const EDGE = { line: 0.22, glow: 0.16 };
+
+/** CSS-Variablen für `.printed` und `.print-edge` (globals.css) */
+export const printedStyle = {
+  ["--wash" as string]: PRINT.wash,
+  ["--grain" as string]: PRINT.grain,
+  ["--edge-line" as string]: EDGE.line,
+  ["--edge-glow" as string]: EDGE.glow,
+};
 
 export const foldColor = (a: number) => `rgb(12 10 8 / ${a})`;
 

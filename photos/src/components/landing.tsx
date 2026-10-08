@@ -92,8 +92,8 @@ function EnterButton({ label = "Mit Google anmelden" }: { label?: string }) {
 /* ------------------------------------------------------------------ Papier und Leinen */
 
 /** Bildunterschrift wie im Buch: Nummer halbfett in Tinte, Titel in grauer Tinte */
-// Auf dem Telefon ist die Seite so klein, dass nur Nummer und Titel passen; Zusatzzeile und Eintrag `wide` erst ab Tablet
-function Cap({ items, note, x, y, right = false }: { items: [number, string, "wide"?][]; note?: string; x: number; y: number; right?: boolean }) {
+// Auf dem Telefon ist die Seite klein; Einträge mit `wide` erst ab Tablet
+function Cap({ items, x, y, right = false }: { items: [number, string, "wide"?][]; x: number; y: number; right?: boolean }) {
   return (
     <p
       className={`text-ink-2 absolute w-max max-w-[62cqw] ${right ? "text-right" : ""}`}
@@ -105,7 +105,6 @@ function Cap({ items, note, x, y, right = false }: { items: [number, string, "wi
           <span className="ml-[0.6em]">{title}</span>
         </span>
       ))}
-      {note && <span className="hidden md:block">{note}</span>}
     </p>
   );
 }
@@ -366,7 +365,7 @@ function Workbench() {
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
           <div
             className="relative aspect-[4/3] w-full [container-type:inline-size]"
-            style={{ ["--loose" as string]: pageCurve(true), ["--curve" as string]: pageCurve(false) }}
+            style={{ ["--loose" as string]: pageCurve(true), ["--curve" as string]: pageCurve(false), ...printedStyle }}
           >
             {/* Buchblock links und rechts, darunter der Schatten des aufgeschlagenen Buchs */}
             <div aria-hidden className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] w-[1.2cqw]" />
@@ -382,8 +381,8 @@ function Workbench() {
               <div className="relative">
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
-                    <Cap items={[[1, "Drachenbaum", "wide"], [2, "Mittagsblume"]]} note="Öffnet erst in der Mittagssonne." x={88} y={62} right />
-                    <Cap items={[[3, "Markisen"], [4, "Reifen"]]} note="Eingerollt gegen den Wind. Der Reifen gab früher auf." x={88} y={130} right />
+                    <Cap items={[[1, "Drachenbaum", "wide"], [2, "Erst mittags offen"]]} x={88} y={62} right />
+                    <Cap items={[[3, "Eingerollt"], [4, "Platt"]]} x={88} y={130} right />
                   </div>
                 </PageFace>
               </div>
@@ -416,7 +415,15 @@ function Workbench() {
             ))}
             {/* Falz und Papier über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
             <div aria-hidden className="bench-caps pointer-events-none absolute inset-0">
-              <div className="printed" style={printedStyle} />
+              {/* Kanten der eingeklebten Abzüge laufen ins Papier aus; der erste liegt im Anschnitt und hat keine */}
+              {SLOTS.slice(1).map((s, i) => (
+                <div
+                  key={i}
+                  className="print-edge"
+                  style={{ left: `${s.box[0]}%`, top: `${s.box[1]}%`, width: `${s.box[2]}%`, height: `${s.box[3]}%`, right: "auto", bottom: "auto" }}
+                />
+              ))}
+              <div className="printed" />
               {(["left", "right"] as const).map((side) => (
                 <div
                   key={side}

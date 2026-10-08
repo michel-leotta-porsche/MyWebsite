@@ -86,7 +86,7 @@ type SizesFor = (w: number) => string;
 // Standard: Seite im offenen Buch, Doppelseite ab Tablet, Einzelseite auf dem Telefon
 const bookSizes: SizesFor = (w) => `(min-width: 768px) ${Math.ceil(w * 0.4)}vw, ${Math.ceil(w * 0.96)}vw`;
 
-function Element({ book, el, eager, z, sizes }: { book: BookData; el: El; eager: boolean; z: number; sizes: SizesFor }) {
+function Element({ book, el, eager, z, sizes, paper, pageH }: { book: BookData; el: El; eager: boolean; z: number; sizes: SizesFor; paper: boolean; pageH: number }) {
   switch (el.t) {
     case "img": {
       const p = plateOf(book, el.no);
@@ -114,6 +114,20 @@ function Element({ book, el, eager, z, sizes }: { book: BookData; el: El; eager:
               fetchPriority={eager ? "high" : undefined}
             />
           </div>
+          {/* nur auf Papier (auf Leinen ist das Foto ein eingeklebter Abzug); im Anschnitt liegt die Kante außerhalb der Seite */}
+          {paper && el.fit !== "contain" && (
+            <div
+              aria-hidden
+              className="print-edge"
+              style={{
+                zIndex: z,
+                left: el.x <= 0 ? "-8px" : `${el.x}cqw`,
+                top: el.y <= 0 ? "-8px" : `${el.y}cqw`,
+                right: el.x + el.w >= 100 ? "-8px" : `calc(100cqw - ${el.x + el.w}cqw)`,
+                bottom: el.y + el.h >= pageH ? "-8px" : `calc(100cqh - ${el.y + el.h}cqw)`,
+              }}
+            />
+          )}
           {el.plate && (
             <div data-plate-box={el.no} className="absolute" style={{ ...box(vx, el.y, vw, el.h), zIndex: z }}>
               <PlateButton book={book} no={el.no} />
@@ -206,13 +220,13 @@ export function PageView({
     <div
       // isolate: die Stapel-Nummern der Elemente gelten nur innerhalb dieser Seite, nie über andere Blätter hinweg
       className={`absolute inset-0 isolate overflow-hidden [container-type:size] ${layout.bg === "paper" ? "paper" : ""} ${layout.linen ? "linen" : ""}`}
-      style={{ backgroundColor: bg }}
+      style={{ backgroundColor: bg, ...printedStyle }}
     >
       {layout.els.map((el, i) => (
-        <Element key={i} book={book} el={el} eager={eager} z={i + 1} sizes={sizes} />
+        <Element key={i} book={book} el={el} eager={eager} z={i + 1} sizes={sizes} paper={layout.bg === "paper"} pageH={100 * book.aspect} />
       ))}
       {/* Papier über allem: die Fotos sind gedruckt, nicht aufgeklebt */}
-      {layout.bg === "paper" && <div aria-hidden className="printed z-[299]" style={printedStyle} />}
+      {layout.bg === "paper" && <div aria-hidden className="printed z-[299]" />}
       {layout.gutter && <Gutter side={side} />}
     </div>
   );
