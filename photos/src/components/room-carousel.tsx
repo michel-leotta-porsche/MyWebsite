@@ -31,9 +31,12 @@ function paintRow(ul: HTMLElement) {
   Array.from(ul.children).forEach((el, i) => {
     const li = el as HTMLElement;
     const d = li.offsetLeft + li.offsetWidth / 2 - mid;
-    const p = Math.min(Math.abs(d) / (li.offsetWidth + 20), 1);
+    // bis zwei Plätze daneben: der zweite Nachbar liegt noch tiefer im Stapel
+    const p = Math.min(Math.abs(d) / (li.offsetWidth + 20), 2);
     li.style.setProperty("--p", p.toFixed(3));
     li.style.setProperty("--side", d < 0 ? "-1" : "1");
+    // je näher an der Mitte, desto weiter oben im Stapel
+    li.style.zIndex = String(100 - Math.round(p * 40));
     if (Math.abs(d) < dist) {
       dist = Math.abs(d);
       best = i;
