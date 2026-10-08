@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { inputClass, linkClass, SlipDialog, TextButton } from "@/components/app-ui";
+import { BookmarkPlus, Check, Flag, MoreHorizontal, PenLine } from "lucide-react";
+
+import { Button, buttonClass, IconButton } from "@/components/ui/button";
+import { noteClass } from "@/components/ui/field";
+import { Menu, MenuItem } from "@/components/ui/menu";
+import { Sheet } from "@/components/ui/sheet";
+import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
 import { Shelf, Table } from "@/components/table";
 import { signInError } from "@/lib/errors";
@@ -25,7 +31,6 @@ export function GuestBook() {
   const [share, setShare] = useState<Share | null | undefined>(undefined);
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState("");
-  const [sent, setSent] = useState<string | null>(null);
   const [ears, setEars] = useState<number[]>([]);
   // Eselsohren gehen erst nach ein paar Sekunden raus; bis dahin lassen sie sich zurücknehmen (UX-Kritik K12)
   const earTimers = useRef(new Map<number, number>());
@@ -91,8 +96,8 @@ export function GuestBook() {
       setEars((e) => e.filter((x) => x !== no));
       return;
     }
-    setFailed(null);
     setEars((e) => [...e, no]);
+    notify(`Eselsohr bei Tafel ${no}`, { duration: EAR_DELAY_MS, action: { label: "Rückgängig", onClick: () => toggleEar(no) } });
     earTimers.current.set(
       no,
       window.setTimeout(() => {
@@ -101,7 +106,7 @@ export function GuestBook() {
           .then(() => setEarsSent((s) => [...s, no]))
           .catch(() => {
             setEars((e) => e.filter((x) => x !== no));
-            setFailed("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal.");
+            notify("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal.");
           });
       }, EAR_DELAY_MS),
     );
@@ -120,23 +125,21 @@ export function GuestBook() {
             <>
               {no !== undefined &&
                 (earsSent.includes(no) ? (
-                  <span className="text-on-table-2">Eselsohr bei {share.fromName}</span>
+                  <span className="text-on-table-2 inline-flex min-h-9 items-center gap-1.5">
+                    <Check aria-hidden className="size-4" />
+                    Eselsohr bei {share.fromName}
+                  </span>
                 ) : (
-                  <TextButton aria-pressed={ears.includes(no)} onClick={() => toggleEar(no)}>
-                    {ears.includes(no) ? "Eselsohr · zurücknehmen" : "Eselsohr"}
-                  </TextButton>
+                  <Button size="sm" aria-pressed={ears.includes(no)} haptic="select" className="aria-pressed:bg-on-table aria-pressed:text-table" onClick={() => toggleEar(no)}>
+                    <Dogear on={ears.includes(no)} />
+                    Eselsohr
+                  </Button>
                 ))}
-              {failed && (
-                <span role="alert" className="text-on-table">
-                  {failed}
-                </span>
-              )}
-              <TextButton onClick={() => setWriting(true)}>Zettel</TextButton>
-              {!mine && (
-                <TextButton className="text-on-table-2" onClick={() => setReporting(true)}>
-                  Melden
-                </TextButton>
-              )}
+              <Button size="sm" onClick={() => setWriting(true)}>
+                <PenLine aria-hidden />
+                Zettel
+              </Button>
+              {!mine && <MoreMenu onReport={() => setReporting(true)} />}
             </>
           );
         }}
@@ -144,110 +147,105 @@ export function GuestBook() {
         <Table
           label={`Ein Buch für ${share.to}`}
           headerRight={
-            <p className="text-on-table-2 text-sm">
+            <div className="flex items-center gap-2">
               {user ? (
                 kept ? (
-                  <Link href="/zimmer" className={linkClass}>
+                  <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
+                    <Check aria-hidden />
                     Liegt in deinem Bücherzimmer
                   </Link>
                 ) : (
-                  <span>…</span>
+                  <span aria-hidden className="inline-block min-h-9 w-24" />
                 )
               ) : (
-                <TextButton onClick={() => setKeeping(true)}>In mein Bücherzimmer legen</TextButton>
+                <Button size="sm" onClick={() => setKeeping(true)}>
+                  <BookmarkPlus aria-hidden />
+                  <span className="max-sm:hidden">In mein Bücherzimmer legen</span>
+                  <span className="sm:hidden">Behalten</span>
+                </Button>
               )}
-              {!mine && (
-                <TextButton className="text-on-table-2 ml-5" onClick={() => setReporting(true)}>
-                  Melden
-                </TextButton>
-              )}
-            </p>
+              {!mine && <MoreMenu onReport={() => setReporting(true)} />}
+            </div>
           }
         >
           <Shelf feature books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
         </Table>
       </Library>
-      {keeping && !user && (
-        <SlipDialog label="In dein Bücherzimmer legen" onClose={() => setKeeping(false)}>
-          <p className="text-sm leading-relaxed">
-            Mit einem Konto liegt „{share.book?.title || "dieses Buch"}“ in deinem Bücherzimmer unter „Für dich“, und du kannst eigene Bücher machen.
+      <Sheet
+        open={keeping && !user}
+        onOpenChange={setKeeping}
+        title="In dein Bücherzimmer legen"
+        description={`Mit einem Konto liegt „${share.book?.title || "dieses Buch"}“ in deinem Bücherzimmer unter „Für dich“, und du kannst eigene Bücher machen.`}
+      >
+        <SignInButtons
+          tone="cloth"
+          busy={signingIn}
+          onPick={(p) => {
+            setSignInFailed(null);
+            setSigningIn(p);
+            signIn(p)
+              .then(() => setKeeping(false))
+              .catch((e) => setSignInFailed(signInError(e)))
+              .finally(() => setSigningIn(null));
+          }}
+        />
+        {signInFailed && (
+          <p role="alert" className="text-danger mt-3 text-sm font-semibold">
+            {signInFailed}
           </p>
-          <div className="bg-table mt-4 p-4">
-            <SignInButtons
-              busy={signingIn}
-              onPick={(p) => {
-                setSignInFailed(null);
-                setSigningIn(p);
-                signIn(p)
-                  .then(() => setKeeping(false))
-                  .catch((e) => setSignInFailed(signInError(e)))
-                  .finally(() => setSigningIn(null));
-              }}
-            />
-          </div>
-          {signInFailed && (
-            <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
-              {signInFailed}
+        )}
+        <p className="text-ink-2 mt-4 text-[13px]">
+          Es gelten die{" "}
+          <Link href="/nutzungsbedingungen" className="underline decoration-ink/40 underline-offset-4 hover:decoration-ink">
+            Nutzungsbedingungen
+          </Link>
+          .
+        </p>
+      </Sheet>
+      <Sheet open={writing} onOpenChange={setWriting} title={`Zettel an ${share.fromName}`} description={`Nur ${share.fromName} liest das.`}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const note = text.trim();
+            if (!note || !token) return;
+            setFailed(null);
+            if (isAbusive(note)) {
+              setFailed("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
+              return;
+            }
+            leaveNote(token, { kind: "note", text: note, from })
+              .then(() => {
+                setText("");
+                setWriting(false);
+                notify(`Dein Zettel liegt bei ${share.fromName}. Danke!`);
+              })
+              .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
+          }}
+        >
+          <label htmlFor="note" className="sr-only">
+            Zettel
+          </label>
+          <textarea
+            id="note"
+            value={text}
+            onChange={(e) => setText(e.target.value.slice(0, 280))}
+            rows={4}
+            className={noteClass}
+            placeholder="Was dir gefällt, eine Frage zum Rezept …"
+          />
+          {failed && (
+            <p role="alert" className="text-danger mt-2 text-sm font-semibold">
+              {failed}
             </p>
           )}
-          <p className="text-ink-2 mt-3 text-[13px]">
-            Es gelten die{" "}
-            <Link href="/nutzungsbedingungen" className="underline decoration-mark decoration-2 underline-offset-4">
-              Nutzungsbedingungen
-            </Link>
-            .
-          </p>
-        </SlipDialog>
-      )}
-      {writing && (
-        <SlipDialog label={`Zettel an ${share.fromName}`} onClose={() => setWriting(false)}>
-          {sent ? (
-            <p className="text-sm">Liegt bei {share.fromName}. Danke!</p>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!text.trim() || !token) return;
-                setFailed(null);
-                if (isAbusive(text)) {
-                  setFailed("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
-                  return;
-                }
-                leaveNote(token, { kind: "note", text: text.trim(), from })
-                  .then(() => setSent(text.trim()))
-                  .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
-              }}
-            >
-              <label htmlFor="note" className="sr-only">
-                Zettel
-              </label>
-              <textarea
-                id="note"
-                value={text}
-                onChange={(e) => setText(e.target.value.slice(0, 280))}
-                rows={4}
-                className={inputClass}
-                placeholder="Was dir gefällt, eine Frage zum Rezept …"
-              />
-              {failed && (
-                <p role="alert" className="text-ink mt-2 text-[13px] font-semibold">
-                  {failed}
-                </p>
-              )}
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-ink-2 text-[12px]">{text.length} / 280 · nur {share.fromName} liest das</span>
-                <button
-                  type="submit"
-                  disabled={!text.trim()}
-                  className="border-ink text-ink hover:bg-ink hover:text-paper border px-3 py-1.5 text-sm font-semibold transition-colors duration-150 disabled:opacity-50"
-                >
-                  Hinlegen
-                </button>
-              </div>
-            </form>
-          )}
-        </SlipDialog>
-      )}
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-ink-2 text-[13px] tabular-nums">{text.length} / 280</span>
+            <Button type="submit" variant="ink" disabled={!text.trim()}>
+              Hinlegen
+            </Button>
+          </div>
+        </form>
+      </Sheet>
       {reporting && (
         <ReportDialog
           share={share}
@@ -256,7 +254,29 @@ export function GuestBook() {
           onBlock={user ? () => blockSender(user.uid, share.owner, share.fromName, [share.token]) : undefined}
         />
       )}
+      <Toaster />
     </main>
+  );
+}
+
+/** Ecke eines Blatts, umgeknickt solange das Eselsohr gesetzt ist */
+function Dogear({ on }: { on: boolean }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round">
+      <path d="M5 3h9l5 5v13H5z" />
+      <path d="M14 3v5h5" className={on ? "fill-current" : ""} />
+    </svg>
+  );
+}
+
+/** Seltene Handgriffe hinter „Mehr“, damit Melden nicht neben Zettel und Eselsohr steht */
+function MoreMenu({ onReport }: { onReport: () => void }) {
+  return (
+    <Menu trigger={<IconButton label="Mehr"><MoreHorizontal aria-hidden /></IconButton>}>
+      <MenuItem icon={<Flag />} onClick={onReport}>
+        Buch melden
+      </MenuItem>
+    </Menu>
   );
 }
 
@@ -267,7 +287,7 @@ function Empty({ text }: { text: string }) {
     <main className="linen table-surface flex min-h-svh flex-col items-center justify-center gap-6 bg-table px-6">
       <p className="text-on-table-2 max-w-sm text-center">{text}</p>
       {user !== undefined && (
-        <Link href={user ? "/zimmer" : "/"} className={`${linkClass} text-sm underline`}>
+        <Link href={user ? "/zimmer" : "/"} className={buttonClass("quiet")}>
           {user ? "Zum Bücherzimmer" : "Zur Startseite"}
         </Link>
       )}

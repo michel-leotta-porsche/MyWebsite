@@ -34,3 +34,7 @@ export function Field({ label, hint, className = "", id, ...p }: Props) {
     </div>
   );
 }
+
+/** Mehrzeiliges Feld auf Papier: Linie statt Kasten, wie Field */
+export const noteClass =
+  "border-ink/25 text-ink placeholder:text-ink-2 focus-visible:border-ink w-full resize-none rounded-none border-0 border-b-[1.5px] bg-transparent py-2 text-base outline-none focus-visible:outline-none";
