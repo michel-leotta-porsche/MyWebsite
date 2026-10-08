@@ -410,9 +410,7 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
   const token = newId() + newId().slice(0, 8);
   if (MOCK) {
     mem.shares.set(token, { token, owner: b.owner, fromName: b.ownerName, to, book: b });
-    try {
-      sessionStorage.setItem("fuji:mock-shares", JSON.stringify([...mem.shares.values()]));
-    } catch {}
+    keepMockShares();
     return token;
   }
   await setDoc(doc(db(), "shares", token), {
@@ -425,6 +423,29 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
     createdAt: serverTimestamp(),
   });
   return token;
+}
+
+const keepMockShares = () => {
+  try {
+    sessionStorage.setItem("fuji:mock-shares", JSON.stringify([...mem.shares.values()]));
+  } catch {}
+};
+
+/**
+ * Links zeigen das Buch in seinem jetzigen Stand: Die Kopie in jedem aktiven Link wird nach dem Speichern
+ * nachgezogen. Vorher blieb sie beim Stand des Teilens stehen, und wer danach noch Fotos verschob,
+ * schickte ein anders angeordnetes Buch herum. Ruhende Links (Papierkorb) bleiben leer.
+ */
+export async function refreshShares(b: StoredBook, known?: Share[]) {
+  if (b.trashed) return;
+  const book = { ...b, schema: SCHEMA };
+  if (MOCK) {
+    for (const s of mem.shares.values()) if ((s.bookId ?? s.book?.id) === b.id) mem.shares.set(s.token, { ...s, book: structuredClone(book) });
+    keepMockShares();
+    return;
+  }
+  const shares = (known ?? (await sharesOfBook(b.owner, b.id))).filter((s) => !s.paused && s.book);
+  await Promise.all(shares.map((s) => updateDoc(doc(db(), "shares", s.token), { book })));
 }
 
 export async function loadShare(token: string): Promise<Share | null> {
