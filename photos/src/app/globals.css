@@ -151,6 +151,47 @@ body {
     radial-gradient(ellipse 80% 70% at 100% 100%, rgb(12 10 8 / 0.3), transparent 70%);
 }
 
+/* ------------------------------------------------------------------ Buch-Baustein
+   Ein Buch wirkt echt durch drei Dinge: die helle Schnittkante des Buchblocks, einen Schatten in mehreren
+   Schichten und den Falz (Falz: book-look.tsx). Alles ruht; bewegt werden nur transform und opacity.
+   Schatten nie animieren: ein zweiter Schatten auf eigenem Element blendet über opacity dazu. */
+:root {
+  /* Schnitt: heller als die Seite, wie frisch beschnittenes Papier */
+  --edge: #f7f3eb;
+  /* geschlossen auf dem Tisch, Licht von oben rechts: der Schatten fällt nach links unten */
+  --book-shadow-closed:
+    -1px 1px 1px rgb(12 10 8 / 0.45), -3px 5px 6px -2px rgb(12 10 8 / 0.4), -8px 14px 22px -8px rgb(12 10 8 / 0.5),
+    -14px 30px 48px -18px rgb(12 10 8 / 0.7);
+  /* angehoben: weiter und weicher */
+  --book-shadow-lift: -10px 22px 30px -12px rgb(12 10 8 / 0.45), -20px 44px 64px -24px rgb(12 10 8 / 0.6);
+  /* aufgeschlagen: das Papier liegt flach, der Schatten fällt gerade nach unten */
+  --book-shadow-open:
+    0 1px 1px rgb(12 10 8 / 0.45), 0 4px 6px -2px rgb(12 10 8 / 0.4), 0 14px 24px -8px rgb(12 10 8 / 0.5),
+    0 34px 60px -20px rgb(12 10 8 / 0.75);
+}
+.book-shadow-closed {
+  box-shadow: var(--book-shadow-closed);
+}
+.book-shadow-lift {
+  box-shadow: var(--book-shadow-lift);
+}
+.book-shadow-open {
+  box-shadow: var(--book-shadow-open);
+}
+/* Buchblock: Blatt für Blatt gestreift, oben vom Licht getroffen, unten im Schatten */
+.book-block-r,
+.book-block-l {
+  background:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.4), transparent 14%, transparent 72%, rgb(12 10 8 / 0.16)),
+    repeating-linear-gradient(var(--block-dir), var(--edge) 0 1px, var(--paper-shade) 1px 2px);
+}
+.book-block-r {
+  --block-dir: to right;
+}
+.book-block-l {
+  --block-dir: to left;
+}
+
 /* Bücher in einer Reihe: unten bündig auf der Tischkante, leicht gedreht */
 .shelf {
   --tw: min(18vw, 248px);

@@ -1095,10 +1095,17 @@ export function Stage({
           )}
           {width > 0 && (
             <div
-              className="shadow-[0_24px_48px_-20px_rgb(12_10_8/0.85)]"
+              className="book-shadow-open relative"
               // Griffe dürfen über den Rand ragen; schmal wird nur waagerecht auf eine Seite beschnitten
               style={{ width: narrow ? pageW : W, overflowX: narrow ? "clip" : "visible", overflowY: "visible" }}
             >
+              {/* Buchblock links und rechts, wie beim fertigen Buch */}
+              {!narrow && (
+                <>
+                  <div aria-hidden className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] w-[8px]" />
+                  <div aria-hidden className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full w-[8px]" />
+                </>
+              )}
               <div
                 className="relative transition-transform duration-500 ease-out select-none"
                 style={{ width: W, height: Hpx, transform: narrow && page === 1 ? `translateX(${-pageW}px)` : undefined }}

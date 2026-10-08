@@ -6,6 +6,7 @@ import { createContext, useContext, type CSSProperties } from "react";
 import { plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
 import { PlateButton } from "@/components/plate-viewer";
+import { FOLD_WIDTH, foldGradient } from "@/lib/book-look";
 
 // Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
 
@@ -15,15 +16,12 @@ export const JumpContext = createContext<(no: number) => void>(() => {});
 const toneClass: Record<Tone, string> = { ink: "text-ink", ink2: "text-ink-2", clothInk: "", paper: "text-paper" };
 
 function Gutter({ side }: { side: "left" | "right" }) {
-  // Wölbung zum Bund hin: das Papier biegt sich, also wird es dunkler
+  // Falz: Wölbung zum Bund hin, gleich gemalt wie in der Textur des WebGL-Blatts
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-y-0 z-[300] w-[14cqw]"
-      style={{
-        [side === "left" ? "right" : "left"]: 0,
-        background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(12 10 8 / 0.16), rgb(12 10 8 / 0.05) 30%, transparent)`,
-      }}
+      className="pointer-events-none absolute inset-y-0 z-[300]"
+      style={{ [side === "left" ? "right" : "left"]: 0, width: `${FOLD_WIDTH}cqw`, background: foldGradient(side) }}
     />
   );
 }

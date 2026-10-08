@@ -10,6 +10,7 @@ import { LegalLinks } from "@/components/legal";
 import type { Mode } from "@/components/book";
 import { ScrollBook } from "@/components/scroll-book";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { foldGradient, FOLD_WIDTH } from "@/lib/book-look";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
 
@@ -30,6 +31,7 @@ import torii from "../../public/photos/japan/torii.jpg";
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
 const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
+// Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 
 /** Anmelden und gleich ins Bücherzimmer; wer schon angemeldet ist, geht direkt hinein */
@@ -102,18 +104,15 @@ function Cap({ no, title, x, y, right = false }: { no: number; title: string; x:
   );
 }
 
-/** Eine Buchseite: Naturpapier, zum Bund hin dunkler (die Seite wölbt sich dort) */
+/** Eine Buchseite: Naturpapier, zum Bund hin der Falz */
 function PageFace({ side, children, className = "" }: { side: "left" | "right"; children?: ReactNode; className?: string }) {
   return (
     <div className={`paper absolute inset-0 overflow-hidden [container-type:inline-size] ${className}`}>
       {children}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-y-0 w-[14cqw]"
-        style={{
-          [side === "left" ? "right" : "left"]: 0,
-          background: `linear-gradient(to ${side === "left" ? "left" : "right"}, rgb(12 10 8 / 0.16), rgb(12 10 8 / 0.05) 30%, transparent)`,
-        }}
+        className="pointer-events-none absolute inset-y-0"
+        style={{ [side === "left" ? "right" : "left"]: 0, width: `${FOLD_WIDTH}cqw`, background: foldGradient(side) }}
       />
     </div>
   );
@@ -123,8 +122,8 @@ function PageFace({ side, children, className = "" }: { side: "left" | "right"; 
 function Cover({ photo, title, author, className = "" }: { photo: StaticImageData; title: string; author: string; className?: string }) {
   return (
     <div className={`relative ${className}`}>
-      <div aria-hidden className={`absolute inset-0 ${lifted}`} />
-      <div aria-hidden className="absolute top-[1.2%] bottom-[0.4%] left-full w-[10px] bg-[repeating-linear-gradient(to_right,var(--paper)_0_1px,var(--paper-shade)_1px_2px)]" />
+      <div aria-hidden className="book-shadow-closed absolute inset-0" />
+      <div aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full w-[10px]" />
       <div className="linen bg-cloth relative aspect-[2/3] w-full overflow-hidden [container-type:inline-size]">
         <div aria-hidden className="absolute inset-y-0 left-0 w-[5cqw] bg-[rgb(12_10_8/0.08)]" />
         <div aria-hidden className="absolute inset-y-0 left-[5cqw] w-[0.25cqw] bg-[rgb(12_10_8/0.18)]" />
@@ -345,7 +344,10 @@ function Workbench() {
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
           <div className="relative aspect-[4/3] w-full [container-type:inline-size] [perspective:1400px]">
             {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
-            <div className={`bench-paper absolute inset-0 grid grid-cols-2 ${lifted}`}>
+            {/* Buchblock links und rechts, darunter der Schatten des aufgeschlagenen Buchs */}
+            <div aria-hidden className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] w-[1.2cqw]" />
+            <div aria-hidden className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full w-[1.2cqw]" />
+            <div className="bench-paper book-shadow-open absolute inset-0 grid grid-cols-2">
               <div className="relative">
                 <PageFace side="left" />
               </div>
@@ -384,6 +386,16 @@ function Workbench() {
                 <Sheet src={s.src} sizes={s.sizes} />
               </div>
             ))}
+            {/* Falz über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
+            <div aria-hidden className="bench-caps pointer-events-none absolute inset-0">
+              {(["left", "right"] as const).map((side) => (
+                <div
+                  key={side}
+                  className="absolute inset-y-0"
+                  style={{ [side === "left" ? "right" : "left"]: "50%", width: `${FOLD_WIDTH / 2}cqw`, background: foldGradient(side) }}
+                />
+              ))}
+            </div>
           </div>
           <p className="text-on-table-2 relative mt-6 text-sm">
             <span className="bench-count-a">4 Fotos, nach Aufnahmezeit</span>

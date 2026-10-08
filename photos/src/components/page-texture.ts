@@ -4,6 +4,7 @@ import { getImageProps, type StaticImageData } from "next/image";
 
 import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
 import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
+import { FOLD_STOPS, FOLD_WIDTH, foldColor } from "@/lib/book-look";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
 // Dieselbe Elementliste wie page-view.tsx (layoutPage), alle Maße in cqw = Seitenbreite / 100.
@@ -30,7 +31,11 @@ function loadImage(url: string) {
       // Fotos aus Firebase Storage: mit CORS laden, sonst darf WebGL sie nicht als Textur nutzen
       if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
       img.decoding = "async";
-      img.onload = () => resolve(img);
+      // erst fertig entpackt zurückgeben, sonst entpackt drawImage im Hauptthread und das Blatt hakt beim ersten Bild
+      img.onload = () => img.decode().then(
+        () => resolve(img),
+        () => resolve(img),
+      );
       img.onerror = reject;
       img.src = url;
     });
@@ -140,13 +145,11 @@ function caption(
 }
 
 function gutter(ctx: CanvasRenderingContext2D, side: "left" | "right", W: number, H: number, cq: number) {
-  const w = 14 * cq;
+  const w = FOLD_WIDTH * cq;
   const x0 = side === "left" ? W : 0;
   const x1 = side === "left" ? W - w : w;
   const g = ctx.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, "rgb(12 10 8 / 0.16)");
-  g.addColorStop(0.3, "rgb(12 10 8 / 0.05)");
-  g.addColorStop(1, "rgb(12 10 8 / 0)");
+  for (const [at, a] of FOLD_STOPS) g.addColorStop(at, foldColor(a));
   ctx.fillStyle = g;
   ctx.fillRect(Math.min(x0, x1), 0, w, H);
 }
