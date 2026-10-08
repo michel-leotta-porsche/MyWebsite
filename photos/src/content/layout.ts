@@ -246,6 +246,9 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       const x = 12;
       const y = 9;
       const titleSize = 11;
+      const titleW = 100 - x - 8;
+      // langer Titel bricht um und wächst nach oben (schmale Schrift: knapp 0.6 der Schätzbreite, lieber eine Zeile zu viel)
+      const titleLines = estimateLines(book.title, titleSize * 0.6, titleW);
       return {
         bg: "cloth",
         linen: true,
@@ -260,7 +263,8 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
             t: "text",
             text: book.title,
             x,
-            y: H - book.bottom - titleSize * 0.95,
+            y: H - book.bottom - titleSize * 0.95 - (titleLines - 1) * titleSize * 0.9,
+            w: titleW,
             size: titleSize,
             weight: 700,
             tone: "clothInk",
