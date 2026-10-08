@@ -25,6 +25,7 @@ import {
   loadBook,
   migrate,
   newId,
+  refreshShares,
   saveBook,
   saveVersion,
   SCHEMA,
@@ -194,6 +195,8 @@ export function Editor() {
           window.clearTimeout(offline);
           setSaved("gespeichert");
           savedOnce.current = true;
+          // geteilte Links bekommen denselben Stand wie das Buch
+          refreshShares(book).catch(() => {});
           if (!idParam) window.history.replaceState(null, "", `/neu?id=${book.id}`);
           if (Date.now() - lastAutoVersion.current > AUTO_VERSION_MS) {
             lastAutoVersion.current = Date.now();

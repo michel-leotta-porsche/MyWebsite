@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { inputClass, SlipDialog } from "@/components/app-ui";
-import { mySharesOf, notesOf, shareBook, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
+import { mySharesOf, notesOf, refreshShares, shareBook, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
 
 const linkFor = (token: string) => `${location.origin}/b?t=${token}`;
 
@@ -26,11 +26,14 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Links aus der Zeit, als sie noch beim Stand des Teilens stehen blieben, holen beim Öffnen auf
+  const catchUp = useEffectEvent((mine: Share[]) => refreshShares(book, mine).catch(() => {}));
   useEffect(() => {
     let alive = true;
     mySharesOf(book.owner)
       .then(async (all) => {
         const mine = all.filter((s) => (s.bookId ?? s.book?.id) === book.id && !s.paused);
+        catchUp(mine);
         if (!alive) return;
         setShares(mine);
         const entries = await Promise.all(mine.map(async (s) => [s.token, await notesOf(s.token).catch(() => [])] as const));
