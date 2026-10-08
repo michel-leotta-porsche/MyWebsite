@@ -267,6 +267,22 @@ const SLOTS = [
   { src: reifen, box: [76, 48, 18, 36], from: ["4vw", "52svh", "11deg"], bend: 8, phone: ["70vw", "6svh", "9deg"], sizes: "(min-width: 768px) 12vw, 22vw" },
 ] as const;
 
+// Wölbung der aufgeschlagenen Seiten: am Bund sinken Ober- und Unterkante um so viel Prozent der Höhe ein, nach außen läuft es aus.
+// Bewusst knapp; mehr wirkt wie ein Effekt statt wie Papier.
+const SAG = { top: 1.2, bottom: 0.8 };
+const CURVE_STEPS = 8;
+
+/** clip-path der Doppelseite. `loose`: dieselben Punkte weit draußen, damit die Abzüge im Flug nicht beschnitten werden */
+function pageCurve(loose: boolean) {
+  // von außen links zum Bund und weiter nach außen rechts; u = Abstand vom Bund in Seitenbreiten
+  const xs = Array.from({ length: 2 * CURVE_STEPS + 1 }, (_, k) => (k * 100) / (2 * CURVE_STEPS));
+  const sag = (x: number, s: number) => s * (1 - Math.abs(x - 50) / 50) ** 2;
+  const pt = (x: number, y: number) => (loose ? `${x * 5 - 200}% ${y * 5 - 200}%` : `${+x.toFixed(2)}% ${+y.toFixed(3)}%`);
+  const top = xs.map((x) => pt(x, sag(x, SAG.top)));
+  const bottom = [...xs].reverse().map((x) => pt(x, 100 - sag(x, SAG.bottom)));
+  return `polygon(${[...top, ...bottom].join(", ")})`;
+}
+
 // So viele Streifen je Hälfte: der Abzug biegt sich an ihren Kanten wie Fotopapier im Luftzug
 const STRIPS = 5;
 
@@ -342,19 +358,25 @@ function Workbench() {
             </p>
           </div>
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
-          <div className="relative aspect-[4/3] w-full [container-type:inline-size] [perspective:1400px]">
-            {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
+          <div
+            className="relative aspect-[4/3] w-full [container-type:inline-size]"
+            style={{ ["--loose" as string]: pageCurve(true), ["--curve" as string]: pageCurve(false) }}
+          >
             {/* Buchblock links und rechts, darunter der Schatten des aufgeschlagenen Buchs */}
             <div aria-hidden className="book-block-l absolute top-[0.6%] right-full bottom-[0.6%] w-[1.2cqw]" />
             <div aria-hidden className="book-block-r absolute top-[0.6%] bottom-[0.6%] left-full w-[1.2cqw]" />
-            <div className="bench-paper book-shadow-open absolute inset-0 grid grid-cols-2">
+            <div aria-hidden className="book-shadow-open absolute inset-0" />
+            {/* Die Seiten wölben sich zum Bund hin; die Form greift erst, wenn alle Abzüge liegen (globals.css) */}
+            <div className="bench-book absolute inset-0 [perspective:1400px]">
+            {/* die Doppelseite liegt schon da und wartet auf ihre Bilder */}
+            <div className="bench-paper absolute inset-0 grid grid-cols-2">
               <div className="relative">
                 <PageFace side="left" />
               </div>
               <div className="relative">
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
-                    <Cap no={2} title="Mittagsblume" x={88} y={81} right />
+                    <Cap no={2} title="Mittagsblume" x={88} y={63} right />
                     <Cap no={3} title="Markisen · 4 Platter Reifen" x={88} y={131} right />
                   </div>
                 </PageFace>
@@ -395,6 +417,7 @@ function Workbench() {
                   style={{ [side === "left" ? "right" : "left"]: "50%", width: `${FOLD_WIDTH / 2}cqw`, background: foldGradient(side) }}
                 />
               ))}
+            </div>
             </div>
           </div>
           <p className="text-on-table-2 relative mt-6 text-sm">

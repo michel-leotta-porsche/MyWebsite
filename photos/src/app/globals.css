@@ -350,6 +350,10 @@ html.ohne-schatten [data-shade] {
 .bench-count-b {
   display: none;
 }
+/* Endzustand: die Seiten wölben sich zum Bund hin (landing.tsx, pageCurve) */
+.bench-book {
+  clip-path: var(--curve);
+}
 /* Papierrand des losen Abzugs; blendet aus, sobald das Bild eingeklebt ist */
 .bench-border {
   opacity: 0;
@@ -446,6 +450,16 @@ html.ohne-schatten [data-shade] {
       48% { opacity: calc(var(--j) * var(--b) * 0.0035); }
       74% { opacity: calc(var(--j) * var(--b) * 0.005); }
       100% { opacity: 0; }
+    }
+    /* Wölbung der Seiten erst, wenn alle Abzüge liegen; vorher ragen sie im Flug über den Rand */
+    .bench-book {
+      animation: book-curve linear both;
+      animation-timeline: --bench;
+      animation-range: contain 80% contain 86%;
+    }
+    @keyframes book-curve {
+      from { clip-path: var(--loose); }
+      to { clip-path: var(--curve); }
     }
     /* Bildunterschriften erst, wenn alle Abzüge liegen */
     .bench-caps {
