@@ -468,19 +468,20 @@ html.ohne-schatten [data-shade] {
     .bench-hinge-l { animation-name: bend-l; }
     .bench-light-r { animation-name: light-r; }
     .bench-light-l { animation-name: light-l; }
-    /* rechts und links leicht versetzt, damit das Blatt nicht wie ein Scharnier klappt */
+    /* rechts und links leicht versetzt, damit das Blatt nicht wie ein Scharnier klappt.
+       Die Faktoren vor --j müssen zu BEND_KEYS in landing.tsx passen; --x/--z rechnet Strip dort exakt aus */
     @keyframes bend-r {
-      0% { transform: translateX(calc(-0.000152 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.01745 * var(--s1) * var(--b) * var(--w))) rotateY(calc(-1 * var(--j) * var(--b) * 1deg)); }
-      30% { transform: translateX(calc(-0.000031 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.00785 * var(--s1) * var(--b) * var(--w))) rotateY(calc(-0.45 * var(--j) * var(--b) * 1deg)); }
-      55% { transform: translateX(calc(-0.000086 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.01309 * var(--s1) * var(--b) * var(--w))) rotateY(calc(-0.75 * var(--j) * var(--b) * 1deg)); }
-      82% { transform: translateX(calc(-0.000002 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.00209 * var(--s1) * var(--b) * var(--w))) rotateY(calc(-0.12 * var(--j) * var(--b) * 1deg)); }
+      0% { transform: translateX(calc(-1 * var(--x0) * var(--w))) translateZ(calc(var(--z0) * var(--w))) rotateY(calc(-1 * var(--j) * var(--b) * 1deg)); }
+      30% { transform: translateX(calc(-1 * var(--x1) * var(--w))) translateZ(calc(var(--z1) * var(--w))) rotateY(calc(-0.45 * var(--j) * var(--b) * 1deg)); }
+      55% { transform: translateX(calc(-1 * var(--x2) * var(--w))) translateZ(calc(var(--z2) * var(--w))) rotateY(calc(-0.75 * var(--j) * var(--b) * 1deg)); }
+      82% { transform: translateX(calc(-1 * var(--x3) * var(--w))) translateZ(calc(var(--z3) * var(--w))) rotateY(calc(-0.12 * var(--j) * var(--b) * 1deg)); }
       100% { transform: none; }
     }
     @keyframes bend-l {
-      0% { transform: translateX(calc(0.000075 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.01222 * var(--s1) * var(--b) * var(--w))) rotateY(calc(0.7 * var(--j) * var(--b) * 1deg)); }
-      22% { transform: translateX(calc(0.000152 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.01745 * var(--s1) * var(--b) * var(--w))) rotateY(calc(1 * var(--j) * var(--b) * 1deg)); }
-      48% { transform: translateX(calc(0.000019 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.00611 * var(--s1) * var(--b) * var(--w))) rotateY(calc(0.35 * var(--j) * var(--b) * 1deg)); }
-      74% { transform: translateX(calc(0.000038 * var(--s2) * var(--b) * var(--b) * var(--w))) translateZ(calc(0.00873 * var(--s1) * var(--b) * var(--w))) rotateY(calc(0.5 * var(--j) * var(--b) * 1deg)); }
+      0% { transform: translateX(calc(var(--x0) * var(--w))) translateZ(calc(var(--z0) * var(--w))) rotateY(calc(0.7 * var(--j) * var(--b) * 1deg)); }
+      22% { transform: translateX(calc(var(--x1) * var(--w))) translateZ(calc(var(--z1) * var(--w))) rotateY(calc(1 * var(--j) * var(--b) * 1deg)); }
+      48% { transform: translateX(calc(var(--x2) * var(--w))) translateZ(calc(var(--z2) * var(--w))) rotateY(calc(0.35 * var(--j) * var(--b) * 1deg)); }
+      74% { transform: translateX(calc(var(--x3) * var(--w))) translateZ(calc(var(--z3) * var(--w))) rotateY(calc(0.5 * var(--j) * var(--b) * 1deg)); }
       100% { transform: none; }
     }
     /* Licht folgt der Neigung: je weiter außen, desto steiler, desto heller oder dunkler */

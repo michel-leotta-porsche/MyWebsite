@@ -291,12 +291,43 @@ function pageCurve(loose: boolean) {
 // So viele Streifen je Hälfte: der Abzug biegt sich an ihren Kanten wie Fotopapier im Luftzug
 const STRIPS = 5;
 
+// Biegung je Schlüsselbild (globals.css, bend-r / bend-l) als Anteil von `bend` je Streifen
+const BEND_KEYS = { r: [1, 0.45, 0.75, 0.12], l: [0.7, 1, 0.35, 0.5] } as const;
+
+/**
+ * Wie weit Streifen j vorrücken muss, damit seine Kante exakt auf der des inneren Nachbarn liegt, in Streifenbreiten.
+ * Exakt statt Kleinwinkel-Näherung: bei 40° fehlte sonst gut ein Pixel, und durch die Fuge schien das Papier.
+ */
+function hingeOffsets(j: number, deg: number) {
+  let x = 0;
+  let z = 0;
+  for (let i = 1; i < j; i++) {
+    const a = (i * deg * Math.PI) / 180;
+    x += 1 - Math.cos(a);
+    z += Math.sin(a);
+  }
+  return { x: +x.toFixed(5), z: +z.toFixed(5) };
+}
+
+const lightColor = (side: "l" | "r", a: number) =>
+  side === "r" ? `color-mix(in srgb, var(--color-paper) ${+(a * 100).toFixed(1)}%, transparent)` : `rgb(12 10 8 / ${+a.toFixed(3)})`;
+
 /**
  * Ein Streifen des Abzugs. Alle Streifen liegen nebeneinander im Abzug (keine Verschachtelung, die Safari nicht zeichnet);
  * jeder dreht sich um seine Kante zur Mitte und rückt so weit vor, dass er an den inneren Nachbarn anschließt (globals.css).
  */
-function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; side: "l" | "r"; j: number }) {
+function Strip({ src, sizes, side, j, bend }: { src: StaticImageData; sizes: string; side: "l" | "r"; j: number; bend: number }) {
   const outer = j === STRIPS;
+  const offsets: Record<string, number> = {};
+  BEND_KEYS[side].forEach((f, k) => {
+    const { x, z } = hingeOffsets(j, f * bend);
+    offsets[`--x${k}`] = x;
+    offsets[`--z${k}`] = z;
+  });
+  // Bild und Licht reichen 2px unter den inneren Nachbarn: die Kanten gedrehter Ebenen werden geglättet, ohne Überlappung blitzt dort das Papier
+  const inner = side === "r" ? "left" : "right";
+  const outerSide = side === "r" ? "right" : "left";
+  const reach = { [inner]: -2, [outerSide]: -1 };
   // Lage im ganzen Bild, in Streifenbreiten von links
   const at = side === "r" ? STRIPS + j - 1 : STRIPS - j;
   return (
@@ -307,9 +338,7 @@ function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; s
         width: `${100 / (2 * STRIPS)}%`,
         transformOrigin: side === "r" ? "left center" : "right center",
         ["--j" as string]: j,
-        // Summen über die inneren Nachbarn: 1 + 2 + … und 1² + 2² + … bis j − 1
-        ["--s1" as string]: ((j - 1) * j) / 2,
-        ["--s2" as string]: ((j - 1) * j * (2 * j - 1)) / 6,
+        ...offsets,
       }}
     >
       {/* Papierrand, solange der Abzug lose ist: nur oben, unten und außen, damit zwischen den Streifen kein Weiß durchblitzt */}
@@ -318,29 +347,34 @@ function Strip({ src, sizes, side, j }: { src: StaticImageData; sizes: string; s
         <div className="bg-paper absolute inset-x-0 bottom-0 h-[6px]" />
         {outer && <div className={`bg-paper absolute inset-y-0 w-[6px] ${side === "l" ? "left-0" : "right-0"}`} />}
       </div>
-      {/* die Streifen überlappen um einen Pixel, damit keine Fuge blitzt */}
-      <div className="absolute inset-y-0 -right-px -left-px overflow-hidden">
-        <div className="absolute inset-y-0" style={{ width: `${2 * STRIPS * 100}%`, left: `${-at * 100}%` }}>
+      <div className="absolute inset-y-0 overflow-hidden" style={reach}>
+        {/* Maß ist die Streifenbreite --w, nicht die Klappe: sonst verrutscht das Bild von Streifen zu Streifen um die Überlappung */}
+        <div className="absolute inset-y-0" style={{ width: `calc(${2 * STRIPS} * var(--w))`, left: `calc(${-at} * var(--w) + ${-reach.left}px)` }}>
           {/* sofort laden: Safari lädt Bilder in gedrehten, verschobenen Ebenen sonst nicht zuverlässig nach */}
           <Image src={src} alt="" fill sizes={sizes} loading="eager" className="object-cover" />
         </div>
       </div>
-      {/* Licht von links oben: rechts aufgebogene Streifen glänzen, links aufgebogene liegen im Schatten */}
-      <div aria-hidden className={`bench-light-${side} absolute inset-0 opacity-0 ${side === "r" ? "bg-paper" : "bg-[rgb(12_10_8)]"}`} />
+      {/* Licht von links oben: rechts aufgebogene Streifen glänzen, links aufgebogene liegen im Schatten.
+          Als Verlauf vom Wert des inneren Nachbarn (j − 1) zum eigenen (j), sonst springt die Helligkeit an jeder Kante und die Streifen sehen aus wie Fugen */}
+      <div
+        aria-hidden
+        className={`bench-light-${side} absolute inset-y-0 opacity-0`}
+        style={{ ...reach, backgroundImage: `linear-gradient(to ${outerSide}, ${lightColor(side, (j - 1) / j)}, ${lightColor(side, 1)})` }}
+      />
     </div>
   );
 }
 
 /** Der Abzug als biegsames Blatt: je Hälfte STRIPS Streifen, von der Mitte nach außen gezählt */
-function Sheet({ src, sizes }: { src: StaticImageData; sizes: string }) {
+function Sheet({ src, sizes, bend }: { src: StaticImageData; sizes: string; bend: number }) {
   const js = Array.from({ length: STRIPS }, (_, i) => i + 1);
   return (
     <>
       {js.map((j) => (
-        <Strip key={`l${j}`} src={src} sizes={sizes} side="l" j={j} />
+        <Strip key={`l${j}`} src={src} sizes={sizes} side="l" j={j} bend={bend} />
       ))}
       {js.map((j) => (
-        <Strip key={`r${j}`} src={src} sizes={sizes} side="r" j={j} />
+        <Strip key={`r${j}`} src={src} sizes={sizes} side="r" j={j} bend={bend} />
       ))}
     </>
   );
@@ -413,7 +447,7 @@ function Workbench() {
               >
                 <div aria-hidden className="bench-shadow absolute inset-0 opacity-0 shadow-[0_60px_80px_-20px_rgb(12_10_8/0.6)]" />
                 <div aria-hidden className="bench-border absolute -inset-[5px] shadow-[0_18px_30px_-12px_rgb(12_10_8/0.6)]" />
-                <Sheet src={s.src} sizes={s.sizes} />
+                <Sheet src={s.src} sizes={s.sizes} bend={s.bend} />
               </div>
             ))}
             {/* Falz und Papier über den eingeklebten Bildern: erst wenn alles liegt, wie die Bildunterschriften */}
