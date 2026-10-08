@@ -17,7 +17,8 @@ export const MAX_ORIGINAL = 12 * 1024 * 1024;
 
 export const fetchBitmap = async (url: string): Promise<Source> => {
   if (!bakeable(url)) throw new Error("Original liegt nicht im eigenen Speicher");
-  const res = await fetch(url, { mode: "cors", credentials: "omit" });
+  // Kopie ohne CORS-Freigabe im Cache: einmal frisch holen
+  const res = await fetch(url, { mode: "cors", credentials: "omit" }).catch(() => fetch(url, { mode: "cors", credentials: "omit", cache: "reload" }));
   if (!res.ok) throw new Error(`Original nicht erreichbar (HTTP ${res.status})`);
   const blob = await res.blob();
   if (blob.size > MAX_ORIGINAL) throw new Error("Original zu groß");
