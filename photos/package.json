@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "export": "STATIC_EXPORT=1 next build && node scripts/shrink-export.mjs"
+    "export": "STATIC_EXPORT=1 next build && node scripts/shrink-export.mjs",
+    "ios:build": "node scripts/ios-build.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3",
     "exifr": "^7.1.3",
     "firebase": "^12.19.0",
     "heic-to": "^1.6.5",
@@ -20,6 +23,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

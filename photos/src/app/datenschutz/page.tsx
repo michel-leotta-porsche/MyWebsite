@@ -82,6 +82,11 @@ export default function Page() {
           Name in deinem Konto. Wann du den Nutzungsbedingungen zugestimmt hast, speichere ich ebenfalls. Rechtsgrundlage ist Art. 6 Abs. 1
           lit. f DSGVO (Schutz vor Missbrauch) bzw. lit. b. Erledigte Meldungen lösche ich.
         </p>
+        <p>
+          Damit ich eine Meldung schnell sehe, bekomme ich sie per E-Mail: Grund, dein Text, Titel und Absender des Buchs, ohne deine
+          Nutzerkennung. Die Mail verschickt der Dienst Resend (Plus Five Five, Inc., USA) in meinem Auftrag, auf Grundlage seines
+          Auftragsverarbeitungsvertrags mit Standardvertragsklauseln.
+        </p>
       </LegalSection>
 
       <LegalSection title="Speicher auf deinem Gerät">
