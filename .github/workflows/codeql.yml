@@ -1,0 +1,48 @@
+# CodeQL: GitHubs eigener Sicherheitsscanner liest den Code (TypeScript, JavaScript, Workflows) und sucht Lücken
+# wie XSS, unsichere Weiterleitungen oder Secrets im Workflow. Für öffentliche Repos kostenlos.
+# Funde erscheinen unter Security → Code scanning und als Hinweis direkt im PR.
+# Nicht zusätzlich das „Default setup“ in den Einstellungen einschalten, sonst laufen zwei Scans gegeneinander.
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [claude/project-thread-d5e0a0]
+  # einmal pro Woche auch ohne Änderung, weil GitHub neue Regeln nachliefert
+  schedule:
+    - cron: "17 5 * * 1"
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyse:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v5
+      # kein Build nötig: CodeQL liest den Quelltext direkt
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - photos/ios
+              - photos/public
+              - "**/*.min.js"
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
