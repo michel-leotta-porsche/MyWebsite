@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://calima.web.app", "https://fujiventura.web.app", "https://fujiventura.firebaseapp.com", "capacitor://localhost", "http://localhost:3000"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range"],
+    "maxAgeSeconds": 3600
+  }
+]
