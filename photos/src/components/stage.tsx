@@ -58,6 +58,8 @@ type Drag = {
 
 /** Werkzeug der Bühne: Auswahl, Stift, Radierer oder eine Form zum Aufziehen */
 type Tool = "select" | "pen" | "eraser" | ShapeKind;
+/** Fächer der Leiste unten auf dem Handy */
+type Dock = "photos" | "text" | "draw" | "shapes";
 type Pt = { x: number; y: number };
 
 const HANDLES: { e: Edges; cls: string; cursor: string; name: string }[] = [
@@ -180,6 +182,10 @@ export function Stage({
   const [notice, setNotice] = useState("");
   /** Handy: Blatt mit den Ebenen */
   const [layersOpen, setLayersOpen] = useState(false);
+  /** Handy: offenes Fach der Leiste unten (null = zugeklappt) */
+  const [dock, setDock] = useState<Dock | null>("photos");
+  /** Handy: Menü hinter „…“ im Kopf */
+  const [moreOpen, setMoreOpen] = useState(false);
   /** Foto aus „Alle Fotos“ mit dem Finger auf die Seite ziehen (HTML-Drag gibt es auf dem iPhone nicht) */
   const pull = useRef<{ key: string; id: number; sx: number; sy: number; active: boolean } | null>(null);
   const pulled = useRef(false);
@@ -1323,63 +1329,191 @@ export function Stage({
       </ol>
   );
 
+  const toggleGrid = () =>
+    setGridOn((g) => {
+      try {
+        localStorage.setItem("fuji-grid", g ? "0" : "1");
+      } catch {}
+      return !g;
+    });
+
+  /** Handy: ein Werkzeug (auch per Kürzel oder Menü gewählt) zeigt sein Fach */
+  const activeDock: Dock | null = tool === "pen" || tool === "eraser" ? "draw" : tool !== "select" ? "shapes" : dock;
+  /** Handy: ein Fach öffnen; Zeichnen nimmt gleich den Stift, die anderen Fächer legen das Werkzeug weg */
+  const openDock = (d: Dock) => {
+    if (activeDock === d) {
+      setDock(null);
+      if (tool !== "select") setTool("select");
+      return;
+    }
+    setDock(d);
+    if (d === "draw") setTool(tool === "eraser" ? "eraser" : "pen");
+    else if (tool !== "select") setTool("select");
+  };
+
+  /** Fotos des Buchs zum Hineinholen: am Desktop unter der Doppelseite, am Handy im Fach „Fotos“ */
+  const photoStrip = (
+    <>
+      <ul tabIndex={0} aria-label="Fotos des Buchs" className={`flex gap-2 overflow-x-auto ${phone ? "pb-1" : "mt-2 pb-2"}`}>
+        {[...shelf.map((photo) => ({ photo, spread: -1 })), ...elsewhere].map(({ photo: ph, spread }) => (
+          <li key={ph.key} className="shrink-0">
+            <button
+              type="button"
+              draggable
+              onDragStart={(e) => e.dataTransfer.setData("text/x-photo", ph.key)}
+              onClick={() => {
+                // nach einem Zug mit dem Finger kein zweites Hinlegen
+                if (pulled.current) return void (pulled.current = false);
+                addPhoto(ph.key, curPage);
+              }}
+              onPointerDown={(e) => {
+                if (e.pointerType !== "touch") return;
+                pulled.current = false;
+                pull.current = { key: ph.key, id: e.pointerId, sx: e.clientX, sy: e.clientY, active: false };
+              }}
+              onPointerMove={(e) => {
+                const pl = pull.current;
+                if (!pl || pl.id !== e.pointerId) return;
+                if (!pl.active) {
+                  const dx = e.clientX - pl.sx;
+                  const dy = e.clientY - pl.sy;
+                  // waagerecht scrollt die Leiste, nach oben gezogen wird das Foto gegriffen
+                  if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx)) return;
+                  pl.active = true;
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }
+                setPullGhost({ src: ph.thumb, x: e.clientX, y: e.clientY });
+              }}
+              onPointerUp={(e) => {
+                const pl = pull.current;
+                pull.current = null;
+                setPullGhost(null);
+                if (!pl?.active) return;
+                pulled.current = true;
+                const r = layerEl.current?.getBoundingClientRect();
+                if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+                  const at = pointOf(e.clientX, e.clientY);
+                  addPhoto(pl.key, pageAt(at.x), at);
+                }
+              }}
+              onPointerCancel={() => {
+                pull.current = null;
+                setPullGhost(null);
+              }}
+              style={{ touchAction: "pan-x" }}
+              aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "beiseitegelegt" : `von Doppelseite ${spread + 1}`}`}
+              className="group block text-left select-none [-webkit-touch-callout:none]"
+            >
+              <span className="relative block h-16 w-16">
+                <Image src={ph.thumb} alt="" fill sizes="64px" className="object-cover transition-opacity duration-150 group-hover:opacity-80" draggable={false} />
+              </span>
+              <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? "Beiseite" : `Doppelseite ${spread + 1}`}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {notice && (
+        <p role="status" className="text-on-table mt-1 text-[13px]">
+          {notice}
+        </p>
+      )}
+    </>
+  );
+
+  const textButtons = () =>
+    (Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
+      <button
+        key={r}
+        type="button"
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
+        onClick={() => addText(r, curPage)}
+        className={`border-on-table/60 text-on-table hover:border-on-table cursor-grab border px-3 text-sm transition-colors duration-150 ${phone ? "min-h-11" : "mr-1 min-h-9"}`}
+        title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
+      >
+        + {TEXT_ROLE[r].label}
+      </button>
+    ));
+
+  const penColors = () => <Swatches value={pen.c} cloth={data.cloth.base} onPick={(c) => c && setPen((p) => ({ ...p, c }))} />;
+  const penWidths = () => (
+      <span className="flex gap-1" role="group" aria-label="Breite">
+        {PEN_SIZES.map((ps) => (
+          <button
+            key={ps.label}
+            type="button"
+            aria-pressed={pen.s === ps.s}
+            aria-label={`Breite ${ps.label}`}
+            title={ps.label}
+            onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
+            className={`flex h-9 w-9 items-center justify-center border ${pen.s === ps.s ? "border-on-table" : "border-transparent"}`}
+          >
+            <span aria-hidden className="bg-on-table block rounded-full" style={{ width: 4 + ps.s * 6, height: 4 + ps.s * 6 }} />
+          </button>
+        ))}
+      </span>
+  );
+
+  // Handy: die Leiste unten weicht der Text-Leiste und dem Zuschneiden
+  const dockShown = phone && !cropping && !(selected?.t === "text" && !draft);
+
   return (
     <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
+      {phone ? (
+        // Handy: eine schlanke Zeile; Raster, Ebenen und Zurücksetzen stehen hinter „…“
+        <header className="sticky top-0 z-30 flex items-center gap-1 bg-table/95 px-1 pt-[env(safe-area-inset-top)]">
+          <button type="button" data-stage-first onClick={onClose} className="text-on-table flex h-11 w-11 shrink-0 items-center justify-center">
+            <span className="sr-only">Zur Übersicht</span>
+            <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]">
+              <path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" strokeWidth={1.8} />
+            </svg>
+          </button>
+          <span className="text-on-table min-w-0 flex-1 truncate font-semibold">Doppelseite {index + 1}</span>
+          <IconButton label="Rückgängig" disabled={!canUndo} onClick={onUndo} d="M9 5L4 10l5 5 M4 10h11a5 5 0 010 10h-3" />
+          <IconButton label="Wiederholen" disabled={!canRedo} onClick={onRedo} d="M15 5l5 5-5 5 M20 10H9a5 5 0 000 10h3" />
+          <IconButton label="Mehr" aria-expanded={moreOpen} aria-haspopup="menu" onClick={() => setMoreOpen((o) => !o)} dots />
+        </header>
+      ) : (
       <header className="sticky top-0 z-30 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 bg-table/95 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 md:px-8">
-        <span className="flex items-baseline gap-5">
-          <TextButton data-stage-first onClick={onClose}>
-            ← Zur Übersicht
-          </TextButton>
-          <span className="text-on-table font-semibold">Doppelseite {index + 1}</span>
-          <span className="text-on-table-2 hidden text-sm md:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
-        </span>
-        <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
-          <TextButton disabled={!canUndo} onClick={onUndo}>
-            Rückgängig
-          </TextButton>
-          <TextButton disabled={!canRedo} onClick={onRedo}>
-            Wiederholen
-          </TextButton>
-          <TextButton
-            aria-pressed={gridOn}
-            onClick={() =>
-              setGridOn((g) => {
-                try {
-                  localStorage.setItem("fuji-grid", g ? "0" : "1");
-                } catch {}
-                return !g;
-              })
-            }
-            title="Raster zeigen (G)"
-          >
-            Raster {gridOn ? "aus" : "an"}
-          </TextButton>
-          {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
-          <TextButton onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
-            Auf Vorschlag zurücksetzen
-          </TextButton>
-        </span>
-      </header>
+          <span className="flex items-baseline gap-5">
+            <TextButton data-stage-first onClick={onClose}>
+              ← Zur Übersicht
+            </TextButton>
+            <span className="text-on-table font-semibold">Doppelseite {index + 1}</span>
+            <span className="text-on-table-2 hidden text-sm md:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
+          </span>
+          <span className="text-on-table-2 flex flex-wrap items-baseline gap-x-5 gap-y-2 text-sm">
+            <TextButton disabled={!canUndo} onClick={onUndo}>
+              Rückgängig
+            </TextButton>
+            <TextButton disabled={!canRedo} onClick={onRedo}>
+              Wiederholen
+            </TextButton>
+            <TextButton aria-pressed={gridOn} onClick={toggleGrid} title="Raster zeigen (G)">
+              Raster {gridOn ? "aus" : "an"}
+            </TextButton>
+            {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
+            <TextButton onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
+              Auf Vorschlag zurücksetzen
+            </TextButton>
+          </span>
+        </header>
+      )}
 
       <p className="sr-only" aria-live="polite">
         {say}
       </p>
 
-      <div className={`grid gap-8 px-4 pb-24 md:px-8 ${phone ? "" : "md:grid-cols-[minmax(0,1fr)_300px]"}`}>
+      <div className={`grid gap-8 px-4 md:px-8 ${phone ? (landscape ? "pb-8" : "pb-[calc(200px+env(safe-area-inset-bottom))]") : "pb-24 md:grid-cols-[minmax(0,1fr)_300px]"}`}>
         <div ref={wrap} className="min-w-0">
           {narrow && (
-            <div className="mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm" role="group" aria-label="Ansicht">
+            <div className={`mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${phone ? "mt-1" : ""}`} role="group" aria-label="Ansicht">
               {(["all", 0, 1] as const).map((v) => (
                 <TextButton key={v} aria-pressed={view === v} className={view === v ? "font-semibold" : ""} onClick={() => camTo(v)}>
                   {v === "all" ? "Ganze Doppelseite" : v === 0 ? "Links" : "Rechts"}
                 </TextButton>
               ))}
               <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
-              {phone && shown.length > 1 && (
-                <TextButton className="ml-auto" aria-expanded={layersOpen} onClick={() => setLayersOpen((o) => !o)}>
-                  Ebenen
-                </TextButton>
-              )}
             </div>
           )}
           {phone && layersOpen && shown.length > 1 && (
@@ -1421,7 +1555,7 @@ export function Stage({
               </TextButton>
               <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
             </div>
-          ) : (
+          ) : phone ? null : (
           <div className="mb-4 space-y-2">
             <div className="flex flex-wrap items-center gap-x-1 gap-y-2" role="toolbar" aria-label="Werkzeuge">
               {(["select", "pen", "eraser"] as const).map((t) => (
@@ -1432,38 +1566,12 @@ export function Stage({
                 <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
               ))}
               <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />
-              {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  draggable
-                  onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
-                  onClick={() => addText(r, curPage)}
-                  className="border-on-table/60 text-on-table hover:border-on-table mr-1 min-h-9 cursor-grab border px-3 text-sm transition-colors duration-150"
-                  title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
-                >
-                  + {TEXT_ROLE[r].label}
-                </button>
-              ))}
+              {textButtons()}
             </div>
             {tool === "pen" && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label="Stift">
-                <Swatches value={pen.c} cloth={data.cloth.base} onPick={(c) => c && setPen((p) => ({ ...p, c }))} />
-                <span className="flex gap-1" role="group" aria-label="Breite">
-                  {PEN_SIZES.map((ps) => (
-                    <button
-                      key={ps.label}
-                      type="button"
-                      aria-pressed={pen.s === ps.s}
-                      aria-label={`Breite ${ps.label}`}
-                      title={ps.label}
-                      onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
-                      className={`flex h-9 w-9 items-center justify-center border ${pen.s === ps.s ? "border-on-table" : "border-transparent"}`}
-                    >
-                      <span aria-hidden className="bg-on-table block rounded-full" style={{ width: 4 + ps.s * 6, height: 4 + ps.s * 6 }} />
-                    </button>
-                  ))}
-                </span>
+                {penColors()}
+                {penWidths()}
                 <span className="text-on-table-2 text-[13px]">{coarse ? "Mit dem Stift zeichnen; der Finger zeichnet nicht, sobald ein Stift da war." : "Zeichnen mit Maus oder Stift. Esc oder V beendet."}</span>
               </div>
             )}
@@ -1774,7 +1882,7 @@ export function Stage({
               />
             </div>
           )}
-          {(shelf.length > 0 || elsewhere.length > 0) && (
+          {!phone && (shelf.length > 0 || elsewhere.length > 0) && (
             <section aria-label="Alle Fotos" className="mt-5">
               <p className="text-on-table text-sm font-semibold">
                 Alle Fotos{" "}
@@ -1782,69 +1890,7 @@ export function Stage({
                   · {coarse ? "antippen oder nach oben auf die Seite ziehen" : "ziehen oder antippen legt sie auf die Seite"}, von anderen Doppelseiten wandern sie herüber
                 </span>
               </p>
-              <ul tabIndex={0} aria-label="Fotos des Buchs" className="mt-2 flex gap-2 overflow-x-auto pb-2">
-                {[...shelf.map((photo) => ({ photo, spread: -1 })), ...elsewhere].map(({ photo: ph, spread }) => (
-                  <li key={ph.key} className="shrink-0">
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => e.dataTransfer.setData("text/x-photo", ph.key)}
-                      onClick={() => {
-                        // nach einem Zug mit dem Finger kein zweites Hinlegen
-                        if (pulled.current) return void (pulled.current = false);
-                        addPhoto(ph.key, curPage);
-                      }}
-                      onPointerDown={(e) => {
-                        if (e.pointerType !== "touch") return;
-                        pulled.current = false;
-                        pull.current = { key: ph.key, id: e.pointerId, sx: e.clientX, sy: e.clientY, active: false };
-                      }}
-                      onPointerMove={(e) => {
-                        const pl = pull.current;
-                        if (!pl || pl.id !== e.pointerId) return;
-                        if (!pl.active) {
-                          const dx = e.clientX - pl.sx;
-                          const dy = e.clientY - pl.sy;
-                          // waagerecht scrollt die Leiste, nach oben gezogen wird das Foto gegriffen
-                          if (Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx)) return;
-                          pl.active = true;
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                        }
-                        setPullGhost({ src: ph.thumb, x: e.clientX, y: e.clientY });
-                      }}
-                      onPointerUp={(e) => {
-                        const pl = pull.current;
-                        pull.current = null;
-                        setPullGhost(null);
-                        if (!pl?.active) return;
-                        pulled.current = true;
-                        const r = layerEl.current?.getBoundingClientRect();
-                        if (r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-                          const at = pointOf(e.clientX, e.clientY);
-                          addPhoto(pl.key, pageAt(at.x), at);
-                        }
-                      }}
-                      onPointerCancel={() => {
-                        pull.current = null;
-                        setPullGhost(null);
-                      }}
-                      style={{ touchAction: "pan-x" }}
-                      aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "beiseitegelegt" : `von Doppelseite ${spread + 1}`}`}
-                      className="group block text-left select-none [-webkit-touch-callout:none]"
-                    >
-                      <span className="relative block h-16 w-16">
-                        <Image src={ph.thumb} alt="" fill sizes="64px" className="object-cover transition-opacity duration-150 group-hover:opacity-80" draggable={false} />
-                      </span>
-                      <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? "Beiseite" : `Doppelseite ${spread + 1}`}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {notice && (
-                <p role="status" className="text-on-table mt-1 text-[13px]">
-                  {notice}
-                </p>
-              )}
+              {photoStrip}
             </section>
           )}
           {pullGhost && (
@@ -1857,12 +1903,16 @@ export function Stage({
               style={{ left: pullGhost.x, top: pullGhost.y, translate: "-50% -75%" }}
             />
           )}
-          {narrow && coarse && (
+          {phone ? (
+            <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
+              Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken zeigt alles, was mit dem Element geht.
+            </p>
+          ) : narrow && coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
               Zwei Finger zoomen und verschieben die Ansicht, Doppeltippen aufs freie Papier holt eine Seite groß und wieder zurück. Zwei Finger auf dem gewählten Foto ändern seine Größe.
             </p>
-          )}
-          {coarse ? (
+          ) : null}
+          {phone ? null : coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
               Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.
               Lange drücken zeigt alles, was mit dem Element geht.
@@ -2017,6 +2067,99 @@ export function Stage({
         </aside>
       </div>
 
+      {dockShown && (
+        // Handy: vier Fächer in Daumenreichweite, eins ist offen; quer steht die Leiste unter der Doppelseite
+        <nav aria-label="Werkzeuge" className={`${landscape ? "relative" : "fixed inset-x-0 bottom-0"} bg-table-deep border-on-table/15 z-[75] border-t pb-[env(safe-area-inset-bottom)]`}>
+          {activeDock && (
+            <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={DOCKS[activeDock].label}>
+              {activeDock === "photos" &&
+                (shelf.length > 0 || elsewhere.length > 0 ? (
+                  photoStrip
+                ) : (
+                  <p className="text-on-table-2 text-[13px]">Alle Fotos des Buchs liegen schon auf dieser Doppelseite.</p>
+                ))}
+              {activeDock === "text" && (
+                <>
+                  <div className="flex flex-wrap gap-2">{textButtons()}</div>
+                  <p className="text-on-table-2 mt-2 text-[13px]">Doppeltippen auf einen Text schreibt.</p>
+                </>
+              )}
+              {activeDock === "draw" && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1">
+                    {(["pen", "eraser"] as const).map((t) => (
+                      <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(t)} />
+                    ))}
+                    {tool === "pen" && <span aria-hidden className="bg-on-table/30 mx-2 h-6 w-px" />}
+                    {tool === "pen" && penWidths()}
+                  </div>
+                  {tool === "pen" ? (
+                    penColors()
+                  ) : (
+                    <p className="text-on-table-2 text-[13px]">Über Striche wischen löscht sie. Formen und Fotos bleiben.</p>
+                  )}
+                </div>
+              )}
+              {activeDock === "shapes" && (
+                <>
+                  <div className="flex items-center gap-1">
+                    {(Object.keys(SHAPES) as ShapeKind[]).map((t) => (
+                      <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t ? "select" : t)} />
+                    ))}
+                  </div>
+                  <p className="text-on-table-2 mt-2 text-[13px]">
+                    {tool === "select" ? "Form wählen, dann auf der Seite aufziehen." : `${SHAPES[tool as ShapeKind].label} aufziehen, ein Tipp legt sie hin.`}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+          <div className="grid grid-cols-4">
+            {(Object.keys(DOCKS) as Dock[]).map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={activeDock === d}
+                onClick={() => openDock(d)}
+                className={`flex h-14 flex-col items-center justify-center gap-0.5 text-[12px] transition-colors duration-150 ${activeDock === d ? "text-on-table shadow-[inset_0_2px_var(--mark)]" : "text-on-table-2"}`}
+              >
+                <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round">
+                  {DOCKS[d].icon}
+                </svg>
+                {DOCKS[d].label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+      {/* Handy: Menü hinter „…“; liegt außerhalb des Kopfs, damit es auch die Leiste unten überdeckt */}
+      {phone && moreOpen && (
+        <>
+          <div className="fixed inset-0 z-[84]" onPointerDown={() => setMoreOpen(false)} />
+          <div role="menu" aria-label="Mehr" onKeyDown={(e) => e.key === "Escape" && setMoreOpen(false)} className="slip text-ink fixed top-[calc(env(safe-area-inset-top)+44px)] right-2 z-[85] w-64 shadow-[0_18px_36px_-10px_rgb(12_10_8/0.8)]">
+            {[
+              { label: gridOn ? "Raster ausblenden" : "Raster zeigen", run: toggleGrid, show: true },
+              { label: "Ebenen", run: () => setLayersOpen(true), show: shown.length > 1 },
+              { label: "Auf Vorschlag zurücksetzen", run: onReset, show: free },
+            ]
+              .filter((m) => m.show)
+              .map((m) => (
+                <button
+                  key={m.label}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    m.run();
+                  }}
+                  className="border-ink/10 block min-h-12 w-full border-t px-4 text-left first:border-t-0"
+                >
+                  {m.label}
+                </button>
+              ))}
+          </div>
+        </>
+      )}
       {menu && <ContextMenu x={menu.cx} y={menu.cy} sheet={coarse} entries={menuEntries()} onClose={() => setMenu(null)} />}
       {cropItem && cropItem.t === "photo" && photos.get(cropItem.key) && (
         <CropDialog
@@ -2725,6 +2868,45 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
         <input type="color" value={value ?? "#1b1c1a"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
       </label>
     </span>
+  );
+}
+
+const DOCKS: Record<Dock, { label: string; icon: React.ReactNode }> = {
+  photos: {
+    label: "Fotos",
+    icon: (
+      <>
+        <rect x={3} y={5} width={18} height={14} />
+        <path d="M3 16l5-5 4 4 3-3 6 6" />
+      </>
+    ),
+  },
+  text: { label: "Text", icon: <path d="M5 6V4h14v2 M12 4v16 M9 20h6" /> },
+  draw: { label: "Zeichnen", icon: <path d="M4 20c3-1 5-6 9-10l4-4 2 2-4 4c-4 4-8 6-11 8z M15 6l2 2" /> },
+  shapes: {
+    label: "Formen",
+    icon: (
+      <>
+        <rect x={3} y={11} width={10} height={9} />
+        <circle cx={16} cy={8} r={5} />
+      </>
+    ),
+  },
+};
+
+/** Knopf nur mit Zeichen (Kopf auf dem Handy); der Name steht für Screenreader daneben */
+function IconButton({ label, d, dots, ...rest }: { label: string; d?: string; dots?: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" title={label} className="text-on-table flex h-11 w-11 shrink-0 items-center justify-center disabled:opacity-35" {...rest}>
+      <span className="sr-only">{label}</span>
+      <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px]">
+        {dots ? (
+          [5, 12, 19].map((cx) => <circle key={cx} cx={cx} cy={12} r={1.8} fill="currentColor" />)
+        ) : (
+          <path d={d} fill="none" stroke="currentColor" strokeWidth={1.7} />
+        )}
+      </svg>
+    </button>
   );
 }
 
