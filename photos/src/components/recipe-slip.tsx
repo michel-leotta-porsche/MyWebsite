@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 
 import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
+import { describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -307,6 +308,27 @@ function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean })
   );
 }
 
+/** Was im Editor nachbearbeitet wurde; die Rezeptwerte sind nachempfunden, nicht von der Kamera */
+function EditSlip({ edit, reduce }: { edit: PhotoEdit; reduce: boolean }) {
+  return (
+    <div>
+      <p className="text-ink-2 mb-2 text-[12px]">Nachbearbeitet in Calima (nachempfunden)</p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+        {describeEdit(edit).map((r, i) => (
+          <div key={r.label} className="contents">
+            <dt className="text-ink-2">{r.label}</dt>
+            <dd className="text-ink">
+              <Roll i={i} reduce={reduce}>
+                {r.value}
+              </Roll>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 const noopSubscribe = () => () => {};
 
 /**
@@ -331,8 +353,9 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
-  const kind = recipe?.kind === "fuji" ? "Fuji-Rezept" : recipe?.kind === "lightroom" ? "Lightroom-Preset" : "Kamera";
-  const title = recipe?.name ?? camera?.device ?? "";
+  const edit = isNeutral(plate.edit) ? null : plate.edit!;
+  const kind = recipe?.kind === "fuji" ? "Fuji-Rezept" : recipe?.kind === "lightroom" ? "Lightroom-Preset" : camera ? "Kamera" : "Bearbeitung";
+  const title = recipe?.name ?? camera?.device ?? "Nachbearbeitet";
 
   return (
     <motion.aside
@@ -369,6 +392,8 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       {recipe?.kind === "lightroom" && <LightroomSlip recipe={recipe} reduce={reduce} />}
       {recipe && camera && <div className="my-4 border-t border-ink/15" />}
       {camera && <CameraSlip camera={camera} reduce={reduce} />}
+      {edit && (recipe || camera) && <div className="my-4 border-t border-ink/15" />}
+      {edit && <EditSlip edit={edit} reduce={reduce} />}
       {recipe?.placeholder && (
         <p className="text-ink-2 mt-4 text-[12px]">
           {recipe.kind === "fuji"

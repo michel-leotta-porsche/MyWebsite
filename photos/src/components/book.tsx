@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { pageNos, plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { headPlates } from "@/content/layout";
-import { hasSlip, recipeOf } from "@/content/recipes";
+import { cameraOf, hasSlip, recipeOf } from "@/content/recipes";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
 import { JumpContext, PageView } from "@/components/page-view";
 import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
@@ -703,7 +703,7 @@ export function Book({
   const pw = pageWidth(book, mode);
   const slipNos = current
     .filter((no) => hasSlip(plateOf(book, no)))
-    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : "Kamera", title: plateOf(book, no).title }));
+    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : cameraOf(plateOf(book, no)) ? "Kamera" : "Bearbeitung", title: plateOf(book, no).title }));
 
   return (
     <section
