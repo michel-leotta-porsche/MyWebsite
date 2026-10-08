@@ -69,14 +69,14 @@ export function Carousel({
   children?: ReactNode;
 }) {
   const list = useRef<HTMLUListElement>(null);
-  const [settled, setSettled] = useState(0);
   const [near, setNear] = useState(0);
   const moving = useRef(false);
   const reduce = useReducedMotion();
   const books = slides.filter((s) => s.book).length;
   const shown = slides.length > 0;
   const clamp = (i: number) => Math.min(Math.max(i, 0), Math.max(0, slides.length - 1));
-  const current = clamp(settled);
+  // das Panel folgt dem Buch, das gerade am nächsten an der Mitte liegt, schon während des Wischens
+  const current = clamp(near);
 
   const paint = () => (list.current ? paintRow(list.current) : 0);
 
@@ -90,7 +90,6 @@ export function Carousel({
     const li = ul.children[i] as HTMLElement | undefined;
     if (li) ul.scrollLeft = li.offsetLeft - (ul.clientWidth - li.offsetWidth) / 2;
     paint();
-    setSettled(i);
     setNear(i);
     // nur beim Erscheinen der Reihe; spätere Wechsel macht der Finger
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,16 +97,50 @@ export function Carousel({
 
   useEffect(() => {
     const ul = list.current;
-    if (!ul) return;
+    const row = ul?.parentElement;
+    if (!ul || !row) return;
     let frame = 0;
     let rest = 0;
+    // Schwung: Zettel und Lampe hängen an einer Feder, die der Wischgeschwindigkeit folgt und nach dem Einrasten nachschwingt
+    let lean = 0;
+    let speed = 0;
+    let target = 0;
+    let lastX = ul.scrollLeft;
+    let lastT = performance.now();
+    let spring = 0;
+    const step = (t: number) => {
+      const dt = Math.min((t - lastT) / 1000, 1 / 30);
+      lastT = t;
+      // Feder mit Masse 1: Steifigkeit 300, Dämpfung 14 (schwingt einmal sichtbar nach)
+      speed += (-300 * (lean - target) - 14 * speed) * dt;
+      lean += speed * dt;
+      target *= 0.85;
+      row.style.setProperty("--lean", lean.toFixed(2));
+      if (Math.abs(lean) > 0.02 || Math.abs(speed) > 0.05 || Math.abs(target) > 0.02) spring = requestAnimationFrame(step);
+      else {
+        spring = 0;
+        row.style.setProperty("--lean", "0");
+      }
+    };
+    const push = () => {
+      const now = performance.now();
+      const v = (ul.scrollLeft - lastX) / Math.max(now - lastT, 8);
+      lastX = ul.scrollLeft;
+      // nach links gewischt (Reihe läuft nach rechts) lehnen sich die Zettel nach links, wie vom Fahrtwind
+      target = Math.max(-14, Math.min(14, -v * 9));
+      if (!spring) {
+        lastT = now;
+        spring = requestAnimationFrame(step);
+      }
+    };
     const settle = () => {
       moving.current = false;
       const i = paint();
-      setSettled(i);
+      setNear(i);
     };
     const onScroll = () => {
       moving.current = true;
+      if (!reduce) push();
       if (!frame)
         frame = requestAnimationFrame(() => {
           frame = 0;
@@ -126,9 +159,10 @@ export function Carousel({
       ul.removeEventListener("scrollend", settle);
       window.removeEventListener("resize", onResize);
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(spring);
       window.clearTimeout(rest);
     };
-  }, [shown]);
+  }, [shown, reduce]);
 
   // neue Bücher (z. B. nach dem Laden der Geschenke) bekommen ihre Größe sofort
   useEffect(() => {
@@ -193,6 +227,10 @@ export function Carousel({
                     decor={
                       <>
                         {s.decor}
+                        {/* Glanz auf dem Leinen: wandert mit der Drehung über den Einband */}
+                        <span aria-hidden className="cover-sheen">
+                          <span />
+                        </span>
                         {/* Halbschatten für die Nachbarn: liegt nur auf dem Einband, nicht auf dem Tisch */}
                         <span aria-hidden className="cover-shade" />
                       </>
@@ -247,7 +285,7 @@ export function Carousel({
               </>
             )}
           </div>
-          {/* wechselt erst beim Einrasten; der Schlüssel spielt das Einblenden einmal ab */}
+          {/* wechselt, sobald ein anderes Buch näher an der Mitte liegt; der Schlüssel spielt das Einblenden einmal ab */}
           <div className="room-panel" aria-live="polite">
             <div key={slide?.key} className="room-panel-in">
               {slide && panel(slide)}
@@ -271,7 +309,7 @@ export function SlipTabs({ names, fresh = [] }: { names: string[]; fresh?: strin
           key={n}
           aria-hidden
           className="slip-tab"
-          style={{ left: `${9 + i * 29}%`, rotate: `${[-2, 1.5, -1][i]}deg`, translate: `0 ${[0, 4, 1][i]}px` }}
+          style={{ left: `${9 + i * 29}%`, ["--r" as string]: `${[-2, 1.5, -1][i]}deg`, ["--k" as string]: [1, 0.8, 1.15][i], translate: `0 ${[0, 4, 1][i]}px` }}
         >
           {fresh.includes(n) && <span className="bg-mark absolute inset-x-0 top-0 h-[3px]" />}
           {i === 2 && rest > 0 ? `+${rest + 1}` : n}

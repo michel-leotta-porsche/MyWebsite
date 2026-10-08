@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { books as sampleBooks, type BookData } from "@/content/books";
 import { linkClass, RequireUser, RoomNav, SlipDialog, TextButton, UndoToast, Wordmark } from "@/components/app-ui";
@@ -562,8 +562,12 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
           {notes.slice(0, 2).map((n, i) => (
             <span
               key={`${n.token}-${n.id}`}
-              className={`note-paper col-start-1 row-start-1 block w-[86%] px-4 pt-3 pb-3 ${isNew(n) ? "is-new" : ""}`}
-              style={i === 0 ? { rotate: "-1deg", zIndex: 2 } : { rotate: "1.5deg", translate: "14px 12px", zIndex: 1 }}
+              className={`note-paper deal col-start-1 row-start-1 block w-[86%] px-4 pt-3 pb-3 ${isNew(n) ? "is-new" : ""}`}
+              style={
+                (i === 0
+                  ? { rotate: "-1deg", zIndex: 2, ["--d" as string]: 1 }
+                  : { rotate: "1.5deg", translate: "14px 12px", zIndex: 1, ["--d" as string]: 0 }) as CSSProperties
+              }
               aria-hidden={i > 0}
             >
               <span className="line-clamp-2 text-[23px] leading-[1.02]" style={{ fontFamily: "var(--font-hand), cursive" }}>
@@ -577,7 +581,11 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
       {ears.length > 0 && (
         <ul className={`flex items-end ${notes.length > 1 ? "mt-3" : ""}`}>
           {ears.slice(0, 3).map((e, i) => (
-            <li key={`${e.token}-${e.id}`} className={i > 0 ? "-ml-6" : ""} style={{ rotate: `${[-3, 2, -1.5][i]}deg`, zIndex: 3 - i }}>
+            <li
+              key={`${e.token}-${e.id}`}
+              className={`deal ${i > 0 ? "-ml-6" : ""}`}
+              style={{ rotate: `${[-3, 2, -1.5][i]}deg`, zIndex: 3 - i, ["--d" as string]: 2 + i } as CSSProperties}
+            >
               <button type="button" onClick={() => open(book.id, e.no)} className="press ear-print" aria-label={`${e.who} hat Tafel ${e.no} geknickt. Dort aufschlagen`}>
                 <EarPhoto book={book} no={e.no} />
               </button>
