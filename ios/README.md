@@ -10,6 +10,12 @@ ausgeliefert (Capacitor, keine Website-Adresse). Die Seiten liegen unter `capaci
 3. `npm run ios:build` baut die App-Fassung, prüft sie und kopiert sie nach `ios/App/App/public`.
 4. `npx cap open ios` öffnet Xcode. Unter Signing & Capabilities das eigene Team wählen, Gerät wählen, Run.
 
+## TestFlight mit einem Befehl
+
+`npm run ios:release` auf `main`: holt den neuesten Stand, baut die App-Fassung, archiviert und lädt zu App Store Connect
+hoch. Signiert wird mit dem Apple-Konto, das in Xcode angemeldet ist. Die Build-Nummer ist Datum und Uhrzeit (z. B.
+`202610091430`), der Build landet nach der Verarbeitung in TestFlight.
+
 ## TestFlight über Xcode Cloud
 
 Jeder Merge auf `main` baut die App in Xcode Cloud und legt sie in TestFlight. `ci_scripts/ci_post_clone.sh` macht
