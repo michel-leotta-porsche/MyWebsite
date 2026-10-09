@@ -925,9 +925,23 @@ html.ohne-struktur .printed::after {
 .studio-slot[data-lift] .studio-sheen {
   opacity: 1;
 }
+/* Stapel: zwei Abzüge unter dem obersten, angehoben fächern sie auf (--f: −1 links, 1 rechts) */
+.studio-fan {
+  rotate: calc(var(--f) * 5deg);
+  translate: calc(var(--f) * 3px) 0;
+  transform-origin: 50% 90%;
+  transition:
+    rotate 500ms var(--ease-out),
+    translate 500ms var(--ease-out);
+}
+.studio-slot[data-lift] .studio-fan {
+  rotate: calc(var(--f) * 13deg);
+  translate: calc(var(--f) * 18px) -4px;
+}
 @media (prefers-reduced-motion: reduce) {
   .studio-sheet,
   .studio-shadow,
+  .studio-fan,
   .studio-shadow-lift,
   .studio-sheen {
     transition: none;

@@ -74,6 +74,26 @@ export async function saveFile(name: string, data: string | Blob, mime: string):
   }
 }
 
+/**
+ * Mehrere Dateien in einem Teilen-Blatt (in der App), dort „{n} Bilder sichern“. Im Browser übernimmt das der Aufrufer
+ * (navigator.share muss direkt im Tipp laufen, am Rechner eine ZIP-Datei).
+ */
+export async function saveFilesInApp(files: File[]): Promise<ShareResult> {
+  const [{ Filesystem, Directory }, { Share }] = await Promise.all([import("@capacitor/filesystem"), import("@capacitor/share")]);
+  const paths = files.map((f, i) => `export/${i + 1}-${safeFileName(f.name.replace(/\.[^.]+$/, ""), f.name.match(/\.[^.]+$/)?.[0] ?? "")}`);
+  try {
+    const uris: string[] = [];
+    // nacheinander, damit nicht alle Fotos zugleich als Base64 im Speicher liegen
+    for (const [i, f] of files.entries()) uris.push((await Filesystem.writeFile({ path: paths[i], data: await base64(f), directory: Directory.Cache, recursive: true })).uri);
+    await Share.share({ files: uris });
+    return "shared";
+  } catch (e) {
+    return cancelled(e) ? "cancelled" : "failed";
+  } finally {
+    for (const path of paths) Filesystem.deleteFile({ path, directory: Directory.Cache }).catch(() => {});
+  }
+}
+
 const base64 = (b: Blob) =>
   new Promise<string>((ok, fail) => {
     const r = new FileReader();
