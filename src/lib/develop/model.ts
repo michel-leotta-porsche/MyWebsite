@@ -47,9 +47,11 @@ export type PhotoEdit = {
   levels: [number, number] | null;
   /** Auto, Angleichen oder Stimmung: Farbübertragung in Lab */
   transfer: Transfer | null;
-  origin: "auto" | "match" | "mood" | null;
+  origin: "auto" | "match" | "mood" | "pick" | null;
   /** bei „Stimmung“: Titel oder Nummer des Vorbilds, nur für den Zettel */
   moodFrom?: string;
+  /** bei einem fertigen Vorschlag: welcher */
+  pick?: PickId;
   rec: RecipeValues;
   /** Name des gewählten Rezepts (auch wenn danach Werte geändert wurden) */
   recName?: string;
@@ -164,7 +166,8 @@ export function cleanEdit(e: unknown): PhotoEdit | undefined {
     amount: num(x.amount, 0, 1, 0.8),
     levels: lv && lv[1] > lv[0] ? (lv as [number, number]) : null,
     transfer,
-    origin: oneOf(x.origin, [null, "auto", "match", "mood"] as const, null),
+    origin: oneOf(x.origin, [null, "auto", "match", "mood", "pick"] as const, null),
+    pick: oneOf(x.pick, [undefined, ...PICKS.map((p) => p.id)], undefined),
     moodFrom: str(x.moodFrom, 60),
     rec: {
       film: oneOf(r.film, [null, ...LOOK_IDS], null),
@@ -669,6 +672,45 @@ export function stats(px: Uint8ClampedArray): PhotoStats {
 }
 
 /** Auto: Tonwerte spreizen und den Farbstich zur Hälfte nehmen */
+/* ---------- Fertige Vorschläge: Auto als Grundlage, darauf ein abgestimmter Satz aus Look und Reglern ---------- */
+
+export type PickId = "klar" | "film" | "sw";
+export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdit>; more: Partial<More> }[] = [
+  {
+    id: "klar",
+    name: "Klar",
+    txt: "frisch, kräftig, knackig",
+    e: { contrast: 0.18, exposure: 0.04 },
+    more: { highlights: -0.3, whites: 0.12, blacks: -0.12, vibrance: 0.32, clarity: 0.3 },
+  },
+  {
+    id: "film",
+    name: "Warmer Film",
+    txt: "weich und warm, wie analog",
+    e: { look: "sommer", amount: 0.65, shadows: 0.15, warmth: 0.12 },
+    more: {
+      vignette: -0.3,
+      curve: [
+        [0, 0.05],
+        [0.5, 0.52],
+        [1, 0.97],
+      ],
+    },
+  },
+  {
+    id: "sw",
+    name: "Schwarzweiß",
+    txt: "kräftiger Kontrast, dunkle Ränder",
+    e: { look: "kohle", amount: 1, contrast: 0.28 },
+    more: { blacks: -0.15, clarity: 0.35, vignette: -0.35 },
+  },
+];
+/** Vorschlag auf ein Foto: Farbe und Licht neu, Zuschnitt und Rezept bleiben */
+export function pickEdit(st: PhotoStats, id: PickId, base: PhotoEdit): PhotoEdit {
+  const p = PICKS.find((x) => x.id === id)!;
+  return { ...neutralEdit(), rec: base.rec, recName: base.recName, geo: base.geo, ...autoEdit(st), ...p.e, more: { ...MORE0(), ...p.more }, origin: "pick", pick: id };
+}
+
 export function autoEdit(st: PhotoStats): Pick<PhotoEdit, "levels" | "transfer"> {
   return {
     levels: [Math.min(0.1, st.p01 * 0.8), Math.max(0.88, st.p99 + (1 - st.p99) * 0.2)],
@@ -706,6 +748,7 @@ export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   if (e.origin === "auto") rows.push({ label: "Vorschlag", value: "Auto" });
   if (e.origin === "match") rows.push({ label: "Vorschlag", value: "an die Doppelseite angeglichen" });
   if (e.origin === "mood") rows.push({ label: "Vorschlag", value: e.moodFrom ? `Stimmung von ${e.moodFrom}` : "Stimmung übernommen" });
+  if (e.origin === "pick") rows.push({ label: "Vorschlag", value: PICKS.find((p) => p.id === e.pick)?.name ?? "fertiger Vorschlag" });
   const R = e.rec;
   if (!recipeIsEmpty(R)) {
     const preset = [...PRESETS].find((p) => sameRecipe(p.v, R));
