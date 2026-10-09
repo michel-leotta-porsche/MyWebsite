@@ -388,12 +388,15 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private func grained(_ image: CIImage) -> CIImage {
         guard let noise else { return image }
         let cellPx = max(1, CGFloat(grainCell) * image.extent.width)
-        grainTick &+= 1
-        let shift = CGFloat(grainTick % 977) * 13
+        // jedes Bild ein frisches Stück Rauschen (Zufallsversatz weit auseinander), nicht ein gleichmäßig weitergeschobenes:
+        // das liest das Auge sonst als Wind, der über den Sucher zieht
+        grainTick = grainTick &* 1664525 &+ 1013904223
+        let dx = CGFloat((grainTick >> 8) & 0x3fff) * cellPx
+        let dy = CGFloat((grainTick >> 18) & 0x3fff) * cellPx
         let k = CGFloat(grainAmount) * 2
         let grain = noise
             .samplingNearest()
-            .transformed(by: CGAffineTransform(translationX: shift, y: shift * 0.37).scaledBy(x: cellPx, y: cellPx))
+            .transformed(by: CGAffineTransform(translationX: dx, y: dy).scaledBy(x: cellPx, y: cellPx))
             .applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0),
                 "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
