@@ -5,7 +5,7 @@ import { test } from "node:test";
 import exifr from "exifr";
 
 import { readFujiRecipe } from "@/lib/fuji";
-import { applySettings, cleanSettings, fromEdit, fromFuji, fromLightroom, thinCurve } from "@/lib/develop/settings";
+import { applySettings, bookLooks, cleanSettings, fromEdit, fromFuji, fromLightroom, sameSettings, thinCurve } from "@/lib/develop/settings";
 import { neutralEdit, PRESETS } from "@/lib/develop/model";
 import { parseXmp, toPreset } from "@/lib/xmp";
 import { CLASSIC_CHROME, dng, fujiNote, jpeg, LR_XMP } from "./fixtures.mjs";
@@ -121,4 +121,24 @@ test("Zwischenablage aus dem Speicher wird geprüft", () => {
   assert.equal(evil.rec.wbR, 9);
   assert.equal(evil.rec.film, null);
   assert.equal(evil.f.exposure, 1);
+});
+
+test("Looks in diesem Buch: zusammengefasst, meistbenutzte zuerst, Kleinigkeiten zählen nicht", () => {
+  const warm = { ...neutralEdit(), warmth: 0.4, exposure: 0.2 };
+  const photos = [
+    { key: "a", edit: { ...warm, recName: "Japan warm" }, at: 2 },
+    { key: "b", edit: { ...neutralEdit(), look: "kohle" as const, amount: 1 }, at: 3 },
+    { key: "c", edit: { ...warm, exposure: 0.21 }, at: 5 },
+    { key: "d", edit: { ...warm }, at: 2 },
+    { key: "e", edit: neutralEdit(), at: 4 },
+    { key: "f", edit: { ...neutralEdit(), levels: [0.02, 0.97] as [number, number], origin: "auto" as const }, at: 6 },
+  ];
+  const looks = bookLooks(photos);
+  assert.equal(looks.length, 2, "neutral und nur Auto bringen keinen Look");
+  assert.deepEqual(looks[0].keys, ["a", "c", "d"]);
+  assert.equal(looks[0].name, "Japan warm");
+  assert.equal(looks[0].where, "Doppelseite 2, 5");
+  assert.equal(looks[1].name, "Look von Doppelseite 3");
+  assert.ok(sameSettings(looks[0], fromEdit(warm)!));
+  assert.ok(!sameSettings(looks[0], looks[1]));
 });

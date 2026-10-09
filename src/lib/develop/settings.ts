@@ -185,6 +185,51 @@ export const asLook = (s: CopiedSettings, id: string): NamedRecipe => ({
   f: s.f,
 });
 
+/* ---------- Looks in diesem Buch ---------- */
+
+// Fingerabdruck auf eine Nachkommastelle: ein kleiner Schubs am Regler ergibt keinen neuen Look
+const sig = (s: Pick<CopiedSettings, "rec" | "f">) => JSON.stringify({ rec: s.rec, f: s.f }, (_, v) => (typeof v === "number" ? Math.round(v * 10) / 10 : v));
+
+/** Derselbe Look, bis auf Kleinigkeiten */
+export const sameSettings = (a: Pick<CopiedSettings, "rec" | "f">, b: Pick<CopiedSettings, "rec" | "f">) => sig(a) === sig(b);
+
+export type BookLook = CopiedSettings & {
+  /** Fotos, die ihn tragen */
+  keys: string[];
+  /** wo er liegt, für die Kachel: „Doppelseite 2, 5“ */
+  where: string;
+};
+
+/**
+ * Jeder Look, der im Buch schon auf einem Foto liegt, ohne dass jemand ihn kopieren musste. Gleiche Looks
+ * werden zusammengefasst, die meistbenutzten zuerst. `at` nennt die Stelle eines Fotos, etwa die Doppelseite.
+ */
+export function bookLooks(photos: { key: string; edit?: PhotoEdit | null; at?: number }[], label = "Doppelseite", max = 8): BookLook[] {
+  const groups = new Map<string, { s: CopiedSettings; keys: string[]; at: number[]; names: string[] }>();
+  for (const p of photos) {
+    const c = cleanEdit(p.edit);
+    const s = c && fromEdit(c);
+    if (!s) continue;
+    const k = sig(s);
+    const g = groups.get(k) ?? { s, keys: [], at: [], names: [] };
+    g.keys.push(p.key);
+    if (p.at !== undefined && !g.at.includes(p.at)) g.at.push(p.at);
+    if (c.recName) g.names.push(c.recName);
+    groups.set(k, g);
+  }
+  return [...groups.values()]
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) => b.g.keys.length - a.g.keys.length || a.i - b.i)
+    .slice(0, max)
+    .map(({ g }) => {
+      const at = [...g.at].sort((a, b) => a - b);
+      const where = at.length ? `${label} ${at.join(", ")}` : "";
+      // der häufigste Name, sonst nach der ersten Stelle benannt
+      const name = g.names.sort((a, b) => g.names.filter((n) => n === b).length - g.names.filter((n) => n === a).length)[0] ?? (at.length ? `Look von ${label} ${at[0]}` : "Look aus diesem Buch");
+      return { ...g.s, name, from: where || undefined, keys: g.keys, where };
+    });
+}
+
 /** Zwischenablage aus dem Speicher: nur geprüfte Werte, wie eigene Rezepte (store.ts cleanRecipe) */
 export function cleanSettings(x: unknown): CopiedSettings | null {
   if (!x || typeof x !== "object") return null;

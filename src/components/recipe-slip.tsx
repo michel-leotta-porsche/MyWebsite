@@ -363,7 +363,7 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
   const take = (w: "file" | "edit", s: CopiedSettings) => {
     copySettings(s);
     setWhich(w);
-    setSay(`Kopiert. In der Werkbank oder im Fotostudio bei einem eigenen Foto einfügen.`);
+    setSay(`Mitgenommen. Liegt im Fotostudio oben bei „Deine Looks“, und in der Werkbank unter „Look übernehmen“.`);
   };
   const save = async () => {
     if (!done) return;
@@ -375,12 +375,12 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
         await auth().authStateReady();
         uid = auth().currentUser?.uid ?? null;
       }
-      if (!uid) return setSay("Zum Speichern als Look brauchst du ein Konto. Kopiert ist es trotzdem.");
+      if (!uid) return setSay("Zum Speichern als Look brauchst du ein Konto. Mitgenommen ist es trotzdem.");
       const { saveRecipe } = await import("@/lib/store");
       await saveRecipe(uid, asLook(done, `own-${Date.now().toString(36)}`));
       setSay(`„${done.name}“ liegt jetzt in deinen Looks.`);
     } catch {
-      setSay("Der Look ließ sich nicht speichern. Kopiert ist er trotzdem.");
+      setSay("Der Look ließ sich nicht speichern. Mitgenommen ist er trotzdem.");
     }
   };
   const label = recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
@@ -390,13 +390,13 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
         {file && (
           <button type="button" className={buttonClass(which === "file" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("file", file)}>
             <ClipboardCopy aria-hidden />
-            {edit ? `${label} kopieren` : "Einstellungen kopieren"}
+            {edit ? `${label} mitnehmen` : "Für eigene Fotos mitnehmen"}
           </button>
         )}
         {edit && (
           <button type="button" className={buttonClass(which === "edit" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("edit", edit)}>
             <ClipboardCopy aria-hidden />
-            {file ? "Bearbeitung kopieren" : "Einstellungen kopieren"}
+            {file ? "Bearbeitung mitnehmen" : "Für eigene Fotos mitnehmen"}
           </button>
         )}
         {done && (
