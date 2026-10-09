@@ -10,10 +10,14 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
+    // App-Fassung und ihre Kopie im Xcode-Projekt (npm run ios:build)
+    "out-app/**",
+    "ios/**",
     "build/**",
     "next-env.d.ts",
-    // Eigenes Projekt mit eigener Konfiguration:
-    "photos/**",
+    // Skills und Werkzeuge, kein eigener Code:
+    ".claude/**",
+    ".impeccable/**",
   ]),
 ]);
 

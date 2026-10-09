@@ -1,15 +1,15 @@
 # Spielt die Foto-App (Calima) auf Firebase Hosting aus, Projekt fujiventura, nur das Ziel app (Site calima).
-# Live nur von Hand: unter Actions → Ausspielen → „Run workflow“ (Branch claude/project-thread-d5e0a0). Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
-# Den Export baut der predeploy in photos/firebase.json selbst (npm run export, danach check-export).
+# Live nur von Hand: unter Actions → Ausspielen → „Run workflow“ (Hauptzweig). Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
+# Den Export baut der predeploy in firebase.json selbst (npm run export, danach check-export).
 #
 # Braucht zwei Repository-Secrets:
 #   FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA  Dienstkonto-JSON (legt `firebase init hosting:github` an)
-#   FUJI_IMPRESSUM_ADRESSE                Anschrift fürs Impressum, Zeilen mit | getrennt (wie in photos/.env.local)
+#   FUJI_IMPRESSUM_ADRESSE                Anschrift fürs Impressum, Zeilen mit | getrennt (wie in .env.local)
 name: Ausspielen
 
 on:
   pull_request:
-    paths: ["photos/**", ".github/workflows/ausspielen.yml"]
+    paths-ignore: ["docs/**", "**/*.md", ".github/dependabot.yml", ".github/workflows/codeql.yml", ".github/workflows/pruefen.yml"]
   # Knopf „Run workflow“ unter Actions: spielt den Hauptstand live aus
   workflow_dispatch:
 
@@ -21,8 +21,8 @@ permissions:
 jobs:
   live:
     name: Live auf calima
-    # nur der Hauptstand geht live, auch wenn beim Knopf ein anderer Branch gewählt ist
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/claude/project-thread-d5e0a0'
+    # nur der Hauptstand (Standard-Branch des Repos) geht live, auch wenn beim Knopf ein anderer Branch gewählt ist
+    if: github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     # nie zwei Deploys gleichzeitig, und keiner wird mittendrin abgebrochen
     concurrency:
@@ -36,9 +36,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: photos/package-lock.json
       - run: npm ci
-        working-directory: photos
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -46,7 +44,6 @@ jobs:
           projectId: fujiventura
           target: app
           channelId: live
-          entryPoint: photos
 
   vorschau:
     name: Vorschau-Link
@@ -68,9 +65,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: photos/package-lock.json
       - run: npm ci
-        working-directory: photos
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -78,4 +73,3 @@ jobs:
           projectId: fujiventura
           target: app
           expires: 7d
-          entryPoint: photos

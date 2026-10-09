@@ -1,11 +1,12 @@
-# Prüft jeden PR und jeden Merge: Lint, Typen und Build für die Website (Wurzel) und die Foto-App (photos/).
+# Prüft jeden PR und jeden Merge: Lint, Typen und Build für Calima.
 # Dasselbe, was AGENTS.md vor jedem Push verlangt, nur jetzt mit Haken am PR.
 name: Prüfen
 
 on:
   pull_request:
   push:
-    branches: [claude/project-thread-d5e0a0]
+    # beide Namen, damit nach dem Umbenennen des Hauptzweigs nichts ausfällt
+    branches: [main, claude/project-thread-d5e0a0]
 
 concurrency:
   group: pruefen-${{ github.ref }}
@@ -16,34 +17,15 @@ permissions:
   contents: read
 
 jobs:
-  website:
-    name: Website
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      # erst bauen: next build erzeugt die Typen für PageProps und LayoutProps, die tsc braucht
-      - run: npm run build
-      - run: npx tsc --noEmit
-
   photos:
     name: Foto-App
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: photos
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: photos/package-lock.json
       - run: npm ci
       - run: npm run lint
       # erst bauen: next build legt next-env.d.ts an (Typen für Bild-Importe), das nicht im Repo liegt
