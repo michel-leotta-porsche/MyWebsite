@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
-import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
@@ -35,6 +35,8 @@ import {
   matchTransfer,
   moodTransfer,
   neutralEdit,
+  pickEdit,
+  PICKS,
   PRESETS,
   REC0,
   recipeIsEmpty,
@@ -524,6 +526,10 @@ export function DevelopDialog({
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [cropping, setCropping] = useState(false);
+  // Telefon: Zettel nach unten gewischt, das Foto bekommt die ganze Höhe
+  const [tucked, setTucked] = useState(false);
+  const slip = useRef<HTMLElement>(null);
+  const pull = useRef<{ x: number; y: number; dy: number } | null>(null);
   // offene Gruppen merkt sich das Gerät, für alle Fotos
   const [groups, setGroups] = useState<Group[]>(() => {
     try {
@@ -810,6 +816,7 @@ export function DevelopDialog({
     }
   };
   const openCrop = () => {
+    setTucked(false);
     setCompare(false);
     setHolding(false);
     setBig(null);
@@ -840,6 +847,7 @@ export function DevelopDialog({
     const n = neutralEdit();
     return {
       auto: me ? { ...n, ...autoEdit(me) } : n,
+      picks: PICKS.map((p) => (me ? pickEdit(me, p.id, n) : n)),
       match: me && otherStats.length ? { ...n, transfer: matchTransfer(me, otherStats) } : n,
       mood: me && moodSt ? { ...n, transfer: moodTransfer(me, moodSt) } : n,
     };
@@ -1265,8 +1273,10 @@ export function DevelopDialog({
         </header>
 
         {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen. Quer stehen Foto und Werkzeuge nebeneinander */}
-        <div className="bg-table flex flex-none flex-col gap-2 flat:min-h-0 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0">
-          <div className={`grid ${cropping ? "h-[clamp(220px,50svh,560px)]" : "h-[clamp(170px,36svh,460px)]"} place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]`}>
+        <div
+          className={`bg-table flex flex-none flex-col gap-2 flat:min-h-0 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0 ${tucked ? "max-lg:min-h-0 max-lg:flex-1" : ""}`}
+        >
+          <div className={`grid ${cropping ? "h-[clamp(220px,50svh,560px)]" : tucked ? "max-lg:min-h-0 max-lg:flex-1" : "h-[clamp(170px,36svh,460px)]"} place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]`}>
             <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${sw} / ${sh}` }}>
               {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
               <div
@@ -1452,9 +1462,54 @@ export function DevelopDialog({
 
         {/* Werkzeuge */}
         <section
+          ref={slip}
           aria-label="Werkzeuge"
           inert={!shown || !!busy}
-          className={`slip text-ink max-lg:rounded-t-tool flat:!rounded-tr-none flat:min-h-0 lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:max-h-full lg:flex-none lg:self-start lg:px-5 lg:pt-5 lg:pb-5 ${!shown || busy ? "opacity-60" : ""}`}
+          onTouchStart={(e) => {
+            const el = slip.current;
+            pull.current = null;
+            if (!el || cropping || window.matchMedia("(min-width: 1024px), (orientation: landscape) and (max-height: 500px)").matches) return;
+            // Regler, Kurve und Drehrad brauchen das Ziehen selbst
+            if ((e.target as Element).closest("input, [role=slider], svg[role=group], [data-dial]")) return;
+            if (!tucked && el.scrollTop > 0) return;
+            pull.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0 };
+          }}
+          onTouchMove={(e) => {
+            const p = pull.current;
+            const el = slip.current;
+            if (!p || !el) return;
+            const dx = e.touches[0].clientX - p.x;
+            p.dy = e.touches[0].clientY - p.y;
+            if (Math.abs(dx) > Math.abs(p.dy)) {
+              pull.current = null;
+              el.style.transform = "";
+              return;
+            }
+            // der Zettel folgt dem Finger nach unten, gebremst
+            if (!tucked && p.dy > 8 && el.scrollTop <= 0) {
+              el.style.transition = "none";
+              el.style.transform = `translateY(${(p.dy - 8) * 0.55}px)`;
+            }
+          }}
+          onTouchEnd={() => {
+            const p = pull.current;
+            const el = slip.current;
+            pull.current = null;
+            if (el) {
+              el.style.transition = reduce ? "" : "transform 220ms var(--ease-out)";
+              el.style.transform = "";
+            }
+            if (!p) return;
+            if (!tucked && p.dy > 70) {
+              setTucked(true);
+              haptic("select");
+            } else if (tucked && p.dy < -24) setTucked(false);
+          }}
+          onTouchCancel={() => {
+            pull.current = null;
+            if (slip.current) slip.current.style.transform = "";
+          }}
+          className={`${tucked ? "max-lg:flex-none max-lg:overflow-hidden max-lg:[&>*:not([data-keep])]:hidden" : ""} slip text-ink max-lg:rounded-t-tool flat:!rounded-tr-none flat:min-h-0 lg:rounded-cut relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pt-4 lg:shadow-[0_18px_30px_-18px_rgb(12_10_8/0.8)] pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] transition-opacity duration-150 lg:max-h-full lg:flex-none lg:self-start lg:px-5 lg:pt-5 lg:pb-5 ${!shown || busy ? "opacity-60" : ""}`}
         >
           {photos.length > 1 && (
             <p className="sr-only">
@@ -1511,11 +1566,29 @@ export function DevelopDialog({
               <p className="text-ink-2 text-[13px] leading-snug">{hint}</p>
             </div>
           )}
+          <div data-keep="" hidden={cropping} className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-1 pb-1 flat:pt-4 lg:-top-5 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5">
+            <button
+              type="button"
+              aria-expanded={!tucked}
+              onClick={() => setTucked((t) => !t)}
+              className={`text-ink-2 flex w-full items-center justify-center gap-1.5 lg:hidden flat:hidden ${tucked ? "min-h-11 text-[13px] font-semibold" : "-mb-0.5 h-5"}`}
+            >
+              {tucked ? (
+                <>
+                  <ChevronUp aria-hidden className="size-4" />
+                  Werkzeuge zeigen
+                </>
+              ) : (
+                <>
+                  <span aria-hidden className="bg-ink/25 h-1 w-10 rounded-full" />
+                  <span className="sr-only">Werkzeuge einklappen, Foto ganz zeigen</span>
+                </>
+              )}
+            </button>
           <div
-            hidden={cropping}
+            hidden={tucked}
             role="tablist"
             aria-label="Werkzeuge"
-            className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-4 pb-1 lg:-top-5 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
             onKeyDown={(e) => {
               // Pfeiltasten wandern zwischen den Reitern (Muster der ARIA-Tabs)
               const i = TABS.findIndex(([t]) => t === tab);
@@ -1553,6 +1626,7 @@ export function DevelopDialog({
               ))}
             </div>
           </div>
+          </div>
 
           <p aria-hidden className={`text-ink-2 -mt-1 text-[13px] leading-snug max-lg:hidden ${cropping ? "lg:hidden" : ""}`}>
             {hint}
@@ -1567,8 +1641,27 @@ export function DevelopDialog({
                   txt="Licht und Farbe automatisch"
                   pressed={edit.origin === "auto"}
                   disabled={!me}
-                  onClick={() => me && act((e) => ({ ...e, ...autoEdit(me), origin: "auto", moodFrom: undefined }))}
+                  onClick={() =>
+                    me &&
+                    act((e) => {
+                      // nach einem fertigen Vorschlag heißt Auto wirklich nur Auto
+                      const base = e.origin === "pick" ? { ...neutralEdit(), rec: e.rec, recName: e.recName, geo: e.geo } : e;
+                      return { ...base, ...autoEdit(me), origin: "auto", moodFrom: undefined, pick: undefined };
+                    })
+                  }
                 />
+                {PICKS.map((p, i) => (
+                  <Tile
+                    key={p.id}
+                    img={tileImg}
+                    edit={sugg.picks[i]}
+                    name={p.name}
+                    txt={p.txt}
+                    pressed={edit.origin === "pick" && edit.pick === p.id}
+                    disabled={!me}
+                    onClick={() => me && act((e) => pickEdit(me, p.id, e), true)}
+                  />
+                ))}
                 {!onFinish && (
                 <Tile
                   img={tileImg}
