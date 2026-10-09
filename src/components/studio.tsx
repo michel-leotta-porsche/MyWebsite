@@ -40,6 +40,7 @@ const MAX_FILE = 60 * 1024 * 1024;
 const ACCEPT = "image/*,.heic,.heif,.dng";
 const N = 33;
 
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const abzuege = (n: number) => (n === 1 ? "Ein Abzug" : `${numberWord(n)} Abzüge`);
 const stem = (name: string) => name.replace(/\.[^.]+$/, "").slice(0, 60) || "Foto";
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
@@ -65,6 +66,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const [preparing, setPreparing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Print[] | null>(null);
+  const [openNote, setOpenNote] = useState<string | null>(null);
   const [done, setDone] = useState<Print[] | null>(null);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -84,7 +86,8 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
 
   const open = async (given: File[]) => {
     setError(null);
-    const images = given.filter((x) => x.type.startsWith("image/") || /\.(heic|heif|dng)$/i.test(x.name));
+    // Safari liefert manche Fotos ohne oder mit allgemeinem Typ; versucht wird alles außer Videos, statt es still zu verwerfen
+    const images = given.filter((x) => !x.type.startsWith("video/"));
     const files = images.filter((f) => f.size <= MAX_FILE).slice(0, MAX_STACK);
     const notes: string[] = [];
     if (images.length > MAX_STACK) notes.push(`Höchstens ${MAX_STACK} Fotos auf einmal, die ersten ${MAX_STACK} sind offen.`);
@@ -101,23 +104,24 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       // nacheinander, nie alle zugleich: jedes Foto wird in voller Größe entpackt
       for (const [i, file] of files.entries()) {
         if (files.length > 1) setPreparing(`Öffne ${i + 1} von ${files.length} …`);
-        try {
-          const s = await studioSource(file);
-          made.push({ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: i });
-        } catch (e) {
+        // Safari verschluckt sich bei vielen großen Fotos hintereinander am Speicher: ein zweiter Versuch nach kurzer Pause
+        const s = await studioSource(file).catch(() => pause(400).then(() => studioSource(file))).catch((e) => {
           broken++;
           if (e instanceof Error && /format|DNG/i.test(e.message)) reason = `: ${e.message}`;
-        }
+          return null;
+        });
+        if (s) made.push({ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: made.length });
       }
     } finally {
       setPreparing(null);
     }
     if (broken) notes.push(files.length === 1 ? `Dieses Foto lässt sich nicht öffnen${reason}.` : `${broken === 1 ? "Ein Foto ließ" : `${numberWord(broken)} Fotos ließen`} sich nicht öffnen.`);
-    if (notes.length) setError(notes.join(" "));
-    if (!made.length) return;
+    if (!made.length) return setError(notes.join(" "));
     // bleibt nur eins übrig, ist es ein einzelner Abzug
     const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
     keep(ps);
+    // der Hinweis gehört in den Editor, der das Studio sonst verdeckt
+    setOpenNote(!notes.length ? null : !broken ? notes.join(" ") : `${notes.join(" ")} ${made.length === 1 ? "Ein Foto ist" : `${numberWord(made.length)} Fotos sind`} offen.`);
     setEditing(ps);
   };
 
@@ -178,9 +182,10 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         tabIndex={-1}
         aria-hidden
         onChange={(e) => {
-          const fs = [...(e.target.files ?? [])];
-          e.target.value = "";
-          if (fs.length) open(fs);
+          const el = e.currentTarget;
+          const fs = [...(el.files ?? [])];
+          // erst leeren, wenn alles gelesen ist: Safari gibt die gewählten Dateien sonst schon frei
+          if (fs.length) open(fs).finally(() => (el.value = ""));
         }}
       />
       {prints.length > 0 && <p className="text-on-table-2 mt-2 text-[13px]">Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.</p>}
@@ -194,12 +199,17 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         <StudioEditor
           prints={editing}
           uid={user.uid}
-          onClose={() => setEditing(null)}
+          note={openNote}
+          onClose={() => {
+            setEditing(null);
+            setOpenNote(null);
+          }}
           onFinish={(edits) => {
             const at = Date.now();
             const ps = editing.map((p) => ({ ...p, edit: edits[p.id] ?? p.edit, at }));
             keep(ps);
             setEditing(null);
+            setOpenNote(null);
             setDone(ps);
           }}
         />
@@ -339,7 +349,7 @@ function OnTable({ i, tilt, className = "", children }: { i: number; tilt: numbe
 }
 
 /** Der Editor der Werkbank für Fotos vom Gerät: Vorschau aus der Seitengröße, eingerechnet wird später aus der Arbeitsfassung */
-function StudioEditor({ prints, uid, onClose, onFinish }: { prints: Print[]; uid: string; onClose: () => void; onFinish: (e: Record<string, PhotoEdit>) => void }) {
+function StudioEditor({ prints, uid, note, onClose, onFinish }: { prints: Print[]; uid: string; note?: string | null; onClose: () => void; onFinish: (e: Record<string, PhotoEdit>) => void }) {
   // Seitengröße und Abzug genügen der Vorschau; die Arbeitsfassung (4096 px) bleibt als Blob, bis gerechnet wird
   const blobs = useMemo(() => Object.fromEntries(prints.flatMap((p) => [[`${p.id}:page`, p.page], [`${p.id}:thumb`, p.thumb]])), [prints]);
   const urls = useBlobUrls(blobs);
@@ -360,7 +370,7 @@ function StudioEditor({ prints, uid, onClose, onFinish }: { prints: Print[]; uid
       camera: p.meta?.camera,
     })),
   );
-  return <DevelopDialog photos={photos} start={prints[0].id} uid={uid} title={prints.length > 1 ? `${prints.length} Fotos` : "Fotostudio"} long={STUDIO_LONG} onFinish={onFinish} onClose={onClose} />;
+  return <DevelopDialog photos={photos} start={prints[0].id} uid={uid} title={prints.length > 1 ? `${prints.length} Fotos` : "Fotostudio"} long={STUDIO_LONG} note={note} onFinish={onFinish} onClose={onClose} />;
 }
 
 /** „Kalkwand · Licht +0,3“: was am Foto gemacht ist, kurz */

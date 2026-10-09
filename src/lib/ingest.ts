@@ -323,16 +323,20 @@ export const STUDIO_LONG = 4096;
 export async function studioSource(file: File): Promise<StudioSource> {
   const meta = await readMeta(file);
   const src = await open(file);
+  const canvases: HTMLCanvasElement[] = [];
   try {
     const large = drawLarge(src, STUDIO_LONG);
+    canvases.push(large);
+    // Bild sofort freigeben: ein entpacktes 48-MP-Foto belegt fast 200 MB
+    src.close();
     const page = shrink(large, SIZES.page);
     const thumb = shrink(page, SIZES.thumb);
+    canvases.push(page, thumb);
     const [work, bp, bt] = await Promise.all([toJpeg(large, 0.92), toJpeg(page), toJpeg(thumb)]);
-    const out = { w: large.width, h: large.height, work, page: bp, thumb: bt, meta };
-    // Safari gibt den Speicher großer Zeichenflächen sonst erst spät frei
-    for (const c of [large, page, thumb]) c.width = c.height = 0;
-    return out;
+    return { w: large.width, h: large.height, work, page: bp, thumb: bt, meta };
   } finally {
     src.close();
+    // Safari gibt den Speicher großer Zeichenflächen sonst erst spät frei, auch wenn etwas schiefging
+    for (const c of canvases) c.width = c.height = 0;
   }
 }

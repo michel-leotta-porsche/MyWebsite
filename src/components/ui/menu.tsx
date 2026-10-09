@@ -1,7 +1,8 @@
 "use client";
 
+import { ContextMenu as BaseContextMenu } from "@base-ui/react/context-menu";
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 
 import { haptic } from "@/lib/haptics";
 
@@ -17,13 +18,57 @@ export function Menu({ trigger, children, align = "end", container }: { trigger:
       <BaseMenu.Trigger render={trigger} />
       <BaseMenu.Portal container={container}>
         <BaseMenu.Positioner className="z-[720] outline-none" sideOffset={8} align={align} collisionPadding={12}>
-          <BaseMenu.Popup className="slip text-ink relative max-h-[var(--available-height)] min-w-56 origin-[var(--transform-origin)] overflow-y-auto overscroll-contain rounded-tool py-1.5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)] outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
-            {children}
-          </BaseMenu.Popup>
+          <BaseMenu.Popup className={popup}>{children}</BaseMenu.Popup>
         </BaseMenu.Positioner>
       </BaseMenu.Portal>
     </BaseMenu.Root>
   );
+}
+
+const popup =
+  "slip text-ink relative max-h-[var(--available-height)] min-w-56 origin-[var(--transform-origin)] overflow-y-auto overscroll-contain rounded-tool py-1.5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)] outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0";
+
+// Kontextmenü: Rechtsklick am Rechner, langes Tippen am Telefon. Die Einträge sind dieselben MenuItem wie oben.
+export function ContextMenu({
+  children,
+  menu,
+  container,
+  className,
+  ...rest
+}: { children: ReactNode; menu: ReactNode; container?: React.RefObject<HTMLElement | null>; className?: string } & { [data: `data-${string}`]: string }) {
+  const opened = useRef(0);
+  return (
+    <BaseContextMenu.Root
+      onOpenChange={(open) => {
+        if (!open) return;
+        opened.current = Date.now();
+        haptic("select");
+      }}
+    >
+      <BaseContextMenu.Trigger
+        {...rest}
+        className={className}
+        // nach langem Tippen schickt das Telefon beim Loslassen noch einen Klick, der darf nichts auslösen
+        onClickCapture={(e) => {
+          if (Date.now() - opened.current > 1500) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        {children}
+      </BaseContextMenu.Trigger>
+      <BaseContextMenu.Portal container={container}>
+        <BaseContextMenu.Positioner className="z-[720] outline-none" collisionPadding={12}>
+          <BaseContextMenu.Popup className={popup}>{menu}</BaseContextMenu.Popup>
+        </BaseContextMenu.Positioner>
+      </BaseContextMenu.Portal>
+    </BaseContextMenu.Root>
+  );
+}
+
+/** kleine Überschrift über einer Gruppe von Einträgen */
+export function MenuLabel({ children }: { children: ReactNode }) {
+  return <div className="text-ink-2 px-4 pt-2 pb-1 text-xs font-semibold">{children}</div>;
 }
 
 export function MenuItem({
