@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { LegalLinks } from "@/components/legal-links";
 import { hitClass } from "@/components/ui-classes";
 import { Wordmark } from "@/components/ui-base";
 
@@ -52,21 +52,5 @@ export function Mail() {
   );
 }
 
-const small = `${hitClass} text-on-table-2 decoration-mark decoration-2 underline-offset-4 transition-colors duration-150 hover:text-on-table hover:underline`;
-
-/** Die Pflichtlinks und die Hilfe, für Fußzeilen und neben der Anmeldung */
-export function LegalLinks({ className = "" }: { className?: string }) {
-  return (
-    <nav aria-label="Rechtliches" className={`flex flex-wrap items-baseline gap-x-5 gap-y-1 text-sm ${className}`}>
-      <Link href="/impressum" className={small}>
-        Impressum
-      </Link>
-      <Link href="/datenschutz" className={small}>
-        Datenschutz
-      </Link>
-      <Link href="/hilfe" className={small}>
-        Hilfe
-      </Link>
-    </nav>
-  );
-}
+// Pflichtlinks und Sprachwahl übersetzen sich selbst, darum als Client-Komponente (legal-links.tsx)
+export { LegalLinks };

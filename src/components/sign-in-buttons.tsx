@@ -1,6 +1,7 @@
 "use client";
 
 import type { SignInProvider } from "@/lib/firebase";
+import { de, useT } from "@/lib/i18n";
 
 // Anmelden mit Apple und Google, gleich groß und gleich gewichtet (App-Store-Richtlinie 4.8).
 // Beide Knöpfe folgen den Vorgaben der Anbieter: weiße Fläche, Logo links, Systemschrift, Apple zuerst.
@@ -28,8 +29,8 @@ const GOOGLE = (
 export const APPLE_READY = true;
 
 const OPTIONS = [
-  { id: "apple.com", label: "Mit Apple anmelden", icon: APPLE },
-  { id: "google.com", label: "Mit Google anmelden", icon: GOOGLE },
+  { id: "apple.com", label: de("Mit Apple anmelden"), icon: APPLE },
+  { id: "google.com", label: de("Mit Google anmelden"), icon: GOOGLE },
 ].filter((o) => APPLE_READY || o.id !== "apple.com") as { id: SignInProvider; label: string; icon: React.ReactNode }[];
 
 /**
@@ -53,6 +54,7 @@ export function SignInButtons({
   className?: string;
 }) {
   const cloth = tone === "cloth" && OPTIONS.length === 1;
+  const t = useT();
   return (
     <div className={`flex w-full max-w-[19rem] flex-col gap-3 ${className}`}>
       {OPTIONS.map((o) => (
@@ -72,7 +74,7 @@ export function SignInButtons({
           style={cloth ? undefined : { fontFamily: "system-ui, -apple-system, sans-serif" }}
         >
           {cloth ? <span className="relative grid size-9 shrink-0 place-items-center rounded-full bg-white">{o.icon}</span> : o.icon}
-          <span className="relative">{busy === o.id ? "Einen Moment …" : o.label}</span>
+          <span className="relative">{busy === o.id ? t("Einen Moment …") : t(o.label)}</span>
         </button>
       ))}
     </div>

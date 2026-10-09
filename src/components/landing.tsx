@@ -19,6 +19,7 @@ import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { landingBook } from "@/content/landing-book";
+import { de, useT } from "@/lib/i18n";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import mittagsblume from "../../public/photos/06-mittagsblume.jpg";
@@ -38,7 +39,8 @@ import bougainvillea from "../../public/photos/04-bougainvillea.jpg";
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
 const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
-const PROVIDERS = APPLE_READY ? "Apple oder Google" : "Google";
+// Wortlaut auf Deutsch, t() übersetzt beim Zeichnen
+const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 
@@ -68,12 +70,13 @@ function useEnter() {
 
 function HeaderSession() {
   const user = useLazyUser();
+  const t = useT();
   // solange Firebase prüft, bleibt die Stelle leer statt zu springen
   if (user === undefined) return <span aria-hidden className="inline-block min-h-9 w-24" />;
   // zwei Anbieter passen nicht in den Kopf: die Anmeldung im Bücherzimmer zeigt beide
   return (
     <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
-      {user ? "Ins Bücherzimmer" : "Anmelden"}
+      {user ? t("Ins Bücherzimmer") : t("Anmelden")}
     </Link>
   );
 }
@@ -81,10 +84,11 @@ function HeaderSession() {
 /** label: ein einzelner Link ins Bücherzimmer (Schluss der Seite); ohne label die Anmeldung mit Apple und Google */
 function EnterButton({ label }: { label?: string }) {
   const { user, busy, error, enter, warm } = useEnter();
+  const t = useT();
   if (user || label)
     return (
       <Link href="/zimmer" className={buttonClass("cloth", "md", "px-7")}>
-        {user ? "Ins Bücherzimmer" : label}
+        {user ? t("Ins Bücherzimmer") : label}
       </Link>
     );
   return (
@@ -256,6 +260,7 @@ function useHeroFit(phone: boolean) {
 }
 
 function Hero() {
+  const t = useT();
   const track = useRef<HTMLElement>(null);
   // Immer die ganze Doppelseite, auch auf dem Telefon (dort kleiner, unter dem Text)
   const phone = useSyncExternalStore(wide, () => !window.matchMedia("(min-width: 768px)").matches, () => false);
@@ -284,9 +289,9 @@ function Hero() {
           <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
             Calima
           </p>
-          <nav aria-label="Auf dieser Seite" className="flex items-baseline gap-6 text-sm">
+          <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-6 text-sm">
             <a href="#werkbank" className="text-on-table-2 decoration-mark hidden decoration-2 underline-offset-4 hover:text-on-table hover:underline md:inline">
-              So entsteht ein Buch
+              {t("So entsteht ein Buch")}
             </a>
             <HeaderSession />
           </nav>
@@ -295,26 +300,26 @@ function Hero() {
         <div className="relative z-10 grid flex-1 items-center gap-8 px-4 pt-6 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12">
           <div ref={text} className="md:col-span-4 md:self-end md:pb-[14svh]">
             <h1 id="hero-h" className="text-on-table leading-[0.86] font-bold tracking-[-0.04em] [text-wrap:balance]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
-              <Words text="Deine Fotos, gebunden." />
+              <Words text={t("Deine Fotos, gebunden.")} />
             </h1>
             <p className="word-rise text-on-table mt-6 max-w-[26rem] text-lg leading-relaxed opacity-80 md:text-xl" style={{ ["--i" as string]: 4 }}>
-              Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.
+              {t("Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.")}
             </p>
             <div className="word-rise mt-8 flex flex-wrap items-center gap-x-7 gap-y-4" style={{ ["--i" as string]: 5 }}>
               <EnterButton />
             </div>
             <p className="text-on-table-2 mt-5 flex items-start gap-2 text-sm">
               <span aria-hidden className="bg-cloth mt-[0.5lh] size-1.5 shrink-0 -translate-y-1/2 rounded-full" />
-              Kostenlos. Wer einen Link bekommt, liest ohne Konto.
+              {t("Kostenlos. Wer einen Link bekommt, liest ohne Konto.")}
             </p>
             <p className="text-on-table-2 mt-2 text-xs leading-relaxed">
-              Ein Buch zum Blättern im Browser, kein Druck. Anmeldung mit {PROVIDERS}, es gelten die{" "}
+              {t("Ein Buch zum Blättern im Browser, kein Druck. Anmeldung mit {providers}, es gelten die", { providers: t(PROVIDERS) })}{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
-                Nutzungsbedingungen
+                {t("Nutzungsbedingungen")}
               </Link>{" "}
-              und der{" "}
+              {t("und der")}{" "}
               <Link href="/datenschutz" className={linkClass}>
-                Datenschutz
+                {t("Datenschutz")}
               </Link>
               .
             </p>
@@ -326,7 +331,7 @@ function Hero() {
                 <ScrollBook book={landingBook} mode={mode} track={track} width={width} />
               </div>
             </div>
-            <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">Scrollen zum Blättern</p>
+            <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">{t("Scrollen zum Blättern")}</p>
           </div>
         </div>
       </div>
@@ -454,19 +459,21 @@ function Sheet({ src, sizes, bend }: { src: StaticImageData; sizes: string; bend
 }
 
 function Workbench() {
+  const t = useT();
   return (
     <section id="werkbank" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
       <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-4 py-12 md:px-8 md:py-10">
         <div className="relative z-10 grid items-center gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
             <h2 id="bench-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl" style={display}>
-              Reinziehen.
+              {t("Reinziehen.")}
               <br />
-              Fertig gesetzt.
+              {t("Fertig gesetzt.")}
             </h2>
             <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg">
-              Fotos vom Handy, von der Fuji oder aus Lightroom auf die Werkbank ziehen, auch HEIC und DNG. Nach ein, zwei Sekunden stehen sie als
-              Doppelseiten da, nach Aufnahmezeit geordnet. Ortsdaten fallen beim Hochladen weg.
+              {t(
+                "Fotos vom Handy, von der Fuji oder aus Lightroom auf die Werkbank ziehen, auch HEIC und DNG. Nach ein, zwei Sekunden stehen sie als Doppelseiten da, nach Aufnahmezeit geordnet. Ortsdaten fallen beim Hochladen weg.",
+              )}
             </p>
           </div>
         <div className="relative z-0 mx-auto w-full max-w-[min(100%,calc((100svh-140px)*4/3))] md:col-span-8 md:col-start-5 md:mr-0">
@@ -489,10 +496,10 @@ function Workbench() {
                 <PageFace side="right">
                   <div className="bench-caps absolute inset-0">
                     {/* jede Unterschrift steht bündig unter ihrem Bild; das randlose Bild links bekommt seine unten am Bund */}
-                    <Cap items={[[2, "Erst mittags offen"]]} x={12} y={61.5} />
-                    <Cap items={[[3, "Eingerollt"]]} x={12} y={127.5} />
-                    <Cap items={[[4, "Platt"]]} x={52} y={127.5} />
-                    <Cap items={[[1, "Drachenbaum, links"]]} x={12} y={137} />
+                    <Cap items={[[2, t("Erst mittags offen")]]} x={12} y={61.5} />
+                    <Cap items={[[3, t("Eingerollt")]]} x={12} y={127.5} />
+                    <Cap items={[[4, t("Platt")]]} x={52} y={127.5} />
+                    <Cap items={[[1, t("Drachenbaum, links")]]} x={12} y={137} />
                   </div>
                 </PageFace>
               </div>
@@ -545,8 +552,8 @@ function Workbench() {
             </div>
           </div>
           <p className="text-on-table-2 relative mt-6 text-sm">
-            <span className="bench-count-a">4 Fotos, nach Aufnahmezeit</span>
-            <span className="bench-count-b">Eine Doppelseite, ohne einen Handgriff</span>
+            <span className="bench-count-a">{t("4 Fotos, nach Aufnahmezeit")}</span>
+            <span className="bench-count-b">{t("Eine Doppelseite, ohne einen Handgriff")}</span>
           </p>
         </div>
         </div>
@@ -558,46 +565,46 @@ function Workbench() {
 /* ------------------------------------------------------------------ 3. Rezept */
 
 function Recipe() {
+  const t = useT();
   return (
     <section aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <h2 id="recipe-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:col-span-7 md:text-7xl" style={display}>
-          Das Rezept liegt bei.
+          {t("Das Rezept liegt bei.")}
         </h2>
         <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
-          Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man
-          gleich als .xmp mit.
+          {t("Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man gleich als .xmp mit.")}
         </p>
       </div>
 
       <figure className="relative mx-auto mt-14 max-w-[1040px] md:mt-20">
         <div className={`bg-paper w-[86%] p-[6px] md:w-[52%] md:p-[10px] ${lifted} -rotate-[1.5deg]`}>
           <div className="relative aspect-[2/3] w-full">
-            <Image src={schild} alt="Schild über der Bucht" fill sizes="(min-width: 768px) 520px, 86vw" className="object-cover" />
+            <Image src={schild} alt={t("Schild über der Bucht")} fill sizes="(min-width: 768px) 520px, 86vw" className="object-cover" />
           </div>
         </div>
         {/* Zettel schiebt sich unter dem Abzug hervor, sobald er ins Bild kommt */}
         <Slip className="reveal-slip relative mt-[-30%] ml-auto w-[92%] rotate-[3deg] p-5 md:absolute md:right-0 md:bottom-[12%] md:mt-0 md:w-[50%] md:p-8">
-          <span className="text-ink-2 block text-xs md:text-sm">Rezept · Beispielwerte</span>
+          <span className="text-ink-2 block text-xs md:text-sm">{t("Rezept · Beispielwerte")}</span>
           <span className="mt-1 block text-2xl font-bold tracking-[-0.02em] md:text-4xl" style={narrow}>
             Classic Chrome
           </span>
           <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-8 gap-y-2 text-sm md:text-base">
-            <dt className="text-ink-2">Dynamik</dt>
+            <dt className="text-ink-2">{t("Dynamik")}</dt>
             <dd>DR200</dd>
-            <dt className="text-ink-2">Lichter · Schatten</dt>
+            <dt className="text-ink-2">{t("Lichter · Schatten")}</dt>
             <dd>−1 · +1</dd>
-            <dt className="text-ink-2">Farbe</dt>
+            <dt className="text-ink-2">{t("Farbe")}</dt>
             <dd>+2</dd>
-            <dt className="text-ink-2">Körnung</dt>
+            <dt className="text-ink-2">{t("Körnung")}</dt>
             <dd className="flex items-center gap-2">
               <span aria-hidden className="flex gap-[3px]">
                 <span className="block h-2 w-5 bg-ink" />
                 <span className="block h-2 w-5 bg-ink/15" />
               </span>
-              schwach, klein
+              {t("schwach, klein")}
             </dd>
-            <dt className="text-ink-2">Weißabgleich</dt>
+            <dt className="text-ink-2">{t("Weißabgleich")}</dt>
             <dd>Auto · R+1 B−2</dd>
           </dl>
         </Slip>
@@ -609,39 +616,39 @@ function Recipe() {
 /* ------------------------------------------------------------------ 4. Hinlegen */
 
 const DETAILS = [
-  { icon: Undo2, title: "Frei, wenn du willst", text: "Bilder schieben, zuschneiden, über den Bund ziehen. Text in vier Schriften, Linien, Klebestreifen, ein Stift. Jeder Handgriff lässt sich zurücknehmen." },
-  { icon: Link2Off, title: "Kein Profil, kein Feed", text: "Ein Buch sieht nur, wer den Link hat. Jeden Link kannst du einzeln zurückziehen." },
+  { icon: Undo2, title: de("Frei, wenn du willst"), text: de("Bilder schieben, zuschneiden, über den Bund ziehen. Text in vier Schriften, Linien, Klebestreifen, ein Stift. Jeder Handgriff lässt sich zurücknehmen.") },
+  { icon: Link2Off, title: de("Kein Profil, kein Feed"), text: de("Ein Buch sieht nur, wer den Link hat. Jeden Link kannst du einzeln zurückziehen.") },
 ] as const;
 
 function Share() {
+  const t = useT();
   return (
     <section aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
         <div aria-hidden className="relative mx-auto aspect-[1/1] w-full max-w-[560px] md:col-span-6 md:mx-0">
           <Cover photo={torii} title="Japan" author="Michel Leotta" cloth="bg-[#c9c8c3] text-[#1b1c1a]" className="absolute top-[2%] left-[4%] w-[54%] -rotate-[4deg]" />
           <Slip className="reveal-slip top-[10%] right-[2%] w-[46%] rotate-[3deg] text-[15px]">
-            Für Jana, von Michel
+            {t("Für Jana, von Michel")}
             <span className="text-ink-2 mt-1.5 block font-mono text-[11px] break-all">calima.web.app/b?t=…</span>
           </Slip>
           <Slip className="reveal-slip reveal-late right-[8%] bottom-[8%] w-[56%] -rotate-[2deg] text-[15px] leading-snug">
-            <span className="text-ink-2 block text-xs">Zettel zu Tafel 7, von Jana</span>
-            Das Tor im Regen hätte ich gern an der Wand.
+            <span className="text-ink-2 block text-xs">{t("Zettel zu Tafel 7, von Jana")}</span>
+            {t("Das Tor im Regen hätte ich gern an der Wand.")}
           </Slip>
         </div>
         <div className="md:col-span-5 md:col-start-8">
           <h2 id="share-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl" style={display}>
-            Hinlegen, nicht posten.
+            {t("Hinlegen, nicht posten.")}
           </h2>
           <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80">
-            Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die
-            nur du liest.
+            {t("Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die nur du liest.")}
           </p>
           <ul className="mt-12 grid gap-3 lg:grid-cols-2">
             {DETAILS.map((d) => (
               <li key={d.title} className="bg-on-table/5 rounded-cut p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)]">
                 <d.icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
-                <h3 className="text-on-table mt-4 text-lg font-semibold tracking-[-0.015em]">{d.title}</h3>
-                <p className="text-on-table-2 mt-1.5 text-base leading-relaxed">{d.text}</p>
+                <h3 className="text-on-table mt-4 text-lg font-semibold tracking-[-0.015em]">{t(d.title)}</h3>
+                <p className="text-on-table-2 mt-1.5 text-base leading-relaxed">{t(d.text)}</p>
               </li>
             ))}
           </ul>
@@ -654,24 +661,25 @@ function Share() {
 /* ------------------------------------------------------------------ Schluss */
 
 function Closing() {
+  const t = useT();
   return (
     <>
       <section aria-labelledby="end-h" className="linen table-surface relative overflow-hidden bg-table px-4 pt-24 pb-20 md:px-8 md:pt-40 md:pb-28">
         <SunAndShade light="sun" />
         <div className="relative z-20">
           <h2 id="end-h" className="text-on-table max-w-[12ch] leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(56px, 9vw, 144px)" }}>
-            Leg deinen Sommer auf den Tisch.
+            {t("Leg deinen Sommer auf den Tisch.")}
           </h2>
           <div className="mt-12 flex flex-wrap items-center gap-x-7 gap-y-4">
-            <EnterButton label="Erstes Buch anlegen" />
+            <EnterButton label={t("Erstes Buch anlegen")} />
             <p className="text-on-table-2 text-sm">
-              Kostenlos, Anmeldung mit {PROVIDERS}. Bücher sieht nur, wem du einen Link gibst.{" "}
+              {t("Kostenlos, Anmeldung mit {providers}. Bücher sieht nur, wem du einen Link gibst.", { providers: t(PROVIDERS) })}{" "}
               <Link href="/nutzungsbedingungen" className={linkClass}>
-                Nutzungsbedingungen
+                {t("Nutzungsbedingungen")}
               </Link>
               {" · "}
               <Link href="/datenschutz" className={linkClass}>
-                Datenschutz
+                {t("Datenschutz")}
               </Link>
             </p>
           </div>
@@ -680,12 +688,12 @@ function Closing() {
       <footer className="linen table-surface relative bg-table px-4 pb-10 text-sm text-on-table-2 md:px-8">
         <div className="border-on-table-2/25 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t pt-6">
           <p>
-            <span className="text-on-table font-semibold">Calima</span> · Beispielfotos von Michel Leotta
+            <span className="text-on-table font-semibold">Calima</span> · {t("Beispielfotos von Michel Leotta")}
           </p>
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
-            <nav aria-label="Räume" className="flex gap-x-5">
+            <nav aria-label={t("Räume")} className="flex gap-x-5">
               <Link href="/zimmer" className={`${hitClass} decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline`}>
-                Bücherzimmer
+                {t("Bücherzimmer")}
               </Link>
             </nav>
             <LegalLinks />

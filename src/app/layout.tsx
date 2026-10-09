@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Caveat, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+import { langScript } from "@/lib/lang";
 import { shareMeta, SITE_URL } from "@/lib/share-meta";
 
 const bricolage = Bricolage_Grotesque({
@@ -33,10 +34,10 @@ const flagScript = `try{var h=document.documentElement,o=(new URLSearchParams(lo
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    // suppressHydrationWarning: das Startskript setzt Klassen (ohne-…) vor React
+    // suppressHydrationWarning: das Startskript setzt Klassen (ohne-…) und die Sprache vor React
     <html lang="de" className={`${bricolage.variable} ${serif.variable} ${mono.variable} ${hand.variable}`} suppressHydrationWarning>
       <body className="min-h-svh">
-        <script dangerouslySetInnerHTML={{ __html: flagScript }} />
+        <script dangerouslySetInnerHTML={{ __html: flagScript + langScript }} />
         {children}
       </body>
     </html>
