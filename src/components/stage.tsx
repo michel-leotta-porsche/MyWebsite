@@ -42,6 +42,8 @@ import {
   type SpreadItem,
 } from "@/lib/free-layout";
 import type { StoredPhoto } from "@/lib/store";
+import { haptic, warmHaptics } from "@/lib/haptics";
+import { IS_APP, keys, withKeys } from "@/lib/app-mode";
 
 // Die Bühne: eine Doppelseite groß, Fotos und Texte direkt auf der Seite bewegen, vergrößern, zuschneiden.
 // Kanten rasten am Raster (6 Spalten, 9 Zeilen), an Seitenkanten, Bund und Nachbarn ein.
@@ -513,9 +515,11 @@ export function Stage({
         setDraft(null);
         setGuides({ xs: [], ys: [] });
         held.current = { cx: clientX, cy: clientY, id: it.id };
-        navigator.vibrate?.(10);
+        haptic("press");
       }, 550);
     }
+    snapped.current = [];
+    warmHaptics();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     speed.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, v: 0 };
     drag.current = { id: it.id, edges, end, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey, touch };
@@ -537,6 +541,8 @@ export function Stage({
   };
   /** letzte Zeigerlage; beim Loslassen zählt sie, auch wenn ihr Bild noch nicht gezeichnet war */
   const last = useRef<{ clientX: number; clientY: number; shiftKey: boolean; altKey: boolean } | null>(null);
+  // eingerastete Hilfslinien des letzten Schritts, für das Klopfen beim Einrasten
+  const snapped = useRef<string[]>([]);
   const compute = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
     const d = drag.current;
     if (!d) return null;
@@ -560,6 +566,10 @@ export function Stage({
     if (!c) return;
     setDraft({ id: c.it.id, box: c.box, original: c.r.original, from: c.from });
     setGuides({ xs: c.r.xs, ys: c.r.ys });
+    // leichtes Klopfen nur, wenn eine neue Hilfslinie einrastet, nicht solange man auf ihr bleibt
+    const prev = snapped.current;
+    snapped.current = [...c.r.xs.map((x) => `x${x}`), ...c.r.ys.map((y) => `y${y}`)];
+    if (snapped.current.some((g) => !prev.includes(g))) haptic("select");
   };
   const onUp = (e?: React.PointerEvent) => {
     cancelAnimationFrame(frame.current);
@@ -861,13 +871,16 @@ export function Stage({
     setMenu({ cx, cy, id, at: pointOf(cx, cy) });
   };
   const copyItem = (it: SpreadItem) => {
-    navigator.clipboard?.writeText(remember(it)).catch(() => {});
+    const marker = remember(it);
+    // in der App gehen nur Texte ins System; Fotos und Formen bleiben in Calimas eigener Ablage (Workshop Paket 6)
+    if (!IS_APP || it.t === "text") navigator.clipboard?.writeText(marker).catch(() => {});
     setSay("Kopiert");
   };
   const pasteFromMenu = async (at?: { x: number; y: number }) => {
     if (clipboard) return paste(clipboard.item, at);
     const text = await navigator.clipboard?.readText().catch(() => "");
-    if (text?.trim()) addText("body", at ? pageAt(at.x) : curPage, at, text.trim());
+    // eingesetzter Text bleibt ein Textfeld, kein Roman
+    if (text?.trim()) addText("body", at ? pageAt(at.x) : curPage, at, text.trim().slice(0, 2000));
   };
   const menuEntries = (): MenuEntry[] => {
     if (!menu) return [];
@@ -875,21 +888,21 @@ export function Stage({
     const common: MenuEntry[] = it
       ? [
           "sep",
-          { label: "Kopieren", hint: "⌘C", run: () => copyItem(it) },
-          { label: "Ausschneiden", hint: "⌘X", run: () => (copyItem(it), remove(it)) },
-          { label: "Duplizieren", hint: "⌘D", run: () => paste(it) },
-          { label: "Einfügen", hint: "⌘V", run: () => pasteFromMenu() },
+          { label: "Kopieren", hint: keys("⌘C"), run: () => copyItem(it) },
+          { label: "Ausschneiden", hint: keys("⌘X"), run: () => (copyItem(it), remove(it)) },
+          { label: "Duplizieren", hint: keys("⌘D"), run: () => paste(it) },
+          { label: "Einfügen", hint: keys("⌘V"), run: () => pasteFromMenu() },
           "sep",
-          { label: "Ganz nach vorn", hint: "⇧⌘]", disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "front") },
-          { label: "Nach vorn", hint: "⌘]", disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "up") },
-          { label: "Nach hinten", hint: "⌘[", disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "down") },
-          { label: "Ganz nach hinten", hint: "⇧⌘[", disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "back") },
+          { label: "Ganz nach vorn", hint: keys("⇧⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "front") },
+          { label: "Nach vorn", hint: keys("⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "up") },
+          { label: "Nach hinten", hint: keys("⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "down") },
+          { label: "Ganz nach hinten", hint: keys("⇧⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "back") },
           "sep",
         ]
       : [];
     if (it?.t === "photo")
       return [
-        { label: "Zuschneiden", hint: "Doppelklick", run: () => setCropping(it.id) },
+        { label: "Zuschneiden", hint: IS_APP ? "Doppeltippen" : "Doppelklick", run: () => setCropping(it.id) },
         { label: "Ausschnitt-Dialog …", run: () => setCrop(it.id) },
         {
           label: "Unterschrift auf der Seite",
@@ -916,7 +929,7 @@ export function Stage({
     if (it?.t === "shape" || it?.t === "ink") return [...common.slice(1), { label: "Löschen", hint: "Entf", run: () => remove(it) }];
     const at = menu.at;
     return [
-      { label: "Hier einfügen", hint: "⌘V", run: () => pasteFromMenu(at) },
+      { label: "Hier einfügen", hint: keys("⌘V"), run: () => pasteFromMenu(at) },
       "sep",
       ...(Object.keys(TEXT_ROLE) as TextRole[]).map((r): MenuEntry => ({ label: `${TEXT_ROLE[r].label} hier`, run: () => addText(r, pageAt(at.x), at) })),
     ];
@@ -1444,7 +1457,7 @@ export function Stage({
         onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
         onClick={() => addText(r, curPage)}
         className={buttonClass("quiet", "sm", `cursor-grab pl-2.5 ${phone ? "min-h-11" : "min-h-10"}`)}
-        title="Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"
+        title={IS_APP ? "Antippen legt den Text auf die Seite, Ziehen an eine bestimmte Stelle" : "Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"}
       >
         <Plus aria-hidden />
         {TEXT_ROLE[r].label}
@@ -1538,10 +1551,10 @@ export function Stage({
               </Button>
             )}
             <ToolGroup label="Verlauf und Raster">
-              <ToolIcon label="Rückgängig (⌘Z)" disabled={!canUndo} onClick={onUndo}>
+              <ToolIcon label={withKeys("Rückgängig", "⌘Z")} disabled={!canUndo} onClick={onUndo}>
                 <Undo2 aria-hidden />
               </ToolIcon>
-              <ToolIcon label="Wiederholen (⇧⌘Z)" disabled={!canRedo} onClick={onRedo}>
+              <ToolIcon label={withKeys("Wiederholen", "⇧⌘Z")} disabled={!canRedo} onClick={onRedo}>
                 <Redo2 aria-hidden />
               </ToolIcon>
               <ToolIcon label="Raster zeigen (G)" aria-pressed={gridOn} onClick={toggleGrid} className="aria-pressed:!bg-on-table aria-pressed:text-table">
@@ -2330,13 +2343,13 @@ function LayerButtons({
   return (
     <div className="flex items-center gap-3">
       <div className="bg-ink/6 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]" role="group" aria-label="Ebene und Kopie">
-        <button type="button" className={icon} onClick={onDuplicate} aria-label="Duplizieren" title="Duplizieren (⌘D)">
+        <button type="button" className={icon} onClick={onDuplicate} aria-label="Duplizieren" title={withKeys("Duplizieren", "⌘D")}>
           <Copy aria-hidden />
         </button>
-        <button type="button" className={icon} onClick={() => onLayer("front")} disabled={!up} aria-label="Ganz nach vorn" title="Ganz nach vorn (⇧⌘])">
+        <button type="button" className={icon} onClick={() => onLayer("front")} disabled={!up} aria-label="Ganz nach vorn" title={withKeys("Ganz nach vorn", "⇧⌘]")}>
           <BringToFront aria-hidden />
         </button>
-        <button type="button" className={icon} onClick={() => onLayer("back")} disabled={!down} aria-label="Ganz nach hinten" title="Ganz nach hinten (⇧⌘[)">
+        <button type="button" className={icon} onClick={() => onLayer("back")} disabled={!down} aria-label="Ganz nach hinten" title={withKeys("Ganz nach hinten", "⇧⌘[")}>
           <SendToBack aria-hidden />
         </button>
       </div>

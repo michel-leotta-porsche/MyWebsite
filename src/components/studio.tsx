@@ -19,7 +19,9 @@ import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
 import { friendlyError } from "@/lib/errors";
 import { withExif } from "@/lib/exif-write";
+import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
+import { safeFileName, saveFile } from "@/lib/native";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_PRINTS, putPrint, removePrint, type Print } from "@/lib/studio-store";
@@ -415,7 +417,13 @@ function DoneSheet({
   };
   const save = () => {
     if (!file) return;
-    if (share)
+    // in der App: Datei ins Teilen-Blatt, dort „Bild sichern“; einen Download gibt es dort nicht
+    if (IS_APP)
+      saveFile(safeFileName(file.name.replace(/\.jpe?g$/i, ""), ".jpg"), file, file.type).then((r) => {
+        if (r === "shared") haptic("success");
+        else if (r === "failed") notify("Die Datei ließ sich nicht sichern. Versuch es bitte noch einmal.");
+      });
+    else if (share)
       // muss direkt im Tipp laufen, sonst lehnt Safari ab
       navigator.share({ files: [file] }).then(
         () => haptic("success"),
@@ -516,12 +524,12 @@ function DoneSheet({
             </div>
             <div className="grid gap-1.5">
               <Button variant="cloth" onClick={save} disabled={!file} className="w-full">
-                {!file && !failed ? "Wird vorbereitet …" : share || touch ? "In Fotos sichern …" : "Herunterladen"}
+                {!file && !failed ? "Wird vorbereitet …" : IS_APP || share || touch ? "In Fotos sichern …" : "Herunterladen"}
               </Button>
               <p className="text-ink-2 text-center text-[13px]" aria-live="polite">
                 {failed
                   ? "Die Datei ließ sich nicht rechnen."
-                  : share
+                  : IS_APP || share
                     ? "Im nächsten Fenster „Bild sichern“ wählen. Ohne Ortsangabe."
                     : `JPEG, ${STUDIO_LONG} px, ohne Ortsangabe.`}
               </p>

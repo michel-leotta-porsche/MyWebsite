@@ -703,7 +703,7 @@ export function Book({
     if (onEdit) {
       const step = Math.min(count, Math.max(0, Math.round(t.get())));
       holdThen(() => {
-        haptic("select");
+        haptic("press");
         onEdit(step);
       });
       return;
@@ -715,7 +715,7 @@ export function Book({
     if (at.corner && onEar && earNo !== undefined && !ears?.includes(earNo)) {
       setEarPress(at.side);
       holdThen(() => {
-        haptic("select");
+        haptic("press");
         onEar(earNo);
       }, false);
       return;
@@ -723,7 +723,7 @@ export function Book({
     const spot = at.spot;
     if (!at.corner && onPin && spot)
       holdThen(() => {
-        haptic("select");
+        haptic("press");
         onPin(spot);
       });
   };
@@ -802,9 +802,15 @@ export function Book({
     if (prog > 0.28 || v < -0.35) target = d.k0 + 1;
     else if (prog < -0.28 || v > 0.35) target = d.k0 - 1;
     target = Math.max(0, Math.min(count, target));
-    if (!swipe) goTo(target);
-    else if (reduce) finger.set(target);
-    else animate(finger, target, { type: "spring", stiffness: 210, damping: 26, velocity: -v * 2.2 });
+    // Haptik einmal, wenn das Blatt liegt; nicht während des Ziehens und nicht, wenn es zurückfällt
+    const landed = () => target !== d.k0 && haptic("select");
+    if (!swipe) {
+      goTo(target);
+      landed();
+    } else if (reduce) {
+      finger.set(target);
+      landed();
+    } else animate(finger, target, { type: "spring", stiffness: 210, damping: 26, velocity: -v * 2.2 }).then(landed);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {

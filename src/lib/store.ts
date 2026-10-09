@@ -1,5 +1,6 @@
 "use client";
 
+import { BookFileError, bookFileText, MAX_FILE, parseBookFile } from "@/lib/book-file";
 import type { StaticImageData } from "next/image";
 import {
   collection,
@@ -350,17 +351,13 @@ export async function listVersions(bookId: string): Promise<Version[]> {
 }
 
 /** Ganzes Projekt als Datei; die Fotos bleiben im Konto und sind über ihre Links erreichbar */
-export function exportBook(b: StoredBook): Blob {
-  // Formatkennung bleibt aus der Zeit vor der Umbenennung, damit ältere Buchdateien weiter laden
-  const data = { format: "fujiventura-buch", schema: SCHEMA, exportedAt: new Date().toISOString(), book: b };
-  return new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
-}
+export const exportBook = (b: StoredBook): string => bookFileText(b, SCHEMA);
 
 export async function importBook(file: File, owner: string, ownerName: string): Promise<StoredBook> {
-  const data = JSON.parse(await file.text());
-  if (data?.format !== "fujiventura-buch" || !data.book) throw new Error("Keine Calima-Buchdatei");
+  // Größe vor dem Lesen prüfen: eine riesige Datei soll nicht erst ganz in den Speicher
+  if (file.size > MAX_FILE) throw new BookFileError("Die Datei ist zu groß für eine Calima-Buchdatei.");
   // als neues Buch im eigenen Konto: neue Kennung, man selbst ist Macher
-  const b = migrate({ ...(data.book as StoredBook), id: newId(), owner, ownerName });
+  const b = migrate({ ...parseBookFile(await file.text(), SCHEMA), id: newId(), owner, ownerName });
   await saveBook(b);
   return b;
 }

@@ -59,6 +59,8 @@
 	<string>UIStatusBarStyleLightContent</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Calima nutzt die Kamera nur, wenn du ein Foto direkt für dein Buch aufnimmst.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Calima legt ein Foto nur dann in deine Mediathek, wenn du es im Fotostudio sicherst.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>

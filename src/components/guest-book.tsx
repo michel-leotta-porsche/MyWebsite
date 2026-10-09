@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { IS_APP } from "@/lib/app-mode";
 import type { BookData } from "@/content/books";
 import { BookmarkPlus, Check, Flag, MoreHorizontal } from "lucide-react";
 
@@ -39,16 +40,33 @@ export function GuestBook() {
     return watchBlocked(user.uid, setBlocked);
   }, [user]);
 
+  // ohne Netz nicht „liegt hier nicht mehr“ sagen, das beunruhigt grundlos; sobald Netz da ist, neu laden
+  const [offline, setOffline] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const again = () => setAttempt((n) => n + 1);
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, []);
   useEffect(() => {
     if (!token) return;
     let alive = true;
     loadShare(token)
-      .then((s) => alive && setShare(s))
-      .catch(() => alive && setShare(null));
+      .then((s) => {
+        if (!alive) return;
+        setOffline(false);
+        setShare(s);
+      })
+      .catch((e) => {
+        if (!alive) return;
+        const code = String((e as { code?: unknown })?.code ?? "");
+        if (!navigator.onLine || /unavailable|deadline/.test(code)) setOffline(true);
+        else setShare(null);
+      });
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [token, attempt]);
 
   const hidden = !!share && !!blocked?.some((b) => b.uid === share.owner);
   // angemeldet: das Buch bleibt im eigenen Bücherzimmer liegen (außer die Person ist ausgeblendet)
@@ -70,6 +88,7 @@ export function GuestBook() {
 
   if (token === null && share === undefined)
     return <Empty text="Dieser Link ist unvollständig." />;
+  if (share === undefined && offline) return <Empty text="Keine Verbindung. Das Buch lädt, sobald du wieder online bist." />;
   if (share === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
   if (!share || !book) return <Empty text="Dieses Buch liegt hier nicht mehr. Vielleicht wurde der Link zurückgezogen." />;
 
@@ -178,7 +197,7 @@ function Empty({ text }: { text: string }) {
       <p className="text-on-table-2 max-w-sm text-center">{text}</p>
       {user !== undefined && (
         <Link href={user ? "/zimmer" : "/"} className={buttonClass("quiet")}>
-          {user ? "Zum Bücherzimmer" : "Zur Startseite"}
+          {user ? "Zum Bücherzimmer" : IS_APP ? "Zu Calima" : "Zur Startseite"}
         </Link>
       )}
     </main>

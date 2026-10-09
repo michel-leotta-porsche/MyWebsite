@@ -2,6 +2,7 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
+import { keys, withKeys } from "@/lib/app-mode";
 import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -1253,10 +1254,10 @@ export function DevelopDialog({
           <h2 className="text-xl font-bold tracking-[-0.02em]">{title}</h2>
           <div className="flex items-center gap-2 lg:gap-3">
             <ToolGroup label="Verlauf">
-              <IconButton label="Rückgängig (⌘Z)" onClick={undo} disabled={!past.length || !!busy}>
+              <IconButton label={withKeys("Rückgängig", "⌘Z")} onClick={undo} disabled={!past.length || !!busy}>
                 <Undo2 aria-hidden />
               </IconButton>
-              <IconButton label="Wiederholen (⇧⌘Z)" onClick={redo} disabled={!future.length || !!busy}>
+              <IconButton label={withKeys("Wiederholen", "⇧⌘Z")} onClick={redo} disabled={!future.length || !!busy}>
                 <Redo2 aria-hidden />
               </IconButton>
             </ToolGroup>
@@ -1443,7 +1444,7 @@ export function DevelopDialog({
                 type="button"
                 aria-pressed={view.z > 1.01}
                 disabled={!shown}
-                title="Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto"
+                title={keys("Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto")}
                 onClick={() => toggleZoom()}
                 className={buttonClass("quiet", "sm", `pl-2.5 max-sm:hidden flat:hidden ${view.z > 1.01 ? "!bg-on-table !text-table" : ""}`)}
               >

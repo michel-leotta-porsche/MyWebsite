@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useSyncExternalStore } from "react";
 
-import { BookmarkCheck, Check, Copy, Gift, Link2, Link2Off, StickyNote, Undo2, X } from "lucide-react";
+import { BookmarkCheck, Check, Copy, Gift, Link2, Link2Off, Share, StickyNote, Undo2, X } from "lucide-react";
 
 import { Button, IconButton } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { ListGroup, ListRow } from "@/components/ui/list";
 import { MountedSheet } from "@/components/ui/sheet";
+import { notify } from "@/components/ui/toaster";
+import { haptic } from "@/lib/haptics";
+import { copyText, shareLink } from "@/lib/native";
+import { IS_APP } from "@/lib/app-mode";
 import { SITE_URL } from "@/lib/share-meta";
 import Link from "next/link";
 
-import { acceptTerms, deleteNote, mySharesOf, notesOf, refreshShares, shareBook, termsAccepted, unshare, type Note, type Share, type StoredBook } from "@/lib/store";
+import { acceptTerms, deleteNote, mySharesOf, notesOf, refreshShares, shareBook, termsAccepted, unshare, type Note, type Share as BookShare, type StoredBook } from "@/lib/store";
 
 // In der iOS-App ist die eigene Adresse capacitor://localhost; geteilt wird immer eine Web-Adresse
 const linkFor = (token: string) => `${location.protocol.startsWith("http") ? location.origin : SITE_URL}/b?t=${token}`;
+
+const noSubscribe = () => () => {};
+const hasShare = () => typeof navigator.share === "function";
 
 /** So lange lässt sich „Zurückziehen“ noch rückgängig machen, bevor der Link gelöscht wird */
 const WITHDRAW_MS = 5000;
@@ -30,10 +37,12 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   // zurückgezogen, aber noch nicht gelöscht: Token → Zeitgeber
   const timers = useRef(new Map<string, number>());
   const [withdrawing, setWithdrawing] = useState<string[]>([]);
-  const [shares, setShares] = useState<Share[] | null>(null);
+  const [shares, setShares] = useState<BookShare[] | null>(null);
   const [notes, setNotes] = useState<Record<string, Note[]>>({});
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  // Teilen-Knopf im Browser nur, wo es ein Teilen-Menü gibt (Telefon, Safari); erst nach dem Laden bekannt
+  const canShare = useSyncExternalStore(noSubscribe, hasShare, () => false);
   // Vor dem ersten Teilen einmal den Nutzungsbedingungen zustimmen (App Store 1.2); null solange unbekannt
   const [agreed, setAgreed] = useState<boolean | null>(null);
   const [agreeNow, setAgreeNow] = useState(false);
@@ -49,7 +58,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   const mustAgree = agreed === false && !agreeNow;
 
   // Links aus der Zeit, als sie noch beim Stand des Teilens stehen blieben, holen beim Öffnen auf
-  const catchUp = useEffectEvent((mine: Share[]) => refreshShares(book, mine).catch(() => {}));
+  const catchUp = useEffectEvent((mine: BookShare[]) => refreshShares(book, mine).catch(() => {}));
   useEffect(() => {
     let alive = true;
     mySharesOf(book.owner)
@@ -80,12 +89,23 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
       const token = await shareBook(named, to.trim());
       setShares((s) => [{ token, owner: book.owner, fromName: book.ownerName, to: to.trim(), book: named }, ...(s ?? [])]);
       setTo("");
-      const url = linkFor(token);
-      // auf dem Telefon gleich das Teilen-Menü (WhatsApp, Nachrichten …)
-      if (navigator.share) navigator.share({ title: named.title, text: `Für ${to.trim()}`, url }).catch(() => {});
+      // auf dem Telefon gleich das Teilen-Menü (WhatsApp, Nachrichten …); in der App zuverlässig auch nach dem Speichern
+      if (canShare || IS_APP) send(token, to.trim(), named.title);
+    } catch {
+      notify("Der Link ließ sich nicht anlegen. Prüf die Verbindung und tipp noch einmal.");
+      haptic("warning");
     } finally {
       setBusy(false);
     }
+  };
+
+  // Teilen-Blatt mit einem Satz, wie man ihn selbst schreiben würde; Rückmeldung nur, wenn es wirklich geklappt hat
+  const send = async (token: string, name: string, title: string) => {
+    const r = await shareLink({ title, text: `Ich hab dir ein Fotobuch hingelegt: „${title}“. Zum Blättern, ohne Konto.`, url: linkFor(token) });
+    if (r === "shared") {
+      notify(`Link für ${name} ist unterwegs.`);
+      haptic("success");
+    } else if (r === "failed") copy(token, name);
   };
 
   // Zurückziehen mit kurzer Frist zum Rückgängigmachen (UX-Kritik K13)
@@ -115,8 +135,13 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
     };
   }, []);
 
-  const copy = async (token: string) => {
-    await navigator.clipboard.writeText(linkFor(token)).catch(() => {});
+  const copy = async (token: string, name: string) => {
+    if (!(await copyText(linkFor(token)))) {
+      notify("Kopieren hat nicht geklappt. Tipp auf Teilen und wähl dort Kopieren.");
+      return;
+    }
+    notify(`Link für ${name} kopiert.`);
+    haptic("success");
     setCopied(token);
     window.setTimeout(() => setCopied(null), 1600);
   };
@@ -126,7 +151,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   return (
     <MountedSheet
       title={needsTitle ? "Buch hinlegen" : `„${book.title}“ hinlegen`}
-      description="Jede Person bekommt einen eigenen Link, ohne Konto. Der Link zeigt dieses Buch und sonst nichts."
+      description="Jede Person bekommt einen eigenen Link, ohne Konto. Wer den Link hat, kann das Buch ansehen, und sonst nichts. Du kannst ihn jederzeit zurückziehen."
       onClose={onClose}
     >
       <form
@@ -186,7 +211,12 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
                         </IconButton>
                       ) : (
                         <>
-                          <IconButton variant="paper" label={copied === s.token ? "Kopiert" : `Link für ${s.to} kopieren`} onClick={() => copy(s.token)}>
+                          {(IS_APP || canShare) && (
+                            <IconButton variant="paper" label={`Link für ${s.to} teilen`} onClick={() => send(s.token, s.to, book.title)}>
+                              <Share aria-hidden />
+                            </IconButton>
+                          )}
+                          <IconButton variant="paper" label={copied === s.token ? "Kopiert" : `Link für ${s.to} kopieren`} onClick={() => copy(s.token, s.to)}>
                             {copied === s.token ? <Check aria-hidden /> : <Copy aria-hidden />}
                           </IconButton>
                           <IconButton variant="paper" label={`Link für ${s.to} zurückziehen`} onClick={() => withdraw(s.token)}>

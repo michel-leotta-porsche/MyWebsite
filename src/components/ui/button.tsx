@@ -12,11 +12,15 @@ export { buttonClass, type ButtonSize, type ButtonVariant };
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** Klopfen in der App beim Antippen; aus mit false */
+  /**
+   * Klopfen in der App beim Antippen. Standard nur bei Hauptknöpfen (Stoff, Tinte): gewöhnliche Knöpfe bleiben still,
+   * wie in Apples eigenen Apps, damit Einrasten und Umblättern spürbar bleiben (Workshop Paket 6)
+   */
   haptic?: HapticKind | false;
 };
 
-export function Button({ variant = "quiet", size = "md", haptic: kind = "tap", className = "", onClick, ...p }: Props) {
+export function Button({ variant = "quiet", size = "md", haptic: own, className = "", onClick, ...p }: Props) {
+  const kind = own ?? (variant === "cloth" || variant === "ink" ? "tap" : false);
   return (
     <button
       type="button"
