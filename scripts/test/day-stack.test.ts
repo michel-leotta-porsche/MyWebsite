@@ -53,3 +53,14 @@ test("Weggelegtes bleibt eine Woche zum Zurückholen, dann geht es", () => {
   // nur noch Abgelaufenes: der Tag verschwindet ganz
   assert.equal(trimPiles(piles([out("alt", KEEP_AWAY + 1)]), now).keep.length, 0);
 });
+
+test("unentwickelte Filme räumt das Fotostudio nicht weg, auch hinter acht neueren Stapeln", () => {
+  const film = Array.from({ length: 24 }, (_, i) => print(`f${i}`, at(2026, 10, 1, 10, i), "film-1"));
+  const newer = Array.from({ length: 9 }, (_, i) => print(`n${i}`, at(2026, 10, 8, 10, i), `s${i}`));
+  const { keep, drop } = trimPiles(piles([...film, ...newer]), at(2026, 10, 9), new Set(["film-1"]));
+  assert.equal(keep.flat().filter((p) => p.stack === "film-1").length, 24, "kein Bild des Films geht verloren");
+  assert.equal(keep.length, 1 + 8, "der Film zählt nicht zu den acht Stapeln");
+  assert.deepEqual(drop.map((p) => p.id), ["n0"]);
+  // entwickelt (nicht mehr im Dunkeln) gilt er wieder als gewöhnlicher, ältester Stapel
+  assert.equal(trimPiles(piles([...film, ...newer]), at(2026, 10, 9), new Set()).drop.filter((p) => p.stack === "film-1").length, 24);
+});
