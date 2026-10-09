@@ -105,17 +105,55 @@ async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRe
   });
 }
 
-/** Abzüge dieses Kontos, neueste zuerst */
+/*
+ * Die Bilder liegen als Bytes in der Datenbank, nicht als Blob: WebKit legt Blobs aus IndexedDB als Dateien ab und
+ * verliert sie in der iPhone-App, sobald die App aktualisiert wird (der Datenordner bekommt einen neuen Pfad). Ältere
+ * Abzüge mit Blob werden beim Lesen angefasst; lassen sie sich nicht mehr lesen, fliegen sie leise raus.
+ */
+type Packed = { buf: ArrayBuffer; type: string };
+const BLOBS = ["work", "page", "thumb", "shot"] as const;
+type Stored = Omit<Print, (typeof BLOBS)[number]> & { work: Blob | Packed; page: Blob | Packed; thumb: Blob | Packed; shot?: Blob | Packed };
+
+const pack = async (b: Blob): Promise<Packed> => ({ buf: await b.arrayBuffer(), type: b.type });
+const unpack = (x: Blob | Packed): Blob => (x instanceof Blob ? x : new Blob([x.buf], { type: x.type }));
+const readable = (b: Blob) =>
+  b
+    .slice(0, 8)
+    .arrayBuffer()
+    .then(() => true)
+    .catch(() => false);
+
+async function unpackPrint(s: Stored): Promise<Print | null> {
+  const out = { ...s } as unknown as Print;
+  for (const k of BLOBS) {
+    const v = s[k];
+    if (!v) continue;
+    if (v instanceof Blob && !(await readable(v))) return null;
+    out[k] = unpack(v);
+  }
+  return out;
+}
+
+/** Abzüge dieses Kontos, neueste zuerst; nicht mehr lesbare werden dabei entfernt */
 export async function listPrints(uid: string): Promise<Print[]> {
-  const all = (await run<Print[]>("readonly", (s) => s.getAll() as IDBRequest<Print[]>)) ?? [];
-  return all.filter((p) => p.owner === uid).sort((a, b) => b.at - a.at);
+  const all = (await run<Stored[]>("readonly", (s) => s.getAll() as IDBRequest<Stored[]>)) ?? [];
+  const out: Print[] = [];
+  for (const s of all.filter((p) => p.owner === uid)) {
+    const p = await unpackPrint(s);
+    if (p) out.push(p);
+    else await removePrint(s.id).catch(() => {});
+  }
+  return out.sort((a, b) => b.at - a.at);
 }
 
 /** Für dieses Konto speichern und, was über die Grenzen hinausgeht, wegräumen */
 export async function putPrints(uid: string, ps: Print[]) {
   // ein Tag auf dem Pult: iOS soll den Speicher bei Platzmangel nicht von selbst leeren
   if (ps.some((p) => isDayStack(p.stack))) navigator.storage?.persist?.().catch(() => {});
-  for (const p of ps) await run("readwrite", (s) => s.put({ ...p, owner: uid }));
+  for (const p of ps) {
+    const s: Stored = { ...p, owner: uid, work: await pack(p.work), page: await pack(p.page), thumb: await pack(p.thumb), shot: p.shot ? await pack(p.shot) : undefined };
+    await run("readwrite", (st) => st.put(s));
+  }
   for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
 }
 
