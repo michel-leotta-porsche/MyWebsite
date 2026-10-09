@@ -431,6 +431,208 @@ html.ohne-struktur .printed::after {
   /* pendelt mit dem Schwung, als hinge sie an einem Kabel (Feder im Karussell) */
   will-change: translate;
 }
+/* Ladehinweis (room-loading.tsx): Lampe und Zettel, wo gleich das Buch liegt. Reines CSS, läuft schon vor dem JavaScript.
+   --rl-t verschiebt alle Zeiten, damit der zweite Hinweis (in der Reihe) dort weitermacht, wo der erste (leerer Tisch) war. */
+.room-loading {
+  position: relative;
+  overflow: visible;
+  height: calc(var(--tw) * 1.5 + 58px);
+  --rl-x: 50%;
+}
+.rl-lamp {
+  position: absolute;
+  inset: -40px -16px 0;
+  pointer-events: none;
+  background: radial-gradient(closest-side at var(--rl-x) 50%, rgb(255 228 190 / 0.2), rgb(255 228 190 / 0.06) 55%, transparent);
+  opacity: 0;
+  animation:
+    rl-lamp 1.6s cubic-bezier(0.33, 0, 0.2, 1) var(--rl-t, 0ms) both,
+    rl-breathe 6s ease-in-out calc(var(--rl-t, 0ms) + 1.6s) infinite;
+  will-change: opacity, transform;
+}
+.rl-paper {
+  position: absolute;
+  top: calc(40px + var(--tw) * 0.1);
+  left: calc(var(--rl-x) - var(--tw) * 0.48);
+  width: calc(var(--tw) * 0.96);
+  font-size: calc(var(--tw) * 0.127);
+  opacity: 0;
+  animation: rl-appear 350ms ease-out calc(var(--rl-t, 0ms) + 300ms) both;
+}
+/* ein zweites Blatt darunter, etwas verdreht */
+.rl-under {
+  position: absolute;
+  left: 0.3em;
+  top: 0.23em;
+  width: 96%;
+  height: 6.67em;
+  transform: perspective(14em) rotateX(9deg) rotate(2.4deg);
+  background: linear-gradient(170deg, #e6dfd2, #cfc6b6);
+  border-radius: 0.05em;
+  box-shadow:
+    0 0.05em 0.05em rgb(12 10 8 / 0.6),
+    0.15em 0.6em 0.75em -0.15em rgb(12 10 8 / 0.55);
+}
+/* aus dem Block gerissen: Linien, roter Rand, Papierkorn, Kante mit Dicke, Ecke unten rechts steht leicht hoch */
+.rl-note {
+  position: relative;
+  min-height: 6.67em;
+  padding: 1.12em 0.67em 0.79em 1.45em;
+  font-family: var(--font-hand), cursive;
+  font-weight: 500;
+  line-height: 1.06em;
+  color: #3b3a36;
+  transform: perspective(14em) rotateX(9deg) rotate(-3.2deg);
+  background:
+    linear-gradient(172deg, rgb(255 251 242 / 0.55), transparent 38%, rgb(70 55 35 / 0.14) 100%),
+    linear-gradient(90deg, transparent 1.12em, rgb(196 92 78 / 0.32) 1.12em calc(1.12em + 1px), transparent calc(1.12em + 1px)),
+    repeating-linear-gradient(180deg, transparent 0 calc(1.06em - 1px), rgb(104 136 168 / 0.3) calc(1.06em - 1px) 1.06em) 0 0.91em,
+    #f1ece2;
+  clip-path: polygon(0 2.2%, 4% 0.6%, 7% 1.9%, 11% 0.2%, 15% 1.6%, 18% 0.5%, 23% 2.1%, 27% 0.8%, 31% 1.7%, 36% 0.1%, 40% 1.5%, 44% 0.7%, 49% 2%, 53% 0.4%, 57% 1.8%, 61% 0.9%, 66% 2.2%, 70% 0.3%, 74% 1.4%, 79% 0.6%, 83% 2%, 88% 0.5%, 92% 1.6%, 96% 0.2%, 100% 1.3%, 100% 100%, 0 100%);
+  filter: drop-shadow(0 0.053em 0 #c9c0b0) drop-shadow(0 0.045em 0.04em rgb(12 10 8 / 0.7)) drop-shadow(0.09em 0.3em 0.24em rgb(12 10 8 / 0.45))
+    drop-shadow(0.23em 0.9em 0.75em rgb(12 10 8 / 0.5));
+}
+.rl-note::before,
+.rl-note::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.rl-note::before {
+  background: url("/textures/paper.webp");
+  mix-blend-mode: multiply;
+  opacity: 0.35;
+}
+.rl-note::after {
+  background:
+    radial-gradient(40% 30% at 100% 100%, rgb(255 255 255 / 0.45), transparent 70%),
+    radial-gradient(70% 55% at 92% 96%, rgb(70 55 35 / 0.2), transparent 70%),
+    linear-gradient(180deg, transparent 70%, rgb(70 55 35 / 0.08)),
+    linear-gradient(90deg, rgb(70 55 35 / 0.06), transparent 12%, transparent 88%, rgb(70 55 35 / 0.07));
+}
+.rl-ln {
+  display: block;
+  min-height: 1.06em;
+}
+.rl-later {
+  color: #4d4433;
+}
+.rl-w {
+  white-space: nowrap;
+}
+.rl-ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(var(--y)) rotate(var(--r));
+  text-shadow: 0 0 0.25px #3b3a36;
+  animation: rl-pencil 220ms ease-out both;
+  animation-delay: calc(var(--rl-t, 0ms) + 450ms + var(--i) * 38ms);
+}
+.rl-l1 .rl-ch {
+  animation-delay: calc(var(--rl-t, 0ms) + 4s + var(--i) * 38ms);
+}
+.rl-l2 .rl-ch {
+  animation-delay: calc(var(--rl-t, 0ms) + 12s + var(--i) * 38ms);
+}
+.rl-line {
+  position: absolute;
+  left: 1.42em;
+  top: 4.18em;
+  width: 3.33em;
+  height: 0.4em;
+  overflow: visible;
+}
+.rl-line path {
+  fill: none;
+  stroke: #4a4842;
+  stroke-width: 1.6px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.8;
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: rl-draw 350ms ease-out calc(var(--rl-t, 0ms) + 1.5s) forwards;
+}
+@keyframes rl-lamp {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes rl-breathe {
+  50% {
+    opacity: 0.9;
+  }
+}
+@keyframes rl-appear {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes rl-pencil {
+  from {
+    opacity: 0;
+    clip-path: inset(-60% 100% -60% -20%);
+  }
+  to {
+    opacity: 0.9;
+    clip-path: inset(-60% -30% -60% -20%);
+  }
+}
+@keyframes rl-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (min-width: 1024px) {
+  /* das Buch liegt in der linken Spalte (7/12) der Reihe; die Reihe ragt 64px nach links */
+  .room-loading {
+    --rl-x: calc(((100% - 112px) * 7 / 12 + 64px) / 2);
+  }
+}
+/* Die Bücher landen auf dem Zettel, wenn er zu sehen war (room-carousel.tsx setzt is-landing) */
+.carousel.is-landing > li .lift {
+  animation: rl-land 520ms cubic-bezier(0.3, 0.6, 0.25, 1) both;
+}
+@keyframes rl-land {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0) scale(1.05);
+  }
+  20% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rl-lamp {
+    animation: rl-appear 600ms ease-out var(--rl-t, 0ms) both;
+  }
+  .rl-ch {
+    --r: 0deg;
+    --y: 0;
+    animation-name: rl-appear;
+    animation-duration: 400ms;
+    animation-delay: calc(var(--rl-t, 0ms) + 300ms);
+  }
+  .rl-l1 .rl-ch {
+    animation-delay: calc(var(--rl-t, 0ms) + 4s);
+  }
+  .rl-l2 .rl-ch {
+    animation-delay: calc(var(--rl-t, 0ms) + 12s);
+  }
+  .rl-line path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .carousel.is-landing > li .lift {
+    animation: rl-appear 400ms ease-out both;
+  }
+}
 .room-dot {
   display: block;
   width: 6px;

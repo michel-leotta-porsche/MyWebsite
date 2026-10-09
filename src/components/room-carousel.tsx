@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import type { BookData } from "@/content/books";
+import { roomLoadingSeen } from "@/components/room-loading";
 import { ClosedBook } from "@/components/table";
 import { haptic } from "@/lib/haptics";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -147,6 +148,15 @@ export function Carousel({
     setNear(i);
     // nur beim Erscheinen der Reihe; spätere Wechsel macht der Finger
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
+  // Lag beim Laden der Zettel auf dem Tisch, landen die Bücher darauf, statt hereinzugleiten (room-loading.tsx)
+  useLayoutEffect(() => {
+    const ul = list.current;
+    if (!ul || !roomLoadingSeen()) return;
+    ul.classList.add("is-landing");
+    const t = window.setTimeout(() => ul.classList.remove("is-landing"), 900);
+    return () => window.clearTimeout(t);
   }, [shown]);
 
   useEffect(() => {
