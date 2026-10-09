@@ -3,14 +3,14 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { keys, withKeys } from "@/lib/app-mode";
-import { Aperture, BookmarkPlus, Check, ClipboardCopy, Copy, Layers, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Aperture, BookmarkPlus, Pencil, Plus, RefreshCw, Check, ClipboardCopy, Copy, Layers, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
 import { CurvePad } from "@/components/curve-pad";
 import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
-import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { ContextMenu, Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/segmented";
 import { Swatches } from "@/components/ui/swatches";
 import { bakePhoto } from "@/lib/develop/bake";
@@ -38,6 +38,7 @@ import {
   neutralEdit,
   pickEdit,
   PICKS,
+  PICKS_SHOWN,
   PRESETS,
   REC0,
   recipeIsEmpty,
@@ -50,6 +51,7 @@ import {
   type More,
   type NamedRecipe,
   type PhotoEdit,
+  type PickId,
   type PhotoStats,
   type RecipeValues,
 } from "@/lib/develop/model";
@@ -57,6 +59,7 @@ import { createPreviewer, type Previewer } from "@/lib/develop/preview";
 import { applySettings, asLook, fromEdit, fromRecipe } from "@/lib/develop/settings";
 import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
 import { haptic } from "@/lib/haptics";
+import { setShownPicks, useShownPicks } from "@/lib/pick-prefs";
 import { copySettings, useCopiedSettings } from "@/lib/settings-clipboard";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -488,6 +491,7 @@ export function DevelopDialog({
   onFinish,
   title = "Bearbeiten",
   long = 2560,
+  note: opening,
   onClose,
 }: {
   /** die Fotos der Doppelseite; bearbeitet wird immer eins */
@@ -503,6 +507,8 @@ export function DevelopDialog({
   title?: string;
   /** lange Kante der eingerechneten Fassung, damit die Körnung in der Vorschau stimmt */
   long?: number;
+  /** Hinweis zum Öffnen, etwa wenn nicht alle gewählten Fotos aufgingen */
+  note?: string | null;
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -517,11 +523,12 @@ export function DevelopDialog({
   const [split, setSplit] = useState(0.5);
   const [holding, setHolding] = useState(false);
   const [big, setBig] = useState<{ value: string; label: string } | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(opening ?? null);
   const [loaded, setLoaded] = useState<Record<string, Loaded>>({});
   const [ready, setReady] = useState<string | null>(null);
   const [own, setOwn] = useState<NamedRecipe[]>([]);
-  const [naming, setNaming] = useState(false);
+  // true: neuen Look benennen, sonst den genannten umbenennen
+  const [naming, setNaming] = useState<boolean | NamedRecipe>(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ask, setAsk] = useState<{ text: string; yes: string; no: string; onYes: () => void } | null>(null);
@@ -852,7 +859,7 @@ export function DevelopDialog({
     const n = neutralEdit();
     return {
       auto: me ? { ...n, ...autoEdit(me) } : n,
-      picks: PICKS.map((p) => (me ? pickEdit(me, p.id, n) : n)),
+      picks: Object.fromEntries(PICKS.map((p) => [p.id, me ? pickEdit(me, p.id, n) : n])) as Record<PickId, PhotoEdit>,
       match: me && otherStats.length ? { ...n, transfer: matchTransfer(me, otherStats) } : n,
       mood: me && moodSt ? { ...n, transfer: moodTransfer(me, moodSt) } : n,
     };
@@ -949,7 +956,9 @@ export function DevelopDialog({
     setOwn((o) => [...o.filter((x) => x.name !== name), r].sort((a, b) => a.name.localeCompare(b.name, "de")));
     setEdit((e) => ({ ...e, recName: name }));
     setNaming(false);
-    setNote(`„${name}“ steht jetzt unter Vorschläge bei „Deine Looks“, auch für andere Fotos und Bücher.`);
+    setNote(`„${name}“ steht jetzt oben bei „Deine Looks“, auch für andere Fotos und Bücher.`);
+    // die Looks stehen oben, das Formular unten: zum neuen Look scrollen
+    requestAnimationFrame(() => dialog.current?.querySelector(`[data-own="${r.id}"]`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }));
     saveRecipe(uid, r).catch(() => setNote("Der Look ließ sich nicht speichern."));
   };
   const askDelete = (gone: NamedRecipe) =>
@@ -962,7 +971,40 @@ export function DevelopDialog({
         deleteRecipe(uid, gone.id).catch(() => {});
       },
     });
-  const saveForm = naming && <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />;
+  const renameOwn = (r: NamedRecipe, name: string) => {
+    if (name === r.name) return setNaming(false);
+    if (own.some((x) => x.id !== r.id && x.name === name)) return setNote(`„${name}“ heißt schon ein anderer Look.`);
+    const next = { ...r, name };
+    setOwn((o) => o.map((x) => (x.id === r.id ? next : x)).sort((a, b) => a.name.localeCompare(b.name, "de")));
+    if (edit.recName === r.name) setEdit((e) => ({ ...e, recName: name }));
+    setNaming(false);
+    setNote(`Heißt jetzt „${name}“.`);
+    saveRecipe(uid, next).catch(() => setNote("Der Look ließ sich nicht speichern."));
+  };
+  const updateOwn = (r: NamedRecipe) => {
+    const next: NamedRecipe = { ...r, v: { ...edit.rec }, f: lookFineOf(edit) };
+    setOwn((o) => o.map((x) => (x.id === r.id ? next : x)));
+    setEdit((e) => ({ ...e, recName: r.name }));
+    setNote(`„${r.name}“ hat jetzt die Einstellungen dieses Fotos.`);
+    saveRecipe(uid, next).catch(() => setNote("Der Look ließ sich nicht speichern."));
+  };
+  const saveForm =
+    naming === true ? (
+      <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />
+    ) : naming ? (
+      <SaveForm key={naming.id} initial={naming.name} label={`Neuer Name für „${naming.name}“`} onCancel={() => setNaming(false)} onSave={(name) => renameOwn(naming, name)} />
+    ) : null;
+
+  /* ----- Vorschläge: welche dastehen, merkt sich das Gerät; austauschen per Rechtsklick oder langem Tippen ----- */
+
+  const shownPicks = useShownPicks();
+  const spare = PICKS.filter((p) => !shownPicks.includes(p.id));
+  const picksChanged = shownPicks.join() !== PICKS_SHOWN.join();
+  const swapPick = (from: PickId, to: PickId) => setShownPicks(shownPicks.map((id) => (id === from ? to : id)));
+  const dropPick = (id: PickId) => {
+    setShownPicks(shownPicks.filter((x) => x !== id));
+    setNote(`„${PICKS.find((p) => p.id === id)?.name}“ steht nicht mehr da. Unter „Weitere“ holst du ihn zurück.`);
+  };
 
   /* ----- Einstellungen kopieren und einfügen: Farbe und Licht, nie der Zuschnitt ----- */
 
@@ -1294,7 +1336,7 @@ export function DevelopDialog({
       : tab === "s"
         ? series
           ? "Ein Foto einstellen, dann „Auf alle“. Oder sein Bild im Streifen über die anderen ziehen."
-          : "Ein Tipp genügt. Danach kannst du unter Feinschliff nachstellen."
+          : "Ein Tipp genügt. Lange drücken oder Rechtsklick tauscht einen Vorschlag aus."
         : tab === "l"
           ? edit.look
             ? "Auf dem Foto wischen ändert die Stärke. Den Look noch einmal antippen oder „Ohne Look“ nimmt ihn weg."
@@ -1767,6 +1809,48 @@ export function DevelopDialog({
             {hint}
           </p>
           <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`} hidden={cropping}>
+            {tab === "s" && own.length > 0 && (
+              <div className="mb-7">
+                <h3 className={groupTitle}>Deine Looks</h3>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
+                  {own.map((r) => (
+                    <ContextMenu
+                      key={r.id}
+                      data-own={r.id}
+                      container={dialog}
+                      className="relative grid min-w-0 select-none"
+                      menu={
+                        <>
+                          <MenuItem icon={<Pencil />} onClick={() => setNaming(r)}>
+                            Umbenennen
+                          </MenuItem>
+                          <MenuItem icon={<RefreshCw />} hint="nimmt Farbe und Licht von jetzt" onClick={() => updateOwn(r)} disabled={colorIsNeutral(edit) || wearsLook(edit, r)}>
+                            Mit diesem Foto überschreiben
+                          </MenuItem>
+                          <MenuSeparator />
+                          <MenuItem icon={<Trash />} danger onClick={() => askDelete(r)}>
+                            Löschen
+                          </MenuItem>
+                        </>
+                      }
+                    >
+                      <Tile img={tileImg} edit={{ ...edit, ...r.f, rec: r.v }} name={r.name} txt={r.f ? "eigener Look" : "eigenes Rezept"} pressed={wearsLook(edit, r)} onClick={() => applyOwn(r)} />
+                      <button
+                        type="button"
+                        onClick={() => askDelete(r)}
+                        aria-label={`${r.name} löschen`}
+                        title={`${r.name} löschen`}
+                        className="bg-paper/90 text-ink hover:bg-paper absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full shadow-[0_1px_4px_rgb(12_10_8/0.3)]"
+                      >
+                        <X aria-hidden className="size-3.5" />
+                      </button>
+                    </ContextMenu>
+                  ))}
+                </div>
+                {naming && naming !== true && saveForm}
+              </div>
+            )}
+            {tab === "s" && own.length > 0 && <h3 className={groupTitle}>Vorschläge</h3>}
             {tab === "s" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile
@@ -1785,18 +1869,75 @@ export function DevelopDialog({
                     })
                   }
                 />
-                {PICKS.map((p, i) => (
-                  <Tile
-                    key={p.id}
-                    img={tileImg}
-                    edit={sugg.picks[i]}
-                    name={p.name}
-                    txt={p.txt}
-                    pressed={edit.origin === "pick" && edit.pick === p.id}
-                    disabled={!me}
-                    onClick={() => me && act((e) => pickEdit(me, p.id, e), true)}
-                  />
-                ))}
+                {shownPicks.map((id) => {
+                  const p = PICKS.find((x) => x.id === id)!;
+                  return (
+                    <ContextMenu
+                      key={id}
+                      container={dialog}
+                      className="grid min-w-0 select-none"
+                      menu={
+                        <>
+                          {spare.length > 0 && <MenuLabel>Austauschen gegen</MenuLabel>}
+                          {spare.map((q) => (
+                            <MenuItem key={q.id} hint={q.txt} onClick={() => swapPick(id, q.id)}>
+                              {q.name}
+                            </MenuItem>
+                          ))}
+                          {spare.length > 0 && <MenuSeparator />}
+                          <MenuItem icon={<Trash />} onClick={() => dropPick(id)}>
+                            Entfernen
+                          </MenuItem>
+                          {picksChanged && (
+                            <MenuItem icon={<RotateCcw />} onClick={() => setShownPicks(null)}>
+                              Vorschläge wie anfangs
+                            </MenuItem>
+                          )}
+                        </>
+                      }
+                    >
+                      <Tile
+                        img={tileImg}
+                        edit={sugg.picks[id]}
+                        name={p.name}
+                        txt={p.txt}
+                        pressed={edit.origin === "pick" && edit.pick === id}
+                        disabled={!me}
+                        onClick={() => me && act((e) => pickEdit(me, id, e), true)}
+                      />
+                    </ContextMenu>
+                  );
+                })}
+                {spare.length > 0 && (
+                  <Menu
+                    container={dialog}
+                    align="start"
+                    trigger={
+                      <button type="button" className="group flex min-w-0 flex-col gap-1 text-left">
+                        <span className="border-ink/25 text-ink-2 group-hover:border-ink/45 group-hover:text-ink grid aspect-[4/5] w-full place-items-center border border-dashed transition-colors duration-150">
+                          <Plus aria-hidden className="size-6" strokeWidth={1.5} />
+                        </span>
+                        <b className="text-sm font-semibold max-sm:text-xs">Weitere</b>
+                        <small className="text-ink-2 line-clamp-2 min-h-[2lh] text-xs leading-snug max-sm:hidden">Vorschläge dazuholen, lange drücken tauscht</small>
+                      </button>
+                    }
+                  >
+                    <MenuLabel>Dazuholen</MenuLabel>
+                    {spare.map((q) => (
+                      <MenuItem key={q.id} hint={q.txt} onClick={() => setShownPicks([...shownPicks, q.id])}>
+                        {q.name}
+                      </MenuItem>
+                    ))}
+                    {picksChanged && (
+                      <>
+                        <MenuSeparator />
+                        <MenuItem icon={<RotateCcw />} onClick={() => setShownPicks(null)}>
+                          Vorschläge wie anfangs
+                        </MenuItem>
+                      </>
+                    )}
+                  </Menu>
+                )}
                 {!onFinish && (
                 <Tile
                   img={tileImg}
@@ -1849,29 +1990,16 @@ export function DevelopDialog({
             )}
             {tab === "s" && (
               <div className="mt-7">
-                <h3 className={groupTitle}>Deine Looks</h3>
-                {own.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
-                    {own.map((r) => (
-                      <div key={r.id} className="relative min-w-0">
-                        <Tile img={tileImg} edit={{ ...edit, ...r.f, rec: r.v }} name={r.name} txt={r.f ? "eigener Look" : "eigenes Rezept"} pressed={wearsLook(edit, r)} onClick={() => applyOwn(r)} />
-                        <button
-                          type="button"
-                          onClick={() => askDelete(r)}
-                          aria-label={`${r.name} löschen`}
-                          title={`${r.name} löschen`}
-                          className="bg-paper/90 text-ink hover:bg-paper absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full shadow-[0_1px_4px_rgb(12_10_8/0.3)]"
-                        >
-                          <X aria-hidden className="size-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
+                {own.length === 0 && (
+                  <>
+                    <h3 className={groupTitle}>Deine Looks</h3>
+                    <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
+                  </>
                 )}
-                {saveForm || (
-                  <div className="mt-3.5 flex flex-wrap gap-2">
+                {naming === true ? (
+                  saveForm
+                ) : (
+                  <div className={`flex flex-wrap gap-2 ${own.length ? "" : "mt-3.5"}`}>
                     <Button variant="paper" size="sm" className="pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
                       <BookmarkPlus aria-hidden />
                       Als eigenen Look speichern
@@ -2182,8 +2310,8 @@ export function DevelopDialog({
   );
 }
 
-function SaveForm({ onSave, onCancel }: { onSave: (name: string) => void; onCancel: () => void }): ReactNode {
-  const [name, setName] = useState("");
+function SaveForm({ onSave, onCancel, initial = "", label = "Name für deinen Look" }: { onSave: (name: string) => void; onCancel: () => void; initial?: string; label?: string }): ReactNode {
+  const [name, setName] = useState(initial);
   return (
     <form
       className="mt-2.5 grid gap-1.5"
@@ -2194,7 +2322,7 @@ function SaveForm({ onSave, onCancel }: { onSave: (name: string) => void; onCanc
       }}
     >
       <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-        <Field label="Name für deinen Look" autoFocus maxLength={40} required value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-[1_1_220px]" />
+        <Field label={label} autoFocus maxLength={40} required value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-[1_1_220px]" />
         <div className="flex gap-2">
           <button type="submit" className={buttonClass("ink", "sm")}>
             Speichern

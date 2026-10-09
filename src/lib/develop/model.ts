@@ -674,7 +674,7 @@ export function stats(px: Uint8ClampedArray): PhotoStats {
 /** Auto: Tonwerte spreizen und den Farbstich zur Hälfte nehmen */
 /* ---------- Fertige Vorschläge: Auto als Grundlage, darauf ein abgestimmter Satz aus Look und Reglern ---------- */
 
-export type PickId = "klar" | "film" | "sw";
+export type PickId = "klar" | "film" | "sw" | "matt" | "abend" | "kuehl" | "dia" | "weich";
 export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdit>; more: Partial<More> }[] = [
   {
     id: "klar",
@@ -704,7 +704,52 @@ export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdi
     e: { look: "kohle", amount: 1, contrast: 0.28 },
     more: { blacks: -0.15, clarity: 0.35, vignette: -0.35 },
   },
+  // zum Austauschen: stehen erst unter Vorschläge, wenn jemand sie dorthin holt
+  {
+    id: "matt",
+    name: "Matt",
+    txt: "blass, Schwarz offen",
+    e: { look: "kreide", amount: 0.7, contrast: -0.08 },
+    more: {
+      vibrance: -0.15,
+      curve: [
+        [0, 0.1],
+        [0.5, 0.52],
+        [1, 0.94],
+      ],
+    },
+  },
+  {
+    id: "abend",
+    name: "Abendlicht",
+    txt: "golden, weiche Schatten",
+    e: { warmth: 0.3, shadows: 0.2, exposure: 0.03 },
+    more: { highlights: -0.2, tint: 0.06, vibrance: 0.2, vignette: -0.2 },
+  },
+  {
+    id: "kuehl",
+    name: "Kühl",
+    txt: "klar und frisch, wie Meerluft",
+    e: { look: "salz", amount: 0.7, warmth: -0.08, contrast: 0.1 },
+    more: { highlights: -0.15, clarity: 0.15 },
+  },
+  {
+    id: "dia",
+    name: "Diafilm",
+    txt: "satt und kräftig",
+    e: { look: "messing", amount: 0.75, contrast: 0.15 },
+    more: { blacks: -0.1, vibrance: 0.15, vignette: -0.2 },
+  },
+  {
+    id: "weich",
+    name: "Weich",
+    txt: "hell und sanft, für Gesichter",
+    e: { exposure: 0.06, contrast: -0.12, shadows: 0.25 },
+    more: { highlights: -0.25, clarity: -0.2, vibrance: 0.1 },
+  },
 ];
+/** stehen ab Werk unter Vorschläge, die übrigen holt man sich per Austauschen dazu */
+export const PICKS_SHOWN: PickId[] = ["klar", "film", "sw"];
 /** Vorschlag auf ein Foto: Farbe und Licht neu, Zuschnitt und Rezept bleiben */
 export function pickEdit(st: PhotoStats, id: PickId, base: PhotoEdit): PhotoEdit {
   const p = PICKS.find((x) => x.id === id)!;
