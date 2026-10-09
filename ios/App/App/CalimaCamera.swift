@@ -610,10 +610,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         let grain = noise
             .samplingNearest()
             .transformed(by: CGAffineTransform(translationX: dx, y: dy).scaledBy(x: cellPx, y: cellPx))
+            // Als Zufallszahl dient der Alphakanal, nicht Rot: CIRandomGenerator würfelt alle vier Kanäle einzeln, und Core
+            // Image rechnet mit vormultiplizierten Farben. Rot durch Alpha geteilt läuft bei jedem zweiten Pixel auf 1 hinaus,
+            // das Korn wurde zu lauter hellen Sprenkeln (Kalkwand, Nachmittag). Alpha selbst bleibt gleichverteilt.
             .applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0),
-                "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
-                "inputBVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputRVector": CIVector(x: 0, y: 0, z: 0, w: k),
+                "inputGVector": CIVector(x: 0, y: 0, z: 0, w: k),
+                "inputBVector": CIVector(x: 0, y: 0, z: 0, w: k),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                 "inputBiasVector": CIVector(x: 0.5 - k / 2, y: 0.5 - k / 2, z: 0.5 - k / 2, w: 1),
             ])
