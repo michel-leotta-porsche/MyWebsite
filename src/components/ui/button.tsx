@@ -1,61 +1,45 @@
-import { Button as ButtonPrimitive } from "@base-ui/react/button"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
+"use client";
 
-/*
- * Systemplan-Button. Eckig, ohne Schatten.
- * primary: Tinte-Fläche, Bernstein-Quadrat als Marker (dreht sich beim Hover).
- * secondary: 1px-Rahmen in Tinte.
- * ghost: nur Text, Unterstrich wächst von links.
- */
-const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center gap-3 font-medium whitespace-nowrap select-none outline-none transition-colors duration-160 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        primary: "bg-ink text-paper hover:bg-ink/90",
-        secondary: "border border-ink text-ink hover:bg-ink hover:text-paper",
-        ghost:
-          "relative px-0! text-ink after:absolute after:inset-x-0 after:bottom-2 after:h-px after:origin-right after:scale-x-0 after:bg-ink after:transition-transform after:duration-500 after:ease-out-expo hover:after:origin-left hover:after:scale-x-100",
-      },
-      size: {
-        default: "h-[50px] px-6 text-base",
-        sm: "h-10 px-4 text-[15px]",
-      },
-    },
-    defaultVariants: {
-      variant: "primary",
-      size: "default",
-    },
-  }
-)
+import type { ButtonHTMLAttributes } from "react";
 
-/** Bernstein-Quadrat für den Primär-Button. */
-function ButtonMarker({ className }: { className?: string }) {
+import { buttonClass, type ButtonSize, type ButtonVariant } from "@/components/ui/button-class";
+import { haptic, type HapticKind } from "@/lib/haptics";
+
+export { buttonClass, type ButtonSize, type ButtonVariant };
+
+// Knöpfe der Werkzeuge; Klassen in button-class.ts (ohne "use client", damit Server-Seiten sie auch nutzen)
+
+type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  /** Klopfen in der App beim Antippen; aus mit false */
+  haptic?: HapticKind | false;
+};
+
+export function Button({ variant = "quiet", size = "md", haptic: kind = "tap", className = "", onClick, ...p }: Props) {
   return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "size-2 bg-signal transition-transform duration-500 ease-out-expo group-hover/button:scale-120 group-hover/button:rotate-45",
-        className
-      )}
+    <button
+      type="button"
+      {...p}
+      onClick={(e) => {
+        if (kind) haptic(kind);
+        onClick?.(e);
+      }}
+      className={buttonClass(variant, size, className)}
     />
-  )
+  );
 }
 
-function Button({
-  className,
-  variant = "primary",
-  size = "default",
-  ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  return (
-    <ButtonPrimitive
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size }), className)}
-      {...props}
-    />
-  )
+/** Symbolknopf: braucht immer einen Namen für Screenreader (label) */
+export function IconButton({ label, variant = "quiet", ...p }: Omit<Props, "size" | "aria-label"> & { label: string }) {
+  return <Button {...p} variant={variant} size="icon" aria-label={label} title={label} />;
 }
 
-export { Button, ButtonMarker, buttonVariants }
+/** Mehrere Symbolknöpfe in einer Pille, z. B. Rückgängig, Ansehen, Mehr */
+export function ToolGroup({ children, label }: { children: React.ReactNode; label: string }) {
+  return (
+    <div role="toolbar" aria-label={label} className="bg-on-table/7 inline-flex rounded-full shadow-[inset_0_0_0_1px_rgb(236_230_220/0.09)] [&_button]:bg-transparent [&_button]:shadow-none [&_button:active]:bg-on-table/12">
+      {children}
+    </div>
+  );
+}
