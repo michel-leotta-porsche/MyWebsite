@@ -50,11 +50,14 @@ const stamp = () => {
 };
 const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
 
-export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onShot: (p: Print, stack?: string) => void; onFilmDone: (stack: string) => void; onClose: () => void }) {
+/** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
+export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: string; taken?: boolean; onShot: (p: Print, stack?: string) => void; onFilmDone: (stack: string) => void; onClose: () => void }) {
   const t = useT();
   const recent = useRecentSettings();
   const [own, setOwn] = useState<NamedRecipe[]>([]);
   const [lookId, setLookId] = useState<string>(() => {
+    // der neueste mitgenommene Look steht in der Liste immer als recent-0
+    if (taken) return "recent-0";
     try {
       return localStorage.getItem(LAST_KEY) ?? "";
     } catch {
@@ -792,7 +795,9 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
             ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
               ? t("{n} auf dem Stapel von heute. Einsortieren kannst du abends.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
-              : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}
+              : lookNow.edit
+                ? t("Halten zeigt das Original, Wischen macht heller oder dunkler.")
+                : t("Mit einem Look zeigt Halten das Original. Wischen macht heller oder dunkler.")}
         </p>
       </footer>
       {viewing && review && !film && <PhotoZoom src={sharp ?? review} alt={t("Letztes Foto")} onClose={() => setViewing(false)} />}

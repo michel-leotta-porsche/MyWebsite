@@ -514,7 +514,7 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
     made.current.developed.add(stack);
     developFilm(uid, stack).catch(() => {});
   };
-  return <CameraView uid={uid} onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
+  return <CameraView uid={uid} taken onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
 }
 
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {

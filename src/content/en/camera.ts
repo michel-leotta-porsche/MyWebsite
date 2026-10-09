@@ -12,6 +12,7 @@ export const CAMERA: Record<string, string> = {
   Frontkamera: "Front camera",
   "{n} auf dem Stapel von heute. Einsortieren kannst du abends.": "{n} on today's stack. You can sort them in the evening.",
   "Halten zeigt das Original, Wischen macht heller oder dunkler.": "Hold to see the original, swipe to go brighter or darker.",
+  "Mit einem Look zeigt Halten das Original. Wischen macht heller oder dunkler.": "With a look, hold to see the original. Swipe to go brighter or darker.",
   "Calima-Look": "Calima look",
   "{label} „{name}“ mitgenommen. Liegt oben bei „Deine Looks“.": "{label} “{name}” taken along. It's up under “Your looks”.",
   "Aus der Datei gelesen, in Calima nachempfunden": "Read from the file, approximated in Calima",

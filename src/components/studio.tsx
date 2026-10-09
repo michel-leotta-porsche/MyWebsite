@@ -362,7 +362,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         </p>
       )}
 
-      {camera && <Camera uid={user.uid} onShot={onShot} onFilmDone={onFilmDone} onClose={closeCamera} />}
+      {camera && <Camera uid={user.uid} taken={wantsCamera} onShot={onShot} onFilmDone={onFilmDone} onClose={closeCamera} />}
       {sorting && (
         <DaySort
           stack={sorting}
