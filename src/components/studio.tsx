@@ -66,15 +66,15 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    listPrints()
+    listPrints(user.uid)
       .then((p) => setPrints(p.slice(0, MAX_PRINTS)))
       .catch(() => {});
-  }, []);
+  }, [user.uid]);
 
   // ohne IndexedDB (privates Fenster) hält das Studio den Abzug nur, solange die Seite offen ist
   const keep = (p: Print) => {
     setPrints((list) => [p, ...list.filter((x) => x.id !== p.id)].slice(0, MAX_PRINTS));
-    putPrint(p).catch(() => {});
+    putPrint(user.uid, p).catch(() => {});
   };
 
   const open = async (file: File) => {

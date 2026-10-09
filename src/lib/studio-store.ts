@@ -4,6 +4,7 @@ import type { PhotoEdit } from "@/lib/develop/model";
 import type { PhotoMeta } from "@/lib/ingest";
 
 // Abzüge im Fotostudio: die letzten bearbeiteten Fotos, nur auf diesem Gerät (IndexedDB), nie hochgeladen.
+// Jeder Abzug gehört einem Konto: wer sich auf demselben Gerät anmeldet, sieht nur seine eigenen.
 // Ein Abzug hält die Arbeitsfassung (4096 px), kleine Vorschauen, die Aufnahmedaten und die Bearbeitung.
 // Geht IndexedDB nicht (privates Fenster, gesperrter Speicher), arbeitet das Studio ohne Gedächtnis weiter.
 
@@ -22,9 +23,11 @@ export type Print = {
   edit?: PhotoEdit;
   /** kleine eingerechnete Fassung fürs Pult */
   shot?: Blob;
+  /** uid des Kontos; ältere Abzüge ohne Besitzer zeigt das Studio niemandem mehr */
+  owner?: string;
 };
 
-/** so viele Abzüge bleiben liegen; ältere räumt das Studio selbst weg */
+/** so viele Abzüge bleiben je Konto liegen; ältere räumt das Studio selbst weg */
 export const MAX_PRINTS = 8;
 
 const DB = "calima-studio";
@@ -55,20 +58,26 @@ async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRe
   });
 }
 
-/** Neueste zuerst */
-export async function listPrints(): Promise<Print[]> {
+/** Abzüge dieses Kontos, neueste zuerst */
+export async function listPrints(uid: string): Promise<Print[]> {
   const all = (await run<Print[]>("readonly", (s) => s.getAll() as IDBRequest<Print[]>)) ?? [];
-  return all.sort((a, b) => b.at - a.at);
+  return all.filter((p) => p.owner === uid).sort((a, b) => b.at - a.at);
 }
 
-/** Speichern und, was über MAX_PRINTS hinausgeht, wegräumen; gibt die neue Liste zurück */
-export async function putPrint(p: Print): Promise<Print[]> {
-  await run("readwrite", (s) => s.put(p));
-  const all = await listPrints();
+/** Für dieses Konto speichern und, was über MAX_PRINTS hinausgeht, wegräumen; gibt die neue Liste zurück */
+export async function putPrint(uid: string, p: Print): Promise<Print[]> {
+  await run("readwrite", (s) => s.put({ ...p, owner: uid }));
+  const all = await listPrints(uid);
   for (const old of all.slice(MAX_PRINTS)) await removePrint(old.id);
   return all.slice(0, MAX_PRINTS);
 }
 
 export async function removePrint(id: string) {
   await run("readwrite", (s) => s.delete(id));
+}
+
+/** Beim Löschen des Kontos: alle Abzüge dieses Kontos und die alten ohne Besitzer vom Gerät entfernen */
+export async function clearPrints(uid: string) {
+  const all = (await run<Print[]>("readonly", (s) => s.getAll() as IDBRequest<Print[]>)) ?? [];
+  for (const p of all) if (!p.owner || p.owner === uid) await removePrint(p.id);
 }
