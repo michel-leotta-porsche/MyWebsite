@@ -1,6 +1,8 @@
 # Spielt die Foto-App (Calima) auf Firebase Hosting aus, Projekt fujiventura, nur das Ziel app (Site calima).
 # Live nur von Hand: unter Actions → Ausspielen → „Run workflow“ (Hauptzweig). Bei jedem PR: eigener Vorschau-Link (7 Tage), den der PR als Kommentar bekommt.
 # Den Export baut der predeploy in firebase.json selbst (npm run export, danach check-export).
+# Firebase erlaubt nur eine Handvoll Vorschau-Kanäle je Site: wird ein PR geschlossen, löscht „Vorschau weg“ seinen Kanal;
+# „Vorschau-Kanäle aufräumen“ (Knopf mit Häkchen) löscht die Kanäle aller geschlossenen PRs, falls die Quote doch voll ist.
 #
 # Braucht zwei Repository-Secrets:
 #   FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA  Dienstkonto-JSON (legt `firebase init hosting:github` an)
@@ -9,9 +11,15 @@ name: Ausspielen
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths-ignore: ["docs/**", "**/*.md", ".github/dependabot.yml", ".github/workflows/codeql.yml", ".github/workflows/pruefen.yml"]
-  # Knopf „Run workflow“ unter Actions: spielt den Hauptstand live aus
+  # Knopf „Run workflow“ unter Actions: spielt den Hauptstand live aus; mit Häkchen räumt er stattdessen Vorschau-Kanäle auf
   workflow_dispatch:
+    inputs:
+      aufraeumen:
+        description: "Nur Vorschau-Kanäle geschlossener PRs löschen, nichts ausspielen"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +30,7 @@ jobs:
   live:
     name: Live auf calima
     # nur der Hauptstand (Standard-Branch des Repos) geht live, auch wenn beim Knopf ein anderer Branch gewählt ist
-    if: github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: github.event_name == 'workflow_dispatch' && !inputs.aufraeumen && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     # nie zwei Deploys gleichzeitig, und keiner wird mittendrin abgebrochen
     concurrency:
@@ -51,6 +59,7 @@ jobs:
     # Dependabot-PRs bekommen die Actions-Secrets ebenfalls nicht; für sie reicht der Build in „Prüfen“.
     if: >-
       github.event_name == 'pull_request'
+      && github.event.action != 'closed'
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
@@ -73,3 +82,55 @@ jobs:
           projectId: fujiventura
           target: app
           expires: 7d
+
+  # Der Kanal eines geschlossenen PRs wird sofort gelöscht, sonst läuft die Quote (Firebase: wenige Kanäle je Site) voll
+  weg:
+    name: Vorschau weg
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Kanal dieses PRs löschen
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/dienstkonto.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/dienstkonto.json"
+          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json
+          for id in $(jq -r '.. | objects | .name? // empty | select(test("/channels/")) | split("/")[-1]' kanaele.json | grep "^pr${PR}-" || true); do
+            echo "lösche $id"
+            npx -y firebase-tools@14 hosting:channel:delete "$id" --site calima --project fujiventura --non-interactive --force
+          done
+
+  aufraeumen:
+    name: Vorschau-Kanäle aufräumen
+    if: github.event_name == 'workflow_dispatch' && inputs.aufraeumen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Kanäle geschlossener PRs löschen
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FUJIVENTURA }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/dienstkonto.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/dienstkonto.json"
+          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json
+          for id in $(jq -r '.. | objects | .name? // empty | select(test("/channels/")) | split("/")[-1]' kanaele.json); do
+            [ "$id" = live ] && continue
+            n=$(printf '%s' "$id" | sed -n 's/^pr\([0-9][0-9]*\)-.*/\1/p')
+            if [ -z "$n" ]; then echo "lasse $id (kein PR-Kanal)"; continue; fi
+            state=$(gh pr view "$n" --json state -q .state 2>/dev/null || echo UNBEKANNT)
+            if [ "$state" = OPEN ]; then echo "lasse $id (PR offen)"; continue; fi
+            echo "lösche $id (PR $state)"
+            npx -y firebase-tools@14 hosting:channel:delete "$id" --site calima --project fujiventura --non-interactive --force
+          done
