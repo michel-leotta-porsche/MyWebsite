@@ -13,6 +13,7 @@ import { MountedSheet } from "@/components/ui/sheet";
 import { OPERATOR } from "@/components/legal";
 import { confirmIdentity, deleteAccountUser, providerOf, renameUser, signOutNow, type AppleRevoke, type User } from "@/lib/firebase";
 import { friendlyError, signInError } from "@/lib/errors";
+import { getLang, locale, useLang, useT } from "@/lib/i18n";
 import { setSessionHint } from "@/lib/session-hint";
 import { clearPrints } from "@/lib/studio-store";
 import { isAdmin } from "@/lib/admin";
@@ -35,8 +36,9 @@ import {
 
 /** Profil: wer angemeldet ist, was auf den Tischen liegt, welche Links draußen sind */
 export function Profile() {
+  const t = useT();
   return (
-    <RequireUser title="Dein Profil" text="Melde dich an, dann siehst du hier deine Bücher, deine geteilten Links und dein Konto.">
+    <RequireUser title={t("Dein Profil")} text={t("Melde dich an, dann siehst du hier deine Bücher, deine geteilten Links und dein Konto.")}>
       {(user) => <Card user={user} />}
     </RequireUser>
   );
@@ -47,14 +49,15 @@ const H2 = "text-on-table text-xl font-semibold tracking-[-0.01em]";
 const PROVIDER_NAMES = { "google.com": "Google", "apple.com": "Apple" } as const;
 
 const since = (user: User) => {
-  const t = user.metadata?.creationTime;
-  if (!t) return null;
-  const d = new Date(t);
-  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+  const created = user.metadata?.creationTime;
+  if (!created) return null;
+  const d = new Date(created);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(locale(getLang()), { month: "long", year: "numeric" });
 };
 
 function Card({ user }: { user: User }) {
   const router = useRouter();
+  const t = useT();
   const [own, setOwn] = useState<StoredBook[] | null>(null);
   const [shares, setShares] = useState<Share[] | null>(null);
   const [gifts, setGifts] = useState<Share[] | null>(null);
@@ -82,19 +85,19 @@ function Card({ user }: { user: User }) {
 
   const books = own?.filter((b) => !b.trashed);
   const photos = books?.reduce((n, b) => n + b.photos.filter((p) => !p.shelved).length, 0);
-  const titleOf = new Map((own ?? []).map((b) => [b.id, b.title || "Ohne Titel"]));
+  const titleOf = new Map((own ?? []).map((b) => [b.id, b.title || t("Ohne Titel")]));
   const stats = [
-    { label: "Eigene Bücher", value: books?.length, href: "/zimmer#von-dir" },
-    { label: "Fotos darin", value: photos, href: "/zimmer#von-dir" },
-    { label: "Hingelegt", value: shares?.length, href: "#hingelegt" },
-    { label: "Für dich", value: gifts?.length, href: "/zimmer" },
+    { label: t("Eigene Bücher"), value: books?.length, href: "/zimmer#von-dir" },
+    { label: t("Fotos darin"), value: photos, href: "/zimmer#von-dir" },
+    { label: t("Hingelegt"), value: shares?.length, href: "#hingelegt" },
+    { label: t("Für dich"), value: gifts?.length, href: "/zimmer" },
   ];
   const joined = since(user);
 
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
-        <RoomTitle>Profil</RoomTitle>
+        <RoomTitle>{t("Profil")}</RoomTitle>
         <RoomNav />
       </header>
 
@@ -106,10 +109,10 @@ function Card({ user }: { user: User }) {
           </span>
           <div className="min-w-0">
             <p className="text-on-table truncate text-4xl leading-[0.95] font-bold tracking-[-0.03em] md:text-5xl" style={{ fontVariationSettings: '"wdth" 78, "opsz" 72' }}>
-              {name ?? "Ohne Namen"}
+              {name ?? t("Ohne Namen")}
             </p>
             <p className="text-on-table-2 mt-1.5 truncate text-sm">
-              Angemeldet mit {PROVIDER_NAMES[providerOf(user)]}
+              {t("Angemeldet mit {provider}", { provider: PROVIDER_NAMES[providerOf(user)] })}
               {user.email && <> · {user.email}</>}
             </p>
           </div>
@@ -119,9 +122,9 @@ function Card({ user }: { user: User }) {
         <section aria-labelledby="ausweis-h" className="slip text-ink mt-10 -rotate-[0.6deg] rounded-cut p-5 shadow-[0_24px_40px_-22px_rgb(12_10_8/0.9)] md:p-6">
           <div className="border-ink/25 flex items-baseline justify-between gap-4 border-b border-dashed pb-3">
             <h2 id="ausweis-h" className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-              Leseausweis
+              {t("Leseausweis")}
             </h2>
-            {joined && <span className="text-ink-2 text-[13px]">seit {joined}</span>}
+            {joined && <span className="text-ink-2 text-[13px]">{t("seit {date}", { date: joined })}</span>}
           </div>
           <dl className="mt-1 grid grid-cols-2 gap-x-6 md:grid-cols-4">
             {stats.map((s) => (
@@ -139,26 +142,26 @@ function Card({ user }: { user: User }) {
 
         {error && (
           <p role="alert" className="text-on-table mt-6 text-sm">
-            Konnte nicht alles laden: {error}
+            {t("Konnte nicht alles laden: {error}", { error })}
           </p>
         )}
 
         <section id="hingelegt" aria-labelledby="hingelegt-h" className="mt-12 scroll-mt-8">
           <h2 id="hingelegt-h" className={H2}>
-            Hingelegt für
+            {t("Hingelegt für")}
           </h2>
           {shares && shares.length === 0 && (
-            <p className="text-on-table-2 mt-2 text-base">Noch niemand. Im Bücherzimmer legst du ein Buch über „Mehr …“ und „Hinlegen für …“ einem Freund hin.</p>
+            <p className="text-on-table-2 mt-2 text-base">{t("Noch niemand. Im Bücherzimmer legst du ein Buch über „Mehr …“ und „Hinlegen für …“ einem Freund hin.")}</p>
           )}
           {shares && shares.length > 0 && (
-            <ListGroup label="Hingelegt für" className="mt-3">
+            <ListGroup label={t("Hingelegt für")} className="mt-3">
               {shares.map((s) => (
                 <ListRow
                   key={s.token}
                   lead={<Gift aria-hidden />}
                   title={s.to}
-                  detail={titleOf.get(s.bookId ?? s.book?.id) ?? s.book?.title ?? "Ohne Titel"}
-                  trail={<StatusPill>{s.paused ? "ruht, im Papierkorb" : "liegt bereit"}</StatusPill>}
+                  detail={titleOf.get(s.bookId ?? s.book?.id) ?? s.book?.title ?? t("Ohne Titel")}
+                  trail={<StatusPill>{s.paused ? t("ruht, im Papierkorb") : t("liegt bereit")}</StatusPill>}
                   href={s.paused ? undefined : `/b?t=${s.token}`}
                 />
               ))}
@@ -168,33 +171,33 @@ function Card({ user }: { user: User }) {
 
         <section aria-labelledby="konto-h" className="mt-12">
           <h2 id="konto-h" className={H2}>
-            Konto
+            {t("Konto")}
           </h2>
-          <ListGroup label="Konto" className="mt-3">
-            <ListRow lead={<PenLine aria-hidden />} title="Name ändern" detail="Steht als Absender auf Büchern und Zetteln" onClick={() => setRenaming(true)} />
-            <ListRow lead={<LogOut aria-hidden />} title="Abmelden" onClick={() => signOutNow().then(() => router.push("/"))} />
-            <ListRow lead={<Trash2 aria-hidden />} title="Konto löschen" detail="Mit allen Büchern und Links" danger onClick={() => setDeleting(true)} />
+          <ListGroup label={t("Konto")} className="mt-3">
+            <ListRow lead={<PenLine aria-hidden />} title={t("Name ändern")} detail={t("Steht als Absender auf Büchern und Zetteln")} onClick={() => setRenaming(true)} />
+            <ListRow lead={<LogOut aria-hidden />} title={t("Abmelden")} onClick={() => signOutNow().then(() => router.push("/"))} />
+            <ListRow lead={<Trash2 aria-hidden />} title={t("Konto löschen")} detail={t("Mit allen Büchern und Links")} danger onClick={() => setDeleting(true)} />
           </ListGroup>
           <p className="text-on-table-2 mt-3 max-w-xl text-sm leading-relaxed">
-            Deine Bücher sieht nur, wem du einen Link gibst. Den Aufbau eines Buchs sicherst du beim Bearbeiten unter „Verlauf“ als Datei; die Fotos bleiben in deinem Konto.
+            {t("Deine Bücher sieht nur, wem du einen Link gibst. Den Aufbau eines Buchs sicherst du beim Bearbeiten unter „Verlauf“ als Datei; die Fotos bleiben in deinem Konto.")}
           </p>
         </section>
 
         {blocked.length > 0 && (
           <section aria-labelledby="blocked-h" className="mt-12">
             <h2 id="blocked-h" className={H2}>
-              Ausgeblendet
+              {t("Ausgeblendet")}
             </h2>
-            <p className="text-on-table-2 mt-2 max-w-xl text-sm">Bücher dieser Personen landen nicht mehr in deinem Bücherzimmer.</p>
-            <ListGroup label="Ausgeblendet" className="mt-3">
+            <p className="text-on-table-2 mt-2 max-w-xl text-sm">{t("Bücher dieser Personen landen nicht mehr in deinem Bücherzimmer.")}</p>
+            <ListGroup label={t("Ausgeblendet")} className="mt-3">
               {blocked.map((b) => (
                 <ListRow
                   key={b.uid}
                   lead={<EyeOff aria-hidden />}
-                  title={b.name || "Ohne Namen"}
+                  title={b.name || t("Ohne Namen")}
                   trail={
                     <Button size="sm" onClick={() => unblockSender(user.uid, b.uid).catch(() => {})}>
-                      Wieder zeigen
+                      {t("Wieder zeigen")}
                     </Button>
                   }
                 />
@@ -207,17 +210,17 @@ function Card({ user }: { user: User }) {
 
         <section aria-labelledby="hilfe-h" className="mt-12">
           <h2 id="hilfe-h" className={H2}>
-            Rechtliches und Hilfe
+            {t("Rechtliches und Hilfe")}
           </h2>
-          <ListGroup label="Rechtliches und Hilfe" className="mt-3">
-            <ListRow lead={<LifeBuoy aria-hidden />} title="Hilfe" href="/hilfe" />
-            <ListRow lead={<ScrollText aria-hidden />} title="Nutzungsbedingungen" href="/nutzungsbedingungen" />
-            <ListRow lead={<ShieldCheck aria-hidden />} title="Datenschutz" href="/datenschutz" />
-            <ListRow lead={<Info aria-hidden />} title="Impressum" href="/impressum" />
-            <ListRow lead={<Mail aria-hidden />} title="Schreib mir" detail={OPERATOR.email} href={`mailto:${OPERATOR.email}`} />
+          <ListGroup label={t("Rechtliches und Hilfe")} className="mt-3">
+            <ListRow lead={<LifeBuoy aria-hidden />} title={t("Hilfe")} href="/hilfe" />
+            <ListRow lead={<ScrollText aria-hidden />} title={t("Nutzungsbedingungen")} href="/nutzungsbedingungen" />
+            <ListRow lead={<ShieldCheck aria-hidden />} title={t("Datenschutz")} href="/datenschutz" />
+            <ListRow lead={<Info aria-hidden />} title={t("Impressum")} href="/impressum" />
+            <ListRow lead={<Mail aria-hidden />} title={t("Schreib mir")} detail={OPERATOR.email} href={`mailto:${OPERATOR.email}`} />
           </ListGroup>
           <p className="text-on-table-2 mt-3 max-w-xl text-sm leading-relaxed">
-            Für Fragen, Fehler oder einen Inhalt, der nicht hierher gehört. Calima ist nicht mit Fujifilm verbunden; FUJIFILM und FUJI sind Marken der FUJIFILM Corporation.
+            {t("Für Fragen, Fehler oder einen Inhalt, der nicht hierher gehört. Calima ist nicht mit Fujifilm verbunden; FUJIFILM und FUJI sind Marken der FUJIFILM Corporation.")}
           </p>
         </section>
       </div>
@@ -245,12 +248,13 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
   const [error, setError] = useState<string | null>(null);
   const busy = step !== null;
   const mock = process.env.NEXT_PUBLIC_FUJI_MOCK === "1";
+  const t = useT();
 
   const run = async () => {
     setError(null);
     let revoke: AppleRevoke = {};
     try {
-      setStep("Anmeldung bestätigen");
+      setStep(t("Anmeldung bestätigen"));
       if (!mock) revoke = await confirmIdentity(user);
     } catch (e) {
       setStep(null);
@@ -259,31 +263,31 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
       return;
     }
     try {
-      await deleteAccountData(user.uid, (s) => setStep(`${s} werden gelöscht`));
-      setStep("Konto wird gelöscht");
+      await deleteAccountData(user.uid, (s) => setStep(t("{what} werden gelöscht", { what: t(s) })));
+      setStep(t("Konto wird gelöscht"));
       if (!mock) await deleteAccountUser(user, revoke);
       await clearPrints(user.uid).catch(() => {});
       setSessionHint(false);
       router.replace("/konto-geloescht");
     } catch (e) {
       setStep(null);
-      setError(`${friendlyError(e)} Was schon gelöscht ist, bleibt gelöscht. Versuch es bitte nochmal.`);
+      setError(t("{error} Was schon gelöscht ist, bleibt gelöscht. Versuch es bitte nochmal.", { error: friendlyError(e) }));
     }
   };
 
   const count = (v: number | undefined) => (v === undefined ? "" : ` (${v})`);
   return (
-    <MountedSheet title="Konto löschen" onClose={onClose} locked={busy}>
-      <p className="text-sm leading-relaxed">Gelöscht wird alles, was zu deinem Konto gehört:</p>
+    <MountedSheet title={t("Konto löschen")} onClose={onClose} locked={busy}>
+      <p className="text-sm leading-relaxed">{t("Gelöscht wird alles, was zu deinem Konto gehört:")}</p>
       <ul className="mt-2 text-sm leading-relaxed">
-        <li>· deine Bücher{count(counts.books)} mit allen Fotos{count(counts.photos)}, Zwischenständen und dem Papierkorb</li>
-        <li>· deine geteilten Links{count(counts.shares)} samt Zetteln und Eselsohren der Gäste</li>
-        <li>· deine Ablage „Für dich“ und deine eigenen Rezepte</li>
-        <li>· dein Konto bei Calima</li>
+        <li>· {t("deine Bücher{books} mit allen Fotos{photos}, Zwischenständen und dem Papierkorb", { books: count(counts.books), photos: count(counts.photos) })}</li>
+        <li>· {t("deine geteilten Links{shares} samt Zetteln und Eselsohren der Gäste", { shares: count(counts.shares) })}</li>
+        <li>· {t("deine Ablage „Für dich“ und deine eigenen Rezepte")}</li>
+        <li>· {t("dein Konto bei Calima")}</li>
       </ul>
-      <p className="mt-3 text-sm leading-relaxed">Wer einen Link von dir hat, kann das Buch danach nicht mehr öffnen.</p>
-      <p className="mt-3 text-sm leading-relaxed font-semibold">Das lässt sich nicht rückgängig machen.</p>
-      {!mock && <p className="text-ink-2 mt-3 text-[13px]">Zur Sicherheit meldest du dich dafür noch einmal an.</p>}
+      <p className="mt-3 text-sm leading-relaxed">{t("Wer einen Link von dir hat, kann das Buch danach nicht mehr öffnen.")}</p>
+      <p className="mt-3 text-sm leading-relaxed font-semibold">{t("Das lässt sich nicht rückgängig machen.")}</p>
+      {!mock && <p className="text-ink-2 mt-3 text-[13px]">{t("Zur Sicherheit meldest du dich dafür noch einmal an.")}</p>}
       {error && (
         <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
           {error}
@@ -292,10 +296,10 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <Button variant="danger" disabled={busy} onClick={run}>
           <Trash2 aria-hidden />
-          {busy ? `${step} …` : "Konto endgültig löschen"}
+          {busy ? `${step} …` : t("Konto endgültig löschen")}
         </Button>
         <Button variant="paper" disabled={busy} onClick={onClose}>
-          Abbrechen
+          {t("Abbrechen")}
         </Button>
       </div>
     </MountedSheet>
@@ -306,6 +310,8 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
 function Reports() {
   const [reports, setReports] = useState<Report[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
+  const lang = useLang();
   useEffect(() => {
     let alive = true;
     openReports()
@@ -321,29 +327,29 @@ function Reports() {
   return (
     <section aria-labelledby="reports-h" className="mt-12">
       <h2 id="reports-h" className={H2}>
-        Meldungen
+        {t("Meldungen")}
       </h2>
       {error && (
         <p role="alert" className="text-on-table mt-3 text-sm">
           {error}
         </p>
       )}
-      {reports && reports.length === 0 && <p className="text-on-table-2 mt-3 text-base">Keine offenen Meldungen.</p>}
+      {reports && reports.length === 0 && <p className="text-on-table-2 mt-3 text-base">{t("Keine offenen Meldungen.")}</p>}
       {reports && reports.length > 0 && (
-        <ListGroup label="Meldungen" className="mt-3">
+        <ListGroup label={t("Meldungen")} className="mt-3">
           {reports.map((r) => (
             <li key={r.id} className="px-4 py-3.5 [&+li]:border-t [&+li]:border-on-table/8">
               <p className="text-on-table font-semibold">
-                {REPORT_REASONS[r.reason] ?? r.reason} · „{r.title || "Ohne Titel"}“ von {r.fromName}
+                {REPORT_REASONS[r.reason] ? t(REPORT_REASONS[r.reason]) : r.reason} · {t("„{title}“ von {name}", { title: r.title || t("Ohne Titel"), name: r.fromName })}
               </p>
               {r.text && <p className="text-on-table-2 mt-1 text-sm">„{r.text}“</p>}
               <p className="text-on-table-2 mt-1 text-[13px]">
-                {r.at ? new Date(r.at.seconds * 1000).toLocaleString("de-DE") : ""} · Macher-ID {r.owner}
+                {r.at ? new Date(r.at.seconds * 1000).toLocaleString(locale(lang)) : ""} · {t("Macher-ID {id}", { id: r.owner })}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link href={`/b?t=${r.token}`} className={buttonClass("quiet", "sm")}>
                   <Eye aria-hidden />
-                  Ansehen
+                  {t("Ansehen")}
                 </Link>
                 <Button
                   size="sm"
@@ -356,11 +362,11 @@ function Reports() {
                   }
                 >
                   <Ban aria-hidden />
-                  Link sperren
+                  {t("Link sperren")}
                 </Button>
                 <Button size="sm" onClick={() => act(r.id, () => closeReport(r.id))}>
                   <Check aria-hidden />
-                  Erledigt, alles in Ordnung
+                  {t("Erledigt, alles in Ordnung")}
                 </Button>
               </div>
             </li>
@@ -379,8 +385,9 @@ function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) 
   const [name, setName] = useState(user.displayName ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
   return (
-    <MountedSheet title="Name ändern" description="So steht es als Absender auf neuen Büchern und Zetteln." onClose={() => onClose()} locked={busy}>
+    <MountedSheet title={t("Name ändern")} description={t("So steht es als Absender auf neuen Büchern und Zetteln.")} onClose={() => onClose()} locked={busy}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -394,7 +401,7 @@ function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) 
             });
         }}
       >
-        <Field label="Name" value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} autoComplete="name" />
+        <Field label={t("Name")} value={name} onChange={(e) => setName(e.target.value.slice(0, 40))} autoComplete="name" />
         {error && (
           <p role="alert" className="text-ink mt-3 text-[13px] font-semibold">
             {error}
@@ -402,10 +409,10 @@ function RenameDialog({ user, onClose }: { user: User; onClose: (name?: string) 
         )}
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <Button type="submit" variant="ink" disabled={busy || !name.trim()}>
-            Speichern
+            {t("Speichern")}
           </Button>
           <Button variant="paper" disabled={busy} onClick={() => onClose()}>
-            Abbrechen
+            {t("Abbrechen")}
           </Button>
         </div>
       </form>

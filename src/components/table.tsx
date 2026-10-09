@@ -7,6 +7,7 @@ import { type BookData } from "@/content/books";
 import { PageView } from "@/components/page-view";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { buttonClass } from "@/components/ui/button";
+import { useT } from "@/lib/i18n";
 
 /** Aufschlagen eines Bands; kommt aus der Library, damit Tisch und Reihen nichts vom Hash oder der View Transition wissen */
 /** `plate`: gleich an dieser Tafel aufschlagen (z. B. vom Eselsohr eines Freundes aus) */
@@ -63,6 +64,7 @@ export function ClosedBook({
   className?: string;
 }) {
   const { open, focusId } = useContext(OpenBook);
+  const t = useT();
   const button = useRef<HTMLButtonElement>(null);
   const edge = Math.round(3 + book.spreads.length / 3);
   // alle Bände, die mit dem ersten Schwung kommen, werden hingelegt; spätere liegen einfach da
@@ -75,6 +77,7 @@ export function ClosedBook({
   useEffect(() => {
     if (focusId === book.id) button.current?.focus({ preventScroll: true });
   }, [focusId, book.id]);
+  const plates = (n: number) => (n === 1 ? t("1 Tafel") : t("{n} Tafeln", { n }));
 
   return (
     <li
@@ -91,7 +94,7 @@ export function ClosedBook({
         ref={button}
         type="button"
         onClick={() => !onPick?.() && open(book.id)}
-        aria-label={`${book.title} aufschlagen, ${book.plates.length} Tafeln${note ? `, ${note}` : ""}`}
+        aria-label={`${t("{title} aufschlagen", { title: book.title })}, ${plates(book.plates.length)}${note ? `, ${note}` : ""}`}
         className="group relative block text-left focus-visible:outline-offset-8"
       >
         <div className="lift relative" style={{ width: coverWidth(book), aspectRatio: `1 / ${book.aspect}` }}>
@@ -139,18 +142,18 @@ export function ClosedBook({
             <span aria-hidden className="mx-2">
               ·
             </span>
-            {meta ?? `${book.plates.length} Tafeln`}
+            {meta ?? plates(book.plates.length)}
           </p>
           {/* Der eine betonte Knopf der Ansicht: sagt, was man mit dem Buch tun kann */}
           <button type="button" onClick={() => open(book.id)} className={buttonClass("cloth", "md", "group/cta px-6")}>
-            Buch aufschlagen
+            {t("Buch aufschlagen")}
             <ArrowRight aria-hidden className="transition-transform duration-500 ease-out group-hover/cta:translate-x-1" />
           </button>
         </div>
       ) : (
         <div className="mt-4 grid gap-0.5 text-sm" style={{ width: coverWidth(book) }}>
           <p className="text-on-table text-base leading-snug font-semibold tracking-[-0.01em]">{book.title}</p>
-          <p className="text-on-table-2">{meta ?? `${book.plates.length} Tafeln`}</p>
+          <p className="text-on-table-2">{meta ?? plates(book.plates.length)}</p>
           {actions && <div className="book-actions mt-1.5 flex flex-wrap gap-x-4 gap-y-1">{actions}</div>}
         </div>
       )}
@@ -222,8 +225,9 @@ export function Table({
   headerRight?: ReactNode;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
-    <section aria-label={label ?? "Tisch mit Fotobüchern"} className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
+    <section aria-label={label ?? t("Tisch mit Fotobüchern")} className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
       <SunAndShade light="sun" />
       <header className="relative z-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-16 md:pt-6">
         {title ?? (

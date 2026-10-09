@@ -5,6 +5,7 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { useId } from "react";
 
 import { haptic } from "@/lib/haptics";
+import { useT } from "@/lib/i18n";
 
 // Farbwahl als Stoffproben wie im Musterbuch (zugeschnitten, darum rounded-cut), Pfeiltasten wechseln wie bei Radio-Knöpfen.
 // Gewählt: Ring in Tinte und ein Haken, der kurz aufspringt.
@@ -13,6 +14,7 @@ export type Swatch = { id: string; label: string; color: string; ink: string };
 
 export function Swatches({ label, items, value, onChange }: { label: string; items: Swatch[]; value: string; onChange: (id: string) => void }) {
   const lid = useId();
+  const t = useT();
   return (
     <div>
       <p id={lid} className="text-ink-2 mb-2.5 text-[13px]">
@@ -31,8 +33,8 @@ export function Swatches({ label, items, value, onChange }: { label: string; ite
           <Radio.Root
             key={s.id}
             value={s.id}
-            aria-label={s.label}
-            title={s.label}
+            aria-label={t(s.label)}
+            title={t(s.label)}
             className="linen grid size-9 overflow-hidden place-items-center rounded-cut shadow-[inset_0_-2px_0_rgb(12_10_8/0.18)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.4,0.64,1)] focus-visible:outline-ink active:scale-90 data-checked:scale-105 data-checked:shadow-[inset_0_-2px_0_rgb(12_10_8/0.18),0_0_0_2px_var(--paper),0_0_0_4px_var(--ink)] pointer-coarse:size-11"
             style={{ backgroundColor: s.color, color: s.ink }}
           >

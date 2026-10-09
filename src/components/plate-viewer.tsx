@@ -4,8 +4,15 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { plateName, plateOf, type BookData } from "@/content/books";
+import { plateOf, type BookData } from "@/content/books";
 import { buttonClass } from "@/components/ui/button-class";
+import { useT } from "@/lib/i18n";
+
+/** „Tafel 3: Titel“ in der gewählten Sprache */
+export function usePlateName() {
+  const t = useT();
+  return (no: number, title?: string) => (title?.trim() ? t("Tafel {no}: {title}", { no, title: title.trim() }) : t("Tafel {no}", { no }));
+}
 
 type Open = (no: number, trigger: HTMLElement) => void;
 const OpenContext = createContext<Open>(() => {});
@@ -14,10 +21,12 @@ export const PlateOpenProvider = OpenContext.Provider;
 /** Unsichtbare Fläche über einer Tafel: Klick hebt sie aus dem Buch */
 export function PlateButton({ book, no }: { book: BookData; no: number }) {
   const open = useContext(OpenContext);
+  const t = useT();
+  const plateName = usePlateName();
   return (
     <button
       type="button"
-      aria-label={`${plateName(no, plateOf(book, no).title)} vergrößern`}
+      aria-label={t("{plate} vergrößern", { plate: plateName(no, plateOf(book, no).title) })}
       onClick={(e) => {
         e.stopPropagation();
         open(no, e.currentTarget);
@@ -81,6 +90,8 @@ export function PlateViewer({
   const controls = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
   const p = plateOf(book, current);
+  const t = useT();
+  const plateName = usePlateName();
 
   useLayoutEffect(() => {
     const update = () => setBox(fit(book, current));
@@ -261,10 +272,10 @@ export function PlateViewer({
             </p>
             {/* „Zurück“ hieße hier zweierlei: zurück aus dem Buch oder zum vorigen Bild */}
             <div className="flex shrink-0 gap-2">
-              <button type="button" onClick={() => step(-1)} aria-label="Voriges Bild" title="Voriges Bild" className={buttonClass("quiet", "icon")}>
+              <button type="button" onClick={() => step(-1)} aria-label={t("Voriges Bild")} title={t("Voriges Bild")} className={buttonClass("quiet", "icon")}>
                 <ChevronLeft aria-hidden />
               </button>
-              <button type="button" onClick={() => step(1)} aria-label="Nächstes Bild" title="Nächstes Bild" className={buttonClass("quiet", "icon")}>
+              <button type="button" onClick={() => step(1)} aria-label={t("Nächstes Bild")} title={t("Nächstes Bild")} className={buttonClass("quiet", "icon")}>
                 <ChevronRight aria-hidden />
               </button>
             </div>
@@ -275,8 +286,8 @@ export function PlateViewer({
         ref={closeBtn}
         type="button"
         onClick={requestClose}
-        aria-label="Schließen"
-        title="Schließen"
+        aria-label={t("Schließen")}
+        title={t("Schließen")}
         className={buttonClass("quiet", "icon", "absolute top-[max(0.75rem,env(safe-area-inset-top))] right-3 md:top-5 md:right-6")}
       >
         <X aria-hidden />

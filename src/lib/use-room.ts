@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { friendlyError } from "@/lib/errors";
+import { t } from "@/lib/i18n";
 import {
   blockSender,
   deleteBookForever,
@@ -48,7 +49,7 @@ async function spreadOf(uid: string, cached = false): Promise<Record<string, Spr
         if (n.kind === "ear") e.ears++;
         else if (n.text?.trim()) e.notes++;
         else continue;
-        e.items.push({ ...n, token: s.token, who: n.from?.trim() || s.to || "Gast" });
+        e.items.push({ ...n, token: s.token, who: n.from?.trim() || s.to || t("Gast") });
       }
     }),
   );

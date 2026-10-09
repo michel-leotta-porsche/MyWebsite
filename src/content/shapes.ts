@@ -1,6 +1,7 @@
 import { getStroke } from "perfect-freehand";
 
 import type { Box, Corner, InkStroke, ShapeKind, ShapeLook } from "@/content/books";
+import { de } from "@/lib/i18n";
 
 // Formen und Handschrift als Pfade in cqw (Seitenbreite = 100, y in cqw).
 // HTML (SVG in page-view.tsx) und Textur (Path2D in page-texture.ts) zeichnen dieselben Pfade, damit nichts springt.
@@ -20,14 +21,14 @@ export type PathEl = {
 /** Strichstärken der drei Stufen in cqw (bei 15 cm Seitenbreite etwa 0,5 / 1 / 1,8 mm) */
 export const WEIGHT: Record<ShapeLook["weight"], number> = { 1: 0.35, 2: 0.7, 3: 1.2 };
 /** Breiten des Stifts in cqw */
-export const PEN_SIZES = [{ label: "fein", s: 0.45 }, { label: "mittel", s: 0.8 }, { label: "kräftig", s: 1.4 }] as const;
+export const PEN_SIZES = [{ label: de("fein"), s: 0.45 }, { label: de("mittel"), s: 0.8 }, { label: de("kräftig"), s: 1.4 }] as const;
 
 export const SHAPES: Record<ShapeKind, { label: string; key: string }> = {
-  line: { label: "Linie", key: "L" },
-  arrow: { label: "Pfeil", key: "A" },
-  rect: { label: "Rechteck", key: "R" },
-  ellipse: { label: "Kreis", key: "O" },
-  tape: { label: "Klebestreifen", key: "K" },
+  line: { label: de("Linie"), key: "L" },
+  arrow: { label: de("Pfeil"), key: "A" },
+  rect: { label: de("Rechteck"), key: "R" },
+  ellipse: { label: de("Kreis"), key: "O" },
+  tape: { label: de("Klebestreifen"), key: "K" },
 };
 /** Formen mit zwei Endpunkten statt Rahmen */
 export const isLinear = (k: ShapeKind) => k === "line" || k === "arrow" || k === "tape";

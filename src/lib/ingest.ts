@@ -6,6 +6,7 @@ import type { CameraInfo, Recipe } from "@/content/recipes";
 import { exifDate, type ExifFields } from "@/lib/exif-write";
 import { readFujiRecipe } from "@/lib/fuji";
 import { findSubject } from "@/lib/subject";
+import { t } from "@/lib/i18n";
 import { parseXmp, toPreset } from "@/lib/xmp";
 
 // Ein Foto für ein neues Buch vorbereiten, ganz im Browser:
@@ -116,7 +117,7 @@ async function decode(blob: Blob, orientation = 1): Promise<Source> {
 async function open(file: File): Promise<Source> {
   if (isDng(file)) {
     const p = await dngPreview(file).catch(() => null);
-    if (!p) throw new Error("DNG ohne Vorschaubild, bitte als JPEG exportieren");
+    if (!p) throw new Error(t("DNG ohne Vorschaubild, bitte als JPEG exportieren"));
     // trägt das Vorschaubild seine Lage selbst (iPhone), dreht der Browser; sonst gilt die Lage aus der DNG
     const own = await exifr.orientation(p.blob).catch(() => undefined);
     return decode(p.blob, own ? 1 : p.orientation);
@@ -130,7 +131,7 @@ async function open(file: File): Promise<Source> {
     const jpeg = await heicTo({ blob: file, type: "image/jpeg", quality: 0.92 }).catch(() => null);
     if (jpeg) return decode(jpeg);
   }
-  throw new Error("Bildformat wird nicht unterstützt");
+  throw new Error(t("Bildformat wird nicht unterstützt"));
 }
 
 /** Erste Stufe: Original auf die große Größe bringen, gedreht nach Orientation (nur bei DNG nötig) */
@@ -173,7 +174,7 @@ function shrink(from: HTMLCanvasElement, long: number): HTMLCanvasElement {
 }
 
 const toJpeg = (canvas: HTMLCanvasElement, quality = 0.86) =>
-  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", quality));
+  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t("Kodieren fehlgeschlagen")))), "image/jpeg", quality));
 
 // sRGB → Lab (D65), reicht für Farbähnlichkeit
 function toLab(r: number, g: number, b: number): [number, number, number] {

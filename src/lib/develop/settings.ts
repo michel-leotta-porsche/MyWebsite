@@ -4,6 +4,7 @@
 
 import type { FujiRecipe, Recipe } from "@/content/recipes";
 import { cleanEdit, colorIsNeutral, fineOf, HUES, MORE0, neutralEdit, REC0, type LookFine, type LookId, type More, type NamedRecipe, type PhotoEdit, type RecipeValues } from "@/lib/develop/model";
+import { t } from "@/lib/i18n";
 import { num as crs, parseXmp } from "@/lib/xmp";
 
 export type CopiedSettings = {
@@ -29,7 +30,7 @@ const fine0 = (): LookFine => ({ exposure: 0, contrast: 0, shadows: 0, warmth: 0
 export function fromEdit(e: PhotoEdit, name?: string, from?: string): CopiedSettings | null {
   const c = cleanEdit(e);
   if (!c) return null;
-  const s: CopiedSettings = { v: 1, source: "edit", name: name || c.recName || "Kopierte Einstellungen", from, rec: { ...c.rec }, f: fineOf(c), approx: false, lost: [] };
+  const s: CopiedSettings = { v: 1, source: "edit", name: name || c.recName || t("Kopierte Einstellungen"), from, rec: { ...c.rec }, f: fineOf(c), approx: false, lost: [] };
   // nur Auto oder Angleichen: das hängt am Foto, es bliebe nichts zum Mitnehmen
   return settingsAreEmpty(s) ? null : s;
 }
@@ -55,16 +56,16 @@ export function fromFuji(r: FujiRecipe, from?: string): CopiedSettings | null {
   if (r.placeholder) return null;
   const hit = FILMS.find(([re]) => re.test(r.film));
   const lost: string[] = [];
-  if (!hit) lost.push(`Filmsimulation ${r.film}`);
-  if (/Sepia/.test(r.film)) lost.push("Sepia-Ton");
-  if (/filter/i.test(r.film)) lost.push("Farbfilter");
+  if (!hit) lost.push(t("Filmsimulation {film}", { film: r.film }));
+  if (/Sepia/.test(r.film)) lost.push(t("Sepia-Ton"));
+  if (/filter/i.test(r.film)) lost.push(t("Farbfilter"));
   const [, film = null, shift = {}] = hit ?? [];
   // „DR Auto (DR400)“: der angewandte Wert zählt
   const drs = [...r.dr.matchAll(/DR(\d+)/g)].map((m) => Number(m[1]));
   const dr = drs.length ? step(drs[drs.length - 1], [100, 200, 400] as const) : 100;
-  if (!/^Auto/.test(r.wb.mode)) lost.push(`Weißabgleich ${r.wb.mode}`);
-  if (r.sharpness) lost.push("Schärfe");
-  if (r.nr) lost.push("Rauschminderung");
+  if (!/^Auto/.test(r.wb.mode)) lost.push(t("Weißabgleich {mode}", { mode: t(r.wb.mode) }));
+  if (r.sharpness) lost.push(t("Schärfe"));
+  if (r.nr) lost.push(t("Rauschminderung"));
   const rec: RecipeValues = {
     film,
     wbR: Math.round(clamp(r.wb.r, -9, 9)),
@@ -137,10 +138,10 @@ export function fromLightroom(xmp: string, name: string, from?: string): CopiedS
     rec.grain = amount > 40 ? 2 : 1;
     rec.gsize = n("GrainSize") >= 40 ? "groß" : "klein";
   }
-  if (n("Dehaze")) lost.push("Dunst entfernen");
-  if (lr.grading && (lr.grading.shadow[1] || lr.grading.highlight[1])) lost.push("Color Grading");
-  if (/crs:Temperature=/.test(xmp) && !/crs:IncrementalTemperature=/.test(xmp)) lost.push("Weißabgleich in Kelvin");
-  if (/<crs:ToneCurvePV2012(Red|Green|Blue)>/.test(xmp)) lost.push("Kurven je Farbkanal");
+  if (n("Dehaze")) lost.push(t("Dunst entfernen"));
+  if (lr.grading && (lr.grading.shadow[1] || lr.grading.highlight[1])) lost.push(t("Color Grading"));
+  if (/crs:Temperature=/.test(xmp) && !/crs:IncrementalTemperature=/.test(xmp)) lost.push(t("Weißabgleich in Kelvin"));
+  if (/<crs:ToneCurvePV2012(Red|Green|Blue)>/.test(xmp)) lost.push(t("Kurven je Farbkanal"));
   // durch dieselbe Prüfung wie geteilte Bücher: alles in seinen Bereichen, ungültige Kurve fällt weg
   const c = cleanEdit({ ...f, rec })!;
   return { v: 1, source: "lightroom", name, from, rec: c.rec, f: fineOf(c), approx: true, lost };
@@ -204,7 +205,7 @@ export type BookLook = CopiedSettings & {
  * Jeder Look, der im Buch schon auf einem Foto liegt, ohne dass jemand ihn kopieren musste. Gleiche Looks
  * werden zusammengefasst, die meistbenutzten zuerst. `at` nennt die Stelle eines Fotos, etwa die Doppelseite.
  */
-export function bookLooks(photos: { key: string; edit?: PhotoEdit | null; at?: number }[], label = "Doppelseite", max = 8): BookLook[] {
+export function bookLooks(photos: { key: string; edit?: PhotoEdit | null; at?: number }[], label = t("Doppelseite"), max = 8): BookLook[] {
   const groups = new Map<string, { s: CopiedSettings; keys: string[]; at: number[]; names: string[] }>();
   for (const p of photos) {
     const c = cleanEdit(p.edit);
@@ -225,7 +226,7 @@ export function bookLooks(photos: { key: string; edit?: PhotoEdit | null; at?: n
       const at = [...g.at].sort((a, b) => a - b);
       const where = at.length ? `${label} ${at.join(", ")}` : "";
       // der häufigste Name, sonst nach der ersten Stelle benannt
-      const name = g.names.sort((a, b) => g.names.filter((n) => n === b).length - g.names.filter((n) => n === a).length)[0] ?? (at.length ? `Look von ${label} ${at[0]}` : "Look aus diesem Buch");
+      const name = g.names.sort((a, b) => g.names.filter((n) => n === b).length - g.names.filter((n) => n === a).length)[0] ?? (at.length ? t("Look von {label} {n}", { label, n: at[0] }) : t("Look aus diesem Buch"));
       return { ...g.s, name, from: where || undefined, keys: g.keys, where };
     });
 }
@@ -240,7 +241,7 @@ export function cleanSettings(x: unknown): CopiedSettings | null {
   return {
     v: 1,
     source: r.source as CopiedSettings["source"],
-    name: r.name.slice(0, 40) || "Kopierte Einstellungen",
+    name: r.name.slice(0, 40) || t("Kopierte Einstellungen"),
     from: typeof r.from === "string" ? r.from.slice(0, 60) : undefined,
     rec: c.rec,
     f: fineOf(c),

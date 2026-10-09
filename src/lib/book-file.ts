@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import type { StoredBook, StoredPhoto } from "@/lib/store";
 
 // Buchdatei („Projekt als Datei sichern“): schreiben ohne Kontodaten, beim Öffnen streng prüfen.
@@ -47,16 +48,16 @@ export function bookFileText(b: StoredBook, schema: number): string {
 }
 
 function checkPhoto(p: StoredPhoto) {
-  if (!p || typeof p !== "object" || typeof p.key !== "string") fail("Ein Foto in der Datei ist beschädigt.");
-  if (!ownImage(p.src) || !ownImage(p.large) || !ownImage(p.thumb)) fail("Die Datei verweist auf Fotos außerhalb von Calima.");
-  if (p.orig && (!ownImage(p.orig.src) || !ownImage(p.orig.large) || !ownImage(p.orig.thumb))) fail("Die Datei verweist auf Fotos außerhalb von Calima.");
-  if (!Number.isFinite(p.w) || !Number.isFinite(p.h) || p.w <= 0 || p.h <= 0) fail("Ein Foto in der Datei ist beschädigt.");
-  if (!text(p.title, 200) || !text(p.note, 2000) || !text(p.alt, 500)) fail("Ein Text in der Datei ist zu lang.");
+  if (!p || typeof p !== "object" || typeof p.key !== "string") fail(t("Ein Foto in der Datei ist beschädigt."));
+  if (!ownImage(p.src) || !ownImage(p.large) || !ownImage(p.thumb)) fail(t("Die Datei verweist auf Fotos außerhalb von Calima."));
+  if (p.orig && (!ownImage(p.orig.src) || !ownImage(p.orig.large) || !ownImage(p.orig.thumb))) fail(t("Die Datei verweist auf Fotos außerhalb von Calima."));
+  if (!Number.isFinite(p.w) || !Number.isFinite(p.h) || p.w <= 0 || p.h <= 0) fail(t("Ein Foto in der Datei ist beschädigt."));
+  if (!text(p.title, 200) || !text(p.note, 2000) || !text(p.alt, 500)) fail(t("Ein Text in der Datei ist zu lang."));
   const r = p.recipe;
   if (r?.kind === "lightroom") {
-    if (r.xmp !== undefined && !ownPath(r.xmp)) fail("Die Datei verweist auf ein Preset außerhalb von Calima.");
-    if (r.source !== undefined && !httpsUrl(r.source?.url)) fail("Die Datei enthält einen ungültigen Link.");
-    if (!text(r.inline, MAX_INLINE)) fail("Ein Preset in der Datei ist zu groß.");
+    if (r.xmp !== undefined && !ownPath(r.xmp)) fail(t("Die Datei verweist auf ein Preset außerhalb von Calima."));
+    if (r.source !== undefined && !httpsUrl(r.source?.url)) fail(t("Die Datei enthält einen ungültigen Link."));
+    if (!text(r.inline, MAX_INLINE)) fail(t("Ein Preset in der Datei ist zu groß."));
   }
 }
 
@@ -65,21 +66,21 @@ function checkPhoto(p: StoredPhoto) {
  * Wirft BookFileError mit einem Satz für die Nutzerin.
  */
 export function parseBookFile(raw: string, schema: number): Omit<StoredBook, "id" | "owner" | "ownerName"> {
-  if (raw.length > MAX_FILE) fail("Die Datei ist zu groß für eine Calima-Buchdatei.");
+  if (raw.length > MAX_FILE) fail(t("Die Datei ist zu groß für eine Calima-Buchdatei."));
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch {
-    fail("Das ist keine Calima-Buchdatei. Sie endet auf .calima.json.");
+    fail(t("Das ist keine Calima-Buchdatei. Sie endet auf .calima.json."));
   }
   const d = data as { format?: unknown; schema?: unknown; book?: unknown };
-  if (!d || d.format !== FORMAT || !d.book || typeof d.book !== "object") fail("Das ist keine Calima-Buchdatei. Sie endet auf .calima.json.");
-  if (d.schema !== undefined && (typeof d.schema !== "number" || d.schema > schema)) fail("Die Datei stammt aus einer neueren Calima-Version.");
+  if (!d || d.format !== FORMAT || !d.book || typeof d.book !== "object") fail(t("Das ist keine Calima-Buchdatei. Sie endet auf .calima.json."));
+  if (d.schema !== undefined && (typeof d.schema !== "number" || d.schema > schema)) fail(t("Die Datei stammt aus einer neueren Calima-Version."));
   const b = d.book as StoredBook;
-  if (!Array.isArray(b.photos) || b.photos.length > MAX_PHOTOS) fail("Die Datei enthält keine gültige Fotoliste.");
-  if (!Array.isArray(b.spreads) || b.spreads.length > MAX_SPREADS) fail("Die Datei enthält keine gültigen Doppelseiten.");
-  if (!text(b.title, 200) || !text(b.subtitle, 400) || !text(b.places, 400)) fail("Ein Text in der Datei ist zu lang.");
-  if (!Number.isFinite(b.aspect)) fail("Das Seitenformat in der Datei ist beschädigt.");
+  if (!Array.isArray(b.photos) || b.photos.length > MAX_PHOTOS) fail(t("Die Datei enthält keine gültige Fotoliste."));
+  if (!Array.isArray(b.spreads) || b.spreads.length > MAX_SPREADS) fail(t("Die Datei enthält keine gültigen Doppelseiten."));
+  if (!text(b.title, 200) || !text(b.subtitle, 400) || !text(b.places, 400)) fail(t("Ein Text in der Datei ist zu lang."));
+  if (!Number.isFinite(b.aspect)) fail(t("Das Seitenformat in der Datei ist beschädigt."));
   b.photos.forEach(checkPhoto);
   return withoutAccount(b);
 }

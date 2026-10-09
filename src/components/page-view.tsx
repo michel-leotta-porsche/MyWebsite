@@ -3,9 +3,10 @@
 import Image from "next/image";
 import { createContext, useContext, type CSSProperties } from "react";
 
-import { plateName, plateOf, type BookData, type Page } from "@/content/books";
+import { plateOf, type BookData, type Page } from "@/content/books";
 import { CAPTION, FONTS, LEADING, layoutPage, type El, type Tone } from "@/content/layout";
-import { PlateButton } from "@/components/plate-viewer";
+import { PlateButton, usePlateName } from "@/components/plate-viewer";
+import { useT } from "@/lib/i18n";
 import { FOLD_WIDTH, foldGradient, printedStyle } from "@/lib/book-look";
 
 // Setzt eine Seite aus der Elementliste von layoutPage. Alle Maße in cqw: jede Seite ist ein Size-Container.
@@ -58,6 +59,8 @@ function Caption({ book, el, z }: { book: BookData; el: Extract<El, { t: "captio
 function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }) {
   const jump = useContext(JumpContext);
   const p = plateOf(book, el.no);
+  const t = useT();
+  const plateName = usePlateName();
   return (
     <button
       type="button"
@@ -65,7 +68,7 @@ function Thumb({ book, el }: { book: BookData; el: Extract<El, { t: "thumb" }> }
         e.stopPropagation();
         jump(el.no);
       }}
-      aria-label={`Zu ${plateName(el.no, p.title)}`}
+      aria-label={t("Zu {plate}", { plate: plateName(el.no, p.title) })}
       className="group absolute focus-visible:outline-ink"
       style={box(el.x, el.y, el.w, el.h)}
     >

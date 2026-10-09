@@ -1,4 +1,5 @@
 import { across, bookById, build, framed, full, type Photo } from "@/content/books";
+import { de } from "@/lib/i18n";
 
 // Vorführbuch für die Landing: drei Doppelseiten aus den stärksten Fotos des Fuerteventura-Buchs,
 // gesetzt mit denselben Seitentypen wie jedes echte Buch. Am Ende ein Bild über den Bund:
@@ -11,7 +12,7 @@ const pick = (...keys: string[]) =>
 export const landingBook = build({
   id: "landing",
   title: "Fuerteventura",
-  subtitle: "Fünf Fotografien",
+  subtitle: de("Fünf Fotografien"),
   author: "Michel Leotta",
   colophon: [],
   aspect: source.aspect,

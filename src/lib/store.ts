@@ -25,6 +25,7 @@ import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } fr
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
+import { de, getLang, translate, type Lang } from "@/lib/i18n";
 import { mapPoint, outSize } from "@/lib/develop/geo";
 import { cleanEdit, fineOf, isNeutral, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
@@ -32,12 +33,12 @@ import type { Ingested, SizeName } from "@/lib/ingest";
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
 
 export const CLOTHS = {
-  ringelblume: { label: "Ringelblume", base: "#e8a72c", deep: "#b97a12", ink: "#3a2706", light: "sun" },
-  nebel: { label: "Nebel", base: "#c9c8c3", deep: "#a3a29c", ink: "#1b1c1a", light: "mist" },
-  salbei: { label: "Salbei", base: "#a3ad92", deep: "#828c72", ink: "#1b1c1a", light: "sun" },
-  sand: { label: "Sand", base: "#d9c6a5", deep: "#b8a17c", ink: "#2a2117", light: "sun" },
-  ziegel: { label: "Ziegel", base: "#cc7048", deep: "#a65532", ink: "#2a120a", light: "sun" },
-  meer: { label: "Meer", base: "#5b979c", deep: "#43777b", ink: "#0f1f21", light: "mist" },
+  ringelblume: { label: de("Ringelblume"), base: "#e8a72c", deep: "#b97a12", ink: "#3a2706", light: "sun" },
+  nebel: { label: de("Nebel"), base: "#c9c8c3", deep: "#a3a29c", ink: "#1b1c1a", light: "mist" },
+  salbei: { label: de("Salbei"), base: "#a3ad92", deep: "#828c72", ink: "#1b1c1a", light: "sun" },
+  sand: { label: de("Sand"), base: "#d9c6a5", deep: "#b8a17c", ink: "#2a2117", light: "sun" },
+  ziegel: { label: de("Ziegel"), base: "#cc7048", deep: "#a65532", ink: "#2a120a", light: "sun" },
+  meer: { label: de("Meer"), base: "#5b979c", deep: "#43777b", ink: "#0f1f21", light: "mist" },
 } as const;
 export type ClothId = keyof typeof CLOTHS;
 
@@ -112,9 +113,19 @@ export type Share = {
 const ONES = ["", "ein", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
 const TEENS = ["zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"];
 const TENS = ["", "", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"];
-/** Zahl als Wort für Titelei und Kolophon (bis 99) */
-export function numberWord(n: number): string {
+const EN_ONES = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const EN_TEENS = ["ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const EN_TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+/** Zahl als Wort für Titelei und Kolophon (bis 99), in der gewählten Sprache */
+export function numberWord(n: number, lang: Lang = getLang()): string {
   let w: string;
+  if (lang === "en") {
+    if (n < 10) w = EN_ONES[n];
+    else if (n < 20) w = EN_TEENS[n - 10];
+    else if (n < 100) w = EN_TENS[Math.floor(n / 10)] + (n % 10 ? `-${EN_ONES[n % 10]}` : "");
+    else w = String(n);
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }
   if (n === 1) w = "eine";
   else if (n < 10) w = ONES[n];
   else if (n < 20) w = TEENS[n - 10];
@@ -146,10 +157,13 @@ export function migrate(b: StoredBook): StoredBook {
   return { ...b, schema: SCHEMA, spreads: b.spreads.map((s) => ({ ...s, id: s.id ?? spreadId() })) };
 }
 
-const photographs = (n: number) => (n === 1 ? "Eine Fotografie" : `${numberWord(n)} Fotografien`);
+type Tr = (text: string, vars?: Record<string, string | number>) => string;
+const photographs = (n: number, t: Tr, lang: Lang) => (n === 1 ? t("Eine Fotografie") : t("{n} Fotografien", { n: numberWord(n, lang) }));
 
 /** Gespeichertes Buch → BookData mit denselben Seitentypen wie Michels Bücher */
-export function toBookData(b: StoredBook): BookData {
+/** lang: Untertitel, Kolophon und Ersatztexte entstehen in dieser Sprache */
+export function toBookData(b: StoredBook, lang: Lang = getLang()): BookData {
+  const t: Tr = (text, vars) => translate(lang, text, vars);
   const byKey = new Map(autoPhotos(b.photos).map((p) => [p.key, p]));
   const photos: Record<string, Photo> = {};
   for (const p of b.photos) {
@@ -175,14 +189,14 @@ export function toBookData(b: StoredBook): BookData {
   const data = build({
     id: b.id,
     author: b.ownerName,
-    title: b.title || "Ohne Titel",
-    subtitle: b.subtitle || photographs(used.size),
+    title: b.title || t("Ohne Titel"),
+    subtitle: b.subtitle || photographs(used.size, t, lang),
     places: b.places,
     colophon: [
-      b.title || "Ohne Titel",
-      `${photographs(used.size)}.`,
-      `Fotografie: ${b.ownerName}`,
-      "Gebunden mit Calima.",
+      b.title || t("Ohne Titel"),
+      `${photographs(used.size, t, lang)}.`,
+      t("Fotografie: {name}", { name: b.ownerName }),
+      t("Gebunden mit Calima."),
       `© ${year} ${b.ownerName}`,
     ],
     aspect: pageAspect(b.aspect),
@@ -203,7 +217,7 @@ export function toBookData(b: StoredBook): BookData {
   });
   // Screenreader hören sonst nur „Foto, Foto, Foto“: wenigstens sagen, welches von wie vielen
   const n = data.plates.length;
-  return { ...data, plates: data.plates.map((pl) => (pl.alt ? pl : { ...pl, alt: `Foto ${pl.no} von ${n}` })) };
+  return { ...data, plates: data.plates.map((pl) => (pl.alt ? pl : { ...pl, alt: t("Foto {no} von {n}", { no: pl.no, n }) })) };
 }
 
 export const newId = () =>
@@ -371,7 +385,7 @@ export const exportBook = (b: StoredBook): string => bookFileText(b, SCHEMA);
 
 export async function importBook(file: File, owner: string, ownerName: string): Promise<StoredBook> {
   // Größe vor dem Lesen prüfen: eine riesige Datei soll nicht erst ganz in den Speicher
-  if (file.size > MAX_FILE) throw new BookFileError("Die Datei ist zu groß für eine Calima-Buchdatei.");
+  if (file.size > MAX_FILE) throw new BookFileError(de("Die Datei ist zu groß für eine Calima-Buchdatei."));
   // als neues Buch im eigenen Konto: neue Kennung, man selbst ist Macher
   const b = migrate({ ...parseBookFile(await file.text(), SCHEMA), id: newId(), owner, ownerName });
   await saveBook(b);
@@ -461,34 +475,34 @@ export async function deleteAccountData(uid: string, onStep?: (text: string) => 
     pausedMock.clear();
     return;
   }
-  if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Zum Löschen brauchst du eine Verbindung.");
-  onStep?.("Bücher");
+  if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error(de("Zum Löschen brauchst du eine Verbindung."));
+  onStep?.(de("Bücher"));
   for (const b of await myBooks(uid)) await deleteBookForever(b);
-  onStep?.("Geteilte Links");
+  onStep?.(de("Geteilte Links"));
   // Links, deren Buch es nicht mehr gibt
   for (const s of await mySharesOf(uid)) {
     const notes = await getDocs(collection(db(), "shares", s.token, "notes")).catch(() => null);
     await Promise.all((notes?.docs ?? []).map((n) => deleteDoc(n.ref)));
     await deleteDoc(doc(db(), "shares", s.token));
   }
-  onStep?.("Ablage und Rezepte");
+  onStep?.(de("Ablage und Rezepte"));
   for (const name of ["inbox", "recipes", "blocked"]) {
     const docs = await getDocs(collection(db(), "users", uid, name));
     await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
   }
   await deleteDoc(doc(db(), "users", uid));
-  onStep?.("Fotos");
+  onStep?.(de("Fotos"));
   await deleteFolder(ref(storage(), `u/${uid}`));
 }
 
 /* ------------------------------------------------------------------ Melden, Ausblenden, Nutzungsbedingungen */
 
 export const REPORT_REASONS = {
-  anstoessig: "Anstößig oder sexuell",
-  gewalt: "Gewalt oder Hass",
-  belaestigung: "Belästigung oder Bedrohung",
-  rechte: "Fremde Fotos, ohne Einverständnis",
-  anderes: "Etwas anderes",
+  anstoessig: de("Anstößig oder sexuell"),
+  gewalt: de("Gewalt oder Hass"),
+  belaestigung: de("Belästigung oder Bedrohung"),
+  rechte: de("Fremde Fotos, ohne Einverständnis"),
+  anderes: de("Etwas anderes"),
 } as const;
 export type ReportReason = keyof typeof REPORT_REASONS;
 

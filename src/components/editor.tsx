@@ -60,6 +60,7 @@ import { copySettings, useRecentSettings } from "@/lib/settings-clipboard";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 import { useWide } from "@/lib/use-wide";
+import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // Buch gestalten: Fotos reinziehen → automatisch gestalten → von Hand ändern.
 // Was man selbst entscheidet, wird fixiert; „Automatisch gestalten“ rechnet nur freie Doppelseiten neu.
@@ -76,10 +77,11 @@ const SHEET =
   "md:rounded-cut max-md:rounded-t-cut max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
 
 function SheetClose({ onClose }: { onClose: () => void }) {
+  const t = useT();
   return (
     <div className="flex justify-end md:hidden">
       <Button variant="ink" size="sm" onClick={onClose} className="-my-1">
-        Fertig
+        {t("Fertig")}
       </Button>
     </div>
   );
@@ -99,15 +101,28 @@ const AUTO_VERSION_MS = 10 * 60 * 1000;
 /** Seitenformat nach den Fotos: iPhone-Hochformate 3:4, Kamera 2:3 */
 const recipeLabel = (p: StoredPhoto) =>
   p.recipe?.kind === "fuji"
-    ? `Fuji-Rezept erkannt: ${p.recipe.film}`
+    ? t("Fuji-Rezept erkannt: {film}", { film: p.recipe.film })
     : p.recipe?.kind === "lightroom"
-      ? "Lightroom-Einstellungen erkannt"
+      ? t("Lightroom-Einstellungen erkannt")
       : p.camera
-        ? `Kein Rezept in der Datei, Kameradaten: ${p.camera.device}`
-        : "Keine Metadaten in der Datei (z. B. aus einem Messenger)";
+        ? t("Kein Rezept in der Datei, Kameradaten: {device}", { device: p.camera.device })
+        : t("Keine Metadaten in der Datei (z. B. aus einem Messenger)");
+
+/** Meldungen aus Rückrufen, die nicht bei jedem Zeichnen neu entstehen sollen: lesen die Sprache beim Aufruf */
+const msg = {
+  undo: () => t("Rückgängig"),
+  notFiles: () => t("Diese Fotos kamen nicht als Dateien an. Aus der Fotos-App bitte erst in den Finder ziehen oder „Fotos auswählen“ nutzen."),
+  notPhoto: () => t("Kein Foto"),
+  cantOpen: () => t("Ließ sich nicht öffnen"),
+  full: (n: number, all: number, over: number) =>
+    t("{n} von {all} Fotos aufgenommen, damit ist das Buch voll (bis zu {max} Fotos). Die übrigen {over} passen in ein zweites Buch.", { n, all, max: MAX, over }),
+  fullAlready: (over: number) => t("Das Buch ist schon voll (bis zu {max} Fotos). Die {over} Fotos passen in ein zweites Buch.", { max: MAX, over }),
+};
 
 const when = (v: Version) =>
-  v.at ? new Date(v.at.seconds * 1000).toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "gerade eben";
+  v.at
+    ? new Date(v.at.seconds * 1000).toLocaleString(locale(getLang()), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : t("gerade eben");
 
 function Lock({ on }: { on: boolean }) {
   return (
@@ -130,6 +145,7 @@ export function Editor() {
   const user = useUser();
   const idParam = useQueryParam("id");
   const wide = useWide();
+  const t = useT();
 
   const [loaded, setLoaded] = useState<StoredBook | null>(null);
   // neues Buch: leer, bis das erste Foto kommt
@@ -163,12 +179,12 @@ export function Editor() {
   // das gewählte Titelbild steht beim Öffnen im Blick, auch wenn es weit hinten im Streifen liegt
   useEffect(() => {
     if (!coverSheet) return;
-    const t = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       const strip = coverStrip.current;
       const on = strip?.querySelector<HTMLElement>("[aria-pressed=true]");
       if (strip && on) strip.scrollLeft = on.offsetLeft - (strip.clientWidth - on.offsetWidth) / 2;
     }, 50);
-    return () => window.clearTimeout(t);
+    return () => window.clearTimeout(timer);
   }, [coverSheet]);
   const [crop, setCrop] = useState<string | null>(null);
   const [develop, setDevelop] = useState<string | null>(null);
@@ -183,7 +199,7 @@ export function Editor() {
   const say = useCallback((text: string, onUndo?: () => void) => {
     setToastOpen(true);
     const done = () => setToastOpen(false);
-    notify(text, { duration: onUndo ? 10000 : 6000, onDismiss: done, onAutoClose: done, ...(onUndo && { action: { label: "Rückgängig", onClick: onUndo } }) });
+    notify(text, { duration: onUndo ? 10000 : 6000, onDismiss: done, onAutoClose: done, ...(onUndo && { action: { label: msg.undo(), onClick: onUndo } }) });
   }, []);
   const [saved, setSaved] = useState<"gespeichert" | "speichert" | "fehler" | "offline" | null>(null);
   const [touched, setTouched] = useState(false);
@@ -242,7 +258,7 @@ export function Editor() {
           if (!idParam) window.history.replaceState(null, "", `/neu?id=${book.id}`);
           if (Date.now() - lastAutoVersion.current > AUTO_VERSION_MS) {
             lastAutoVersion.current = Date.now();
-            saveVersion(book, "Zwischenstand", true).catch(() => {});
+            saveVersion(book, de("Zwischenstand"), true).catch(() => {});
           }
         })
         .catch(() => setSaved("fehler"));
@@ -368,7 +384,7 @@ export function Editor() {
       } else {
         // z. B. aus der Fotos-App am Mac: dort kommen keine Dateien im Browser an
         if (!hasFiles(e) && !e.dataTransfer.types.includes("text/uri-list")) return;
-        setDropHint("Diese Fotos kamen nicht als Dateien an. Aus der Fotos-App bitte erst in den Finder ziehen oder „Fotos auswählen“ nutzen.");
+        setDropHint(msg.notFiles());
       }
     };
     window.addEventListener("dragover", over, true);
@@ -400,14 +416,14 @@ export function Editor() {
       setPending((p) => [
         ...p,
         ...items,
-        ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: "Kein Foto" })),
+        ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: msg.notPhoto() })),
       ]);
       // die Grenze klar benennen: wie viele aufgenommen wurden und wohin der Rest kann (#44)
       if (over > 0)
         setDropHint(
           list.length
-            ? `${list.length} von ${list.length + over} Fotos aufgenommen, damit ist das Buch voll (bis zu ${MAX} Fotos). Die übrigen ${over} passen in ein zweites Buch.`
-            : `Das Buch ist schon voll (bis zu ${MAX} Fotos). Die ${over} Fotos passen in ein zweites Buch.`,
+            ? msg.full(list.length, list.length + over, over)
+            : msg.fullAlready(over),
         );
       const mark = (key: string, state: Pending["state"], error?: string) =>
         setPending((p) => p.map((x) => (x.key === key ? { ...x, state, error } : x)));
@@ -444,7 +460,7 @@ export function Editor() {
           try {
             await lane();
             const ph = await ingest(list[i], it.key).catch(() => {
-              throw new Error("Ließ sich nicht öffnen");
+              throw new Error(msg.cantOpen());
             });
             mark(it.key, "laden");
             inFlight++;
@@ -473,7 +489,7 @@ export function Editor() {
               ),
             );
           } catch (e) {
-            mark(it.key, "fehler", e instanceof Error ? e.message : "Ließ sich nicht öffnen");
+            mark(it.key, "fehler", e instanceof Error ? e.message : msg.cantOpen());
           }
         }
       };
@@ -511,8 +527,8 @@ export function Editor() {
   if (user === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
   if (user === null)
     return (
-      <SignInTable title="Ein Buch gestalten">
-        Melde dich an, dann ziehst du deine Fotos hier hinein. Rezepte und Kameradaten werden gelesen, GPS-Daten fallen weg.
+      <SignInTable title={t("Ein Buch gestalten")}>
+        {t("Melde dich an, dann ziehst du deine Fotos hier hinein. Rezepte und Kameradaten werden gelesen, GPS-Daten fallen weg.")}
       </SignInTable>
     );
   if (!book) return <main className="linen table-surface min-h-svh bg-table" />;
@@ -572,7 +588,7 @@ export function Editor() {
     setSel({ type: "spread", id });
   };
   const removeSpread = (i: number) => {
-    snapshot("vor dem Entfernen einer Doppelseite");
+    snapshot(de("vor dem Entfernen einer Doppelseite"));
     update((b) => {
       const keys = new Set(b.spreads[i]?.keys ?? []);
       return {
@@ -581,7 +597,12 @@ export function Editor() {
       };
     });
     setSel(null);
-    say(`Doppelseite ${i + 1} entfernt${book.spreads[i]?.keys.length ? ", die Fotos sind beiseitegelegt" : ""}.`, undo);
+    say(
+      book.spreads[i]?.keys.length
+        ? t("Doppelseite {n} entfernt, die Fotos sind beiseitegelegt.", { n: i + 1 })
+        : t("Doppelseite {n} entfernt.", { n: i + 1 }),
+      undo,
+    );
   };
   /** Foto auf eine andere Doppelseite: ist sie voll, tauscht ihr letztes Foto den Platz; freie Seiten bekommen es in die erste freie Zelle */
   const movePhoto = (key: string, to: number) =>
@@ -596,7 +617,7 @@ export function Editor() {
           if (target.pages) {
             const added = ph ? addKey(target, key, ph.w / ph.h, { aspect: b.aspect, bottom: bottomFor(b.aspect) }) : null;
             if (!added) {
-              say("Auf dieser Doppelseite ist kein Platz frei. Öffne sie mit „Gestalten“ und mach Platz.");
+              say(t("Auf dieser Doppelseite ist kein Platz frei. Öffne sie mit „Gestalten“ und mach Platz."));
               return ss;
             }
             ss[to] = added;
@@ -652,7 +673,7 @@ export function Editor() {
   };
   const resetStage = () => {
     if (!stageId) return;
-    snapshot("vor dem Zurücksetzen einer Doppelseite");
+    snapshot(de("vor dem Zurücksetzen einer Doppelseite"));
     // auf den Vorschlag zurück; was über zwei Fotos hinausgeht, verteilt die Automatik neu
     update((b) => relayout(mapSpreads(b, (ss) => ss.map((s) => (s.id === stageId ? { ...s, pages: undefined, pinned: false, layout: 0 } : s)))));
   };
@@ -668,7 +689,7 @@ export function Editor() {
    * Frei gestaltete Seiten und Textseiten behalten ihre Form; auf der Bühne bleibt die Doppelseite stehen.
    */
   const shelvePhoto = (key: string, close = true) => {
-    say("Beiseitegelegt, nicht mehr im Buch.", undo);
+    say(t("Beiseitegelegt, nicht mehr im Buch."), undo);
     update((b) => {
       let gap = false;
       const next = {
@@ -702,10 +723,14 @@ export function Editor() {
   };
   const fileOf = (p: StoredPhoto) => (p.recipe ? fromRecipe(p.recipe, p.title || undefined) : null);
   const copyFrom = (s: CopiedSettings | null) => {
-    if (!s) return say("Dieses Foto hat noch keine Einstellungen zum Kopieren.");
+    if (!s) return say(t("Dieses Foto hat noch keine Einstellungen zum Kopieren."));
     copySettings(s);
     haptic("select");
-    say(`„${s.name}“ mitgenommen${s.approx ? ", in Calima nachempfunden" : ""}. Liegt im Fotostudio oben bei „Deine Looks“.`);
+    say(
+      s.approx
+        ? t("„{name}“ mitgenommen, in Calima nachempfunden. Liegt im Fotostudio oben bei „Deine Looks“.", { name: s.name })
+        : t("„{name}“ mitgenommen. Liegt im Fotostudio oben bei „Deine Looks“.", { name: s.name }),
+    );
   };
   const pasteOn = async (p: StoredPhoto, s: CopiedSettings | null = copied) => {
     if (!s || !user || pasting) return;
@@ -715,9 +740,14 @@ export function Editor() {
       const out = await bakePhoto({ url: origOf(p).large, lut: buildLut(e, 33), n: 33, rec: e.rec, geo: e.geo, vignette: e.more?.vignette, clarity: e.more?.clarity });
       const urls = await uploadEdited(user.uid, book.id, p.key, out.blobs);
       update((b) => ({ ...b, photos: b.photos.map((x) => (x.key === p.key ? { ...x, ...editedPatch(x, e, { urls, color: out.color }) } : x)) }));
-      say(`„${s.name}“ übernommen${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`, undo);
+      say(
+        s.approx
+          ? t("„{name}“ übernommen, nachempfunden. Der Zuschnitt bleibt.", { name: s.name })
+          : t("„{name}“ übernommen. Der Zuschnitt bleibt.", { name: s.name }),
+        undo,
+      );
     } catch {
-      say("Übernehmen hat nicht geklappt. Prüf die Verbindung und versuch es noch einmal.");
+      say(t("Übernehmen hat nicht geklappt. Prüf die Verbindung und versuch es noch einmal."));
     } finally {
       setPasting(null);
     }
@@ -731,8 +761,8 @@ export function Editor() {
   const onKey = (e: KeyboardEvent) => {
     // die Bildbearbeitung hat ihr eigenes Rückgängig
     if (develop) return;
-    const t = e.target as HTMLElement;
-    const typing = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
+    const el = e.target as HTMLElement;
+    const typing = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !typing) {
       e.preventDefault();
       if (e.shiftKey) redo();
@@ -745,7 +775,7 @@ export function Editor() {
       e.preventDefault();
       if (e.key.toLowerCase() === "c") copyFrom(editOf(selPhoto) ?? fileOf(selPhoto));
       else if (copied) pasteOn(selPhoto);
-      else say("Erst bei einem Foto einen Look mitnehmen.");
+      else say(t("Erst bei einem Foto einen Look mitnehmen."));
       return;
     }
     const i = spreadOf(selPhoto.key);
@@ -796,15 +826,15 @@ export function Editor() {
 
   const status =
     saved === "speichert"
-      ? "Speichert …"
+      ? t("Speichert …")
       : saved === "gespeichert"
-        ? "Gespeichert"
+        ? t("Gespeichert")
         : saved === "offline"
           ? wide
-            ? "Offline gespeichert, geht raus, sobald Netz da ist"
-            : "Offline gespeichert"
+            ? t("Offline gespeichert, geht raus, sobald Netz da ist")
+            : t("Offline gespeichert")
           : saved === "fehler"
-            ? "Speichern fehlgeschlagen"
+            ? t("Speichern fehlgeschlagen")
             : "";
 
   return (
@@ -819,24 +849,24 @@ export function Editor() {
             className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 pr-2 text-base font-medium transition-opacity duration-150 active:opacity-60"
           >
             <ChevronLeft aria-hidden className="size-5" />
-            Bücherzimmer
+            {t("Bücherzimmer")}
           </Link>
           <span aria-live="polite" className="text-on-table-2 text-[13px]">
             {status}
           </span>
         </div>
         <div className="mt-1 flex items-center justify-between gap-3">
-          <ToolGroup label="Bearbeiten">
-            <IconButton label={withKeys("Rückgängig", "⌘Z")} disabled={!undoState.past} onClick={undo}>
+          <ToolGroup label={t("Bearbeiten")}>
+            <IconButton label={withKeys(t("Rückgängig"), "⌘Z")} disabled={!undoState.past} onClick={undo}>
               <Undo2 aria-hidden />
             </IconButton>
-            <IconButton label={withKeys("Wiederholen", "⇧⌘Z")} disabled={!undoState.future} onClick={redo} className="max-md:hidden">
+            <IconButton label={withKeys(t("Wiederholen"), "⇧⌘Z")} disabled={!undoState.future} onClick={redo} className="max-md:hidden">
               <Redo2 aria-hidden />
             </IconButton>
-            <IconButton label="Verlauf" onClick={() => setHistory(true)} className="max-md:hidden">
+            <IconButton label={t("Verlauf")} onClick={() => setHistory(true)} className="max-md:hidden">
               <History aria-hidden />
             </IconButton>
-            <IconButton label="Ansehen" disabled={!data} onClick={() => setPreview(true)}>
+            <IconButton label={t("Ansehen")} disabled={!data} onClick={() => setPreview(true)}>
               <Eye aria-hidden />
             </IconButton>
             {/* Telefon: Wiederholen und Verlauf hinter „Mehr“ (#43) */}
@@ -844,16 +874,16 @@ export function Editor() {
               <Menu
                 align="start"
                 trigger={
-                  <IconButton label="Mehr">
+                  <IconButton label={t("Mehr")}>
                     <MoreHorizontal aria-hidden />
                   </IconButton>
                 }
               >
                 <MenuItem icon={<Redo2 aria-hidden />} disabled={!undoState.future} onClick={redo}>
-                  Wiederholen
+                  {t("Wiederholen")}
                 </MenuItem>
                 <MenuItem icon={<History aria-hidden />} onClick={() => setHistory(true)}>
-                  Verlauf
+                  {t("Verlauf")}
                 </MenuItem>
               </Menu>
             </span>
@@ -868,38 +898,41 @@ export function Editor() {
             >
               <SlidersHorizontal aria-hidden />
               {/* Telefon: nur das Zeichen, sonst passt „Hinlegen“ nicht mehr in die Zeile */}
-              <span className="max-md:sr-only">Bearbeiten</span>
+              <span className="max-md:sr-only">{t("Bearbeiten")}</span>
             </Button>
             <Button variant="cloth" size="sm" disabled={!data || saved === "speichert"} onClick={() => setSharing(true)} className="pointer-coarse:min-h-11 md:min-h-11 md:px-5">
               <Gift aria-hidden />
-              Hinlegen<span className="max-md:hidden"> für …</span>
+              <span className="max-md:hidden">{t("Hinlegen für …")}</span>
+              <span className="md:hidden">{t("Hinlegen …")}</span>
             </Button>
           </span>
         </div>
       </header>
 
       <div className={`grid gap-8 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:grid-cols-[minmax(0,1fr)_320px] md:px-8 ${selPhoto || selSpread?.text ? "max-md:pb-[62svh]" : ""}`}>
-        <section aria-label="Doppelseiten" className="min-w-0">
+        <section aria-label={t("Doppelseiten")} className="min-w-0">
           {/* Fotos */}
           <div className="bg-on-table/5 flex flex-col items-start gap-3 rounded-tool p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)] md:p-6">
             <span aria-hidden className="bg-on-table/8 text-on-table grid size-11 place-items-center rounded-full">
               <ImagePlus className="size-5" />
             </span>
             <p className="text-on-table text-lg font-semibold">
-              <span className="pointer-coarse:hidden">{book.photos.length ? "Weitere Fotos hineinziehen" : "Fotos hier hineinziehen"}</span>
-              <span className="hidden pointer-coarse:inline">{book.photos.length ? "Weitere Fotos vom Handy" : "Fotos vom Handy"}</span>
+              <span className="pointer-coarse:hidden">{book.photos.length ? t("Weitere Fotos hineinziehen") : t("Fotos hier hineinziehen")}</span>
+              <span className="hidden pointer-coarse:inline">{book.photos.length ? t("Weitere Fotos vom Handy") : t("Fotos vom Handy")}</span>
             </p>
             <p className="text-on-table-2 max-w-[60ch] text-sm leading-relaxed">
-              Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen
-              werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone.
+              {t(
+                "Originale direkt von der Kamera bringen ihr Fuji-Rezept mit, Lightroom-Exporte mit „Alle Metadaten“ ihre Einstellungen. Beim Hochladen werden die Fotos neu gespeichert, GPS und Seriennummer fallen weg. JPEG, HEIC und DNG vom iPhone.",
+              )}
             </p>
             {/* die Grenze steht direkt am Knopf, nicht versteckt im Absatz (#44) */}
             <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <Button size="sm" onClick={() => fileInput.current?.click()} aria-describedby="photo-limit">
-                Fotos auswählen
+                {t("Fotos auswählen")}
               </Button>
               <span id="photo-limit" className="text-on-table-2 text-sm tabular-nums">
-                bis zu {MAX} Fotos{book.photos.length ? ` · ${book.photos.length >= MAX ? "Buch ist voll" : `noch ${MAX - book.photos.length} frei`}` : ""}
+                {t("bis zu {max} Fotos", { max: MAX })}
+                {book.photos.length ? ` · ${book.photos.length >= MAX ? t("Buch ist voll") : t("noch {n} frei", { n: MAX - book.photos.length })}` : ""}
               </span>
             </span>
             <input
@@ -920,13 +953,13 @@ export function Editor() {
             )}
             {pending.length > 0 &&
               (() => {
-                const total = pending.filter((p) => p.error !== "kein Foto").length;
+                const total = pending.filter((p) => p.error !== msg.notPhoto()).length;
                 const done = pending.filter((p) => p.state === "fertig").length;
                 return (
                   total > 0 && (
                     <div className="w-full max-w-sm">
                       <p className="text-on-table text-sm tabular-nums" aria-live="polite">
-                        {done} von {total} Fotos im Buch
+                        {t("{done} von {total} Fotos im Buch", { done, total })}
                       </p>
                       {/* Fortschritt als Linie, die mit scaleX wächst (Signal, keine Fläche) */}
                       <span aria-hidden className="bg-on-table/12 mt-2 block h-1 overflow-hidden rounded-full">
@@ -937,7 +970,7 @@ export function Editor() {
                 );
               })()}
             {pending.length > 0 && (
-              <ul className="text-on-table-2 max-h-48 w-full space-y-1.5 overflow-y-auto text-sm" tabIndex={0} aria-label="Fortschritt je Foto">
+              <ul className="text-on-table-2 max-h-48 w-full space-y-1.5 overflow-y-auto text-sm" tabIndex={0} aria-label={t("Fortschritt je Foto")}>
                 {pending.map((p) => (
                   <li key={p.key} className="flex items-center gap-2.5">
                     <span aria-hidden className={`shrink-0 [&_svg]:size-4 ${p.state === "fehler" ? "text-danger-on-table" : p.state === "fertig" ? "text-on-table" : ""}`}>
@@ -945,7 +978,7 @@ export function Editor() {
                     </span>
                     <span className="min-w-0 flex-1 truncate">{p.name}</span>
                     <span className={`shrink-0 ${p.state === "fehler" ? "text-on-table" : ""}`}>
-                      {p.state === "lesen" ? "liest …" : p.state === "laden" ? "lädt hoch …" : p.state === "fertig" ? "fertig" : p.error}
+                      {p.state === "lesen" ? t("liest …") : p.state === "laden" ? t("lädt hoch …") : p.state === "fertig" ? t("fertig") : p.error}
                     </span>
                   </li>
                 ))}
@@ -957,27 +990,27 @@ export function Editor() {
           {data && (
             <>
               <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-on-table text-lg font-semibold">{book.spreads.length} Doppelseiten</h2>
+                <h2 className="text-on-table text-lg font-semibold">{book.spreads.length === 1 ? t("1 Doppelseite") : t("{n} Doppelseiten", { n: book.spreads.length })}</h2>
                 <span className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => insertText(book.spreads.length)}>
                     <Type aria-hidden />
-                    Textseite
+                    {t("Textseite")}
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => {
-                      snapshot("vor „Automatisch gestalten“");
+                      snapshot(de("vor „Automatisch gestalten“"));
                       update(relayout);
                     }}
-                    title="Fixierte Doppelseiten und Textseiten bleiben, wie sie sind"
+                    title={t("Fixierte Doppelseiten und Textseiten bleiben, wie sie sind")}
                   >
                     <LayoutGrid aria-hidden />
-                    Automatisch gestalten
+                    {t("Automatisch gestalten")}
                   </Button>
                 </span>
               </div>
               <p className="text-on-table-2 mt-1 text-[13px]">
-                <Lock on /> bleibt, wie du es gesetzt hast.
+                <Lock on /> {t("bleibt, wie du es gesetzt hast.")}
               </p>
               <ol className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
                 {book.spreads.map((s, i) => {
@@ -1001,30 +1034,30 @@ export function Editor() {
                             className={`inline-flex min-h-6 items-center text-left pointer-coarse:min-h-11 ${active ? "text-on-table font-semibold" : ""}`}
                             aria-pressed={active}
                           >
-                            {s.text ? "Textseite" : s.pages ? `Doppelseite ${i + 1} · frei` : `Doppelseite ${i + 1}`}
+                            {s.text ? t("Textseite") : s.pages ? t("Doppelseite {n} · frei", { n: i + 1 }) : t("Doppelseite {n}", { n: i + 1 })}
                           </button>
                           <button
                             type="button"
                             onClick={() => togglePin(i)}
                             disabled={!!s.text}
                             aria-pressed={!!s.pinned || !!s.text}
-                            aria-label={s.pinned || s.text ? `Doppelseite ${i + 1} lösen` : `Doppelseite ${i + 1} fixieren`}
+                            aria-label={s.pinned || s.text ? t("Doppelseite {n} lösen", { n: i + 1 }) : t("Doppelseite {n} fixieren", { n: i + 1 })}
                             className={`${HIT} ${s.pinned || s.text ? "text-mark" : "text-on-table-2 hover:text-on-table"}`}
-                            title={s.pinned ? "fixiert: die Automatik lässt sie in Ruhe" : "frei: die Automatik darf sie neu ordnen"}
+                            title={s.pinned ? t("fixiert: die Automatik lässt sie in Ruhe") : t("frei: die Automatik darf sie neu ordnen")}
                           >
                             <Lock on={!!s.pinned || !!s.text} />
                           </button>
                         </span>
                         <span className="flex flex-wrap items-center gap-x-1.5">
-                          <button type="button" className={buttonClass("quiet", "sm", "min-h-8")} onClick={() => openStage(i)} aria-label={`Doppelseite ${i + 1} gestalten`}>
-                            Gestalten
+                          <button type="button" className={buttonClass("quiet", "sm", "min-h-8")} onClick={() => openStage(i)} aria-label={t("Doppelseite {n} gestalten", { n: i + 1 })}>
+                            {t("Gestalten")}
                           </button>
                           {!s.text && s.keys.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setDevelop(s.keys[0])}
-                              aria-label={`Fotos von Doppelseite ${i + 1} bearbeiten`}
-                              title="Fotos bearbeiten: Looks, Vorschläge, Feinschliff"
+                              aria-label={t("Fotos von Doppelseite {n} bearbeiten", { n: i + 1 })}
+                              title={t("Fotos bearbeiten: Looks, Vorschläge, Feinschliff")}
                               className={ROUND}
                             >
                               <SlidersHorizontal aria-hidden className="size-4" />
@@ -1035,14 +1068,14 @@ export function Editor() {
                               type="button"
                               className={buttonClass("quiet", "sm", "min-h-8")}
                               onClick={() => cycle(i)}
-                              aria-label={`Anderes Layout für Doppelseite ${i + 1}, jetzt ${s.layout + 1} von ${variantsOf(s, auto).length}`}
-                              title={`Layout ${s.layout + 1} von ${variantsOf(s, auto).length}`}
+                              aria-label={t("Anderes Layout für Doppelseite {n}, jetzt {k} von {all}", { n: i + 1, k: s.layout + 1, all: variantsOf(s, auto).length })}
+                              title={t("Layout {k} von {all}", { k: s.layout + 1, all: variantsOf(s, auto).length })}
                             >
-                              Anderes Layout
+                              {t("Anderes Layout")}
                             </button>
                           )}
                           <span className="flex items-center gap-x-1">
-                            <button type="button" className={ROUND} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={`Doppelseite ${i + 1} nach vorn`}>
+                            <button type="button" className={ROUND} onClick={() => moveSpread(i, i - 1)} disabled={i === 0} aria-label={t("Doppelseite {n} nach vorn", { n: i + 1 })}>
                               <ChevronLeft aria-hidden className="size-4" />
                             </button>
                             <button
@@ -1050,7 +1083,7 @@ export function Editor() {
                               className={ROUND}
                               onClick={() => moveSpread(i, i + 1)}
                               disabled={i === book.spreads.length - 1}
-                              aria-label={`Doppelseite ${i + 1} nach hinten`}
+                              aria-label={t("Doppelseite {n} nach hinten", { n: i + 1 })}
                             >
                               <ChevronRight aria-hidden className="size-4" />
                             </button>
@@ -1061,8 +1094,8 @@ export function Editor() {
                             type="button"
                             className={ROUND}
                             onClick={() => removeSpread(i)}
-                            aria-label={`Doppelseite ${i + 1} entfernen, die Fotos werden beiseitegelegt`}
-                            title="Doppelseite entfernen, die Fotos werden beiseitegelegt"
+                            aria-label={t("Doppelseite {n} entfernen, die Fotos werden beiseitegelegt", { n: i + 1 })}
+                            title={t("Doppelseite entfernen, die Fotos werden beiseitegelegt")}
                           >
                             <X aria-hidden className="size-4" />
                           </button>
@@ -1082,7 +1115,7 @@ export function Editor() {
                             openStage(i);
                           }
                         }}
-                        title={IS_APP ? undefined : "Doppelklick: gestalten"}
+                        title={IS_APP ? undefined : t("Doppelklick: gestalten")}
                         className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}
                       >
                         {(["left", "right"] as const).map((side) => {
@@ -1110,7 +1143,7 @@ export function Editor() {
                                     e.dataTransfer.setData("text/x-photo", key);
                                   }}
                                   onClick={() => setSel(sel?.type === "photo" && sel.key === key ? null : { type: "photo", key })}
-                                  aria-label={`Foto auswählen: ${byKey.get(key)?.title || "ohne Titel"}`}
+                                  aria-label={t("Foto auswählen: {title}", { title: byKey.get(key)?.title || t("ohne Titel") })}
                                   aria-pressed={sel?.type === "photo" && sel.key === key}
                                   className={`absolute inset-0 z-30 ${sel?.type === "photo" && sel.key === key ? "outline-mark outline-2 -outline-offset-2" : ""}`}
                                 />
@@ -1119,7 +1152,7 @@ export function Editor() {
                                 <button
                                   type="button"
                                   onClick={() => openStage(i)}
-                                  aria-label={`Doppelseite ${i + 1} gestalten`}
+                                  aria-label={t("Doppelseite {n} gestalten", { n: i + 1 })}
                                   className="absolute inset-0 z-30"
                                 />
                               )}
@@ -1127,12 +1160,12 @@ export function Editor() {
                                 <button
                                   type="button"
                                   onClick={() => setSel({ type: "spread", id: s.id! })}
-                                  aria-label="Text bearbeiten"
+                                  aria-label={t("Text bearbeiten")}
                                   className="absolute inset-0 z-30"
                                 />
                               )}
                               {key && byKey.get(key)?.star && (
-                                <span aria-label="wichtig" className="text-mark pointer-events-none absolute top-1 right-1 z-40">
+                                <span aria-label={t("wichtig")} className="text-mark pointer-events-none absolute top-1 right-1 z-40">
                                   <Star on />
                                 </span>
                               )}
@@ -1141,7 +1174,7 @@ export function Editor() {
                         })}
                       </div>
                       {!textFits(s) && (
-                        <p className="text-on-table mt-2 text-xs">Der Text ist etwa {textOverflow(s, data)} Zeilen zu lang für die Seite.</p>
+                        <p className="text-on-table mt-2 text-xs">{t("Der Text ist etwa {n} Zeilen zu lang für die Seite.", { n: textOverflow(s, data) })}</p>
                       )}
                     </li>
                   );
@@ -1153,8 +1186,8 @@ export function Editor() {
           {/* Ablage: hochgeladen, gerade nicht im Buch */}
           {shelf.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-on-table text-lg font-semibold">Beiseitegelegt</h2>
-              <p className="text-on-table-2 mt-1 text-[13px]">Nicht im Buch. „Ins Buch“ legt ein Foto zurück.</p>
+              <h2 className="text-on-table text-lg font-semibold">{t("Beiseitegelegt")}</h2>
+              <p className="text-on-table-2 mt-1 text-[13px]">{t("Nicht im Buch. „Ins Buch“ legt ein Foto zurück.")}</p>
               <ul className="mt-3 flex flex-wrap gap-3">
                 {shelf.map((p) => (
                   <li key={p.key} className="flex flex-col items-start gap-1">
@@ -1163,13 +1196,13 @@ export function Editor() {
                       draggable
                       onDragStart={(e) => e.dataTransfer.setData("text/x-photo", p.key)}
                       onClick={() => setSel({ type: "photo", key: p.key })}
-                      aria-label={`Beiseitegelegtes Foto auswählen: ${p.title || "ohne Titel"}`}
+                      aria-label={t("Beiseitegelegtes Foto auswählen: {title}", { title: p.title || t("ohne Titel") })}
                       className="relative h-20 w-20"
                     >
                       <Image src={p.thumb} alt="" fill sizes="80px" className="object-cover" />
                     </button>
-                    <Button size="sm" className="w-20 px-0" onClick={() => unshelvePhoto(p.key)} aria-label={`${p.title || "Foto"} ins Buch`}>
-                      Ins Buch
+                    <Button size="sm" className="w-20 px-0" onClick={() => unshelvePhoto(p.key)} aria-label={t("{title} ins Buch", { title: p.title || t("Foto") })}>
+                      {t("Ins Buch")}
                     </Button>
                   </li>
                 ))}
@@ -1189,7 +1222,7 @@ export function Editor() {
                 <button
                   type="button"
                   onClick={() => setCoverSheet(true)}
-                  aria-label="Einband: Titelbild wählen"
+                  aria-label={t("Einband: Titelbild wählen")}
                   className="relative w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-transform duration-150 ease-out active:scale-[0.97]"
                   style={{ aspectRatio: `1 / ${data.aspect}` }}
                 >
@@ -1205,7 +1238,7 @@ export function Editor() {
                   <span className="absolute inset-y-0 left-0 w-[5%] bg-[rgb(12_10_8/0.22)]" />
                   <span className="absolute right-1.5 bottom-3 left-2.5">
                     <span className="line-clamp-3 text-[12px] leading-[0.95] font-bold tracking-[-0.03em] break-words" style={{ fontVariationSettings: '"wdth" 76' }}>
-                      {book.title || "Ohne Titel"}
+                      {book.title || t("Ohne Titel")}
                     </span>
                     {book.subtitle && <span className="mt-1 line-clamp-2 block text-[9px] leading-tight font-medium break-words">{book.subtitle}</span>}
                   </span>
@@ -1213,27 +1246,27 @@ export function Editor() {
               )}
               <div className="space-y-2">
                 <p className="text-lg font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
-                  Buch
+                  {t("Buch")}
                 </p>
                 {data && (
                   <button type="button" className={buttonClass("paper", "sm")} onClick={() => setCoverSheet(true)}>
                     <ImagePlus aria-hidden />
-                    Titelbild …
+                    {t("Titelbild …")}
                   </button>
                 )}
               </div>
             </div>
-            <Field label="Titel" value={book.title} maxLength={40} onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
+            <Field label={t("Titel")} value={book.title} maxLength={40} onChange={(e) => update((b) => ({ ...b, title: e.target.value.slice(0, 40) }), "title")} />
             <Field
-              label="Zeile darunter"
-              hint="Leer lassen: Anzahl der Fotos"
+              label={t("Zeile darunter")}
+              hint={t("Leer lassen: Anzahl der Fotos")}
               value={book.subtitle}
               maxLength={60}
               onChange={(e) => update((b) => ({ ...b, subtitle: e.target.value.slice(0, 60) }), "subtitle")}
             />
             <Swatches
-              label="Farbe des Einbands"
-              items={(Object.keys(CLOTHS) as ClothId[]).map((id) => ({ id, label: CLOTHS[id].label, color: CLOTHS[id].base, ink: CLOTHS[id].ink }))}
+              label={t("Farbe des Einbands")}
+              items={(Object.keys(CLOTHS) as ClothId[]).map((id) => ({ id, label: t(CLOTHS[id].label), color: CLOTHS[id].base, ink: CLOTHS[id].ink }))}
               value={book.cloth}
               onChange={(id) => update((b) => ({ ...b, cloth: id as ClothId }))}
             />
@@ -1254,17 +1287,17 @@ export function Editor() {
                 onClick={() => toggleStar(selPhoto.key)}
                 className={buttonClass(selPhoto.star ? "ink" : "paper", "sm")}
               >
-                <Star on={!!selPhoto.star} /> {selPhoto.star ? "Wichtig: kommt groß ins Buch" : "Als wichtig markieren"}
+                <Star on={!!selPhoto.star} /> {selPhoto.star ? t("Wichtig: kommt groß ins Buch") : t("Als wichtig markieren")}
               </button>
-              <Field label="Titel" value={selPhoto.title} maxLength={50} onChange={(e) => setPhoto(selPhoto.key, { title: e.target.value.slice(0, 50) }, `t-${selPhoto.key}`)} />
+              <Field label={t("Titel")} value={selPhoto.title} maxLength={50} onChange={(e) => setPhoto(selPhoto.key, { title: e.target.value.slice(0, 50) }, `t-${selPhoto.key}`)} />
               <Field
-                label="Zusatz (Ort, Notiz)"
+                label={t("Zusatz (Ort, Notiz)")}
                 value={selPhoto.note ?? ""}
                 maxLength={50}
                 onChange={(e) => setPhoto(selPhoto.key, { note: e.target.value.slice(0, 50) || undefined }, `n-${selPhoto.key}`)}
               />
               <Field
-                label="Beschreibung für Screenreader"
+                label={t("Beschreibung für Screenreader")}
                 value={selPhoto.alt}
                 maxLength={200}
                 onChange={(e) => setPhoto(selPhoto.key, { alt: e.target.value.slice(0, 200) }, `a-${selPhoto.key}`)}
@@ -1280,16 +1313,16 @@ export function Editor() {
                       else setCrop(selPhoto.key);
                     }}
                   >
-                    Ausschnitt …
+                    {t("Ausschnitt …")}
                   </button>
                 )}
                 <button type="button" className={buttonClass("paper", "sm")} onClick={() => setDevelop(selPhoto.key)}>
-                  Bearbeiten …
+                  {t("Bearbeiten …")}
                 </button>
                 {fileOf(selPhoto) && (
-                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(fileOf(selPhoto))} title="für andere Fotos und Bücher, in Calima nachempfunden">
+                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(fileOf(selPhoto))} title={t("für andere Fotos und Bücher, in Calima nachempfunden")}>
                     <ClipboardCopy aria-hidden />
-                    {selPhoto.recipe?.kind === "fuji" ? "Fuji-Rezept mitnehmen" : "Lightroom-Werte mitnehmen"}
+                    {selPhoto.recipe?.kind === "fuji" ? t("Fuji-Rezept mitnehmen") : t("Lightroom-Werte mitnehmen")}
                   </button>
                 )}
                 {(() => {
@@ -1302,21 +1335,21 @@ export function Editor() {
                     <Menu
                       align="start"
                       trigger={
-                        <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} disabled={!!pasting} title="Farbe und Licht von einem anderen Foto, der Zuschnitt bleibt. ⇧⌘V nimmt den zuletzt mitgenommenen">
+                        <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} disabled={!!pasting} title={t("Farbe und Licht von einem anderen Foto, der Zuschnitt bleibt. ⇧⌘V nimmt den zuletzt mitgenommenen")}>
                           {pasting === selPhoto.key ? <LoaderCircle aria-hidden className="animate-spin" /> : <ClipboardPaste aria-hidden />}
-                          {pasting === selPhoto.key ? "Übernehme …" : "Look übernehmen"}
+                          {pasting === selPhoto.key ? t("Übernehme …") : t("Look übernehmen")}
                           <ChevronDown aria-hidden />
                         </button>
                       }
                     >
-                      {fresh.length > 0 && <MenuLabel>Zuletzt mitgenommen</MenuLabel>}
+                      {fresh.length > 0 && <MenuLabel>{t("Zuletzt mitgenommen")}</MenuLabel>}
                       {fresh.map((c, i) => (
-                        <MenuItem key={`r${i}`} hint={[c.from, c.approx && "nachempfunden"].filter(Boolean).join(", ") || undefined} onClick={() => pasteOn(selPhoto, c)}>
+                        <MenuItem key={`r${i}`} hint={[c.from, c.approx && t("nachempfunden")].filter(Boolean).join(", ") || undefined} onClick={() => pasteOn(selPhoto, c)}>
                           {c.name}
                         </MenuItem>
                       ))}
                       {fresh.length > 0 && here.length > 0 && <MenuSeparator />}
-                      {here.length > 0 && <MenuLabel>In diesem Buch</MenuLabel>}
+                      {here.length > 0 && <MenuLabel>{t("In diesem Buch")}</MenuLabel>}
                       {here.map((l) => (
                         <MenuItem key={l.keys.join()} hint={l.where || undefined} onClick={() => pasteOn(selPhoto, l)}>
                           {l.name}
@@ -1331,11 +1364,11 @@ export function Editor() {
                   onClick={() => setCover(selPhoto.key)}
                   disabled={book.coverKey === selPhoto.key || !!selPhoto.shelved}
                 >
-                  {book.coverKey === selPhoto.key ? "Auf dem Einband" : "Auf den Einband"}
+                  {book.coverKey === selPhoto.key ? t("Auf dem Einband") : t("Auf den Einband")}
                 </button>
                 {selPhoto.shelved ? (
                   <button type="button" className={buttonClass("paper", "sm")} onClick={() => unshelvePhoto(selPhoto.key)}>
-                    Ins Buch
+                    {t("Ins Buch")}
                   </button>
                 ) : (
                   <button
@@ -1346,7 +1379,7 @@ export function Editor() {
                       setSel(null);
                     }}
                   >
-                    Beiseitelegen
+                    {t("Beiseitelegen")}
                   </button>
                 )}
               </div>
@@ -1358,7 +1391,7 @@ export function Editor() {
                     disabled={spreadOf(selPhoto.key) <= 0}
                     onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) - 1)}
                   >
-                    ← Nach vorn
+                    {t("← Nach vorn")}
                   </button>
                   <button
                     type="button"
@@ -1366,12 +1399,12 @@ export function Editor() {
                     disabled={spreadOf(selPhoto.key) >= book.spreads.length - 1}
                     onClick={() => movePhoto(selPhoto.key, spreadOf(selPhoto.key) + 1)}
                   >
-                    Nach hinten →
+                    {t("Nach hinten →")}
                   </button>
                 </div>
               )}
               {!selPhoto.shelved && (
-                <p className="text-ink-2 text-[12px] pointer-coarse:hidden">Ziehen auf eine andere Doppelseite verschiebt das Foto auch. Tastatur: Alt + ← / → , Entf legt es beiseite.</p>
+                <p className="text-ink-2 text-[12px] pointer-coarse:hidden">{t("Ziehen auf eine andere Doppelseite verschiebt das Foto auch. Tastatur: Alt + ← / → , Entf legt es beiseite.")}</p>
               )}
             </div>
           )}
@@ -1379,26 +1412,26 @@ export function Editor() {
           {selSpread?.text && (
             <div className={`slip text-ink space-y-3 p-5 ${SHEET}`}>
               <SheetClose onClose={() => setSel(null)} />
-              <p className="text-sm font-semibold">Textseite</p>
+              <p className="text-sm font-semibold">{t("Textseite")}</p>
               <Field
-                label="Überschrift (optional)"
-                hint="z. B. Drei Tage am Meer"
+                label={t("Überschrift (optional)")}
+                hint={t("z. B. Drei Tage am Meer")}
                 value={selSpread.text.heading ?? ""}
                 maxLength={60}
                 onChange={(e) => setText(selSpreadIndex, { heading: e.target.value.slice(0, 60) })}
               />
               <label className="block text-[13px]">
-                <span className="text-ink-2">Text</span>
+                <span className="text-ink-2">{t("Text")}</span>
                 <textarea
                   className={noteClass}
                   rows={7}
                   value={selSpread.text.body}
-                  placeholder="Ein paar Sätze zu eurer Geschichte. Leerzeile = neuer Absatz."
+                  placeholder={t("Ein paar Sätze zu eurer Geschichte. Leerzeile = neuer Absatz.")}
                   onChange={(e) => setText(selSpreadIndex, { body: e.target.value.slice(0, 1200) })}
                 />
               </label>
               <fieldset className="flex gap-2 text-sm">
-                <legend className="text-ink-2 mb-1 text-[13px]">Schrift</legend>
+                <legend className="text-ink-2 mb-1 text-[13px]">{t("Schrift")}</legend>
                 {(["text", "gross"] as const).map((st) => (
                   <button
                     key={st}
@@ -1407,23 +1440,25 @@ export function Editor() {
                     onClick={() => setText(selSpreadIndex, { style: st })}
                     className={buttonClass((selSpread.text?.style ?? "text") === st ? "ink" : "paper", "sm")}
                   >
-                    {st === "text" ? "Absatz" : "Groß"}
+                    {st === "text" ? t("Absatz") : t("Groß")}
                   </button>
                 ))}
               </fieldset>
               <p className={`text-[12px] ${textFits(selSpread) ? "text-ink-2" : "text-ink font-semibold"}`}>
                 {textFits(selSpread)
-                  ? "Passt auf die Seite. Daneben kann ein Foto stehen: einfach hierher ziehen."
-                  : `Etwa ${textOverflow(selSpread, data)} Zeilen zu lang für die Seite: kürzen${selSpread.text.style === "gross" ? " oder „Absatz“ wählen" : ""}.`}
+                  ? t("Passt auf die Seite. Daneben kann ein Foto stehen: einfach hierher ziehen.")
+                  : selSpread.text.style === "gross"
+                    ? t("Etwa {n} Zeilen zu lang für die Seite: kürzen oder „Absatz“ wählen.", { n: textOverflow(selSpread, data) })
+                    : t("Etwa {n} Zeilen zu lang für die Seite: kürzen.", { n: textOverflow(selSpread, data) })}
               </p>
             </div>
           )}
 
           {!selPhoto && !selSpread && data && (
             <p className="text-on-table-2 text-sm leading-relaxed">
-              Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben.{" "}
-              <span className="pointer-coarse:hidden">Doppelklick auf eine Doppelseite öffnet sie zum Gestalten. Fotos und Doppelseiten lassen sich ziehen.</span>
-              <span className="hidden pointer-coarse:inline">„Gestalten“ öffnet eine Doppelseite zum freien Anordnen.</span>
+              {t("Tippe auf ein Foto für Titel, Ausschnitt und Stern, oder auf eine Textseite zum Schreiben.")}{" "}
+              <span className="pointer-coarse:hidden">{t("Doppelklick auf eine Doppelseite öffnet sie zum Gestalten. Fotos und Doppelseiten lassen sich ziehen.")}</span>
+              <span className="hidden pointer-coarse:inline">{t("„Gestalten“ öffnet eine Doppelseite zum freien Anordnen.")}</span>
             </p>
           )}
         </aside>
@@ -1436,7 +1471,7 @@ export function Editor() {
           className="bg-table-raised fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-[500] shadow-[0_18px_36px_-14px_rgb(0_0_0/0.8),inset_0_0_0_1px_rgb(236_230_220/0.1)] hover:bg-table-raised md:hidden"
         >
           <Undo2 aria-hidden />
-          Rückgängig
+          {t("Rückgängig")}
         </Button>
       )}
       <Toaster />
@@ -1467,7 +1502,7 @@ export function Editor() {
       {dragOver && (
         <div aria-hidden className="pointer-events-none fixed inset-3 z-[650] flex items-center justify-center border-2 border-dashed border-mark bg-[rgb(12_10_8/0.6)]">
           <p className="text-on-table text-2xl font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-            Loslassen, dann kommen die Fotos ins Buch
+            {t("Loslassen, dann kommen die Fotos ins Buch")}
           </p>
         </div>
       )}
@@ -1507,7 +1542,7 @@ export function Editor() {
         <HistoryDialog
           book={book}
           onRestore={(v) => {
-            snapshot("vor dem Zurückholen");
+            snapshot(de("vor dem Zurückholen"));
             update(() => migrate({ ...v.book, id: book.id, owner: book.owner }));
             setHistory(false);
           }}
@@ -1515,11 +1550,11 @@ export function Editor() {
         />
       )}
       {data && (
-        <Sheet title="Einband" description="Tippe auf ein Foto, es kommt auf den Einband. Fotos mit Stern stehen vorn." open={coverSheet} onOpenChange={setCoverSheet}>
+        <Sheet title={t("Einband")} description={t("Tippe auf ein Foto, es kommt auf den Einband. Fotos mit Stern stehen vorn.")} open={coverSheet} onOpenChange={setCoverSheet}>
           <div className="relative mx-auto w-[170px] shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)]" style={{ aspectRatio: `1 / ${data.aspect}` }}>
             <PageView book={data} page={{ kind: "cover" }} side="right" sizes={() => "170px"} />
           </div>
-          <p className="text-ink-2 mt-5 mb-2 text-[13px]">Titelbild</p>
+          <p className="text-ink-2 mt-5 mb-2 text-[13px]">{t("Titelbild")}</p>
           <ul
             ref={coverStrip}
             className="relative -mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 pt-1 pb-2"
@@ -1531,7 +1566,7 @@ export function Editor() {
                   <button
                     type="button"
                     aria-pressed={on}
-                    aria-label={`${p.title || `Foto ${i + 1}`}${p.star ? ", wichtig" : ""}`}
+                    aria-label={`${p.title || t("Foto {n}", { n: i + 1 })}${p.star ? `, ${t("wichtig")}` : ""}`}
                     onClick={() => !on && setCover(p.key)}
                     className={`relative block h-24 outline-offset-2 ${on ? "outline-ink outline-2 outline-solid" : ""}`}
                     style={{ aspectRatio: `${p.w} / ${p.h}` }}
@@ -1583,6 +1618,7 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
   const [all, setAll] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const load = useCallback(() => {
     listVersions(book.id)
       .then(setList)
@@ -1593,17 +1629,17 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
   }, [load]);
   // Datei erst beim Tippen erzeugen; in der App über das Teilen-Blatt („In Dateien sichern“), im Browser als Download
   const saveProject = async () => {
-    const r = await saveFile(safeFileName(book.title || "Fotobuch", ".calima.json"), exportBook(book), "application/json");
+    const r = await saveFile(safeFileName(book.title || t("Fotobuch"), ".calima.json"), exportBook(book), "application/json");
     if (r === "shared" && IS_APP) {
-      notify("Projekt gesichert.");
+      notify(t("Projekt gesichert."));
       haptic("success");
-    } else if (r === "failed") notify("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal.");
+    } else if (r === "failed") notify(t("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal."));
   };
 
   const shown = list && !all ? list.slice(0, 8) : list;
 
   return (
-    <MountedSheet title="Verlauf" description="Zwischenstände entstehen von selbst vor großen Änderungen und alle zehn Minuten." onClose={onClose}>
+    <MountedSheet title={t("Verlauf")} description={t("Zwischenstände entstehen von selbst vor großen Änderungen und alle zehn Minuten.")} onClose={onClose}>
       {(close) => (
         <>
           <form
@@ -1611,36 +1647,36 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
-              await saveVersion(book, name.trim() || "Eigener Stand", false).catch(() => {});
+              await saveVersion(book, name.trim() || de("Eigener Stand"), false).catch(() => {});
               setName("");
               setBusy(false);
               load();
             }}
           >
-            <Field label="Eigenen Stand benennen" className="min-w-0 flex-1" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
+            <Field label={t("Eigenen Stand benennen")} className="min-w-0 flex-1" value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} />
             <Button type="submit" variant="paper" size="sm" disabled={busy} className="mb-1.5">
               <BookmarkPlus aria-hidden />
-              Sichern
+              {t("Sichern")}
             </Button>
           </form>
 
           <div className="mt-6">
-            {list === null && <p className="text-ink-2 text-sm">Lade …</p>}
-            {list?.length === 0 && <p className="text-ink-2 text-sm">Noch keine Zwischenstände.</p>}
+            {list === null && <p className="text-ink-2 text-sm">{t("Lade …")}</p>}
+            {list?.length === 0 && <p className="text-ink-2 text-sm">{t("Noch keine Zwischenstände.")}</p>}
             {shown && shown.length > 0 && (
-              <ListGroup paper label="Zwischenstände">
+              <ListGroup paper label={t("Zwischenstände")}>
                 {shown.map((v) => (
                   <ListRow
                     key={v.id}
                     paper
                     lead={v.auto ? <History aria-hidden /> : <Bookmark aria-hidden />}
-                    title={<span className={`block truncate ${v.auto ? "font-normal" : ""}`}>{v.label}</span>}
-                    detail={`${when(v)} · ${v.book.spreads.length} Doppelseiten`}
+                    title={<span className={`block truncate ${v.auto ? "font-normal" : ""}`}>{t(v.label)}</span>}
+                    detail={`${when(v)} · ${v.book.spreads.length === 1 ? t("1 Doppelseite") : t("{n} Doppelseiten", { n: v.book.spreads.length })}`}
                     trail={
                       // Telefon: nur das Symbol, damit Name und Datum Platz haben
-                      <Button variant="paper" size="sm" onClick={() => close(() => onRestore(v))} aria-label={`${v.label} vom ${when(v)} zurückholen`} className="max-sm:size-11 max-sm:px-0">
+                      <Button variant="paper" size="sm" onClick={() => close(() => onRestore(v))} aria-label={t("{label} vom {when} zurückholen", { label: t(v.label), when: when(v) })} className="max-sm:size-11 max-sm:px-0">
                         <RotateCcw aria-hidden />
-                        <span className="max-sm:sr-only">Zurückholen</span>
+                        <span className="max-sm:sr-only">{t("Zurückholen")}</span>
                       </Button>
                     }
                   />
@@ -1649,7 +1685,7 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
             )}
             {list && !all && list.length > 8 && (
               <Button variant="paper" size="sm" className="mt-3" onClick={() => setAll(true)}>
-                Ältere zeigen ({list.length - 8})
+                {t("Ältere zeigen ({n})", { n: list.length - 8 })}
               </Button>
             )}
           </div>
@@ -1657,11 +1693,11 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
           <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <Button variant="paper" size="sm" onClick={saveProject}>
               {IS_APP ? <Share aria-hidden /> : <Download aria-hidden />}
-              {IS_APP ? "Projekt als Datei sichern …" : "Projekt als Datei sichern"}
+              {IS_APP ? t("Projekt als Datei sichern …") : t("Projekt als Datei sichern")}
             </Button>
           </div>
           <p className="text-ink-2 mt-2 text-[13px] leading-relaxed">
-            Enthält Aufbau und Texte, nicht die Fotos: Die bleiben in deinem Konto. Wieder öffnen: Bücherzimmer › Neues Buch › Aus Datei öffnen.
+            {t("Enthält Aufbau und Texte, nicht die Fotos: Die bleiben in deinem Konto. Wieder öffnen: Bücherzimmer › Neues Buch › Aus Datei öffnen.")}
           </p>
         </>
       )}

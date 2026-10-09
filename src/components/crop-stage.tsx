@@ -5,7 +5,8 @@ import { useRef, useState, type CSSProperties } from "react";
 import { FlipHorizontal2, RotateCcwSquare, WandSparkles } from "lucide-react";
 
 import { IconButton } from "@/components/ui/button";
-import { cropFits, toward, type Geo } from "@/lib/develop/geo";
+import { cropFits, degrees, toward, type Geo } from "@/lib/develop/geo";
+import { useT } from "@/lib/i18n";
 import { haptic } from "@/lib/haptics";
 
 // Zuschneiden im Editor (Workshop editor-werkzeuge-workshop/, Paket 1): ein Rahmen über dem ganzen Foto und ein Drehrad
@@ -54,6 +55,7 @@ function dragTo(h: Handle, c: Crop, dx: number, dy: number, k: number | null, W:
 
 export function CropStage({ geo, W, H, ratio, onChange, onEnd }: { geo: Geo; W: number; H: number; ratio: number | null; onChange: (c: Crop) => void; onEnd: () => void }) {
   const box = useRef<HTMLDivElement>(null);
+  const t = useT();
   const drag = useRef<{ h: Handle; x: number; y: number; from: Crop } | null>(null);
   const [active, setActive] = useState(false);
   const [x, y, w, h] = geo.crop;
@@ -107,7 +109,7 @@ export function CropStage({ geo, W, H, ratio, onChange, onEnd }: { geo: Geo; W: 
     >
       <div
         role="group"
-        aria-label="Rahmen. Ziehen verschiebt, Ecken ändern die Größe. Pfeiltasten verschieben."
+        aria-label={t("Rahmen. Ziehen verschiebt, Ecken ändern die Größe. Pfeiltasten verschieben.")}
         tabIndex={0}
         onKeyDown={(e) => key(e, "move")}
         onPointerDown={(e) => down(e, "move")}
@@ -180,6 +182,7 @@ export function StraightenDial({
   onAuto?: () => void;
   autoBusy?: boolean;
 }) {
+  const t = useT();
   const drag = useRef<{ x: number; from: number; snapped: boolean } | null>(null);
   const snap = (a: number) => (Math.abs(a) < 0.6 ? 0 : Math.round(a * 10) / 10);
   const set = (a: number) => {
@@ -191,10 +194,10 @@ export function StraightenDial({
     }
     onChange(v);
   };
-  const label = `${angle > 0 ? "+" : angle < 0 ? "−" : ""}${Math.abs(angle).toFixed(1).replace(".", ",")}°`;
+  const label = degrees(angle);
   return (
     <div className="flex items-center justify-center gap-2">
-      <IconButton label="90° nach links drehen" onClick={onTurn}>
+      <IconButton label={t("90° nach links drehen")} onClick={onTurn}>
         <RotateCcwSquare aria-hidden />
       </IconButton>
       <div className="relative w-[min(62vw,300px)] focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-[var(--color-mark)]">
@@ -206,11 +209,11 @@ export function StraightenDial({
             type="button"
             onClick={onAuto}
             disabled={autoBusy}
-            title="Horizont suchen und gerade richten"
+            title={t("Horizont suchen und gerade richten")}
             className="text-on-table hover:bg-on-table/10 absolute -top-1.5 right-0 flex min-h-7 items-center gap-1 rounded-full px-2 text-xs font-semibold disabled:opacity-50 pointer-coarse:-top-3 pointer-coarse:min-h-11"
           >
             <WandSparkles aria-hidden className="size-3.5" />
-            Auto<span className="sr-only">: gerade richten</span>
+            Auto<span className="sr-only">{t(": gerade richten")}</span>
           </button>
         )}
         <div
@@ -262,7 +265,7 @@ export function StraightenDial({
           max={45}
           step={0.1}
           value={angle}
-          aria-label="Geraderichten"
+          aria-label={t("Geraderichten")}
           aria-valuetext={label}
           onFocus={onStart}
           onBlur={onEnd}
@@ -270,7 +273,7 @@ export function StraightenDial({
           className="sr-only"
         />
       </div>
-      <IconButton label="Spiegeln" onClick={onFlip}>
+      <IconButton label={t("Spiegeln")} onClick={onFlip}>
         <FlipHorizontal2 aria-hidden />
       </IconButton>
     </div>

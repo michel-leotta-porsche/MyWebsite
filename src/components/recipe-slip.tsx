@@ -13,6 +13,7 @@ import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
 import { cleanEdit, describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
 import { asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
+import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
@@ -85,11 +86,13 @@ function WbCross({ r, b, reduce }: { r: number; b: number; reduce: boolean }) {
 }
 
 type Row = { id: string; label: string; value: React.ReactNode };
+type Tr = ReturnType<typeof useT>;
+const LEVELS = [de("Aus"), de("Schwach"), de("Stark")];
 
 /** Zeilen in der Reihenfolge des Bildqualitäts-Menüs der Kamera */
-function fujiRows(r: FujiRecipe, reduce: boolean): Row[] {
-  const grain = ["Aus", "Schwach", "Stark"][r.grain.strength] + (r.grain.strength ? `, ${r.grain.size}` : "");
-  const level = (v: 0 | 1 | 2) => ["Aus", "Schwach", "Stark"][v];
+function fujiRows(r: FujiRecipe, reduce: boolean, t: Tr): Row[] {
+  const grain = t(LEVELS[r.grain.strength]) + (r.grain.strength ? `, ${r.grain.size === "groß" ? t("groß") : t("klein")}` : "");
+  const level = (v: 0 | 1 | 2) => t(LEVELS[v]);
   let i = 0;
   const roll = (v: React.ReactNode) => (
     <Roll i={i++} reduce={reduce}>
@@ -97,19 +100,19 @@ function fujiRows(r: FujiRecipe, reduce: boolean): Row[] {
     </Roll>
   );
   return [
-    { id: "grain", label: "Körnung", value: <Steps value={r.grain.strength} i={i++} reduce={reduce} label={grain} /> },
+    { id: "grain", label: t("Körnung"), value: <Steps value={r.grain.strength} i={i++} reduce={reduce} label={grain} /> },
     { id: "cc", label: "Color Chrome", value: <Steps value={r.colorChrome} i={i++} reduce={reduce} label={level(r.colorChrome)} /> },
-    { id: "fxb", label: "Color Chrome FX Blau", value: <Steps value={r.fxBlue} i={i++} reduce={reduce} label={level(r.fxBlue)} /> },
-    { id: "wb", label: "Weißabgleich", value: roll(`${r.wb.mode}, R${signed(r.wb.r)} B${signed(r.wb.b)}`) },
-    { id: "dr", label: "Dynamikbereich", value: roll(r.dr) },
-    { id: "hl", label: "Lichter", value: roll(signed(r.highlight)) },
-    { id: "sh", label: "Schatten", value: roll(signed(r.shadow)) },
-    { id: "col", label: "Farbe", value: roll(signed(r.color)) },
-    { id: "sharp", label: "Schärfe", value: roll(signed(r.sharpness)) },
-    { id: "nr", label: "Rauschminderung", value: roll(signed(r.nr)) },
-    { id: "cl", label: "Klarheit", value: roll(signed(r.clarity)) },
-    { id: "iso", label: "ISO", value: roll(r.iso) },
-    { id: "ev", label: "Belichtungskorrektur", value: roll(r.ev) },
+    { id: "fxb", label: t("Color Chrome FX Blau"), value: <Steps value={r.fxBlue} i={i++} reduce={reduce} label={level(r.fxBlue)} /> },
+    { id: "wb", label: t("Weißabgleich"), value: roll(`${t(r.wb.mode)}, R${signed(r.wb.r)} B${signed(r.wb.b)}`) },
+    { id: "dr", label: t("Dynamikbereich"), value: roll(r.dr) },
+    { id: "hl", label: t("Lichter"), value: roll(signed(r.highlight)) },
+    { id: "sh", label: t("Schatten"), value: roll(signed(r.shadow)) },
+    { id: "col", label: t("Farbe"), value: roll(signed(r.color)) },
+    { id: "sharp", label: t("Schärfe"), value: roll(signed(r.sharpness)) },
+    { id: "nr", label: t("Rauschminderung"), value: roll(signed(r.nr)) },
+    { id: "cl", label: t("Klarheit"), value: roll(signed(r.clarity)) },
+    { id: "iso", label: "ISO", value: roll(t(r.iso)) },
+    { id: "ev", label: t("Belichtungskorrektur"), value: roll(r.ev) },
   ];
 }
 
@@ -124,9 +127,10 @@ const readChecks = (name: string): string[] => {
 };
 
 function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
+  const t = useT();
   const [dial, setDial] = useState(false);
   const [checked, setChecked] = useState<string[]>([]);
-  const rows = fujiRows(recipe, reduce);
+  const rows = fujiRows(recipe, reduce, t);
   const toggle = (id: string) => {
     const next = checked.includes(id) ? checked.filter((x) => x !== id) : [...checked, id];
     setChecked(next);
@@ -147,7 +151,7 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
           animate={{ clipPath: "inset(0 0% 0 0)", rotate: -2, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.22, ease: EXPO }}
         >
-          {recipe.film}
+          {t(recipe.film)}
         </motion.p>
         <WbCross r={recipe.wb.r} b={recipe.wb.b} reduce={reduce} />
       </div>
@@ -188,7 +192,7 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
           className={buttonClass("paper", "sm", "pl-2.5")}
         >
           {dial ? done ? <Check aria-hidden /> : <ArrowLeft aria-hidden /> : <Camera aria-hidden />}
-          {dial ? (done ? "Fertig. Auf C1 gespeichert?" : "Zurück zum Rezept") : "An der Kamera einstellen"}
+          {dial ? (done ? t("Fertig. Auf C1 gespeichert?") : t("Zurück zum Rezept")) : t("An der Kamera einstellen")}
         </button>
       </div>
     </>
@@ -197,6 +201,7 @@ function FujiSlip({ recipe, reduce }: { recipe: FujiRecipe; reduce: boolean }) {
 
 /** Lightroom: Grundwerte, Tonkurve, die sich zeichnet, HSL als Balken um die Mitte */
 function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: boolean }) {
+  const t = useT();
   const [loaded, setLoaded] = useState<LightroomSettings | null>(null);
   const inline = useMemo(() => (recipe.inline ? parseXmp(recipe.inline) : null), [recipe.inline]);
   useEffect(() => {
@@ -204,7 +209,7 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
     let alive = true;
     fetch(recipe.xmp)
       .then((r) => r.text())
-      .then((t) => alive && setLoaded(parseXmp(t)))
+      .then((x) => alive && setLoaded(parseXmp(x)))
       .catch(() => {});
     return () => {
       alive = false;
@@ -216,17 +221,17 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
     const text = recipe.inline ?? (recipe.xmp ? await fetch(recipe.xmp).then((r) => r.text()).catch(() => null) : null);
     const r = text ? await saveFile(safeFileName(recipe.name, ".xmp"), text, "application/rdf+xml") : "failed";
     if (r === "shared" && IS_APP) {
-      notify("Preset gesichert.");
+      notify(t("Preset gesichert."));
       haptic("success");
-    } else if (r === "failed") notify("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal.");
+    } else if (r === "failed") notify(t("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal."));
   };
-  if (!s) return <p className="text-ink-2 text-sm">Lade Preset …</p>;
+  if (!s) return <p className="text-ink-2 text-sm">{t("Lade Preset …")}</p>;
   const path = s.curve.map(([x, y], i) => `${i ? "L" : "M"}${(x / 255) * 100},${100 - (y / 255) * 100}`).join(" ");
   const fmt = (v: number, unit?: string) => (unit === "EV" ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}` : signed(v));
   return (
     <>
       <div className="flex items-start gap-4">
-        <svg aria-label="Gradationskurve" role="img" viewBox="-2 -2 104 104" className="h-24 w-24 shrink-0">
+        <svg aria-label={t("Gradationskurve")} role="img" viewBox="-2 -2 104 104" className="h-24 w-24 shrink-0">
           <rect x="0" y="0" width="100" height="100" className="fill-none stroke-ink/20" strokeWidth="0.8" />
           <line x1="0" y1="100" x2="100" y2="0" className="stroke-ink/20" strokeWidth="0.8" strokeDasharray="2 2" />
           <motion.path
@@ -243,7 +248,7 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
             .filter((b) => b.value !== 0)
             .map((b, i) => (
               <div key={b.key} className="contents">
-                <dt className="text-ink-2">{b.label}</dt>
+                <dt className="text-ink-2">{t(b.label)}</dt>
                 <dd className="text-ink text-right">
                   <Roll i={i} reduce={reduce}>
                     {fmt(b.value, b.unit)}
@@ -253,11 +258,11 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
             ))}
         </dl>
       </div>
-      <p className="text-ink-2 mt-4 text-[12px]">Farbmischer, Sättigung</p>
+      <p className="text-ink-2 mt-4 text-[12px]">{t("Farbmischer, Sättigung")}</p>
       <ul className="mt-1 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 text-[12px]">
         {s.hsl.map((h, i) => (
           <li key={h.color} className="contents">
-            <span className="text-ink-2">{h.color}</span>
+            <span className="text-ink-2">{t(h.color)}</span>
             <span aria-hidden className="relative h-1.5 bg-ink/10">
               <span className="absolute inset-y-0 left-1/2 w-px bg-ink/30" />
               {h.sat !== 0 && (
@@ -281,7 +286,7 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <Button variant="paper" size="sm" className="pl-2.5" onClick={savePreset}>
           {IS_APP ? <Share aria-hidden /> : <Download aria-hidden />}
-          {IS_APP ? "Als Lightroom-Preset sichern …" : "Preset sichern (.xmp)"}
+          {IS_APP ? t("Als Lightroom-Preset sichern …") : t("Preset sichern (.xmp)")}
         </Button>
         {recipe.source && (
           <a href={recipe.source.url} className="text-ink-2 text-[12px] underline underline-offset-2" target="_blank" rel="noreferrer">
@@ -293,23 +298,25 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
   );
 }
 
-const lens = (c: CameraInfo) => {
-  const t = c.shutter ? (c.shutter >= 1 ? `${c.shutter}s` : `1/${Math.round(1 / c.shutter)}s`) : undefined;
+const lens = (c: CameraInfo, t: Tr, lang: ReturnType<typeof useLang>) => {
+  const time = c.shutter ? (c.shutter >= 1 ? `${c.shutter}s` : `1/${Math.round(1 / c.shutter)}s`) : undefined;
   return [
-    ["Gerät", c.device],
-    ["Brennweite", c.focal35 ? `${c.focal35} mm (KB)` : undefined],
-    ["Blende", c.aperture ? `f/${c.aperture.toFixed(1)}` : undefined],
-    ["Zeit", t],
+    [t("Gerät"), c.device],
+    [t("Brennweite"), c.focal35 ? t("{mm} mm (KB)", { mm: c.focal35 }) : undefined],
+    [t("Blende"), c.aperture ? `f/${c.aperture.toFixed(1)}` : undefined],
+    [t("Zeit"), time],
     ["ISO", c.iso?.toString()],
-    ["Belichtung", c.ev !== undefined ? `${c.ev > 0 ? "+" : c.ev < 0 ? "−" : "±"}${Math.abs(c.ev).toFixed(1)} EV` : undefined],
-    ["Datum", c.date ? new Date(c.date).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }) : undefined],
+    [t("Belichtung"), c.ev !== undefined ? `${c.ev > 0 ? "+" : c.ev < 0 ? "−" : "±"}${Math.abs(c.ev).toFixed(1)} EV` : undefined],
+    [t("Datum"), c.date ? new Date(c.date).toLocaleDateString(locale(lang), { day: "numeric", month: "long", year: "numeric" }) : undefined],
   ].filter((r): r is [string, string] => !!r[1]);
 };
 
 function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean }) {
+  const t = useT();
+  const lang = useLang();
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-      {lens(camera).map(([k, v], i) => (
+      {lens(camera, t, lang).map(([k, v], i) => (
         <div key={k} className="contents">
           <dt className="text-ink-2">{k}</dt>
           <dd className="text-ink">
@@ -325,9 +332,10 @@ function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean })
 
 /** Was im Editor nachbearbeitet wurde; die Rezeptwerte sind nachempfunden, nicht von der Kamera */
 function EditSlip({ edit, reduce }: { edit: PhotoEdit; reduce: boolean }) {
+  const t = useT();
   return (
     <div>
-      <p className="text-ink-2 mb-2 text-[12px]">Nachbearbeitet in Calima (nachempfunden)</p>
+      <p className="text-ink-2 mb-2 text-[12px]">{t("Nachbearbeitet in Calima (nachempfunden)")}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
         {describeEdit(edit).map((r, i) => (
           <div key={r.label} className="contents">
@@ -352,6 +360,7 @@ const noopSubscribe = () => () => {};
  * Firebase wird erst beim Speichern geladen, damit der Zettel die Startseite nicht schwerer macht.
  */
 function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof recipeOf> }) {
+  const t = useT();
   const from = plateName(plate.no, plate.title);
   const file = recipe ? fromRecipe(recipe, from) : null;
   const clean = isNeutral(plate.edit) ? null : cleanEdit(plate.edit);
@@ -363,11 +372,11 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
   const take = (w: "file" | "edit", s: CopiedSettings) => {
     copySettings(s);
     setWhich(w);
-    setSay(`Mitgenommen. Liegt im Fotostudio oben bei „Deine Looks“, und in der Werkbank unter „Look übernehmen“.`);
+    setSay(t("Mitgenommen. Liegt im Fotostudio oben bei „Deine Looks“, und in der Werkbank unter „Look übernehmen“."));
   };
   const save = async () => {
     if (!done) return;
-    setSay("Speichere …");
+    setSay(t("Speichere …"));
     try {
       let uid: string | null = process.env.NEXT_PUBLIC_FUJI_MOCK === "1" ? "test" : null;
       if (!uid) {
@@ -375,43 +384,45 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
         await auth().authStateReady();
         uid = auth().currentUser?.uid ?? null;
       }
-      if (!uid) return setSay("Zum Speichern als Look brauchst du ein Konto. Mitgenommen ist es trotzdem.");
+      if (!uid) return setSay(t("Zum Speichern als Look brauchst du ein Konto. Mitgenommen ist es trotzdem."));
       const { saveRecipe } = await import("@/lib/store");
       await saveRecipe(uid, asLook(done, `own-${Date.now().toString(36)}`));
-      setSay(`„${done.name}“ liegt jetzt in deinen Looks.`);
+      setSay(t("„{name}“ liegt jetzt in deinen Looks.", { name: done.name }));
     } catch {
-      setSay("Der Look ließ sich nicht speichern. Mitgenommen ist er trotzdem.");
+      setSay(t("Der Look ließ sich nicht speichern. Mitgenommen ist er trotzdem."));
     }
   };
-  const label = recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
+  const fuji = recipe?.kind === "fuji";
   return (
     <div className="mt-4 border-t border-ink/15 pt-4">
       <div className="flex flex-wrap gap-2">
         {file && (
           <button type="button" className={buttonClass(which === "file" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("file", file)}>
             <ClipboardCopy aria-hidden />
-            {edit ? `${label} mitnehmen` : "Für eigene Fotos mitnehmen"}
+            {edit ? (fuji ? t("Fuji-Rezept mitnehmen") : t("Lightroom-Werte mitnehmen")) : t("Für eigene Fotos mitnehmen")}
           </button>
         )}
         {edit && (
           <button type="button" className={buttonClass(which === "edit" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("edit", edit)}>
             <ClipboardCopy aria-hidden />
-            {file ? "Bearbeitung mitnehmen" : "Für eigene Fotos mitnehmen"}
+            {file ? t("Bearbeitung mitnehmen") : t("Für eigene Fotos mitnehmen")}
           </button>
         )}
         {done && (
           <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={save}>
             <BookmarkPlus aria-hidden />
-            Als Look speichern
+            {t("Als Look speichern")}
           </button>
         )}
       </div>
       <p role="status" className="text-ink-2 mt-2 text-[12px] leading-snug">
         {say ??
           (file
-            ? `Farbe und Licht ohne Zuschnitt. Das ${label === "Fuji-Rezept" ? "Rezept" : "Preset"} wird in Calima nachempfunden, nicht exakt.`
-            : "Farbe und Licht ohne Zuschnitt, für deine eigenen Fotos.")}
-        {done?.lost.length ? ` Nicht übertragbar: ${done.lost.join(", ")}.` : ""}
+            ? fuji
+              ? t("Farbe und Licht ohne Zuschnitt. Das Rezept wird in Calima nachempfunden, nicht exakt.")
+              : t("Farbe und Licht ohne Zuschnitt. Das Preset wird in Calima nachempfunden, nicht exakt.")
+            : t("Farbe und Licht ohne Zuschnitt, für deine eigenen Fotos."))}
+        {done?.lost.length ? ` ${t("Nicht übertragbar: {list}.", { list: done.lost.join(", ") })}` : ""}
       </p>
     </div>
   );
@@ -422,6 +433,7 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
  * nie das Nachbarbild verdeckt und klar ist, zu welchem Bild er gehört (UX-Kritik K10).
  */
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {
+  const t = useT();
   const reduce = useReducedMotion() ?? false;
   const recipe = recipeOf(plate);
   const camera = cameraOf(plate);
@@ -440,13 +452,13 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
   }, [onClose]);
 
   const edit = isNeutral(plate.edit) ? null : plate.edit!;
-  const kind = recipe?.kind === "fuji" ? "Fuji-Rezept" : recipe?.kind === "lightroom" ? "Lightroom-Preset" : camera ? "Kamera" : "Bearbeitung";
-  const title = recipe?.name ?? camera?.device ?? "Nachbearbeitet";
+  const kind = recipe?.kind === "fuji" ? t("Fuji-Rezept") : recipe?.kind === "lightroom" ? t("Lightroom-Preset") : camera ? t("Kamera") : t("Bearbeitung");
+  const title = recipe ? t(recipe.name) : (camera?.device ?? t("Nachbearbeitet"));
 
   return (
     <motion.aside
       role="dialog"
-      aria-label={`${kind} zu ${plateName(plate.no, plate.title)}`}
+      aria-label={t("{kind} zu {plate}", { kind, plate: plateName(plate.no, plate.title) })}
       tabIndex={0}
       className={`slip text-ink rounded-cut fixed z-[400] max-h-[calc(100svh-24px)] w-[min(360px,calc(100vw-24px))] overflow-y-auto overscroll-contain p-5 pb-4 md:max-h-[calc(100svh-120px)] shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75),0_3px_8px_-3px_rgb(12_10_8/0.5)] md:bottom-24 ${side === "left" ? "md:left-[max(24px,calc(50vw-560px))]" : "md:right-[max(24px,calc(50vw-560px))]"}`}
       style={phone ? { left: 12, bottom: 12 } : undefined}
@@ -459,13 +471,13 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-ink-2 text-[12px]">
-            {kind} · Tafel {plate.no}
+            {kind} · {t("Tafel {n}", { n: plate.no })}
           </p>
           <p className="truncate text-lg leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
             {title}
           </p>
         </div>
-        <button ref={closeBtn} type="button" onClick={onClose} aria-label="Schließen" title="Schließen" className={buttonClass("paper", "icon", "-mt-1 -mr-1.5")}>
+        <button ref={closeBtn} type="button" onClick={onClose} aria-label={t("Schließen")} title={t("Schließen")} className={buttonClass("paper", "icon", "-mt-1 -mr-1.5")}>
           <X aria-hidden />
         </button>
       </header>
@@ -479,8 +491,8 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       {recipe?.placeholder && (
         <p className="text-ink-2 mt-4 text-[12px]">
           {recipe.kind === "fuji"
-            ? "Platzhalter: Die echten Werte kommen aus den Originaldateien der Kamera."
-            : "Beispiel-Preset für den Prototyp, nicht die Bearbeitung dieses Fotos."}
+            ? t("Platzhalter: Die echten Werte kommen aus den Originaldateien der Kamera.")
+            : t("Beispiel-Preset für den Prototyp, nicht die Bearbeitung dieses Fotos.")}
         </p>
       )}
     </motion.aside>

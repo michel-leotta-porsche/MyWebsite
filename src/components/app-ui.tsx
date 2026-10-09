@@ -9,6 +9,7 @@ import { SignInButtons } from "@/components/sign-in-buttons";
 import { linkClass, Wordmark } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
 import { signIn, type SignInProvider, type User } from "@/lib/firebase";
+import { de, useT } from "@/lib/i18n";
 import { useUser } from "@/lib/use-user";
 
 // Kleine Bausteine für Tisch, Editor und Gastlink: Raumkopf, Anmeldung.
@@ -30,23 +31,24 @@ export function RoomTitle({ children }: { children: ReactNode }) {
 
 /** Die Räume hinter der Anmeldung: alle Bücher, man selbst. Gestaltet wird ein einzelnes Buch auf der Werkbank (/neu) */
 export const ROOMS = [
-  { href: "/zimmer", label: "Bücherzimmer" },
-  { href: "/profil", label: "Profil" },
+  { href: "/zimmer", label: de("Bücherzimmer") },
+  { href: "/profil", label: de("Profil") },
 ] as const;
 
 /** Wege zwischen den Räumen als Umschalter (Pille); der aktuelle Raum ist der helle Daumen und kein Link */
 export function RoomNav({ className = "" }: { className?: string }) {
   const path = usePathname();
+  const t = useT();
   return (
-    <nav aria-label="Räume" className={`bg-on-table/7 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(236_230_220/0.1)] ${className}`}>
+    <nav aria-label={t("Räume")} className={`bg-on-table/7 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(236_230_220/0.1)] ${className}`}>
       {ROOMS.map((r) =>
         path === r.href ? (
           <span key={r.href} aria-current="page" className={`${ROOM_TAB} bg-on-table text-table`}>
-            {r.label}
+            {t(r.label)}
           </span>
         ) : (
           <Link key={r.href} href={r.href} className={`${ROOM_TAB} text-on-table-2 hover:text-on-table`}>
-            {r.label}
+            {t(r.label)}
           </Link>
         ),
       )}
@@ -82,6 +84,7 @@ export function RequireUser({
 export function SignInTable({ title, children }: { title: string; children?: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<SignInProvider | null>(null);
+  const t = useT();
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
       <header className="flex items-baseline justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
@@ -112,9 +115,9 @@ export function SignInTable({ title, children }: { title: string; children?: Rea
           )}
         </div>
         <p className="text-on-table-2 mt-6 text-sm">
-          Mit dem Anmelden gelten die{" "}
+          {t("Mit dem Anmelden gelten die")}{" "}
           <Link href="/nutzungsbedingungen" className={`${linkClass} underline`}>
-            Nutzungsbedingungen
+            {t("Nutzungsbedingungen")}
           </Link>
           .
         </p>

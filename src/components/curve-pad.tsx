@@ -6,6 +6,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import { CURVE_GAP, curveFn } from "@/lib/develop/model";
+import { useT } from "@/lib/i18n";
 
 type Pt = [number, number];
 const LINE: Pt[] = [
@@ -24,6 +25,7 @@ export function CurvePad({ points, hist, onStart, onChange }: { points: Pt[]; hi
   const drag = useRef<{ i: number; out: boolean; list: Pt[] } | null>(null);
   const [out, setOut] = useState<number | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
+  const t = useT();
 
   const path = useMemo(() => {
     const f = curveFn(pts);
@@ -124,7 +126,7 @@ export function CurvePad({ points, hist, onStart, onChange }: { points: Pt[]; hi
       ref={svg}
       viewBox="-3 -3 106 106"
       role="group"
-      aria-label="Gradationskurve"
+      aria-label={t("Gradationskurve")}
       className="bg-ink/4 aspect-square w-full max-w-[300px] cursor-crosshair touch-none rounded-[6px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)] select-none"
       onPointerDown={down}
       onPointerMove={move}
@@ -155,11 +157,11 @@ export function CurvePad({ points, hist, onStart, onChange }: { points: Pt[]; hi
           r={focus === i ? 3.6 : 2.8}
           tabIndex={0}
           role="slider"
-          aria-label={i === 0 ? "Schwarzpunkt" : i === pts.length - 1 ? "Weißpunkt" : `Punkt ${i} von ${pts.length - 2}`}
+          aria-label={i === 0 ? t("Schwarzpunkt") : i === pts.length - 1 ? t("Weißpunkt") : t("Punkt {i} von {n}", { i, n: pts.length - 2 })}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={pct(y)}
-          aria-valuetext={`Eingang ${pct(x)}, Ausgang ${pct(y)}`}
+          aria-valuetext={t("Eingang {x}, Ausgang {y}", { x: pct(x), y: pct(y) })}
           onFocus={() => setFocus(i)}
           onBlur={() => setFocus(null)}
           onKeyDown={(e) => key(e, i)}

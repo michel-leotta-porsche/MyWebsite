@@ -6,6 +6,7 @@ import { Crosshair, Maximize2, RotateCcw, Scan } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { MountedSheet } from "@/components/ui/sheet";
+import { useT } from "@/lib/i18n";
 import type { StoredPhoto } from "@/lib/store";
 import { findSubject } from "@/lib/subject";
 
@@ -29,6 +30,7 @@ export function CropDialog({
   onChange: (v: View) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [view, setView] = useState<View>({ focus: photo.focus ?? [0.5, 0.5], zoom: photo.zoom ?? 1, fit: photo.fit ?? "cover" });
   const [subject, setSubject] = useState<[number, number] | null>(photo.subject ?? null);
   const [face, setFace] = useState(false);
@@ -79,8 +81,8 @@ export function CropDialog({
     const sy = top + subject[1] * H;
     const m = 0.08;
     if (sx < FW * m || sx > FW * (1 - m) || sy < FH * m || sy > FH * (1 - m))
-      warning = face ? "Das Gesicht ist angeschnitten." : "Das Hauptmotiv liegt am Rand oder ist angeschnitten.";
-    else if (gutter && Math.abs(sx / FW - 0.5) < 0.05) warning = face ? "Das Gesicht liegt im Falz." : "Das Hauptmotiv liegt im Falz.";
+      warning = face ? t("Das Gesicht ist angeschnitten.") : t("Das Hauptmotiv liegt am Rand oder ist angeschnitten.");
+    else if (gutter && Math.abs(sx / FW - 0.5) < 0.05) warning = face ? t("Das Gesicht liegt im Falz.") : t("Das Hauptmotiv liegt im Falz.");
   }
 
   const centerOnSubject = () => {
@@ -95,7 +97,7 @@ export function CropDialog({
 
   return (
     <MountedSheet
-      title="Ausschnitt"
+      title={t("Ausschnitt")}
       wide={wide}
       onClose={onClose}
     >
@@ -119,7 +121,7 @@ export function CropDialog({
             // Ziehen verschiebt den Ausschnitt, nicht das Blatt
             data-base-ui-swipe-ignore
             tabIndex={view.fit === "cover" ? 0 : -1}
-            aria-label="Ausschnitt verschieben: Pfeiltasten, mit Umschalt in großen Schritten"
+            aria-label={t("Ausschnitt verschieben: Pfeiltasten, mit Umschalt in großen Schritten")}
             className="absolute inset-0 touch-none overflow-hidden bg-paper outline-offset-4 select-none"
             style={{ cursor: view.fit === "cover" ? "grab" : "default" }}
             onKeyDown={(e) => {
@@ -152,7 +154,7 @@ export function CropDialog({
             {/* eslint-disable-next-line @next/next/no-img-element -- exakte Lage wie im Buch, ohne next/image */}
             <img
               src={photo.src}
-              alt={photo.alt || "Foto"}
+              alt={photo.alt || t("Foto")}
               draggable={false}
               className="pointer-events-none absolute max-w-none"
               style={{ left, top, width: shownW, height: shownH }}
@@ -170,7 +172,12 @@ export function CropDialog({
       </div>
 
       <p className={`mt-3 min-h-5 text-[13px] ${warning ? "text-ink font-semibold" : "text-ink-2"}`} role={warning ? "alert" : undefined}>
-        {warning ?? (subject ? `Punkt: ${face ? "erkanntes Gesicht" : "geschätztes Hauptmotiv"}. Ziehen oder Pfeiltasten verschieben den Ausschnitt.` : "Ziehen oder Pfeiltasten verschieben den Ausschnitt.")}
+        {warning ??
+          (subject
+            ? face
+              ? t("Punkt: erkanntes Gesicht. Ziehen oder Pfeiltasten verschieben den Ausschnitt.")
+              : t("Punkt: geschätztes Hauptmotiv. Ziehen oder Pfeiltasten verschieben den Ausschnitt.")
+            : t("Ziehen oder Pfeiltasten verschieben den Ausschnitt."))}
       </p>
 
       <label className="mt-4 block text-[13px]">
@@ -189,15 +196,15 @@ export function CropDialog({
       <div className="mt-4 flex flex-wrap gap-2">
         <Button variant="paper" size="sm" onClick={centerOnSubject} disabled={!subject}>
           <Crosshair aria-hidden />
-          Motiv in die Mitte
+          {t("Motiv in die Mitte")}
         </Button>
         <Button variant="paper" size="sm" aria-pressed={view.fit === "contain"} onClick={() => set({ ...view, fit: view.fit === "contain" ? "cover" : "contain" })}>
           {view.fit === "contain" ? <Scan aria-hidden /> : <Maximize2 aria-hidden />}
-          {view.fit === "contain" ? "Feld füllen" : "Ganzes Foto zeigen"}
+          {view.fit === "contain" ? t("Feld füllen") : t("Ganzes Foto zeigen")}
         </Button>
         <Button variant="paper" size="sm" onClick={() => set({ focus: [0.5, 0.5], zoom: 1, fit: "cover" })}>
           <RotateCcw aria-hidden />
-          Zurücksetzen
+          {t("Zurücksetzen")}
         </Button>
       </div>
     </MountedSheet>

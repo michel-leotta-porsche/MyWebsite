@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { noteClass } from "@/components/ui/field";
 import { Sheet } from "@/components/ui/sheet";
 import { friendlyError } from "@/lib/errors";
+import { useT } from "@/lib/i18n";
 import { REPORT_REASONS, reportShare, type ReportReason, type Share } from "@/lib/store";
 
 /**
@@ -20,6 +21,7 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
   const [block, setBlock] = useState(!!onBlock);
   const [state, setState] = useState<"idle" | "busy" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   const send = async () => {
     if (!reason) return;
@@ -36,11 +38,11 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
   };
 
   return (
-    <Sheet open title="Buch melden" onOpenChange={(o) => !o && state !== "busy" && onClose()}>
+    <Sheet open title={t("Buch melden")} onOpenChange={(o) => !o && state !== "busy" && onClose()}>
       {state === "sent" ? (
         <div className="text-sm leading-relaxed">
-          <p>Danke. Ich sehe mir das innerhalb von 24 Stunden an und nehme das Buch herunter, wenn es gegen die Nutzungsbedingungen verstößt.</p>
-          {block && onBlock && <p className="mt-2">Bücher von {share.fromName} siehst du nicht mehr. Im Profil kannst du das zurücknehmen.</p>}
+          <p>{t("Danke. Ich sehe mir das innerhalb von 24 Stunden an und nehme das Buch herunter, wenn es gegen die Nutzungsbedingungen verstößt.")}</p>
+          {block && onBlock && <p className="mt-2">{t("Bücher von {name} siehst du nicht mehr. Im Profil kannst du das zurücknehmen.", { name: share.fromName })}</p>}
         </div>
       ) : (
         <form
@@ -50,26 +52,26 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
           }}
         >
           <p className="text-sm leading-relaxed">
-            „{share.book?.title || "Ohne Titel"}“ von {share.fromName}. Was stimmt nicht?
+            {t("„{title}“ von {name}. Was stimmt nicht?", { title: share.book?.title || t("Ohne Titel"), name: share.fromName })}
           </p>
           <fieldset className="mt-3">
-            <legend className="sr-only">Grund</legend>
+            <legend className="sr-only">{t("Grund")}</legend>
             <div className="bg-ink/4 overflow-hidden rounded-tool shadow-[inset_0_0_0_1px_rgb(27_28_26/0.1)]">
               {(Object.keys(REPORT_REASONS) as ReportReason[]).map((r) => (
                 <CheckRow key={r} type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)}>
-                  {REPORT_REASONS[r]}
+                  {t(REPORT_REASONS[r])}
                 </CheckRow>
               ))}
             </div>
           </fieldset>
           <label htmlFor="report-text" className="text-ink-2 mt-2 block text-[13px]">
-            Magst du kurz sagen, worum es geht? (freiwillig)
+            {t("Magst du kurz sagen, worum es geht? (freiwillig)")}
           </label>
           <textarea id="report-text" value={text} onChange={(e) => setText(e.target.value.slice(0, 500))} rows={3} className={noteClass} />
           {onBlock && (
             <div className="bg-ink/4 mt-3 overflow-hidden rounded-tool shadow-[inset_0_0_0_1px_rgb(27_28_26/0.1)]">
               <CheckRow type="checkbox" checked={block} onChange={(v) => setBlock(v)}>
-                Bücher von {share.fromName} nicht mehr zeigen
+                {t("Bücher von {name} nicht mehr zeigen", { name: share.fromName })}
               </CheckRow>
             </div>
           )}
@@ -80,10 +82,10 @@ export function ReportDialog({ share, reporter, onClose, onBlock }: { share: Sha
           )}
           <div className="mt-4 flex flex-wrap items-baseline justify-between gap-3">
             <Link href="/nutzungsbedingungen" className="text-ink-2 text-[13px] underline underline-offset-4">
-              Nutzungsbedingungen
+              {t("Nutzungsbedingungen")}
             </Link>
             <Button type="submit" variant="ink" disabled={!reason || state === "busy"}>
-              {state === "busy" ? "Sendet …" : "Melden"}
+              {state === "busy" ? t("Sendet …") : t("Melden")}
             </Button>
           </div>
         </form>

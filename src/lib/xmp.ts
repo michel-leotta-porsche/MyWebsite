@@ -1,6 +1,8 @@
 // Liest Lightroom- und Camera-Raw-Einstellungen (crs:) aus einem XMP-Text: aus einer Preset-Datei
 // oder aus dem XMP-Block eines exportierten JPGs. Nur globale Werte; Masken, Zuschnitt, Retusche bleiben weg.
 
+import { de } from "@/lib/i18n";
+
 export type LightroomSettings = {
   name?: string;
   basics: { key: string; label: string; value: number; unit?: string }[];
@@ -14,26 +16,26 @@ export type LightroomSettings = {
 };
 
 const BASICS: [string, string, string?][] = [
-  ["Exposure2012", "Belichtung", "EV"],
-  ["Contrast2012", "Kontrast"],
-  ["Highlights2012", "Lichter"],
-  ["Shadows2012", "Tiefen"],
-  ["Whites2012", "Weiß"],
-  ["Blacks2012", "Schwarz"],
-  ["Texture", "Struktur"],
-  ["Clarity2012", "Klarheit"],
-  ["Dehaze", "Dunst entfernen"],
-  ["Vibrance", "Dynamik"],
-  ["Saturation", "Sättigung"],
+  ["Exposure2012", de("Belichtung"), "EV"],
+  ["Contrast2012", de("Kontrast")],
+  ["Highlights2012", de("Lichter")],
+  ["Shadows2012", de("Tiefen")],
+  ["Whites2012", de("Weiß")],
+  ["Blacks2012", de("Schwarz")],
+  ["Texture", de("Struktur")],
+  ["Clarity2012", de("Klarheit")],
+  ["Dehaze", de("Dunst entfernen")],
+  ["Vibrance", de("Dynamik")],
+  ["Saturation", de("Sättigung")],
 ];
 const COLORS: [string, string][] = [
-  ["Red", "Rot"],
+  ["Red", de("Rot")],
   ["Orange", "Orange"],
-  ["Yellow", "Gelb"],
-  ["Green", "Grün"],
-  ["Aqua", "Aquamarin"],
-  ["Blue", "Blau"],
-  ["Purple", "Lila"],
+  ["Yellow", de("Gelb")],
+  ["Green", de("Grün")],
+  ["Aqua", de("Aquamarin")],
+  ["Blue", de("Blau")],
+  ["Purple", de("Lila")],
   ["Magenta", "Magenta"],
 ];
 
@@ -60,8 +62,8 @@ export function parseXmp(xmp: string): LightroomSettings | null {
   const curve = [...curveBlock.matchAll(/<rdf:li>\s*(\d+)\s*,\s*(\d+)\s*<\/rdf:li>/g)].map(
     (m) => [Number(m[1]), Number(m[2])] as [number, number],
   );
-  const hsl = COLORS.map(([en, de]) => ({
-    color: de,
+  const hsl = COLORS.map(([en, label]) => ({
+    color: label,
     hue: num(xmp, `HueAdjustment${en}`) ?? 0,
     sat: num(xmp, `SaturationAdjustment${en}`) ?? 0,
     lum: num(xmp, `LuminanceAdjustment${en}`) ?? 0,

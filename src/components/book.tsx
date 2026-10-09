@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { pageNos, plateName, plateOf, type BookData, type Page } from "@/content/books";
 import { headPlates } from "@/content/layout";
+import { useT } from "@/lib/i18n";
 import { cameraOf, hasSlip, recipeOf } from "@/content/recipes";
 import { createCurlStore, PageCurl, type CurlStore } from "@/components/page-curl";
 import { JumpContext, PageView } from "@/components/page-view";
@@ -75,17 +76,19 @@ export function pagesAt(book: BookData, mode: Mode, k: number): Page[] {
 }
 export const platesOn = (pages: Page[]) => [...new Set(pages.flatMap(pageNos))];
 
-function labelAt(book: BookData, mode: Mode, k: number): string {
-  if (k === 0) return "Einband";
+function labelAt(book: BookData, mode: Mode, k: number, t: Tr): string {
+  if (k === 0) return t("Einband");
   const pages = pagesAt(book, mode, k);
   const ps = platesOn(pages);
   if (ps.length === 0) {
-    if (pages.some((p) => p.kind === "title")) return "Titel";
-    if (pages.some((p) => p.kind === "index")) return "Verzeichnis";
-    return "Kolophon";
+    if (pages.some((p) => p.kind === "title")) return t("Titel");
+    if (pages.some((p) => p.kind === "index")) return t("Verzeichnis");
+    return t("Kolophon");
   }
-  return ps.length > 1 ? `Tafel ${ps[0]}–${ps[ps.length - 1]}` : `Tafel ${ps[0]}`;
+  return ps.length > 1 ? t("Tafel {from}–{to}", { from: ps[0], to: ps[ps.length - 1] }) : t("Tafel {no}", { no: ps[0] });
 }
+
+type Tr = ReturnType<typeof useT>;
 
 type SideCaption = { side: "left" | "right"; plates: { no: number; title: string; name: string; slip: string | null }[] };
 
@@ -93,7 +96,7 @@ type SideCaption = { side: "left" | "right"; plates: { no: number; title: string
  * Je aufgeschlagener Seite: Titel der randlosen Tafeln (sie tragen keine Unterschrift auf der Seite) und
  * welcher Zettel zu einem Foto gehört (Rezept aus Fuji-Daten oder Lightroom-Preset, Kamera, Bearbeitung).
  */
-function sideCaptions(book: BookData, mode: Mode, k: number): SideCaption[] {
+function sideCaptions(book: BookData, mode: Mode, k: number, t: Tr): SideCaption[] {
   const pages = pagesAt(book, mode, k);
   const names = pages.length === 2 ? (["left", "right"] as const) : (["right"] as const);
   return pages.map((page, i) => {
@@ -101,7 +104,7 @@ function sideCaptions(book: BookData, mode: Mode, k: number): SideCaption[] {
     const heads = new Set(headPlates(book, page, side));
     const plates = pageNos(page).map((no) => {
       const p = plateOf(book, no);
-      const slip = !hasSlip(p) ? null : recipeOf(p) ? "Rezept" : cameraOf(p) ? "Kamera" : "Bearbeitung";
+      const slip = !hasSlip(p) ? null : recipeOf(p) ? t("Rezept") : cameraOf(p) ? t("Kamera") : t("Bearbeitung");
       return { no, title: heads.has(no) ? p.title : "", name: p.title, slip };
     });
     return { side, plates: plates.filter((pl) => pl.title || pl.slip) };
@@ -367,6 +370,7 @@ export function Book({
   const swipe = mode === "single";
   const reduce = useReducedMotion() ?? false;
   const nPlates = book.plates.length;
+  const t = useT();
 
   const track = useRef<HTMLElement>(null);
   const bookRef = useRef<HTMLDivElement>(null);
@@ -379,7 +383,7 @@ export function Book({
   const sprung = useSpring(raw, { stiffness: 150, damping: 26, mass: 0.7 });
   const stepped = useTransform(raw, (v) => Math.min(count, Math.round(v)));
   const finger = useMotionValue(0);
-  const t = swipe ? finger : reduce ? stepped : sprung;
+  const turn = swipe ? finger : reduce ? stepped : sprung;
 
   const curlR = useSpring(0, { stiffness: 420, damping: 30 });
   const curlL = useSpring(0, { stiffness: 420, damping: 30 });
@@ -389,14 +393,14 @@ export function Book({
   const [k, setK] = useState(0);
   const [kt, setKt] = useState(0);
   useMotionValueEvent(raw, "change", (v) => !swipe && setK(Math.min(count, Math.round(v))));
-  useMotionValueEvent(t, "change", (v) => {
+  useMotionValueEvent(turn, "change", (v) => {
     const r = Math.min(count, Math.round(v));
     setKt(r);
     if (swipe) setK(r);
   });
 
   // Nach dem Kolophon weiterscrollen: das Buch klappt zu und legt sich zurück auf den Tisch
-  const outro = useTransform(t, (v) => clamp01((v - count) / OUTRO));
+  const outro = useTransform(turn, (v) => clamp01((v - count) / OUTRO));
   const closed = useRef(false);
   useMotionValueEvent(outro, "change", (o) => {
     if (o > 0.82 && !closed.current) {
@@ -406,12 +410,12 @@ export function Book({
   });
 
   // Eselsohr nur, wenn das Buch ruhig aufgeschlagen liegt
-  const resting = useTransform<number, number>(t, (v) => (Math.abs(v - Math.round(v)) < 0.03 && v <= count ? 1 : 0));
+  const resting = useTransform<number, number>(turn, (v) => (Math.abs(v - Math.round(v)) < 0.03 && v <= count ? 1 : 0));
   const curlRight = useTransform<number, number>([curlR, resting], ([c, r]) => c * r);
   const curlLeft = useTransform<number, number>([curlL, resting], ([c, r]) => c * r);
 
   // Geschlossen liegt das Buch flach und rechts versetzt; beim Öffnen richtet es sich auf
-  const open = useTransform(t, (v) => clamp01(v));
+  const open = useTransform(turn, (v) => clamp01(v));
   const shift = useTransform(open, (o) => (mode === "spread" ? -25 * (1 - o) : 0));
   const tilt = useTransform<number, number>([open, outro], ([o, x]) => 16 - 12 * o + 14 * x);
   const lift = useTransform<number, number>([open, outro], ([o, x]) => (0.94 + 0.06 * o) * (1 - 0.18 * x));
@@ -420,15 +424,15 @@ export function Book({
   const bookOpacity = useTransform(outro, [0.4, 1], [1, 0]);
 
   // Papierkanten: rechts schrumpft der Stapel, links wächst er
-  const rightEdge = useTransform(t, (v) => clamp01((count - v) / count));
-  const leftEdge = useTransform(t, (v) => clamp01((v - 1) / count));
+  const rightEdge = useTransform(turn, (v) => clamp01((count - v) / count));
+  const leftEdge = useTransform(turn, (v) => clamp01((v - 1) / count));
   const rightEdgeT = useMotionTemplate`scaleX(${rightEdge})`;
   const leftEdgeT = useMotionTemplate`scaleX(${leftEdge})`;
   const rightFootT = useMotionTemplate`scaleY(${rightEdge})`;
   const leftFootT = useMotionTemplate`scaleY(${leftEdge})`;
   const edgeW = Math.round(3 + count / 4);
   // Wölbung der Seiten nur, solange das Buch ruhig offen liegt: beim Umblättern zeichnet WebGL das Licht
-  const still = useTransform<number, number>([t, outro], ([v, x]) =>
+  const still = useTransform<number, number>([turn, outro], ([v, x]) =>
     v < 0.5 ? 0 : clamp01(1 - Math.abs(v - Math.round(v)) * 12) * (1 - x),
   );
 
@@ -440,7 +444,7 @@ export function Book({
     if (ps.length) return (ps.reduce((a, b) => a + b, 0) / ps.length - 1) / Math.max(1, nPlates - 1);
     return step <= 1 ? 0 : 1;
   };
-  const fill = useTransform(t, range, range.map(progressAt));
+  const fill = useTransform(turn, range, range.map(progressAt));
   const fillT = useMotionTemplate`scaleX(${fill})`;
 
   // Hinweis zum Blättern: verschwindet nach dem ersten eigenen Umblättern und kommt in dieser Sitzung nicht wieder.
@@ -457,7 +461,7 @@ export function Book({
     () => true,
   );
   const [turned, setTurned] = useState(false);
-  useMotionValueEvent(t, "change", (v) => {
+  useMotionValueEvent(turn, "change", (v) => {
     if (turned || v < 1.9) return;
     setTurned(true);
     try {
@@ -701,7 +705,7 @@ export function Book({
   const startPress = (p: Pt) => {
     pressed.current = false;
     if (onEdit) {
-      const step = Math.min(count, Math.max(0, Math.round(t.get())));
+      const step = Math.min(count, Math.max(0, Math.round(turn.get())));
       holdThen(() => {
         haptic("press");
         onEdit(step);
@@ -946,9 +950,9 @@ export function Book({
     const onRight = !!r && pageNos(r).includes(slipPlate.no);
     return onRight && !onLeft ? "left" : "right";
   })();
-  const label = labelAt(book, mode, k);
+  const label = labelAt(book, mode, k, t);
   const pw = pageWidth(book, mode);
-  const sides = sideCaptions(book, mode, kt);
+  const sides = sideCaptions(book, mode, kt, t);
   const slipProps = { k, slip: slipPlate?.no ?? null, onOpen: setSlip, onPoint: setPointed };
   const actions = (extra || onEdit) && (
     <>
@@ -960,7 +964,7 @@ export function Book({
   return (
     <section
       ref={track}
-      aria-label={`Fotobuch ${book.title}`}
+      aria-label={t("Fotobuch {title}", { title: book.title })}
       tabIndex={-1}
       className="relative outline-none"
       style={{ height: swipe ? "100svh" : `${count * 85 + 100 + OUTRO * 85}svh` }}
@@ -994,7 +998,7 @@ export function Book({
             onClick={onClose}
             className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 justify-self-start pr-2 text-lg font-bold whitespace-nowrap tracking-[-0.02em] transition-opacity duration-150 active:opacity-60 flat:whitespace-normal"
             style={{ fontVariationSettings: '"wdth" 80' }}
-            aria-label="Calima, zurück zum Tisch"
+            aria-label={t("Calima, zurück zum Tisch")}
           >
             {/* Pfeil zeigt, dass der Name zurückführt (wie „‹ Bücherzimmer“ in der Werkbank); auf dem Telefon gibt es kein Esc */}
             <ChevronLeft aria-hidden className="text-on-table-2 size-5" />
@@ -1022,8 +1026,8 @@ export function Book({
             <button
               type="button"
               onClick={() => onEdit(k)}
-              aria-label="Bearbeiten"
-              title="Bearbeiten (oder lange aufs Buch drücken)"
+              aria-label={t("Bearbeiten")}
+              title={t("Bearbeiten (oder lange aufs Buch drücken)")}
               className={buttonClass("quiet", "sm", "-mr-1 -mt-1.5 size-11 shrink-0 justify-center p-0 md:hidden flat:hidden")}
             >
               <Pencil aria-hidden />
@@ -1144,11 +1148,11 @@ export function Book({
                   </div>
 
                   {leaves.map((leaf, i) => (
-                    <LeafView key={i} book={book} leaf={leaf} i={i} count={count} t={t} mode={mode} k={kt} curl={curl} />
+                    <LeafView key={i} book={book} leaf={leaf} i={i} count={count} t={turn} mode={mode} k={kt} curl={curl} />
                   ))}
 
                   {bend && !reduce && (
-                    <PageCurl book={book} leaves={leaves} t={t} k={kt} mode={mode} store={curl} bookRef={bookRef} />
+                    <PageCurl book={book} leaves={leaves} t={turn} k={kt} mode={mode} store={curl} bookRef={bookRef} />
                   )}
 
                   {/* Wölbung: am Bund hebt sich das Papier ins Licht, zur Außenkante fällt es ab */}
@@ -1187,10 +1191,10 @@ export function Book({
                         {onEar && (
                           <button
                             type="button"
-                            aria-label={`Eselsohr bei Tafel ${no}`}
+                            aria-label={t("Eselsohr bei Tafel {no}", { no })}
                             aria-hidden={on || undefined}
                             tabIndex={on ? -1 : undefined}
-                            title={on ? undefined : "Ecke gedrückt halten"}
+                            title={on ? undefined : t("Ecke gedrückt halten")}
                             data-lift={!on && (earPress === side || earHint === side) ? "" : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1241,7 +1245,7 @@ export function Book({
                   {/* Blätterknöpfe für Tastatur und Screenreader, an den Außenkanten */}
                   <button
                     type="button"
-                    aria-label="Zurückblättern"
+                    aria-label={t("Zurückblättern")}
                     disabled={k === 0}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1253,7 +1257,7 @@ export function Book({
                   />
                   <button
                     type="button"
-                    aria-label="Weiterblättern"
+                    aria-label={t("Weiterblättern")}
                     disabled={k === count}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1271,7 +1275,7 @@ export function Book({
 
         {/* Bildfolge als Linie mit Haltepunkten */}
         <nav
-          aria-label="Bildfolge"
+          aria-label={t("Bildfolge")}
           className="relative z-20 mx-auto w-full max-w-[680px] px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-7 flat:pt-0 flat:pb-[max(0.25rem,env(safe-area-inset-bottom))]"
         >
           <AnimatePresence>
@@ -1283,11 +1287,11 @@ export function Book({
                 transition={{ duration: 0.3 }}
               >
                 {swipe ? (
-                  "Wischen oder Tippen zum Blättern"
+                  t("Wischen oder Tippen zum Blättern")
                 ) : (
                   <>
-                    <span className="pointer-coarse:hidden">Scrollen, Klicken oder ← → zum Blättern</span>
-                    <span className="hidden pointer-coarse:inline">Scrollen oder Wischen zum Blättern</span>
+                    <span className="pointer-coarse:hidden">{t("Scrollen, Klicken oder ← → zum Blättern")}</span>
+                    <span className="hidden pointer-coarse:inline">{t("Scrollen oder Wischen zum Blättern")}</span>
                   </>
                 )}
               </motion.p>
@@ -1367,10 +1371,11 @@ export function Book({
 
 /** In die Werkbank, an die aufgeschlagene Doppelseite; dasselbe wie langes Drücken aufs Buch */
 function EditButton({ onEdit }: { onEdit: () => void }) {
+  const t = useT();
   return (
-    <button type="button" onClick={onEdit} title="Oder lange aufs Buch drücken" className={buttonClass("quiet", "sm")}>
+    <button type="button" onClick={onEdit} title={t("Oder lange aufs Buch drücken")} className={buttonClass("quiet", "sm")}>
       <Pencil aria-hidden />
-      Bearbeiten
+      {t("Bearbeiten")}
     </button>
   );
 }
@@ -1443,11 +1448,12 @@ function SideCaptions({
 
 /** Knopf „Rezept“ (Pille) zu einer Tafel; Zeigen oder Fokus hebt das Foto auf der Seite hervor */
 function SlipButton({ no, label, title, k, slip, onOpen, onPoint }: SlipProps & { no: number; label: string; title: string }) {
+  const t = useT();
   return (
     <button
       type="button"
       aria-expanded={slip === no}
-      aria-label={`${label} zu ${plateName(no, title)}`}
+      aria-label={t("{label} zu {plate}", { label, plate: plateName(no, title) })}
       onClick={() => onOpen(slip === no ? null : { no, k })}
       onPointerEnter={(e) => e.pointerType === "mouse" && onPoint(no)}
       onPointerLeave={() => onPoint(null)}
