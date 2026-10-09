@@ -10,13 +10,14 @@ import { haptic } from "@/lib/haptics";
 
 type Trigger = Parameters<typeof BaseMenu.Trigger>[0]["render"];
 
-export function Menu({ trigger, children, align = "end" }: { trigger: Trigger; children: ReactNode; align?: "start" | "center" | "end" }) {
+// container: in einem modalen <dialog> muss das Menü im Dialog hängen, sonst liegt es unter der obersten Ebene
+export function Menu({ trigger, children, align = "end", container }: { trigger: Trigger; children: ReactNode; align?: "start" | "center" | "end"; container?: React.RefObject<HTMLElement | null> }) {
   return (
     <BaseMenu.Root>
       <BaseMenu.Trigger render={trigger} />
-      <BaseMenu.Portal>
+      <BaseMenu.Portal container={container}>
         <BaseMenu.Positioner className="z-[720] outline-none" sideOffset={8} align={align} collisionPadding={12}>
-          <BaseMenu.Popup className="slip text-ink relative min-w-56 origin-[var(--transform-origin)] overflow-hidden rounded-tool py-1.5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)] outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+          <BaseMenu.Popup className="slip text-ink relative max-h-[var(--available-height)] min-w-56 origin-[var(--transform-origin)] overflow-y-auto overscroll-contain rounded-tool py-1.5 shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)] outline-none transition-[scale,opacity] duration-150 ease-out data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             {children}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

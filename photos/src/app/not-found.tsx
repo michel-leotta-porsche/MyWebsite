@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Wordmark } from "@/components/ui-base";
-import { linkClass } from "@/components/ui-classes";
+import { buttonClass } from "@/components/ui/button-class";
 
 export const metadata: Metadata = { title: "Nicht gefunden · Calima" };
 
@@ -18,11 +18,11 @@ export default function NotFound() {
           Diese Seite gibt es nicht.
         </h1>
         <p className="text-on-table-2 mt-3 text-base leading-relaxed">Vielleicht ist der Link alt oder unvollständig.</p>
-        <p className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-base">
-          <Link href="/zimmer" className={`${linkClass} underline`}>
+        <p className="mt-8 flex flex-wrap gap-2">
+          <Link href="/zimmer" className={buttonClass("cloth")}>
             Zum Bücherzimmer
           </Link>
-          <Link href="/" className={`${linkClass} underline`}>
+          <Link href="/" className={buttonClass("quiet")}>
             Zur Startseite
           </Link>
         </p>

@@ -638,7 +638,7 @@ function Share() {
           </p>
           <ul className="mt-12 grid gap-3 lg:grid-cols-2">
             {DETAILS.map((d) => (
-              <li key={d.title} className="bg-on-table/5 rounded-tool p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)]">
+              <li key={d.title} className="bg-on-table/5 rounded-cut p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)]">
                 <d.icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
                 <h3 className="text-on-table mt-4 text-lg font-semibold tracking-[-0.015em]">{d.title}</h3>
                 <p className="text-on-table-2 mt-1.5 text-base leading-relaxed">{d.text}</p>

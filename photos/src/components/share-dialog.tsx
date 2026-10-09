@@ -2,7 +2,12 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { inputClass, SlipDialog } from "@/components/app-ui";
+import { BookmarkCheck, Check, Copy, Gift, Link2, Link2Off, StickyNote, Undo2, X } from "lucide-react";
+
+import { Button, IconButton } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { ListGroup, ListRow } from "@/components/ui/list";
+import { MountedSheet } from "@/components/ui/sheet";
 import { SITE_URL } from "@/lib/share-meta";
 import Link from "next/link";
 
@@ -116,99 +121,116 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
     window.setTimeout(() => setCopied(null), 1600);
   };
 
+  const allNotes = (shares ?? []).flatMap((s) => (notes[s.token] ?? []).map((n) => ({ n, s })));
+
   return (
-    <SlipDialog label={needsTitle ? "Buch hinlegen" : `„${book.title}“ hinlegen`} onClose={onClose}>
+    <MountedSheet
+      title={needsTitle ? "Buch hinlegen" : `„${book.title}“ hinlegen`}
+      description="Jede Person bekommt einen eigenen Link, ohne Konto. Der Link zeigt dieses Buch und sonst nichts."
+      onClose={onClose}
+    >
       <form
-        className="flex flex-wrap gap-2"
+        className="grid gap-3"
         onSubmit={(e) => {
           e.preventDefault();
           create();
         }}
       >
-        {needsTitle && (
-          <label className="mb-2 block w-full text-[13px]">
-            <span className="text-ink-2">Titel des Buchs, steht auf dem Einband</span>
-            <input value={title} onChange={(e) => setTitle(e.target.value.slice(0, 40))} placeholder="z. B. Lissabon im Mai" className={inputClass} />
-          </label>
-        )}
-        <label className="sr-only" htmlFor="share-to">
-          Für wen
-        </label>
-        <input
-          id="share-to"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          placeholder="Für wen? z. B. Lena"
-          className={`${inputClass} min-w-0 flex-1`}
-          maxLength={40}
-        />
-        <button
-          type="submit"
-          disabled={busy || !to.trim() || (needsTitle && !title.trim()) || mustAgree || agreed === null}
-          className="border-ink text-ink hover:bg-ink hover:text-paper shrink-0 border px-3 text-sm font-semibold transition-colors duration-150 disabled:opacity-50"
-        >
-          Link erstellen
-        </button>
+        {needsTitle && <Field label="Titel des Buchs" hint="Steht auf dem Einband" value={title} onChange={(e) => setTitle(e.target.value.slice(0, 40))} />}
+        <div className="flex items-end gap-3">
+          <Field label="Für wen?" className="min-w-0 flex-1" value={to} onChange={(e) => setTo(e.target.value)} maxLength={40} />
+          <Button
+            type="submit"
+            variant="ink"
+            size="sm"
+            className="mb-1.5"
+            disabled={busy || !to.trim() || (needsTitle && !title.trim()) || mustAgree || agreed === null}
+          >
+            <Link2 aria-hidden />
+            Link erstellen
+          </Button>
+        </div>
       </form>
       {agreed === false && (
-        <label className="mt-2 flex min-h-11 items-center gap-3 text-[13px]">
-          <input type="checkbox" checked={agreeNow} onChange={(e) => setAgreeNow(e.target.checked)} className="accent-ink" />
+        <label className="mt-3 flex min-h-11 items-center gap-3 text-[13px]">
+          <input type="checkbox" checked={agreeNow} onChange={(e) => setAgreeNow(e.target.checked)} className="accent-ink size-[18px] shrink-0" />
           <span>
             Ich teile nur, woran ich die Rechte habe, und halte mich an die{" "}
-            <Link href="/nutzungsbedingungen" className="underline decoration-mark decoration-2 underline-offset-4">
+            <Link href="/nutzungsbedingungen" className="underline underline-offset-4">
               Nutzungsbedingungen
             </Link>
             .
           </span>
         </label>
       )}
-      <p className="text-ink-2 mt-2 text-[13px]">
-        Hinlegen heißt: Jede Person bekommt einen eigenen Link zum Teilen, ohne Konto. Der Link zeigt dieses Buch und sonst nichts.
-      </p>
 
-      <ul className="mt-5 space-y-4">
-        {shares === null && <li className="text-ink-2 text-sm">Lade …</li>}
-        {shares?.map((s) => (
-          <li key={s.token} className="border-t border-ink/15 pt-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <p className="text-sm font-semibold">Für {s.to}</p>
-              <span className="flex gap-3 text-sm">
-                <button type="button" onClick={() => copy(s.token)} className="underline decoration-mark decoration-2 underline-offset-4">
-                  {copied === s.token ? "Kopiert" : "Link kopieren"}
-                </button>
-                {withdrawing.includes(s.token) ? (
-                  <button type="button" onClick={() => keep(s.token)} className="underline decoration-mark decoration-2 underline-offset-4">
-                    Zurückgezogen · Rückgängig
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => withdraw(s.token)} className="text-ink-2 underline underline-offset-4">
-                    Zurückziehen
-                  </button>
-                )}
-              </span>
-            </div>
-            {(notes[s.token] ?? []).map((n) => (
-              <p key={n.id} className="text-ink-2 mt-1 flex items-baseline justify-between gap-3 text-[13px]">
-                <span className="min-w-0">
-                  {n.kind === "ear" ? `Eselsohr bei Tafel ${n.no}` : `„${n.text}“`}
-                  {n.from ? ` · ${n.from}` : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNotes((all) => ({ ...all, [s.token]: (all[s.token] ?? []).filter((x) => x.id !== n.id) }));
-                    deleteNote(s.token, n.id).catch(() => {});
-                  }}
-                  className="shrink-0 underline underline-offset-4"
-                  aria-label={n.kind === "ear" ? `Eselsohr bei Tafel ${n.no} entfernen` : `Zettel von ${n.from || "Gast"} entfernen`}
-                >
-                  Entfernen
-                </button>
-              </p>
+      <div className="mt-6">
+        {shares === null && <p className="text-ink-2 text-sm">Lade …</p>}
+        {shares && shares.length > 0 && (
+          <ListGroup paper label="Links">
+            {shares.map((s) => {
+              const going = withdrawing.includes(s.token);
+              const count = (notes[s.token] ?? []).length;
+              return (
+                <ListRow
+                  key={s.token}
+                  paper
+                  lead={<Gift aria-hidden />}
+                  title={`Für ${s.to}`}
+                  detail={going ? "Wird zurückgezogen" : count ? `${count} ${count === 1 ? "Rückmeldung" : "Rückmeldungen"}` : "Liegt bereit"}
+                  trail={
+                    <span className="flex gap-1">
+                      {going ? (
+                        <IconButton variant="paper" label={`Link für ${s.to} behalten`} onClick={() => keep(s.token)}>
+                          <Undo2 aria-hidden />
+                        </IconButton>
+                      ) : (
+                        <>
+                          <IconButton variant="paper" label={copied === s.token ? "Kopiert" : `Link für ${s.to} kopieren`} onClick={() => copy(s.token)}>
+                            {copied === s.token ? <Check aria-hidden /> : <Copy aria-hidden />}
+                          </IconButton>
+                          <IconButton variant="paper" label={`Link für ${s.to} zurückziehen`} onClick={() => withdraw(s.token)}>
+                            <Link2Off aria-hidden />
+                          </IconButton>
+                        </>
+                      )}
+                    </span>
+                  }
+                />
+              );
+            })}
+          </ListGroup>
+        )}
+      </div>
+
+      {allNotes.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-ink-2 mb-2 text-[13px] font-semibold">Zettel und Eselsohren</h3>
+          <ListGroup paper label="Zettel und Eselsohren">
+            {allNotes.map(({ n, s }) => (
+              <ListRow
+                key={n.id}
+                paper
+                lead={n.kind === "ear" ? <BookmarkCheck aria-hidden /> : <StickyNote aria-hidden />}
+                title={<span className="block font-normal">{n.kind === "ear" ? `Eselsohr bei Tafel ${n.no}` : `„${n.text}“`}</span>}
+                detail={`${n.from || "Gast"} · Link für ${s.to}`}
+                trail={
+                  <IconButton
+                    variant="paper"
+                    label={n.kind === "ear" ? `Eselsohr bei Tafel ${n.no} entfernen` : `Zettel von ${n.from || "Gast"} entfernen`}
+                    onClick={() => {
+                      setNotes((all) => ({ ...all, [s.token]: (all[s.token] ?? []).filter((x) => x.id !== n.id) }));
+                      deleteNote(s.token, n.id).catch(() => {});
+                    }}
+                  >
+                    <X aria-hidden />
+                  </IconButton>
+                }
+              />
             ))}
-          </li>
-        ))}
-      </ul>
-    </SlipDialog>
+          </ListGroup>
+        </div>
+      )}
+    </MountedSheet>
   );
 }

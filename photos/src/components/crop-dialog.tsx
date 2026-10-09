@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { SlipDialog } from "@/components/app-ui";
+import { Crosshair, Maximize2, RotateCcw, Scan } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { MountedSheet } from "@/components/ui/sheet";
 import type { StoredPhoto } from "@/lib/store";
 import { findSubject } from "@/lib/subject";
 
@@ -89,8 +92,13 @@ export function CropDialog({
     set({ ...view, fit: "cover", focus: [fx, fy] });
   };
 
+
   return (
-    <SlipDialog label="Ausschnitt" onClose={onClose} wide={wide}>
+    <MountedSheet
+      title="Ausschnitt"
+      wide={wide}
+      onClose={onClose}
+    >
       {/* Band über die ganze Zettelbreite: was außerhalb des Felds liegt, bleibt blass sichtbar (UX-Kritik K7) */}
       <div className="relative -mx-5 overflow-hidden bg-paper-shade py-4">
         <div className="relative mx-auto" style={{ width: FW, height: FH }}>
@@ -108,6 +116,8 @@ export function CropDialog({
           <div
             ref={frame}
             role="group"
+            // Ziehen verschiebt den Ausschnitt, nicht das Blatt
+            data-base-ui-swipe-ignore
             tabIndex={view.fit === "cover" ? 0 : -1}
             aria-label="Ausschnitt verschieben: Pfeiltasten, mit Umschalt in großen Schritten"
             className="absolute inset-0 touch-none overflow-hidden bg-paper outline-offset-4 select-none"
@@ -176,22 +186,20 @@ export function CropDialog({
           className="block w-full accent-[var(--ink)]"
         />
       </label>
-      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-        <button type="button" onClick={centerOnSubject} disabled={!subject} className="underline decoration-mark decoration-2 underline-offset-4 disabled:opacity-50">
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="paper" size="sm" onClick={centerOnSubject} disabled={!subject}>
+          <Crosshair aria-hidden />
           Motiv in die Mitte
-        </button>
-        <button
-          type="button"
-          aria-pressed={view.fit === "contain"}
-          onClick={() => set({ ...view, fit: view.fit === "contain" ? "cover" : "contain" })}
-          className="underline decoration-mark decoration-2 underline-offset-4"
-        >
+        </Button>
+        <Button variant="paper" size="sm" aria-pressed={view.fit === "contain"} onClick={() => set({ ...view, fit: view.fit === "contain" ? "cover" : "contain" })}>
+          {view.fit === "contain" ? <Scan aria-hidden /> : <Maximize2 aria-hidden />}
           {view.fit === "contain" ? "Feld füllen" : "Ganzes Foto zeigen"}
-        </button>
-        <button type="button" onClick={() => set({ focus: [0.5, 0.5], zoom: 1, fit: "cover" })} className="text-ink-2 underline underline-offset-4">
+        </Button>
+        <Button variant="paper" size="sm" onClick={() => set({ focus: [0.5, 0.5], zoom: 1, fit: "cover" })}>
+          <RotateCcw aria-hidden />
           Zurücksetzen
-        </button>
+        </Button>
       </div>
-    </SlipDialog>
+    </MountedSheet>
   );
 }

@@ -31,8 +31,8 @@ jobs:
     env:
       FUJI_IMPRESSUM_ADRESSE: ${{ secrets.FUJI_IMPRESSUM_ADRESSE }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -50,8 +50,12 @@ jobs:
 
   vorschau:
     name: Vorschau-Link
-    # Secrets gibt es nur für PRs aus diesem Repo, nicht aus Forks
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # Secrets gibt es nur für PRs aus diesem Repo, nicht aus Forks.
+    # Dependabot-PRs bekommen die Actions-Secrets ebenfalls nicht; für sie reicht der Build in „Prüfen“.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     concurrency:
       group: ausspielen-vorschau-${{ github.event.pull_request.number }}
@@ -59,8 +63,8 @@ jobs:
     env:
       FUJI_IMPRESSUM_ADRESSE: ${{ secrets.FUJI_IMPRESSUM_ADRESSE }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm

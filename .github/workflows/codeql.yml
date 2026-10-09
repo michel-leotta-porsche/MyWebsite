@@ -31,7 +31,7 @@ jobs:
       matrix:
         language: [javascript-typescript, actions]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # kein Build nötig: CodeQL liest den Quelltext direkt
       - uses: github/codeql-action/init@v4
         with:

@@ -23,7 +23,7 @@ import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } fr
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
-import { cleanEdit, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
+import { cleanEdit, fineOf, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
 
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
@@ -244,7 +244,9 @@ const cleanRecipe = (x: unknown): NamedRecipe | null => {
   if (!x || typeof x !== "object") return null;
   const r = x as Record<string, unknown>;
   if (typeof r.id !== "string" || typeof r.name !== "string" || !r.name.trim()) return null;
-  return { id: r.id, name: r.name.slice(0, 40), txt: typeof r.txt === "string" ? r.txt.slice(0, 60) : "eigenes", v: cleanEdit({ rec: r.v })!.rec };
+  const base: NamedRecipe = { id: r.id, name: r.name.slice(0, 40), txt: typeof r.txt === "string" ? r.txt.slice(0, 60) : "eigenes", v: cleanEdit({ rec: r.v })!.rec };
+  // f: Feinschliff und Look eines eigenen Looks; ältere Rezepte haben ihn nicht
+  return r.f && typeof r.f === "object" ? { ...base, f: fineOf(cleanEdit(r.f)!) } : base;
 };
 export async function myRecipes(uid: string): Promise<NamedRecipe[]> {
   let raw: unknown[] = [];

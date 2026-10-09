@@ -217,7 +217,13 @@ export const lookOf = (id: LookId | null) => LOOKS.find((l) => l.id === id);
 
 /* ---------- Rezepte: fünf voreingestellte, eigene kommen aus dem Profil ---------- */
 
-export type NamedRecipe = { id: string; name: string; txt: string; v: RecipeValues };
+/** Teil eines eigenen Looks, der nicht vom einzelnen Foto abhängt: Feinschliff und Look mit Stärke */
+export type LookFine = Pick<PhotoEdit, "exposure" | "contrast" | "shadows" | "warmth" | "sat" | "look" | "amount">;
+/** Rezept; mit f ein „eigener Look“, der alle übertragbaren Einstellungen mitnimmt */
+export type NamedRecipe = { id: string; name: string; txt: string; v: RecipeValues; f?: LookFine };
+export const fineOf = (e: PhotoEdit): LookFine => ({ exposure: e.exposure, contrast: e.contrast, shadows: e.shadows, warmth: e.warmth, sat: e.sat, look: e.look, amount: e.amount });
+/** trägt ein Foto genau diesen eigenen Look? */
+export const wearsLook = (e: PhotoEdit, r: NamedRecipe) => sameRecipe(r.v, e.rec) && (!r.f || JSON.stringify(r.f) === JSON.stringify(fineOf(e)));
 
 export const PRESETS: NamedRecipe[] = [
   { id: "sommerlicht", name: "Sommerlicht", txt: "warm, weiche Lichter", v: { film: "sommer", wbR: 2, wbB: -4, hl: -1, sh: 1, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },

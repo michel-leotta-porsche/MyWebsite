@@ -14,6 +14,16 @@ updates:
         update-types: [minor, patch]
     commit-message:
       prefix: "Pakete"
+    ignore:
+      # Typen passend zur Node-Version, mit der gebaut und ausgespielt wird (22). Erst mit dem Umstieg auf Node 24 anheben.
+      - dependency-name: "@types/node"
+        versions: [">=23"]
+      # typescript-eslint (über eslint-config-next) läuft noch nicht mit TypeScript 7. Freigeben, sobald Next es unterstützt.
+      - dependency-name: typescript
+        versions: [">=7"]
+      # eslint-plugin-react (über eslint-config-next) bricht mit ESLint 10. Freigeben, sobald eslint-config-next ESLint 10 nennt.
+      - dependency-name: eslint
+        versions: [">=10"]
 
   - package-ecosystem: github-actions
     directory: "/"
