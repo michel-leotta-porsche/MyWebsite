@@ -491,6 +491,10 @@ function Ask({ text, yes, no, onYes, onNo }: { text: string; yes: string; no: st
 
 /* ---------- Dialog ---------- */
 
+const STAGE_KEY = "calima:buehne";
+/** so klein wird das Foto höchstens, wenn man die Werkzeuge hochzieht */
+const STAGE_MIN = 96;
+
 export function DevelopDialog({
   photos: given,
   start,
@@ -555,6 +559,24 @@ export function DevelopDialog({
   const [tucked, setTucked] = useState(false);
   const slip = useRef<HTMLElement>(null);
   const pull = useRef<{ x: number; y: number; dy: number } | null>(null);
+  // Telefon: Höhe der Bühne, wenn der Zettel am Griff hochgezogen wurde (null: wie gewohnt), auf dem Gerät gemerkt
+  const stage = useRef<HTMLDivElement>(null);
+  const [stageH, setStageH] = useState<number | null>(() => {
+    try {
+      const v = Number(localStorage.getItem(STAGE_KEY));
+      return v >= STAGE_MIN ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  const grab = useRef<{ y: number; h: number; full: number; moved: boolean } | null>(null);
+  const keepStage = (h: number | null) => {
+    setStageH(h);
+    try {
+      if (h == null) localStorage.removeItem(STAGE_KEY);
+      else localStorage.setItem(STAGE_KEY, String(Math.round(h)));
+    } catch {}
+  };
   // offene Gruppen merkt sich das Gerät, für alle Fotos
   const [groups, setGroups] = useState<Group[]>(() => {
     try {
@@ -1490,7 +1512,10 @@ export function DevelopDialog({
         <div
           className={`bg-table flex flex-none flex-col gap-2 flat:min-h-0 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0 ${tucked ? "max-lg:min-h-0 max-lg:flex-1" : ""}`}
         >
-          <div className={`grid ${cropping ? "h-[clamp(220px,50svh,560px)]" : tucked ? "max-lg:min-h-0 max-lg:flex-1" : "h-[clamp(170px,36svh,460px)]"} place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]`}>
+          <div
+            ref={stage}
+            style={stageH != null && !cropping && !tucked ? ({ "--stage": `${stageH}px` } as CSSProperties) : undefined}
+            className={`grid ${cropping ? "h-[clamp(220px,50svh,560px)]" : tucked ? "max-lg:min-h-0 max-lg:flex-1" : "h-[var(--stage,clamp(170px,36svh,460px))]"} place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]`}>
             <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${sw} / ${sh}` }}>
               {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
               <div
@@ -1688,7 +1713,7 @@ export function DevelopDialog({
             pull.current = null;
             if (!el || cropping || window.matchMedia("(min-width: 1024px), (orientation: landscape) and (max-height: 500px)").matches) return;
             // Regler, Kurve und Drehrad brauchen das Ziehen selbst
-            if ((e.target as Element).closest("input, [role=slider], svg[role=group], [data-dial]")) return;
+            if ((e.target as Element).closest("input, [role=slider], svg[role=group], [data-dial], [data-grab]")) return;
             if (!tucked && el.scrollTop > 0) return;
             pull.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0 };
           }}
@@ -1787,9 +1812,54 @@ export function DevelopDialog({
           <div data-keep="" hidden={cropping} className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-1 pb-1 flat:pt-4 lg:-top-5 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5">
             <button
               type="button"
+              data-grab=""
               aria-expanded={!tucked}
-              onClick={() => setTucked((t) => !t)}
-              className={`text-ink-2 flex w-full items-center justify-center gap-1.5 lg:hidden flat:hidden ${tucked ? "min-h-11 text-[13px] font-semibold" : "-mb-0.5 h-5"}`}
+              onClick={() => {
+                // nach dem Ziehen kein Klick hinterher
+                if (grab.current?.moved) return void (grab.current = null);
+                setTucked((t) => !t);
+              }}
+              // am Griff zieht man den Zettel stufenlos hoch (Foto kleiner, mehr Werkzeug) oder weit nach unten zum Einklappen
+              onPointerDown={(e) => {
+                const el = stage.current;
+                if (tucked || !el) return;
+                el.style.removeProperty("--stage");
+                const full = el.getBoundingClientRect().height;
+                if (stageH != null) el.style.setProperty("--stage", `${stageH}px`);
+                grab.current = { y: e.clientY, h: el.getBoundingClientRect().height, full, moved: false };
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                const g = grab.current;
+                const el = stage.current;
+                if (!g || !el || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                const dy = e.clientY - g.y;
+                if (!g.moved && Math.abs(dy) < 6) return;
+                g.moved = true;
+                // über die gewohnte Höhe hinaus nur gebremst: das ist der Weg zum Einklappen
+                const h = g.h + dy;
+                el.style.setProperty("--stage", `${h > g.full ? g.full + (h - g.full) * 0.35 : Math.max(STAGE_MIN, h)}px`);
+              }}
+              onPointerUp={(e) => {
+                const g = grab.current;
+                const el = stage.current;
+                if (!g || !el || !g.moved) return void (grab.current = null);
+                const h = g.h + e.clientY - g.y;
+                if (h > g.full + 70) {
+                  setTucked(true);
+                  haptic("select");
+                }
+                const next = h >= g.full - 12 ? null : Math.max(STAGE_MIN, h);
+                if (next == null) el.style.removeProperty("--stage");
+                else el.style.setProperty("--stage", `${next}px`);
+                keepStage(next);
+              }}
+              onPointerCancel={() => {
+                grab.current = null;
+                if (stage.current && stageH == null) stage.current.style.removeProperty("--stage");
+                else stage.current?.style.setProperty("--stage", `${stageH}px`);
+              }}
+              className={`text-ink-2 flex w-full touch-none items-center justify-center gap-1.5 lg:hidden flat:hidden ${tucked ? "min-h-11 text-[13px] font-semibold" : "-mt-1 -mb-1.5 h-7 cursor-row-resize"}`}
             >
               {tucked ? (
                 <>
