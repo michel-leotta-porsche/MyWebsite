@@ -2,8 +2,10 @@
 
 import { getApp, getApps, initializeApp } from "firebase/app";
 import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  browserSessionPersistence,
   deleteUser,
-  getAuth,
   GoogleAuthProvider,
   indexedDBLocalPersistence,
   initializeAuth,
@@ -37,14 +39,53 @@ const config = {
 
 export const app = () => (getApps().length ? getApp() : initializeApp(config));
 let au: Auth | null = null;
+
 /**
- * In der App (capacitor://localhost) bleibt getAuth hängen: es lädt den Helfer für Popups und Weiterleitungen
- * als iframe von der authDomain, und der meldet sich dort nie. Die App braucht ihn nicht (Anmelden nativ),
- * also dort ohne Popup-Helfer und mit IndexedDB als Speicher.
+ * Der Popup-Helfer lädt als iframe von der authDomain (gapi und iframe.js, gut 130 KiB). getAuth wartet auf Handys
+ * und in Safari mit dem Anmeldestand, bis er da ist: das hielt das Bücherzimmer am iPhone rund eine Sekunde dunkel.
+ * Hier meldet Firebase den Anmeldestand sofort, und der Helfer lädt danach, damit Safari das Popup noch im Tipp öffnet:
+ * gleich, wenn niemand angemeldet ist (Anmeldeseite), sonst im Leerlauf (Profil, Konto löschen).
+ * _shouldInitProactively und _initialize sind Firebase-intern; ändern sie sich, lädt der Helfer erst beim Tippen.
+ */
+type Resolver = { _initialize(auth: Auth): Promise<unknown> };
+let popupHelper: Resolver | null = null;
+// erst im Browser bauen: beim Vorrendern ist browserPopupRedirectResolver keine Klasse
+const laterPopupResolver = () =>
+  class extends (browserPopupRedirectResolver as unknown as new () => Resolver) {
+    constructor() {
+      super();
+      // Firebase legt genau eine Instanz an; die merken, um sie nachher anzustoßen
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      popupHelper = this;
+    }
+    get _shouldInitProactively() {
+      return false;
+    }
+  } as unknown as typeof browserPopupRedirectResolver;
+function warmPopupHelper(a: Auth) {
+  const go = () => void popupHelper?._initialize(a).catch(() => {});
+  a.authStateReady().then(() => {
+    if (!a.currentUser) go();
+    else if ("requestIdleCallback" in window) requestIdleCallback(go, { timeout: 3000 });
+    else setTimeout(go, 1500);
+  });
+}
+
+/**
+ * In der App (capacitor://localhost) meldet sich der Popup-Helfer nie, und sie braucht ihn nicht (Anmelden nativ):
+ * dort ohne ihn und mit IndexedDB als Speicher. Im Web dieselben Speicher wie getAuth, der Helfer kommt nachher.
  */
 export const auth = () => {
   if (au) return au;
-  au = IS_APP ? initializeAuth(app(), { persistence: indexedDBLocalPersistence }) : getAuth(app());
+  if (IS_APP) {
+    au = initializeAuth(app(), { persistence: indexedDBLocalPersistence });
+    return au;
+  }
+  au = initializeAuth(app(), {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+    popupRedirectResolver: laterPopupResolver(),
+  });
+  warmPopupHelper(au);
   return au;
 };
 

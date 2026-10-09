@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  getDocsFromCache,
   limit,
   onSnapshot,
   orderBy,
@@ -660,9 +661,11 @@ export async function loadShare(token: string): Promise<Share | null> {
   return share.paused || !share.book ? null : share;
 }
 
-export async function mySharesOf(uid: string): Promise<Share[]> {
+/** cached: nur aus dem Zwischenspeicher im Browser, ohne Netz (leer, wenn dort noch nichts liegt) */
+export async function mySharesOf(uid: string, cached = false): Promise<Share[]> {
   if (MOCK) return [...mem.shares.values()];
-  const s = await getDocs(query(collection(db(), "shares"), where("owner", "==", uid)));
+  const q = query(collection(db(), "shares"), where("owner", "==", uid));
+  const s = await (cached ? getDocsFromCache(q) : getDocs(q));
   return s.docs.map((d) => d.data() as Share);
 }
 
@@ -677,9 +680,10 @@ export async function leaveNote(token: string, n: Omit<Note, "id" | "at">) {
   await addDoc(collection(db(), "shares", token, "notes"), { ...n, at: serverTimestamp() });
 }
 
-export async function notesOf(token: string): Promise<Note[]> {
+export async function notesOf(token: string, cached = false): Promise<Note[]> {
   if (MOCK) return mem.notes.get(token) ?? [];
-  const s = await getDocs(query(collection(db(), "shares", token, "notes"), orderBy("at", "desc")));
+  const q = query(collection(db(), "shares", token, "notes"), orderBy("at", "desc"));
+  const s = await (cached ? getDocsFromCache(q) : getDocs(q));
   return s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Note, "id">) }));
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +18,6 @@ import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
 import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
-import { Studio } from "@/components/studio";
 import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-carousel";
 import { OpenBook, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
@@ -27,6 +27,9 @@ import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBo
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
 import { markSeen, seenSnapshot } from "@/lib/seen";
 import { useShelf } from "@/lib/shelf";
+
+// Das Fotostudio liegt unter den Büchern und bringt den Editor mit: eigener Teil, damit die Bücher nicht darauf warten
+const Studio = dynamic(() => import("@/components/studio").then((m) => m.Studio), { ssr: false });
 
 /** Google-Konten, unter denen Michel angemeldet ist. Kein Schutz: die Fotos liegen ohnehin öffentlich unter /photos */
 const OWNER_EMAILS = ["michel.julian.leotta@gmail.com"];

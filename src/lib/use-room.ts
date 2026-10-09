@@ -28,15 +28,20 @@ export type Feedback = Note & { token: string; who: string };
 /** Wo ein eigenes Buch hingelegt ist und was davon zurückkam; `items` neueste zuerst */
 export type Spread = { to: string[]; notes: number; ears: number; items: Feedback[] };
 
-/** Für jedes eigene Buch: bei wem es liegt, welche Zettel und Eselsohren kamen. Ruhende Links zählen nicht. */
-async function spreadOf(uid: string): Promise<Record<string, Spread>> {
-  const shares = (await mySharesOf(uid)).filter((s) => !s.paused);
+/**
+ * Für jedes eigene Buch: bei wem es liegt, welche Zettel und Eselsohren kamen. Ruhende Links zählen nicht.
+ * cached: nur aus dem Zwischenspeicher im Browser; null, wenn dort noch keine Links liegen.
+ */
+async function spreadOf(uid: string, cached = false): Promise<Record<string, Spread> | null> {
+  const all = await mySharesOf(uid, cached);
+  if (cached && all.length === 0) return null;
+  const shares = all.filter((s) => !s.paused);
   const out: Record<string, Spread> = {};
   await Promise.all(
     shares.map(async (s) => {
       const id = s.bookId ?? s.book?.id;
       if (!id) return;
-      const notes = await notesOf(s.token).catch(() => []);
+      const notes = await notesOf(s.token, cached).catch(() => []);
       const e = (out[id] ??= { to: [], notes: 0, ears: 0, items: [] });
       if (s.to && !e.to.includes(s.to)) e.to.push(s.to);
       for (const n of notes) {
@@ -97,11 +102,24 @@ export function useRoom(uid: string) {
   useEffect(() => watchBlocked(uid, setBlocked), [uid]);
   const visibleGifts = useMemo(() => gifts?.filter((g) => !blocked.some((b) => b.uid === g.owner)) ?? null, [gifts, blocked]);
 
-  // Nur eine Zugabe an den Büchern: schlägt das Laden fehl, fehlt die Zeile einfach
+  // Nur eine Zugabe an den Büchern: schlägt das Laden fehl, fehlt die Zeile einfach.
+  // Zuerst der Stand vom letzten Besuch aus dem Zwischenspeicher, damit die Bücher nicht auf das Netz warten
+  // (zwei Abfragen nacheinander, am Handy gut eine halbe Sekunde); der frische Stand ersetzt ihn danach.
   useEffect(() => {
     let alive = true;
+    let fresh = false;
+    spreadOf(uid, true)
+      .then((s) => {
+        if (!alive || fresh || !s) return;
+        setSpread(s);
+        setSpreadLoaded(true);
+      })
+      .catch(() => {});
     spreadOf(uid)
-      .then((s) => alive && setSpread(s))
+      .then((s) => {
+        fresh = true;
+        if (alive && s) setSpread(s);
+      })
       .catch(() => {})
       .finally(() => alive && setSpreadLoaded(true));
     return () => {
