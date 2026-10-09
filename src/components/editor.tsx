@@ -212,6 +212,8 @@ export function Editor() {
   const future = useRef<StoredBook[]>([]);
   const lastTag = useRef<{ tag: string; at: number } | null>(null);
   const savedOnce = useRef(false);
+  // die Änderung, deren Speichern noch auf den Zeitgeber wartet
+  const unsaved = useRef<StoredBook | null>(null);
   const lastAutoVersion = useRef(0);
   useEffect(() => {
     bookRef.current = book;
@@ -244,7 +246,9 @@ export function Editor() {
   // nach jeder Änderung speichern; ohne Netz bleibt die Änderung im Browser und geht später raus
   useEffect(() => {
     if (!book || !touched || !book.photos.length) return;
+    unsaved.current = book;
     const id = window.setTimeout(() => {
+      unsaved.current = null;
       const done = saveBook(book);
       // Firestore bestätigt erst mit Netz; offline zeigt der Kopf das an
       const offline = window.setTimeout(() => !navigator.onLine && setSaved("offline"), 1500);
@@ -265,6 +269,23 @@ export function Editor() {
     }, 900);
     return () => window.clearTimeout(id);
   }, [book, idParam, touched]);
+
+  // Wer die Werkbank verlässt oder die App weglegt, bevor der Zeitgeber oben läuft, verliert sonst die letzte Änderung,
+  // beim neuen Buch sogar das ganze Buch: was noch aussteht, geht dann sofort raus
+  useEffect(() => {
+    const flush = () => {
+      const b = unsaved.current;
+      if (b) saveBook(b).catch(() => {});
+    };
+    const onHide = () => document.visibilityState === "hidden" && flush();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   /** Zwischenstand vor einer großen Änderung */
   const snapshot = useCallback((label: string) => {
