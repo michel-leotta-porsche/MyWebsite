@@ -601,6 +601,21 @@ html.ohne-struktur .printed::after {
     translate: 0 -4px;
   }
 }
+/* Abzug im Fotostudio: Foto mit weißem Rand, liegt auf dem Tisch wie die Eselsohr-Abzüge */
+.studio-print {
+  display: block;
+  padding: 5px 5px 14px;
+  background: var(--paper);
+  box-shadow:
+    0 1px 1px rgb(12 10 8 / 0.5),
+    0 12px 18px -8px rgb(12 10 8 / 0.75);
+  transition: translate 160ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .studio-print:hover {
+    translate: 0 -4px;
+  }
+}
 .press:active {
   scale: 0.97;
 }

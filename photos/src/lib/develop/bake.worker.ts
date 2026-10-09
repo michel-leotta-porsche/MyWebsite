@@ -3,7 +3,7 @@
 import { bake, type BakeJob } from "@/lib/develop/bake-core";
 
 const make = (w: number, h: number) => new OffscreenCanvas(w, h);
-const encode = (c: OffscreenCanvas | HTMLCanvasElement) => (c as OffscreenCanvas).convertToBlob({ type: "image/jpeg", quality: 0.86 });
+const encode = (c: OffscreenCanvas | HTMLCanvasElement, quality: number) => (c as OffscreenCanvas).convertToBlob({ type: "image/jpeg", quality });
 
 self.onmessage = async (e: MessageEvent<{ id: number; job: BakeJob }>) => {
   const { id, job } = e.data;

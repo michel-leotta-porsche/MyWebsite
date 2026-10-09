@@ -17,6 +17,7 @@ import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
 import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
+import { Studio } from "@/components/studio";
 import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-carousel";
 import { OpenBook, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
@@ -378,6 +379,7 @@ function Room({ user }: { user: User }) {
             </p>
           </div>
           {giftsFirst ? [forYou, fromYou] : [fromYou, forYou]}
+          <Studio user={user} books={own} />
           {putAway.length > 0 && (
             <section aria-labelledby="weggelegt-h" className="grid max-w-xl gap-2">
               <h2 id="weggelegt-h" className="text-on-table-2 text-sm">
