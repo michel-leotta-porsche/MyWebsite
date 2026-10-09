@@ -7,6 +7,7 @@ import exifr from "exifr";
 import { applySettings, cleanSettings, fromEdit } from "@/lib/develop/settings";
 import { withXmp } from "@/lib/exif-write";
 import { neutralEdit, PRESETS } from "@/lib/develop/model";
+import { fmtDuration, ISO_STOPS, nearest, realFocals, SHUTTER_STOPS } from "@/lib/camera";
 import { calimaXmp, parseCalimaXmp } from "@/lib/xmp";
 import { jpeg, LR_XMP } from "./fixtures.mjs";
 
@@ -51,8 +52,7 @@ test("fremde oder kaputte Blöcke ergeben kein Rezept", () => {
 });
 
 // Expertenmodus E1: Reihen und Beschriftungen der Räder
-test("Zeiten lesbar und in Drittelstufen", async () => {
-  const { fmtDuration, SHUTTER_STOPS, nearest, ISO_STOPS, realFocals } = await import("../../src/lib/camera.ts");
+test("Zeiten lesbar und in Drittelstufen", () => {
   assert.equal(fmtDuration(1 / 250), "1/250");
   assert.equal(fmtDuration(1 / 8000), "1/8000");
   assert.equal(fmtDuration(0.5), "0,5 s");
