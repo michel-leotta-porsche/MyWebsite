@@ -39,7 +39,7 @@ async function withinLimit() {
   });
 }
 
-export const mailOnReport = onDocumentCreated({ document: "reports/{id}", secrets: [RESEND_API_KEY] }, async (event) => {
+export const mailOnReport = onDocumentCreated({ document: "reports/{id}", secrets: [RESEND_API_KEY], maxInstances: 2 }, async (event) => {
   const r = event.data?.data();
   if (!r) return;
   if (!(await withinLimit())) {

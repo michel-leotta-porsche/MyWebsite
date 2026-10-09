@@ -553,6 +553,8 @@ export async function closeReport(id: string) {
 /** Link sperren: Zettel und Link löschen. Für Admins bei einer Meldung; das Buch beim Macher bleibt */
 export async function takeDownShare(token: string) {
   if (MOCK) return;
+  // erst merken, dann löschen: so kann der Macher denselben Link nicht neu anlegen (firestore.rules)
+  await setDoc(doc(db(), "takedowns", token), { at: serverTimestamp() });
   const notes = await getDocs(collection(db(), "shares", token, "notes")).catch(() => null);
   await Promise.all((notes?.docs ?? []).map((n) => deleteDoc(n.ref)));
   await deleteDoc(doc(db(), "shares", token));
