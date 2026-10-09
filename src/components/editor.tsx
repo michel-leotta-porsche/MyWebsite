@@ -44,7 +44,9 @@ import {
   type StoredPhoto,
   type Version,
 } from "@/lib/store";
-import { IS_APP } from "@/lib/app-mode";
+import { IS_APP, withKeys } from "@/lib/app-mode";
+import { friendlyError } from "@/lib/errors";
+import { takeHandover } from "@/lib/handoff";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
 import { useQueryParam } from "@/lib/use-query";
@@ -59,6 +61,8 @@ type Pending = { key: string; name: string; state: "lesen" | "laden" | "fertig" 
 type Selection = { type: "photo"; key: string } | { type: "spread"; id: string } | null;
 
 const MAX = 60;
+/** so viele Fotos laden höchstens gleichzeitig hoch (je drei Größen) */
+const MAX_UPLOADS = 3;
 /** Unter 768px: Panel des Gewählten als Blatt am unteren Rand, direkt beim Foto statt weit darunter */
 const SHEET =
   "md:rounded-cut max-md:rounded-t-cut max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-[620] max-md:max-h-[60svh] max-md:overflow-y-auto max-md:overscroll-contain max-md:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-md:shadow-[0_-16px_32px_-12px_rgb(12_10_8/0.7)]";
@@ -374,7 +378,7 @@ export function Editor() {
     };
   }, []);
 
-  // Fotos reinziehen: zwei gleichzeitig lesen und kodieren, Hochladen läuft neben dem nächsten Foto her.
+  // Fotos reinziehen: zwei gleichzeitig lesen und kodieren (in der App eins), Hochladen läuft neben dem nächsten Foto her.
   // Das Buch wird gesammelt neu gerechnet (höchstens alle 800 ms), nicht nach jedem Foto.
   const addFiles = useCallback(
     async (files: File[]) => {
@@ -391,7 +395,7 @@ export function Editor() {
       setPending((p) => [
         ...p,
         ...items,
-        ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: "kein Foto" })),
+        ...skipped.map((f) => ({ key: newId().slice(0, 10), name: f.name, state: "fehler" as const, error: "Kein Foto" })),
       ]);
       // die Grenze klar benennen: wie viele aufgenommen wurden und wohin der Rest kann (#44)
       if (over > 0)
@@ -416,17 +420,32 @@ export function Editor() {
       };
 
       const uploads: Promise<void>[] = [];
+      // Gegendruck: höchstens so viele Fotos gleichzeitig in der Leitung, sonst stauen sich bei langsamem Netz
+      // Dutzende MB fertiger Bilder im Speicher (Workshop Paket 6, S7)
+      let inFlight = 0;
+      const waiting: (() => void)[] = [];
+      const lane = async () => {
+        while (inFlight >= MAX_UPLOADS) await new Promise<void>((ok) => waiting.push(ok));
+      };
+      const done = () => {
+        inFlight--;
+        waiting.shift()?.();
+      };
       let next = 0;
       const work = async () => {
         while (next < list.length) {
           const i = next++;
           const it = items[i];
           try {
-            const ph = await ingest(list[i], it.key);
+            await lane();
+            const ph = await ingest(list[i], it.key).catch(() => {
+              throw new Error("Ließ sich nicht öffnen");
+            });
             mark(it.key, "laden");
+            inFlight++;
             // Hochladen nicht abwarten: das nächste Foto wird schon gelesen
             uploads.push(
-              uploadPhoto(user.uid, b.id, ph).then(
+              uploadPhoto(user.uid, b.id, ph).finally(done).then(
                 (urls) => {
                   ready.push({
                     key: ph.key,
@@ -445,15 +464,16 @@ export function Editor() {
                   });
                   if (!timer) timer = window.setTimeout(flush, 800);
                 },
-                (e) => mark(it.key, "fehler", e instanceof Error ? e.message : "Hochladen fehlgeschlagen"),
+                (e) => mark(it.key, "fehler", friendlyError(e)),
               ),
             );
           } catch (e) {
-            mark(it.key, "fehler", e instanceof Error ? e.message : "Fehler");
+            mark(it.key, "fehler", e instanceof Error ? e.message : "Ließ sich nicht öffnen");
           }
         }
       };
-      await Promise.all([work(), work()]);
+      // in der App ein Strang: zwei gleichzeitig dekodierte 24-MP-Fotos sprengen auf kleinen iPhones den Speicher
+      await Promise.all(IS_APP ? [work()] : [work(), work()]);
       await Promise.all(uploads);
       flush();
       // Messgrundlage T2: Zeit vom Reinziehen bis zum fertigen Erstentwurf (nur für die Messskripte, nicht in der Oberfläche)
@@ -462,6 +482,14 @@ export function Editor() {
     },
     [relayout, update, user],
   );
+
+  // Fotos, die im Bücherzimmer schon gewählt wurden (App): aufnehmen, sobald das neue Buch steht
+  const hasBook = !!book;
+  useEffect(() => {
+    if (!hasBook || idParam) return;
+    const files = takeHandover();
+    if (files) addFiles(files);
+  }, [hasBook, idParam, addFiles]);
   useEffect(() => {
     addRef.current = addFiles;
   }, [addFiles]);
@@ -757,10 +785,10 @@ export function Editor() {
         </div>
         <div className="mt-1 flex items-center justify-between gap-3">
           <ToolGroup label="Bearbeiten">
-            <IconButton label="Rückgängig (⌘Z)" disabled={!undoState.past} onClick={undo}>
+            <IconButton label={withKeys("Rückgängig", "⌘Z")} disabled={!undoState.past} onClick={undo}>
               <Undo2 aria-hidden />
             </IconButton>
-            <IconButton label="Wiederholen (⇧⌘Z)" disabled={!undoState.future} onClick={redo} className="max-md:hidden">
+            <IconButton label={withKeys("Wiederholen", "⇧⌘Z")} disabled={!undoState.future} onClick={redo} className="max-md:hidden">
               <Redo2 aria-hidden />
             </IconButton>
             <IconButton label="Verlauf" onClick={() => setHistory(true)} className="max-md:hidden">
@@ -875,7 +903,7 @@ export function Editor() {
                     </span>
                     <span className="min-w-0 flex-1 truncate">{p.name}</span>
                     <span className={`shrink-0 ${p.state === "fehler" ? "text-on-table" : ""}`}>
-                      {p.state === "lesen" ? "liest …" : p.state === "laden" ? "lädt hoch …" : p.state === "fertig" ? "fertig" : `Fehler: ${p.error}`}
+                      {p.state === "lesen" ? "liest …" : p.state === "laden" ? "lädt hoch …" : p.state === "fertig" ? "fertig" : p.error}
                     </span>
                   </li>
                 ))}
@@ -1012,7 +1040,7 @@ export function Editor() {
                             openStage(i);
                           }
                         }}
-                        title="Doppelklick: gestalten"
+                        title={IS_APP ? undefined : "Doppelklick: gestalten"}
                         className={`flex cursor-grab justify-center shadow-[0_12px_24px_-12px_rgb(12_10_8/0.8)] active:cursor-grabbing ${active ? "outline-mark outline-2 outline-offset-2" : ""}`}
                       >
                         {(["left", "right"] as const).map((side) => {

@@ -27,6 +27,7 @@ import { OpenBook, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
 import { IS_APP } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
+import { handOver } from "@/lib/handoff";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
 import { markSeen, seenSnapshot } from "@/lib/seen";
@@ -100,6 +101,7 @@ function Room({ user }: { user: User }) {
   const [emptying, setEmptying] = useState(false);
   const router = useRouter();
   const importInput = useRef<HTMLInputElement>(null);
+  const pickInput = useRef<HTMLInputElement>(null);
 
   const { own, gifts, trash } = room;
   const shelf = useShelf();
@@ -268,9 +270,16 @@ function Room({ user }: { user: User }) {
               title="Neues Buch"
               meta={IS_APP ? "Fotos wählen, fertig." : "Fotos reinziehen, fertig."}
               primary={
-                <Link href="/neu" className={primaryClass}>
-                  Fotos wählen
-                </Link>
+                IS_APP ? (
+                  // in der App öffnet die Apple-Auswahl sofort; wer abbricht, bleibt im Zimmer und hat kein leeres Buch
+                  <button type="button" className={primaryClass} onClick={() => pickInput.current?.click()}>
+                    Fotos wählen
+                  </button>
+                ) : (
+                  <Link href="/neu" className={primaryClass}>
+                    Fotos wählen
+                  </Link>
+                )
               }
             >
               <Button size="sm" onClick={() => importInput.current?.click()}>
@@ -373,6 +382,20 @@ function Room({ user }: { user: User }) {
       }}
     >
       {!ownReady && <RoomLoading />}
+      <input
+        ref={pickInput}
+        type="file"
+        accept="image/*,.heic,.heif,.dng"
+        multiple
+        className="sr-only"
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          e.target.value = "";
+          if (!files.length) return;
+          handOver(files);
+          router.push("/neu");
+        }}
+      />
       <input
         ref={importInput}
         type="file"

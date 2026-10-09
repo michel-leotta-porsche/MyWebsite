@@ -271,11 +271,13 @@ export async function readMeta(file: File): Promise<PhotoMeta> {
 export async function ingest(file: File, key: string, known?: PhotoMeta): Promise<Ingested> {
   const { taken, camera, recipe } = known ?? (await readMeta(file));
   const src = await open(file);
+  const canvases: HTMLCanvasElement[] = [];
   try {
     // Stufen statt dreimal vom Original: schneller und genauso scharf
     const large = drawLarge(src, SIZES.large);
     const page = shrink(large, SIZES.page);
     const thumb = shrink(page, SIZES.thumb);
+    canvases.push(large, page, thumb);
     const [bl, bp, bt, subject] = await Promise.all([toJpeg(large), toJpeg(page), toJpeg(thumb), findSubject(page)]);
     return {
       key,
@@ -291,6 +293,8 @@ export async function ingest(file: File, key: string, known?: PhotoMeta): Promis
       recipe,
     };
   } finally {
+    // wie im Fotostudio: Safari gibt große Zeichenflächen sonst erst spät frei, bei 60 Fotos ist dann der Speicher voll
+    for (const c of canvases) c.width = c.height = 0;
     src.close();
   }
 }
