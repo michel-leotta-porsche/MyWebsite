@@ -161,6 +161,17 @@ export const DEVELOP: Record<string, string> = {
   "Ohne Look": "No look",
   "nimmt den Look weg": "removes the look",
   "Stärke {name}": "Strength {name}",
+  // Verlauf hinter Rückgängig
+  "{n} Fotos auf einmal": "{n} photos at once",
+  "Nichts geändert": "No change",
+  Auto: "Auto",
+  Einstellungen: "Settings",
+  "Zurück bis vor …": "Go back to before …",
+  "der letzte Schritt": "the last step",
+  "{n} Schritte zurück": "{n} steps back",
+  "Ganz an den Anfang": "Back to the start",
+  "Noch nichts zum Zurücknehmen": "Nothing to undo yet",
+  "Rückgängig, lange drücken zeigt den Verlauf": "Undo, press and hold for history",
 
   // Mehr Werkzeuge
   "{name} schließen": "Close {name}",

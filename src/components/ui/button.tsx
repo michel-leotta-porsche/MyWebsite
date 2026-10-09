@@ -36,7 +36,7 @@ export function Button({ variant = "quiet", size = "md", haptic: own, className 
 
 /** Symbolknopf: braucht immer einen Namen für Screenreader (label) */
 export function IconButton({ label, variant = "quiet", ...p }: Omit<Props, "size" | "aria-label"> & { label: string }) {
-  return <Button {...p} variant={variant} size="icon" aria-label={label} title={label} />;
+  return <Button {...p} variant={variant} size="icon" aria-label={label} title={p.title ?? label} />;
 }
 
 /** Mehrere Symbolknöpfe in einer Pille, z. B. Rückgängig, Ansehen, Mehr */
