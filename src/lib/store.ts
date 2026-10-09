@@ -226,6 +226,7 @@ export const newId = () =>
 // Testmodus ohne Firebase: alles bleibt im Speicher dieser Seite
 const MOCK = process.env.NEXT_PUBLIC_FUJI_MOCK === "1";
 const mem = { books: new Map<string, StoredBook>(), shares: new Map<string, Share>(), notes: new Map<string, Note[]>() };
+const mockWatchers = new Set<() => void>();
 // im Testmodus überleben geteilte Bücher einen Seitenwechsel (für den Test des Gastlinks);
 // Bücher und Zettel lassen sich für Bildschirmfotos vorab in den sessionStorage legen
 if (MOCK && typeof window !== "undefined") {
@@ -350,7 +351,10 @@ export async function deleteRecipe(uid: string, id: string) {
 
 export async function saveBook(b: StoredBook) {
   b = { ...b, schema: SCHEMA };
-  if (MOCK) return void mem.books.set(b.id, structuredClone(b));
+  if (MOCK) {
+    mem.books.set(b.id, structuredClone(b));
+    return void mockWatchers.forEach((f) => f());
+  }
   await setDoc(doc(db(), "books", b.id), { ...b, updatedAt: serverTimestamp() }, { merge: false });
 }
 
@@ -622,8 +626,11 @@ export async function myBooks(uid: string): Promise<StoredBook[]> {
  */
 export function watchMyBooks(uid: string, next: (books: StoredBook[]) => void, fail: (e: unknown) => void): () => void {
   if (MOCK) {
-    queueMicrotask(() => next([...mem.books.values()]));
-    return () => {};
+    // wie onSnapshot: auch nach jedem Speichern
+    const f = () => next([...mem.books.values()]);
+    queueMicrotask(f);
+    mockWatchers.add(f);
+    return () => void mockWatchers.delete(f);
   }
   const q = query(collection(db(), "books"), where("owner", "==", uid));
   return onSnapshot(q, (s) => next(s.docs.map((d) => fromDoc(d.data()))), fail);

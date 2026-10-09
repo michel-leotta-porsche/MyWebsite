@@ -66,6 +66,17 @@
 	<string>Calima nutzt die Kamera nur, wenn du ein Foto direkt für dein Buch aufnimmst.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Calima legt ein Foto nur dann in deine Mediathek, wenn du es im Fotostudio sicherst.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.calima.kamera</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Ins Reisebuch fotografieren</string>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCapturePhoto</string>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>

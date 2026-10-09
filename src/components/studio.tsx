@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { BookPlus, Camera as CameraIcon, ChevronLeft, Pencil, Trash2 } from "lucide-react";
 
@@ -20,8 +21,10 @@ import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "
 import { friendlyError } from "@/lib/errors";
 import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
-import { hasCamera } from "@/lib/camera";
+import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
+import { dayOf, daysAgo, dayStack, isDayStack } from "@/lib/day-stack";
 import { undevelopedStacks } from "@/lib/film";
+import { newBook, uploadPrints } from "@/lib/shelve";
 import { useQueryParam } from "@/lib/use-query";
 import { calimaXmp } from "@/lib/xmp";
 import { IS_APP } from "@/lib/app-mode";
@@ -29,8 +32,8 @@ import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/native";
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
-import { aspectFor, autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { listPrints, MAX_PRINTS, MAX_STACK, piles, putPrints, removePrint, trimPiles, type Print } from "@/lib/studio-store";
+import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
+import { listPrints, MAX_STACK, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -41,6 +44,7 @@ import { de, getLang, locale, t, useT } from "@/lib/i18n";
 // der Editor ist groß und wird erst geladen, wenn jemand ein Foto öffnet
 const DevelopDialog = dynamic(() => import("@/components/develop-dialog").then((m) => m.DevelopDialog), { ssr: false });
 const Camera = dynamic(() => import("@/components/camera").then((m) => m.Camera), { ssr: false });
+const DaySort = dynamic(() => import("@/components/day-sort").then((m) => m.DaySort), { ssr: false });
 
 /** größer ist keine Fotodatei, sondern etwas, das beim Entpacken den Speicher sprengt */
 const MAX_FILE = 60 * 1024 * 1024;
@@ -77,8 +81,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const [done, setDone] = useState<Print[] | null>(null);
   const [over, setOver] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  // eine Kamera-Sitzung ist ein Stapel: alle Aufnahmen bis zum Schließen
-  const session = useRef<{ stack: string; prints: Print[] }>({ stack: newId(), prints: [] });
+  const [sorting, setSorting] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const t = useT();
   const router = useRouter();
@@ -92,10 +95,13 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       .catch(() => {});
   }, [user.uid]);
 
-  // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist
+  // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist. Liegt ein Abzug
+  // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher
   const keep = (ps: Print[]) => {
     setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
-    putPrints(user.uid, ps).catch(() => {});
+    putPrints(user.uid, ps)
+      .then(() => setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x))))
+      .catch(() => {});
   };
   // Bilder auf einem unentwickelten Film bleiben im Dunkeln: sie liegen schon im Studio, zeigen sich aber erst nach dem Entwickeln
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
@@ -103,15 +109,21 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const stacks = piles(shown);
 
   const openCamera = () => setCameraOpen(true);
+  // Quick Action am App-Symbol, während das Zimmer offen ist (app-launch.tsx)
+  useEffect(() => {
+    const on = (e: Event) => {
+      e.preventDefault();
+      setSorting(null);
+      setCameraOpen(true);
+    };
+    window.addEventListener(OPEN_CAMERA, on);
+    return () => window.removeEventListener(OPEN_CAMERA, on);
+  }, []);
+  // Abendstapel: ohne Film legt die Kamera jedes Foto auf den Stapel seines Tages, sortiert nach der Aufnahmezeit
   const onShot = (p: Print, filmStack?: string) => {
     // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film
     if (filmStack) return keep([{ ...p, stack: filmStack }]);
-    const cur = session.current;
-    const i = cur.prints.findIndex((x) => x.id === p.id);
-    const print = { ...p, stack: cur.stack, pos: i < 0 ? cur.prints.length : cur.prints[i].pos };
-    if (i < 0) cur.prints.push(print);
-    else cur.prints[i] = print;
-    keep([print]);
+    keep([{ ...p, stack: dayStack(p.at), pos: p.at }]);
   };
   // ein voller oder entnommener Film: der Stapel liegt schon im Studio, jetzt zu Fertig
   const onFilmDone = (stack: string) => {
@@ -124,16 +136,38 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       return list;
     });
   };
+  // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
   const closeCamera = () => {
     setCameraOpen(false);
     if (wantsCamera) router.replace("/zimmer");
-    const made = session.current.prints;
-    session.current = { stack: newId(), prints: [] };
-    if (!made.length) return;
-    // ein einzelnes Foto ist ein Abzug, kein Stapel
-    const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
-    keep(ps);
-    setDone(ps);
+  };
+
+  /** Fotos aus der Mediathek, selbst gewählt, auf einen Tagesstapel legen */
+  const addToDay = async (stack: string, given: File[]) => {
+    const images = given.filter((x) => !x.type.startsWith("video/") && x.size <= MAX_FILE).slice(0, MAX_STACK);
+    const { studioSource } = await import("@/lib/ingest");
+    const at = Date.now();
+    let broken = 0;
+    for (const [i, file] of images.entries()) {
+      setPreparing(t("Öffne {i} von {n} …", { i: i + 1, n: images.length }));
+      const s = await studioSource(file).catch(() => pause(400).then(() => studioSource(file))).catch(() => null);
+      if (!s) {
+        broken++;
+        continue;
+      }
+      // eingereiht nach der Aufnahmezeit, sonst nach dem Datum der Datei
+      const taken = s.meta.taken ? Date.parse(s.meta.taken) : NaN;
+      keep([{ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: Number.isFinite(taken) ? taken : file.lastModified || at }]);
+    }
+    setPreparing(null);
+    if (broken) notify(broken === 1 ? t("Ein Foto ließ sich nicht öffnen.") : t("{n} Fotos ließen sich nicht öffnen.", { n: numberWord(broken) }));
+  };
+  /** nach dem Einsortieren: der Tag liegt im Buch, sein Stapel verlässt den Pult */
+  const clearDay = (stack: string) => {
+    setPrints((list) => {
+      for (const p of list) if (p.stack === stack) removePrint(p.id).catch(() => {});
+      return list.filter((p) => p.stack !== stack);
+    });
   };
 
   const open = async (given: File[]) => {
@@ -228,22 +262,16 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       </div>
 
       <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label={t("Abzüge")}>
-        {stacks.map((pile, i) => (pile.length > 1 ? <StackTile key={pile[0].stack} pile={pile} i={i} onOpen={() => setEditing(pile)} /> : <PrintTile key={pile[0].id} print={pile[0]} i={i} onOpen={() => setEditing(pile)} />))}
-        {hasCamera() && (
-          <OnTable i={stacks.length} tilt={-2} className={shown.length ? "ml-4" : "-ml-5 md:-ml-6"}>
-            <button
-              type="button"
-              onClick={openCamera}
-              disabled={!!preparing}
-              className="studio-sheet linen bg-paper-shade text-cloth-ink/70 grid h-[132px] w-[104px] content-between p-3 text-left disabled:opacity-70 md:h-[156px] md:w-[124px]"
-              aria-describedby="studio-h"
-            >
-              <CameraIcon aria-hidden className="h-7 w-7" strokeWidth={1.5} />
-              <span className="text-[15px] leading-tight font-bold">{t("Kamera")}</span>
-            </button>
-          </OnTable>
+        {stacks.map((pile, i) =>
+          isDayStack(pile[0].stack) ? (
+            <DayTile key={pile[0].stack} pile={pile} i={i} n={stacks.length} onOpen={() => setSorting(pile[0].stack!)} />
+          ) : pile.length > 1 ? (
+            <StackTile key={pile[0].stack} pile={pile} i={i} n={stacks.length} onOpen={() => setEditing(pile)} />
+          ) : (
+            <PrintTile key={pile[0].id} print={pile[0]} i={i} n={stacks.length} onOpen={() => setEditing(pile)} />
+          ),
         )}
-        <OnTable i={stacks.length + (hasCamera() ? 1 : 0)} tilt={2} className={shown.length || hasCamera() ? "ml-4" : "-ml-5 md:-ml-6"}>
+        <OnTable i={stacks.length} n={stacks.length} tilt={2} className={shown.length ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
             type="button"
             onClick={() => input.current?.click()}
@@ -277,9 +305,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       />
       {shown.length > 0 && (
         <p className="text-on-table-2 mt-2 text-[13px]">
-          {t("Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.")}
+          {stacks.some((pile) => isDayStack(pile[0].stack))
+            ? t("Ein Tag öffnet sich zum Einsortieren: nach rechts ins Buch, nach links weg. Nichts davon wird hochgeladen, bevor es im Buch liegt.")
+            : t("Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.")}
         </p>
       )}
+      {hasCamera() && <Shutter onShoot={openCamera} hidden={camera || !!sorting} />}
       {error && (
         <p role="alert" className="text-on-table text-sm">
           {error}
@@ -287,6 +318,24 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       )}
 
       {camera && <Camera uid={user.uid} onShot={onShot} onFilmDone={onFilmDone} onClose={closeCamera} />}
+      {sorting && (
+        <DaySort
+          stack={sorting}
+          prints={stacks.find((pile) => pile[0].stack === sorting) ?? []}
+          user={user}
+          books={books}
+          adding={preparing}
+          onChange={keep}
+          onAdd={(files) => addToDay(sorting, files)}
+          onEditAll={() => {
+            const pile = stacks.find((x) => x[0].stack === sorting);
+            setSorting(null);
+            if (pile) setEditing(pile);
+          }}
+          onLaid={() => clearDay(sorting)}
+          onClose={() => setSorting(null)}
+        />
+      )}
       {editing && (
         <StudioEditor
           prints={editing}
@@ -329,14 +378,14 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   );
 }
 
-function PrintTile({ print, i, onOpen }: { print: Print; i: number; onOpen: () => void }) {
+function PrintTile({ print, i, n, onOpen }: { print: Print; i: number; n: number; onOpen: () => void }) {
   const blobs = useMemo(() => ({ img: print.shot ?? print.thumb }), [print.shot, print.thumb]);
   const { img } = useBlobUrls(blobs);
   const [pw, ph] = outSize(print.edit?.geo, print.w, print.h);
   const land = pw >= ph;
   const t = useT();
   return (
-    <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
       <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("{name}, {when} bearbeitet. Öffnen", { name: print.name, when: when(print.at) })}>
         <span className="studio-paper">
           {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
@@ -364,10 +413,10 @@ function Paper({ print, className = "", children }: { print: Print; className?: 
 }
 
 /** Ein Stapel auf dem Pult: oben der erste Abzug, darunter zwei weitere, die sich beim Anheben auffächern */
-function StackTile({ pile, i, onOpen }: { pile: Print[]; i: number; onOpen: () => void }) {
+function StackTile({ pile, i, n, onOpen }: { pile: Print[]; i: number; n: number; onOpen: () => void }) {
   const t = useT();
   return (
-    <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
       <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("Stapel mit {n} Fotos, {when} bearbeitet. Öffnen", { n: numberWord(pile.length).toLowerCase(), when: when(pile[0].at) })}>
         {pile.slice(1, 3).map((p, j) => (
           <span key={p.id} aria-hidden className="studio-fan absolute inset-0 grid place-items-end" style={{ ["--f" as string]: j ? -1 : 1 } as CSSProperties}>
@@ -385,13 +434,85 @@ function StackTile({ pile, i, onOpen }: { pile: Print[]; i: number; onOpen: () =
   );
 }
 
+/** Der Stapel eines Tages: wie ein Stapel, darunter ein Zettel mit dem Tag; öffnet das Einsortieren */
+function DayTile({ pile, i, n, onOpen }: { pile: Print[]; i: number; n: number; onOpen: () => void }) {
+  const t = useT();
+  const day = dayName(pile[0].stack!);
+  const open = pile.filter((p) => !p.pick).length;
+  return (
+    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="studio-sheet"
+        aria-label={
+          open
+            ? t("{day}: {n} Fotos, {open} noch nicht einsortiert. Einsortieren", { day, n: pile.length, open })
+            : t("{day}: {n} Fotos, alle einsortiert. Ins Buch legen", { day, n: pile.length })
+        }
+      >
+        {pile.slice(1, 3).map((p, j) => (
+          <span key={p.id} aria-hidden className="studio-fan absolute inset-0 grid place-items-end" style={{ ["--f" as string]: j ? -1 : 1 } as CSSProperties}>
+            <Paper print={p} className="shadow-[1px_2px_4px_rgb(12_10_8/0.35)]" />
+          </span>
+        ))}
+        <Paper print={pile[0]}>
+          <span aria-hidden className="studio-sheen" />
+        </Paper>
+        <span aria-hidden className="bg-cloth text-cloth-ink absolute -top-2.5 -right-2.5 z-[1] grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] font-bold tabular-nums shadow-[0_2px_6px_rgb(12_10_8/0.45)]">
+          {open || pile.length}
+        </span>
+        <span aria-hidden className="note-paper absolute -bottom-4 left-1/2 z-[1] -translate-x-1/2 -rotate-2 px-2.5 pt-0.5 pb-1 text-[19px] leading-none whitespace-nowrap" style={{ fontFamily: "var(--font-hand), cursive" }}>
+          {day}
+        </span>
+      </button>
+    </OnTable>
+  );
+}
+
+/** „Heute“, „Gestern“ oder „Mi., 7. Okt.“: wie der Zettel auf dem Tagesstapel */
+export function dayName(stack: string) {
+  const ago = daysAgo(stack);
+  if (ago === 0) return t("Heute");
+  if (ago === 1) return t("Gestern");
+  return dayOf(stack).toLocaleDateString(locale(getLang()), { weekday: "short", day: "numeric", month: "short" });
+}
+
+/**
+ * Der Auslöser im Bücherzimmer (nur in der App): immer an derselben Stelle unten rechts, ein heller Ring wie die Schrift
+ * auf dem Tisch. Gelb bleibt dem einen Hauptknopf. In der Mitte läge er auf gängigen iPhones über den Knöpfen des
+ * ersten Buchs; rechts sind die frei, weil die Knöpfe links anfangen. Öffnet Calimas Kamera, jedes Foto landet auf dem
+ * Stapel von heute.
+ */
+function Shutter({ onShoot, hidden }: { onShoot: () => void; hidden: boolean }) {
+  const t = useT();
+  if (hidden) return null;
+  return createPortal(
+    <button
+      type="button"
+      onClick={() => {
+        haptic("press");
+        onShoot();
+      }}
+      aria-label={t("Fotografieren")}
+      className="press border-on-table fixed z-40 grid size-[68px] place-items-center rounded-full border-[3.5px] bg-[rgb(18_17_16/0.55)] shadow-[0_12px_28px_-8px_rgb(12_10_8/0.9)] backdrop-blur-sm"
+      style={{ right: "max(18px, env(safe-area-inset-right))", bottom: "max(18px, calc(env(safe-area-inset-bottom) + 6px))" }}
+    >
+      <span className="bg-on-table text-table grid size-[52px] place-items-center rounded-full">
+        <CameraIcon aria-hidden className="size-[22px]" strokeWidth={2.2} />
+      </span>
+    </button>,
+    document.body,
+  );
+}
+
 const still = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Etwas, das auf dem Tisch liegt: Schatten bleibt liegen, das Blatt darüber hebt sich beim Zeigen (Maus) oder Drücken (Finger)
  * und kippt zur Hand hin. Die Neigung läuft über CSS-Variablen am Element, nicht über React, damit nichts neu rendert.
  */
-function OnTable({ i, tilt, className = "", children }: { i: number; tilt: number; className?: string; children: ReactNode }) {
+function OnTable({ i, n, tilt, className = "", children }: { i: number; /** wie viele Stapel liegen: die vorderen liegen oben */ n: number; tilt: number; className?: string; children: ReactNode }) {
   const ref = useRef<HTMLLIElement>(null);
   const set = (rx: number, ry: number) => {
     const el = ref.current;
@@ -425,7 +546,7 @@ function OnTable({ i, tilt, className = "", children }: { i: number; tilt: numbe
     <li
       ref={ref}
       className={`studio-slot deal ${className}`}
-      style={{ rotate: `${tilt}deg`, zIndex: MAX_PRINTS + 1 - i, ["--d" as string]: i } as CSSProperties}
+      style={{ rotate: `${tilt}deg`, zIndex: n + 1 - i, ["--d" as string]: i } as CSSProperties}
       onPointerEnter={(e) => e.pointerType === "mouse" && lift(true)}
       onPointerDown={(e) => e.pointerType !== "mouse" && lift(true)}
       onPointerMove={lean}
@@ -547,7 +668,7 @@ function DoneSheet({
       const out: File[] = [];
       // nacheinander: jedes Foto braucht in voller Größe viel Speicher
       for (const p of prints) {
-        const url = URL.createObjectURL(p.work);
+        const url = URL.createObjectURL(await workOf(p));
         const e = p.edit ?? neutralEdit();
         try {
           const baked = await bakePhoto({
@@ -649,43 +770,8 @@ function DoneSheet({
     const into = target ? `„${target.title || t("Ohne Titel")}“` : t("ein neues Buch");
     setBusy(many ? t("Lege Foto {i} von {n} in {into} …", { i: 1, n: prints.length, into }) : target ? t("Lege das Foto in {into} …", { into }) : t("Lege ein neues Buch an …"));
     try {
-      const { ingest } = await import("@/lib/ingest");
       const bookId = target?.id ?? newId();
-      const photos: StoredPhoto[] = [];
-      for (const [i, p] of prints.entries()) {
-        if (many) setBusy(t("Lege Foto {i} von {n} in {into} …", { i: i + 1, n: prints.length, into }));
-        const key = newId().slice(0, 10);
-        const edit = p.edit;
-        // das unbearbeitete Foto wird zum Original im Buch, die Bearbeitung liegt darüber: auf der Werkbank bleibt sie änderbar
-        const ph = await ingest(new File([p.work], `${p.name}.jpg`, { type: "image/jpeg" }), key, p.meta);
-        const urls = await uploadPhoto(user.uid, bookId, ph);
-        let photo: StoredPhoto = {
-          key,
-          title: "",
-          alt: "",
-          w: ph.w,
-          h: ph.h,
-          src: urls.page,
-          large: urls.large,
-          thumb: urls.thumb,
-          color: ph.color,
-          subject: ph.subject,
-          taken: ph.taken,
-          recipe: ph.recipe,
-          camera: ph.camera,
-        };
-        if (edit && !isNeutral(edit)) {
-          const local = URL.createObjectURL(ph.blobs.large);
-          try {
-            const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette, clarity: edit.more?.clarity });
-            const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
-            photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
-          } finally {
-            URL.revokeObjectURL(local);
-          }
-        }
-        photos.push(photo);
-      }
+      const photos = await uploadPrints(user.uid, bookId, prints, (i) => many && setBusy(t("Lege Foto {i} von {n} in {into} …", { i: i + 1, n: prints.length, into })));
       if (target) {
         // frisch laden: auf einem anderen Gerät kann sich das Buch seitdem geändert haben
         const fresh = (await loadBook(target.id)) ?? target;
@@ -693,19 +779,7 @@ function DoneSheet({
       } else {
         const auto = autoPhotos(photos);
         const { spreads, coverKey } = relayoutFree([], auto, new Set());
-        await saveBook({
-          schema: SCHEMA,
-          id: bookId,
-          owner: user.uid,
-          ownerName: user.displayName ?? "Ich",
-          title: "",
-          subtitle: "",
-          cloth: "ringelblume",
-          aspect: aspectFor(photos),
-          coverKey: coverKey || pickCover(auto) || photos[0].key,
-          photos,
-          spreads,
-        });
+        await saveBook(newBook(user, bookId, photos, spreads, coverKey || pickCover(auto)));
       }
       haptic("success");
       const name = target?.title || t("Ohne Titel");

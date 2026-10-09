@@ -1,3 +1,6 @@
 /* Permission prompts in English */
 "NSCameraUsageDescription" = "Calima only uses the camera when you take a photo directly for your book.";
 "NSPhotoLibraryAddUsageDescription" = "Calima only adds a photo to your library when you save it in the Photo studio.";
+
+/* Quick Action am App-Symbol (Abendstapel) */
+"Ins Reisebuch fotografieren" = "Shoot for your travel book";

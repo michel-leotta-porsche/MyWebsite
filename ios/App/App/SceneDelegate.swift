@@ -11,7 +11,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.rootViewController = CalimaViewController()
         window?.makeKeyAndVisible()
 
+        // Kaltstart über die Quick Action am App-Symbol: die Seite holt sie ab, sobald sie läuft (CalimaLaunch)
+        if let item = connectionOptions.shortcutItem { _ = CalimaLaunch.receive(item) }
+
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    /// Quick Action, während Calima im Hintergrund lag
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(CalimaLaunch.receive(shortcutItem))
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

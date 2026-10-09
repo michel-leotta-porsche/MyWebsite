@@ -24,7 +24,8 @@ import type { Print } from "@/lib/studio-store";
 // unten macht heller oder dunkler, zwei Finger zoomen, ein Tipp stellt scharf. Jedes Foto wird ein Abzug im Fotostudio,
 // mit dem Look als Bearbeitung; eingerechnet wird erst beim Sichern, dann auch die Klarheit. Die Körnung läuft schon im
 // Sucher mit. „Film einlegen“ (Stufe 2) hält einen Look fest: FILM_FRAMES Bilder, die als ein Stapel im Fotostudio
-// landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus. Das Werkzeug
+// landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus. Ohne Film liegt
+// jedes Foto auf dem Stapel des Tages (Abendstapel, reisebuch-workshop-2026-10-09/abendstapel-plan.md). Das Werkzeug
 // (Expertenmodus E1, camera-dials.tsx) liegt hinter dem Schieberegler-Knopf oben: Brennweiten, Räder mit „A“, Messer,
 // Raster mit Wasserwaage, Lupe beim Scharfstellen von Hand.
 
@@ -619,7 +620,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
               : film
             ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
-              ? t("{n} im Stapel. Nach dem Schließen liegen sie im Fotostudio.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
+              ? t("{n} auf dem Stapel von heute. Einsortieren kannst du abends.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
               : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}
         </p>
       </footer>

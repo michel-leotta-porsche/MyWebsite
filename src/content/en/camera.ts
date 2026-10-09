@@ -10,7 +10,7 @@ export const CAMERA: Record<string, string> = {
   Auslösen: "Shutter",
   Rückkamera: "Back camera",
   Frontkamera: "Front camera",
-  "{n} im Stapel. Nach dem Schließen liegen sie im Fotostudio.": "{n} in the stack. They are in the Photo studio once you close.",
+  "{n} auf dem Stapel von heute. Einsortieren kannst du abends.": "{n} on today's stack. You can sort them in the evening.",
   "Halten zeigt das Original, Wischen macht heller oder dunkler.": "Hold to see the original, swipe to go brighter or darker.",
   "Calima-Look": "Calima look",
   "{label} „{name}“ mitgenommen. Liegt oben bei „Deine Looks“.": "{label} “{name}” taken along. It's up under “Your looks”.",

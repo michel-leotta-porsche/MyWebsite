@@ -41,14 +41,17 @@ type Plugin = {
   discard(o: { path: string }): Promise<void>;
   /** Körnung live im Sucher: amount wie GRAIN.amount, cell wie GRAIN.cell (Anteil der Bildbreite); 0 schaltet sie ab */
   setGrain(o: { amount: number; cell: number }): Promise<void>;
+  /** die Quick Action vom App-Symbol abholen, einmal: „kamera“ oder nichts (SceneDelegate.swift, CalimaLaunch) */
+  launch(): Promise<{ action?: string }>;
   /**
    * Ereignisse aus der App: „shutter“ (Kamera-Knopf oder Lautstärketaste gedrückt), „zoom“ (am Kamera-Knopf gewischt,
-   * data.factor relativ zur Hauptkamera). Vorgesehen auch für Erkenner (Vorschläge wie Ticket oder Bordkarte, Reisebuch-Workshop).
+   * data.factor relativ zur Hauptkamera), „launch“ (eine Quick Action wartet, abholen mit launch()). Vorgesehen auch für
+   * Erkenner (Vorschläge wie Ticket oder Bordkarte, Reisebuch-Workshop).
    */
   addListener(event: "event", fn: (e: CameraEvent) => void): Promise<{ remove: () => Promise<void> }>;
 };
 
-export type CameraEvent = { name: "shutter" | "zoom" | "meter" | "level" | (string & {}); data: Record<string, unknown> };
+export type CameraEvent = { name: "shutter" | "zoom" | "meter" | "level" | "launch" | (string & {}); data: Record<string, unknown> };
 
 /* ----- Expertenmodus E1: Brennweiten, Räder, Messer (expertenmodus-workshop-2026-10-09/) ----- */
 
@@ -85,6 +88,10 @@ export const fmtFocus = (f: number) => (f >= 0.98 ? "∞" : f <= 0.02 ? "nah" : 
 
 /** nächste Raststellung einer Reihe */
 export const nearest = (list: readonly number[], v: number) => list.reduce((b, x) => (Math.abs(Math.log(x / v)) < Math.abs(Math.log(b / v)) ? x : b), list[0]);
+
+
+/** Ereignis an das Fotostudio im Bücherzimmer: Kamera öffnen. Wer es übernimmt, ruft preventDefault() */
+export const OPEN_CAMERA = "calima:kamera";
 
 /** Ein Film: ein Look, so viele Bilder, dann ein Stapel. 24 wie ein kurzer Kleinbildfilm; mehr sprengt den Platz im Fotostudio (MAX_KEPT) */
 export const FILM_FRAMES = 24;
