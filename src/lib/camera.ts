@@ -14,9 +14,12 @@ export type Frame = { x: number; y: number; w: number; h: number };
 /** was die Kamera kann: echte Objektive als Zoomfaktoren zur Hauptkamera, Grenzen für Zeit und ISO */
 export type CameraInfo = { front: boolean; lenses: number[]; limits: { minDuration: number; maxDuration: number; minISO: number; maxISO: number } };
 
-/** Die Räder (Expertenmodus E1): null heißt „A“, die Kamera stellt selbst. duration in Sekunden, focus 0 (nah) bis 1 (fern), kelvin als Farbtemperatur. */
-export type Dials = { duration: number | null; iso: number | null; focus: number | null; kelvin: number | null };
-export const AUTO: Dials = { duration: null, iso: null, focus: null, kelvin: null };
+/** Die Räder (Expertenmodus E1): null heißt „A“, die Kamera stellt selbst. duration in Sekunden, focus 0 (nah) bis 1 (fern), kelvin als Farbtemperatur,
+ *  tint die Tönung dazu (negativ grüner, positiv magenta; gilt nur mit kelvin). */
+export type Dials = { duration: number | null; iso: number | null; focus: number | null; kelvin: number | null; tint: number | null };
+export const AUTO: Dials = { duration: null, iso: null, focus: null, kelvin: null, tint: null };
+/** Tönung im Weiß-Feld: ±TINT_MAX (iOS erlaubt ±150, mehr braucht kein Foto) */
+export const TINT_MAX = 60;
 
 /** Messung der Kamera, kommt als Ereignis „meter“: offset in EV zur Zielbelichtung, dazu die Werte, die gerade gelten */
 export type Meter = { offset: number; duration: number; iso: number; lens: number; kelvin: number };
@@ -29,7 +32,8 @@ type Plugin = {
   setOriginal(o: { on: boolean }): Promise<void>;
   setExposure(o: { ev: number }): Promise<void>;
   setZoom(o: { factor: number }): Promise<{ factor: number }>;
-  focus(o: { x: number; y: number }): Promise<void>;
+  /** lock: Schärfe und Helligkeit an der Stelle messen und dann festhalten (AE/AF-Sperre) */
+  focus(o: { x: number; y: number; lock?: boolean }): Promise<void>;
   flip(): Promise<CameraInfo>;
   /** Räder stellen; fehlende oder null-Werte heißen A. Steht nur Zeit oder nur ISO, regelt die Kamera das andere nach (wie Fuji, Michels Wahl „Ausgleichen“) */
   setDials(o: Dials): Promise<void>;

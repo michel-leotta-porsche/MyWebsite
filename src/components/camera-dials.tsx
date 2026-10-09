@@ -2,7 +2,7 @@
 
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 
-import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELVIN, nearest, SHUTTER_STOPS, type CameraInfo, type Dials, type Meter } from "@/lib/camera";
+import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELVIN, nearest, SHUTTER_STOPS, TINT_MAX, type CameraInfo, type Dials, type Meter } from "@/lib/camera";
 import { useT } from "@/lib/i18n";
 
 // Die Räder der Kamera (Expertenmodus E1, expertenmodus-workshop-2026-10-09/): wie an einer Fujifilm hat jedes Rad eine
@@ -10,7 +10,7 @@ import { useT } from "@/lib/i18n";
 // Zeitvorwahl (ISO gleicht aus, der Chip zeigt „ISO A 640“), wer Zeit und ISO festhält, fotografiert von Hand. Ein Rad wird angetippt und dann auf dem Lineal darunter
 // gedreht; ein Tipp auf „A“ gibt es der Kamera zurück. Brennweiten sind ehrlich: echte Objektive fett, der Rest Ausschnitt.
 
-export type DialKey = keyof Dials;
+export type DialKey = Exclude<keyof Dials, "tint">;
 export const DIALS: DialKey[] = ["duration", "iso", "focus", "kelvin"];
 
 /** Zeiten und ISO, die diese Kamera wirklich kann */
@@ -195,7 +195,7 @@ export function Ruler({
     <div className="flex items-center gap-3 px-4">
       <button
         type="button"
-        onClick={() => onChange({ ...dials, [dial]: null })}
+        onClick={() => onChange({ ...dials, [dial]: null, ...(dial === "kelvin" ? { tint: null } : {}) })}
         aria-pressed={!manual}
         className={`flex-none rounded-full border px-3 py-1.5 text-[13px] font-bold ${manual ? "border-on-table-2/50 text-on-table" : "bg-cloth border-cloth text-cloth-ink"}`}
         aria-label={t("Rad auf A, die Kamera stellt selbst")}
@@ -225,6 +225,86 @@ export function Ruler({
         <p className={`mt-1 text-center text-[13px] font-semibold tabular-nums ${manual ? "text-cloth" : "text-on-table"}`}>
           {manual ? "" : "A · "}
           {dialLabel(dial, dials, meter)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Weiß als Feld statt Lineal: links kälter, rechts wärmer (Farbtemperatur), oben grüner, unten magenta (Tönung).
+ *  Der Punkt folgt dem Finger; Doppeltipp oder „A“ gibt das Weiß der Kamera zurück. Auf A zeigt der Punkt blass, was
+ *  die Kamera gerade misst. */
+export function WhitePad({ dials, meter, onChange }: { dials: Dials; meter: Meter | null; onChange: (next: Dials) => void }) {
+  const t = useT();
+  const pad = useRef<HTMLDivElement>(null);
+  const lastTap = useRef(0);
+  const manual = dials.kelvin != null;
+  const kelvin = dials.kelvin ?? Math.min(KELVIN.max, Math.max(KELVIN.min, meter?.kelvin || 5500));
+  const tint = manual ? (dials.tint ?? 0) : 0;
+  const fx = (kelvin - KELVIN.min) / (KELVIN.max - KELVIN.min);
+  const fy = (tint + TINT_MAX) / (2 * TINT_MAX);
+  const auto = () => onChange({ ...dials, kelvin: null, tint: null });
+  const set = (e: ReactPointerEvent) => {
+    const r = pad.current?.getBoundingClientRect();
+    if (!r) return;
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const k = Math.round((KELVIN.min + x * (KELVIN.max - KELVIN.min)) / KELVIN.step) * KELVIN.step;
+    // um die Mitte rastet die Tönung auf 0 ein, sonst trifft man neutral nie genau
+    const tn = Math.round((y * 2 - 1) * TINT_MAX);
+    const next = { ...dials, kelvin: k, tint: Math.abs(tn) <= 4 ? 0 : tn };
+    if (next.kelvin !== dials.kelvin || next.tint !== dials.tint) onChange(next);
+  };
+  const onDown = (e: ReactPointerEvent) => {
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      lastTap.current = 0;
+      return auto();
+    }
+    lastTap.current = now;
+    set(e);
+  };
+  const tintLabel = tint === 0 ? "" : tint < 0 ? ` · ${t("grün")} ${-tint}` : ` · ${t("magenta")} ${tint}`;
+  return (
+    <div className="flex items-center gap-3 px-4">
+      <button
+        type="button"
+        onClick={auto}
+        aria-pressed={!manual}
+        className={`flex-none rounded-full border px-3 py-1.5 text-[13px] font-bold ${manual ? "border-on-table-2/50 text-on-table" : "bg-cloth border-cloth text-cloth-ink"}`}
+        aria-label={t("Rad auf A, die Kamera stellt selbst")}
+      >
+        A
+      </button>
+      <div className="min-w-0 flex-1">
+        <div
+          ref={pad}
+          className="border-on-table-2/40 relative h-16 touch-none overflow-hidden rounded-xl border select-none"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgb(120 200 120 / 0.35), transparent 45%, transparent 55%, rgb(220 110 200 / 0.35)), linear-gradient(to right, rgb(110 160 235 / 0.55), rgb(40 40 40 / 0.2) 50%, rgb(240 170 80 / 0.55))",
+          }}
+          onPointerDown={onDown}
+          onPointerMove={(e) => e.buttons && set(e)}
+          role="slider"
+          aria-label={t("Farbtemperatur und Tönung")}
+          aria-valuenow={kelvin}
+          aria-valuetext={`${fmtKelvin(kelvin)}${tintLabel}`}
+          tabIndex={0}
+        >
+          <span aria-hidden className="bg-on-table/25 pointer-events-none absolute inset-x-0 top-1/2 h-px" />
+          <span aria-hidden className="bg-on-table/25 pointer-events-none absolute inset-y-0 left-1/2 w-px" />
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute h-4 w-4 rounded-full border-2 shadow transition-[left,top] duration-75 ${manual ? "bg-cloth border-on-table" : "border-on-table/70 bg-transparent"}`}
+            style={{ left: `calc(${fx * 100}% - 8px)`, top: `calc(${fy * 100}% - 8px)` }}
+          />
+        </div>
+        <p className={`mt-1 text-center text-[13px] font-semibold tabular-nums ${manual ? "text-cloth" : "text-on-table"}`}>
+          {manual ? "" : "A · "}
+          {fmtKelvin(kelvin)}
+          {tintLabel}
         </p>
       </div>
     </div>

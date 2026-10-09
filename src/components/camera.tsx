@@ -1,10 +1,10 @@
 "use client";
 
-import { Film as FilmIcon, SlidersHorizontal, SwitchCamera, X } from "lucide-react";
+import { Film as FilmIcon, Lock, SlidersHorizontal, SwitchCamera, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { allAuto, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
+import { allAuto, DialChips, GridOverlay, MeterBadge, Ruler, WhitePad, type DialKey } from "@/components/camera-dials";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
@@ -90,7 +90,8 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       .catch(() => {})
       .finally(() => URL.revokeObjectURL(url));
   };
-  const [reticle, setReticle] = useState<{ x: number; y: number; k: number } | null>(null);
+  /** Marke, wo zuletzt scharf gestellt wurde; locked: Schärfe und Helligkeit sind festgehalten (zweiter Tipp auf die Marke) */
+  const [reticle, setReticle] = useState<{ x: number; y: number; k: number; locked?: boolean } | null>(null);
   // Werkzeug (E1): offen oder zu bleibt gemerkt; die Räder selbst fangen bei jedem Öffnen auf A an
   const [tools, setTools] = useState(() => {
     try {
@@ -228,7 +229,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       .catch(() => {});
   };
   const changeDials = (next: Dials) => {
-    if (next[dial as DialKey] !== dials[dial as DialKey]) haptic("select");
+    if (next[dial as DialKey] !== dials[dial as DialKey] || (next.tint === 0) !== (dials.tint === 0)) haptic("select");
     setDials(next);
   };
   const lenses = useMemo(() => realFocals(info?.lenses ?? [1]), [info]);
@@ -359,14 +360,28 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     if (g.mode === "hold") holdOriginal(false);
     if (g.mode === "drag") window.setTimeout(() => setShowEv(false), 900);
     if (g.mode === "wait" && e.type !== "pointercancel") {
-      // kurzer Tipp: scharf stellen, die Marke zeigt wo
+      // kurzer Tipp: scharf stellen, die Marke zeigt wo. Noch ein Tipp auf die Marke hält Schärfe und Helligkeit fest,
+      // ein Tipp auf die festgehaltene Marke löst sie wieder; ein Tipp woanders stellt dort neu scharf
       const r = box.current?.getBoundingClientRect();
       if (r) {
-        const x = (e.clientX - r.left) / r.width;
-        const y = (e.clientY - r.top) / r.height;
-        CalimaCamera.focus({ x, y }).catch(() => {});
-        setReticle({ x: e.clientX - r.left, y: e.clientY - r.top, k: Date.now() });
-        window.setTimeout(() => setReticle((cur) => (cur && Date.now() - cur.k >= 900 ? null : cur)), 1000);
+        const px = e.clientX - r.left;
+        const py = e.clientY - r.top;
+        const onMark = reticle && Math.hypot(px - reticle.x, py - reticle.y) < 48;
+        if (onMark && reticle.locked) {
+          haptic("select");
+          CalimaCamera.focus({ x: reticle.x / r.width, y: reticle.y / r.height }).catch(() => {});
+          setReticle(null);
+        } else if (onMark) {
+          haptic("press");
+          CalimaCamera.focus({ x: reticle.x / r.width, y: reticle.y / r.height, lock: true }).catch(() => {});
+          setReticle({ ...reticle, k: Date.now(), locked: true });
+        } else {
+          CalimaCamera.focus({ x: px / r.width, y: py / r.height }).catch(() => {});
+          const k = Date.now();
+          setReticle({ x: px, y: py, k });
+          // so lange bleibt Zeit für den zweiten Tipp
+          window.setTimeout(() => setReticle((cur) => (cur && cur.k === k && !cur.locked ? null : cur)), 2200);
+        }
       }
     }
     gesture.current = null;
@@ -527,7 +542,18 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           {tools && ready && <MeterBadge meter={meter} />}
           {flash && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
           {reticle && (
-            <span aria-hidden className="border-cloth pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 border-2 opacity-90" style={{ left: reticle.x, top: reticle.y }} />
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute h-16 w-16 border-2 transition-colors ${reticle.locked ? "border-cloth" : "border-on-table/90"}`}
+              style={{ left: reticle.x - 32, top: reticle.y - 32 }}
+            >
+              {reticle.locked && (
+                <span className="bg-cloth text-cloth-ink absolute -top-6 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap">
+                  <Lock className="h-2.5 w-2.5" />
+                  {t("Fest")}
+                </span>
+              )}
+            </span>
           )}
           {showEv && (
             <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 right-3 rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums">
@@ -541,7 +567,8 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         {tools && (
           <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={setDial} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} />
         )}
-        {tools && dial && dial !== "focal" && (
+        {tools && dial === "kelvin" && <WhitePad dials={dials} meter={meter} onChange={changeDials} />}
+        {tools && dial && dial !== "focal" && dial !== "kelvin" && (
           <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
         )}
         {film ? (
@@ -645,7 +672,13 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           </span>
         </div>
         <p className="text-on-table-2 px-6 text-center text-[12px]">
-          {tools && dial && dial !== "focal"
+          {reticle?.locked
+            ? t("Schärfe und Licht stehen fest. Ein Tipp auf die Marke löst sie.")
+            : reticle
+              ? t("Noch ein Tipp auf die Marke hält Schärfe und Licht fest.")
+              : tools && dial === "kelvin"
+                ? t("Links kälter, rechts wärmer, oben grüner, unten magenta. Doppeltipp gibt es der Kamera zurück.")
+                : tools && dial && dial !== "focal"
             ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
             : tools && focal != null && !lenses.includes(focal)
               ? t("{mm} mm ist ein Ausschnitt aus der Hauptkamera, kein eigenes Objektiv.", { mm: focal })

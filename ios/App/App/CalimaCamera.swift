@@ -112,7 +112,8 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             duration: call.getDouble("duration"),
             iso: call.getDouble("iso").map { Float($0) },
             focus: call.getDouble("focus").map { Float($0) },
-            kelvin: call.getDouble("kelvin").map { Float($0) }
+            kelvin: call.getDouble("kelvin").map { Float($0) },
+            tint: call.getDouble("tint").map { Float($0) }
         )
         camera.setDials(d)
         call.resolve()
@@ -181,7 +182,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func focus(_ call: CAPPluginCall) {
-        camera.focus(x: CGFloat(call.getDouble("x") ?? 0.5), y: CGFloat(call.getDouble("y") ?? 0.5))
+        camera.focus(x: CGFloat(call.getDouble("x") ?? 0.5), y: CGFloat(call.getDouble("y") ?? 0.5), lock: call.getBool("lock") ?? false)
         call.resolve()
     }
 
@@ -288,6 +289,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         var iso: Float?
         var focus: Float?
         var kelvin: Float?
+        /// Tönung (grün −, magenta +), gilt nur zusammen mit kelvin
+        var tint: Float?
     }
     private var dials = Dials()
     /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
@@ -349,7 +352,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         // Weiß
         if let kelvin = d.kelvin {
             if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
-                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: 0)
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: min(max(d.tint ?? 0, -150), 150))
                 device.setWhiteBalanceModeLocked(with: clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
             }
         } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
@@ -742,20 +745,22 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     }
 
     /// x, y in 0..1 des Suchers (hochkant); die Kamera rechnet quer, deshalb gedreht
-    func focus(x: CGFloat, y: CGFloat) {
-        guard let device = input?.device, !front else { return }
+    /// Tippen: an der Stelle scharf stellen und messen. lock hält danach Schärfe und Helligkeit fest (AE/AF-Sperre:
+    /// einmal messen, dann stehen lassen). Räder von Hand bleiben, wie sie sind.
+    func focus(x: CGFloat, y: CGFloat, lock: Bool = false) {
         let p = CGPoint(x: min(max(y, 0), 1), y: min(max(1 - x, 0), 1))
         queue.async {
-            guard (try? device.lockForConfiguration()) != nil else { return }
-            if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+            guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            if !self.front, self.dials.focus == nil, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
                 device.focusPointOfInterest = p
                 device.focusMode = .autoFocus
             }
-            if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.continuousAutoExposure) {
+            let mode: AVCaptureDevice.ExposureMode = lock ? .autoExpose : .continuousAutoExposure
+            if self.dials.duration == nil, self.dials.iso == nil, device.isExposurePointOfInterestSupported, device.isExposureModeSupported(mode) {
                 device.exposurePointOfInterest = p
-                device.exposureMode = .continuousAutoExposure
+                device.exposureMode = mode
             }
-            device.unlockForConfiguration()
         }
     }
 
