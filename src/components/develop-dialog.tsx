@@ -1030,7 +1030,7 @@ export function DevelopDialog({
   // das Rezept aus der Datei steckt in diesem Foto schon drin; kopiert wird es nur für andere Fotos
   const fileSettings = useMemo(() => (photo.recipe ? fromRecipe(photo.recipe) : null), [photo.recipe]);
   const fileFuji = photo.recipe?.kind === "fuji";
-  const fileLabel = fileFuji ? t("Fuji-Rezept") : t("Lightroom-Werte");
+  const fileLabel = fileFuji ? t("Fuji-Rezept") : photo.recipe?.kind === "calima" ? t("Calima-Look") : t("Lightroom-Werte");
   const copyEdit = () => {
     const s = fromEdit(edit, undefined, nameOf(photo));
     if (!s) return setNote(t("Noch nichts zu kopieren: Stell zuerst Farbe oder Licht ein."));
@@ -1042,7 +1042,11 @@ export function DevelopDialog({
     if (!fileSettings) return;
     copySettings({ ...fileSettings, from: nameOf(photo) });
     haptic("select");
-    setNote(t("{label} „{name}“ mitgenommen, in Calima nachempfunden. Liegt oben bei „Deine Looks“.", { label: fileLabel, name: shownName(fileSettings.name) }));
+    setNote(
+      fileSettings.approx
+        ? t("{label} „{name}“ mitgenommen, in Calima nachempfunden. Liegt oben bei „Deine Looks“.", { label: fileLabel, name: shownName(fileSettings.name) })
+        : t("{label} „{name}“ mitgenommen. Liegt oben bei „Deine Looks“.", { label: fileLabel, name: shownName(fileSettings.name) }),
+    );
   };
   const paste = () => {
     if (!copied) return setNote(t("Erst bei einem Foto einen Look mitnehmen."));

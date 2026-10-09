@@ -137,3 +137,35 @@ export async function withExif(jpeg: Blob, f: ExifFields): Promise<Blob> {
   seg.set(tiff, 10);
   return new Blob([buf.subarray(0, 2), seg, buf.subarray(at)], { type: "image/jpeg" });
 }
+
+const XMP_HEAD = "http://ns.adobe.com/xap/1.0/\0";
+
+/**
+ * XMP-Paket als zweiten APP1-Block hinter den Exif-Block setzen (so liest exifr es). Ein vorhandener XMP-Block
+ * wird ersetzt. Pakete über 64 kB passen nicht in einen Block und bleiben weg.
+ */
+export async function withXmp(jpeg: Blob, xmp: string): Promise<Blob> {
+  const packet = new TextEncoder().encode(xmp);
+  if (packet.length + XMP_HEAD.length + 2 > 0xffff) return jpeg;
+  const buf = new Uint8Array(await jpeg.arrayBuffer());
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return jpeg;
+  const parts: Uint8Array<ArrayBuffer>[] = [buf.subarray(0, 2)];
+  let at = 2;
+  const seg = () => {
+    const len = 2 + XMP_HEAD.length + packet.length;
+    const s = new Uint8Array(2 + len);
+    s.set([0xff, 0xe1, len >> 8, len & 0xff]);
+    for (let i = 0; i < XMP_HEAD.length; i++) s[4 + i] = XMP_HEAD.charCodeAt(i);
+    s.set(packet, 4 + XMP_HEAD.length);
+    return s;
+  };
+  // APP0 (JFIF) und APP1 (Exif) bleiben vorn; ein alter XMP-Block fällt weg
+  while (at + 4 <= buf.length && buf[at] === 0xff && (buf[at + 1] === 0xe0 || buf[at + 1] === 0xe1)) {
+    const len = 2 + ((buf[at + 2] << 8) | buf[at + 3]);
+    const isXmp = buf[at + 1] === 0xe1 && buf[at + 4] === 0x68 && buf[at + 5] === 0x74 && buf[at + 6] === 0x74 && buf[at + 7] === 0x70;
+    if (!isXmp) parts.push(buf.subarray(at, at + len));
+    at += len;
+  }
+  parts.push(seg(), buf.subarray(at));
+  return new Blob(parts, { type: "image/jpeg" });
+}

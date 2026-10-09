@@ -3,11 +3,12 @@
 import exifr from "exifr";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
+import { cleanSettings } from "@/lib/develop/settings";
 import { exifDate, type ExifFields } from "@/lib/exif-write";
 import { readFujiRecipe } from "@/lib/fuji";
 import { findSubject } from "@/lib/subject";
 import { t } from "@/lib/i18n";
-import { parseXmp, toPreset } from "@/lib/xmp";
+import { parseCalimaXmp, parseXmp, toPreset } from "@/lib/xmp";
 
 // Ein Foto für ein neues Buch vorbereiten, ganz im Browser:
 // Rezept und Kameradaten lesen, dann neu kodieren in drei Größen. Beim Neukodieren fallen alle
@@ -249,6 +250,11 @@ export async function readMeta(file: File): Promise<PhotoMeta> {
     const x = await exifr.parse(file, { tiff: false, xmp: { parse: false } });
     xmp = typeof x?.xmp === "string" ? x.xmp : undefined;
   } catch {}
+  // eine von Calima gesicherte Datei trägt ihre Einstellungen selbst
+  if (!recipe && xmp) {
+    const own = cleanSettings(parseCalimaXmp(xmp));
+    if (own) recipe = { kind: "calima", name: own.name, settings: own, placeholder: false };
+  }
   if (!recipe && xmp) {
     const lr = parseXmp(xmp);
     // nur wenn wirklich Entwicklungswerte drinstehen, nicht bloß ein Profilname

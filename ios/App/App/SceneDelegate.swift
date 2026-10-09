@@ -28,6 +28,11 @@ class CalimaViewController: CAPBridgeViewController {
     override func router() -> Router {
         return CalimaRouter()
     }
+
+    /// Eigene Plugins aus dem App-Ziel, ohne eigenes Paket: die Kamera (CalimaCamera.swift)
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(CalimaCameraPlugin())
+    }
 }
 
 /// Der Export legt jede Seite als eigene Datei ab: /zimmer → zimmer.html, / → index.html.

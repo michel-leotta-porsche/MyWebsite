@@ -151,6 +151,8 @@ export function fromLightroom(xmp: string, name: string, from?: string): CopiedS
 export function fromRecipe(r: Recipe, from?: string): CopiedSettings | null {
   if (r.placeholder) return null;
   if (r.kind === "fuji") return fromFuji(r, from);
+  // aus einer Calima-Datei: schon in Calimas Reglern, nur die Herkunft kommt neu dazu
+  if (r.kind === "calima") return { ...r.settings, from };
   return r.inline ? fromLightroom(r.inline, r.name, from) : null;
 }
 

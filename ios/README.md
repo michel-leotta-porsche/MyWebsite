@@ -33,6 +33,14 @@ selbst; die nächste Nummer steht in App Store Connect unter Xcode Cloud → Ein
   App Store Connect und zu `/datenschutz` passen.
 - Nur iPhone (`TARGETED_DEVICE_FAMILY = 1`), Bundle-ID `app.calima`.
 - App-Icon aus `src/app/icon.svg` ohne Rundung und ohne Transparenz, Startbild in Tischfarbe.
+- `App/CalimaCamera.swift`: Calimas Kamera als Capacitor-Plugin direkt im App-Ziel (kein eigenes Paket), in
+  `SceneDelegate.swift` über `capacitorDidLoad` registriert. Der Sucher ist eine Metal-Ansicht hinter der Webansicht,
+  die Seite wird durchsichtig (`html[data-kamera]`), der Look liegt als 3D-LUT (`CIColorCubeWithColorSpace`) live auf
+  dem Bild. Die Web-Seite liegt in `src/lib/camera.ts` und `src/components/camera.tsx`. Jede Aufnahme ist das
+  unbearbeitete JPEG mit Aufnahmedaten; den Look rechnet das Fotostudio beim Sichern ein und schreibt ihn als
+  `calima:settings` ins XMP, damit die Datei ihr Rezept kennt. Prüfen geht nur auf dem Gerät (Kamera-Erlaubnis,
+  Sucher, Look-Wechsel, Auslösen); der Simulator hat keine Kamera. Erkenner für Sucherbilder (Reisebuch: Ticket,
+  Bordkarte) hängen sich an `CalimaCamera.analyzers` und melden über `CalimaCamera.addListener("event", …)`.
 
 ## Anmelden mit Apple und Google (einmalig einrichten)
 

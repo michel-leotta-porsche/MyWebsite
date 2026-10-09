@@ -2,6 +2,7 @@
 
 import { ArrowLeft, BookmarkPlus, Camera, Check, ClipboardCopy, Download, Share, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, buttonClass } from "@/components/ui/button";
@@ -10,9 +11,9 @@ import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
 import { plateName, type Plate } from "@/content/books";
-import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
-import { cleanEdit, describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
-import { asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
+import { cameraOf, recipeOf, type CalimaRecipe, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
+import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
+import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
@@ -352,6 +353,29 @@ function EditSlip({ edit, reduce }: { edit: PhotoEdit; reduce: boolean }) {
   );
 }
 
+/** Einstellungen aus einer von Calima gesicherten Datei: dieselben Regler, nur aus der Datei gelesen */
+function CalimaSlip({ recipe, reduce }: { recipe: CalimaRecipe; reduce: boolean }) {
+  const t = useT();
+  const edit = useMemo(() => applySettings(neutralEdit(), recipe.settings), [recipe.settings]);
+  return (
+    <div>
+      <p className="text-ink-2 mb-2 text-[12px]">{recipe.settings.approx ? t("Aus der Datei gelesen, in Calima nachempfunden") : t("Aus der Datei gelesen, so wie das Foto gesichert wurde")}</p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+        {describeEdit(edit).map((r, i) => (
+          <div key={r.label} className="contents">
+            <dt className="text-ink-2">{r.label}</dt>
+            <dd className="text-ink">
+              <Roll i={i} reduce={reduce}>
+                {r.value}
+              </Roll>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 const noopSubscribe = () => () => {};
 
 /**
@@ -361,6 +385,7 @@ const noopSubscribe = () => () => {};
  */
 function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof recipeOf> }) {
   const t = useT();
+  const router = useRouter();
   const from = plateName(plate.no, plate.title);
   const file = recipe ? fromRecipe(recipe, from) : null;
   const clean = isNeutral(plate.edit) ? null : cleanEdit(plate.edit);
@@ -393,13 +418,27 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
     }
   };
   const fuji = recipe?.kind === "fuji";
+  // „So fotografieren“ (Kamera-Workshop): der Look geht mit in Calimas Kamera, die im Fotostudio aufgeht. Nur in der App.
+  const shoot = () => {
+    const s = file ?? edit;
+    if (!s) return;
+    copySettings(s);
+    haptic("tap");
+    router.push("/zimmer?kamera=1");
+  };
   return (
     <div className="mt-4 border-t border-ink/15 pt-4">
+      {IS_APP && (
+        <button type="button" className={`${buttonClass("cloth", "sm", "pl-2.5")} mb-2`} onClick={shoot}>
+          <Camera aria-hidden />
+          {t("So fotografieren")}
+        </button>
+      )}
       <div className="flex flex-wrap gap-2">
         {file && (
           <button type="button" className={buttonClass(which === "file" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("file", file)}>
             <ClipboardCopy aria-hidden />
-            {edit ? (fuji ? t("Fuji-Rezept mitnehmen") : t("Lightroom-Werte mitnehmen")) : t("Für eigene Fotos mitnehmen")}
+            {edit ? (fuji ? t("Fuji-Rezept mitnehmen") : recipe?.kind === "calima" ? t("Calima-Look mitnehmen") : t("Lightroom-Werte mitnehmen")) : t("Für eigene Fotos mitnehmen")}
           </button>
         )}
         {edit && (
@@ -420,7 +459,9 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
           (file
             ? fuji
               ? t("Farbe und Licht ohne Zuschnitt. Das Rezept wird in Calima nachempfunden, nicht exakt.")
-              : t("Farbe und Licht ohne Zuschnitt. Das Preset wird in Calima nachempfunden, nicht exakt.")
+              : recipe?.kind === "calima"
+                ? t("Farbe und Licht ohne Zuschnitt, so wie das Foto gesichert wurde.")
+                : t("Farbe und Licht ohne Zuschnitt. Das Preset wird in Calima nachempfunden, nicht exakt.")
             : t("Farbe und Licht ohne Zuschnitt, für deine eigenen Fotos."))}
         {done?.lost.length ? ` ${t("Nicht übertragbar: {list}.", { list: done.lost.join(", ") })}` : ""}
       </p>
@@ -452,7 +493,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
   }, [onClose]);
 
   const edit = isNeutral(plate.edit) ? null : plate.edit!;
-  const kind = recipe?.kind === "fuji" ? t("Fuji-Rezept") : recipe?.kind === "lightroom" ? t("Lightroom-Preset") : camera ? t("Kamera") : t("Bearbeitung");
+  const kind = recipe?.kind === "fuji" ? t("Fuji-Rezept") : recipe?.kind === "lightroom" ? t("Lightroom-Preset") : recipe?.kind === "calima" ? t("Calima-Look") : camera ? t("Kamera") : t("Bearbeitung");
   const title = recipe ? t(recipe.name) : (camera?.device ?? t("Nachbearbeitet"));
 
   return (
@@ -483,6 +524,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       </header>
       {recipe?.kind === "fuji" && <FujiSlip recipe={recipe} reduce={reduce} />}
       {recipe?.kind === "lightroom" && <LightroomSlip recipe={recipe} reduce={reduce} />}
+      {recipe?.kind === "calima" && <CalimaSlip recipe={recipe} reduce={reduce} />}
       {recipe && camera && <div className="my-4 border-t border-ink/15" />}
       {camera && <CameraSlip camera={camera} reduce={reduce} />}
       {edit && (recipe || camera) && <div className="my-4 border-t border-ink/15" />}

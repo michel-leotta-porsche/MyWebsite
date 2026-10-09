@@ -114,3 +114,38 @@ export function toPreset(xmp: string, name: string): string {
 </x:xmpmeta>
 `;
 }
+
+/* ---------- Calimas eigener Block: die kopierbaren Einstellungen, damit ein gesichertes Foto sein Rezept behält ---------- */
+
+const NS = "https://calima.web.app/ns/1.0/";
+const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const unescapeXml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+
+/**
+ * XMP-Paket mit `calima:settings` (JSON der Einstellungen, wie sie die Zwischenablage hält) und `calima:name`.
+ * Liegt neben den Aufnahmedaten in der gesicherten Datei; beim Öffnen liest readMeta es als Rezept „Calima-Look“.
+ */
+export function calimaXmp(settings: { name: string; source: string } & Record<string, unknown>): string {
+  return `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:calima="${NS}" calima:version="1" calima:source="${escapeXml(settings.source)}">
+   <calima:name>${escapeXml(settings.name)}</calima:name>
+   <calima:settings>${escapeXml(JSON.stringify(settings))}</calima:settings>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+}
+
+/** Die Einstellungen aus einem XMP-Block zurück, ungeprüft (cleanSettings prüft sie) */
+export function parseCalimaXmp(xmp: string): unknown {
+  if (!xmp.includes(NS)) return null;
+  const m = xmp.match(/<calima:settings>([\s\S]*?)<\/calima:settings>/);
+  if (!m) return null;
+  try {
+    return JSON.parse(unescapeXml(m[1]));
+  } catch {
+    return null;
+  }
+}

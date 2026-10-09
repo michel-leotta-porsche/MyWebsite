@@ -1,4 +1,5 @@
 import type { Plate } from "@/content/books";
+import type { CopiedSettings } from "@/lib/develop/settings";
 import camera from "@/content/camera.json";
 import { isNeutral } from "@/lib/develop/model";
 import { de } from "@/lib/i18n";
@@ -51,7 +52,15 @@ export type CameraInfo = {
   date?: string;
 };
 
-export type Recipe = FujiRecipe | LightroomRecipe;
+/** Calimas eigene Einstellungen aus einer gesicherten Datei (XMP-Block calima:settings), so wie die Zwischenablage sie hält */
+export type CalimaRecipe = {
+  kind: "calima";
+  name: string;
+  settings: CopiedSettings;
+  placeholder: false;
+};
+
+export type Recipe = FujiRecipe | LightroomRecipe | CalimaRecipe;
 
 const sommerlicht: FujiRecipe = {
   kind: "fuji",
