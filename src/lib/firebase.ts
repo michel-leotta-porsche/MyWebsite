@@ -32,8 +32,8 @@ const config = {
   apiKey: "AIzaSyCh1QxkXtljnVpeZNjZMghO2xFsDj6VygY",
   // Anmeldung über die Domain, auf der die Seite gerade läuft: Safari trennt den Speicher fremder Domains, über
   // firebaseapp.com ginge der Zwischenstand der Google-Anmeldung verloren. Firebase Hosting liefert /__/auth/ auf
-  // beiden Adressen selbst aus. calima.web.app bleibt für alte Links erreichbar.
-  authDomain: typeof location !== "undefined" && AUTH_HOSTS.includes(location.hostname) ? location.hostname : "calima.photo",
+  // beiden Adressen selbst aus. Vorschau-Kanäle, localhost und die App nehmen calima.web.app, das immer angeschlossen ist.
+  authDomain: typeof location !== "undefined" && AUTH_HOSTS.includes(location.hostname) ? location.hostname : "calima.web.app",
   projectId: "fujiventura",
   storageBucket: "fujiventura.firebasestorage.app",
   messagingSenderId: "972013615891",
