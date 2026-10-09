@@ -311,6 +311,14 @@ const SWIPED = "fuji:swiped";
 const LONG_PRESS = 480;
 
 type Pt = { x: number; y: number; time: number };
+/** Stelle auf einer Tafel: x und y von 0 bis 1 über das Foto */
+export type Spot = { no: number; x: number; y: number };
+/** Etwas, das an einer Stelle im Foto hängt (Zettel, Marker); Book setzt es nur an seinen Platz */
+export type Pinned = Spot & { key: string; node: React.ReactNode };
+// so groß (px) ist die Ecke, in der langes Drücken ein Eselsohr knickt
+const CORNER = 56;
+// Klicks und Fingertipps in diesen Elementen gehören nicht dem Buch (Zettel, Marker)
+const OWN = "[data-own-gesture]";
 const pointOf = (e: { clientX: number; clientY: number; timeStamp: number }): Pt => ({ x: e.clientX, y: e.clientY, time: e.timeStamp });
 
 export function Book({
@@ -323,6 +331,8 @@ export function Book({
   ears,
   onEar,
   onEdit,
+  onPin,
+  pins,
 }: {
   book: BookData;
   mode: Mode;
@@ -336,8 +346,12 @@ export function Book({
   extra?: (book: BookData, plates: number[]) => React.ReactNode;
   /** Tafeln mit Eselsohr: die obere Außenecke ist umgeknickt */
   ears?: number[];
-  /** Ecke antippen setzt ein Eselsohr */
+  /** Ecke gedrückt halten knickt ein Eselsohr (Tastatur: Enter auf der Ecke) */
   onEar?: (no: number) => void;
+  /** Nur in fremden Büchern: langes Drücken aufs Foto heftet dort etwas an */
+  onPin?: (spot: Spot) => void;
+  /** Was an Stellen im Foto hängt */
+  pins?: Pinned[];
   /** Nur im eigenen Buch: in die Werkbank, an die aufgeschlagene Stelle (step wie k: 0 Einband, 1 Titel, …) */
   onEdit?: (step: number) => void;
 }) {
@@ -492,10 +506,15 @@ export function Book({
   );
   const jump = useCallback((no: number) => goTo(stepForPlate(no)), [goTo, stepForPlate]);
 
-  // Vom Tisch aufgeschlagen: der Einband öffnet sich von selbst, wenn das Buch liegt
+  // Vom Tisch aufgeschlagen: der Einband öffnet sich von selbst, wenn das Buch liegt. Nur einmal: rendert das
+  // Zimmer neu (Zettel auf, Eselsohr), kommt das Buch als neues Objekt, und das Buch soll nicht zurückspringen
+  const autoOpened = useRef(false);
   useEffect(() => {
-    if (!autoOpen || (reduce && !startPlate)) return;
-    const id = window.setTimeout(() => goTo(startPlate ? stepForPlate(startPlate) : 1), reduce ? 0 : 420);
+    if (autoOpened.current || !autoOpen || (reduce && !startPlate)) return;
+    const id = window.setTimeout(() => {
+      autoOpened.current = true;
+      goTo(startPlate ? stepForPlate(startPlate) : 1);
+    }, reduce ? 0 : 420);
     return () => window.clearTimeout(id);
   }, [autoOpen, goTo, reduce, startPlate, stepForPlate]);
 
@@ -570,6 +589,8 @@ export function Book({
   useEffect(() => {
     if (viewer) return;
     const onKey = (e: KeyboardEvent) => {
+      // beim Schreiben auf einem Zettel gehören die Tasten dem Zettel
+      if ((e.target as Element | null)?.closest?.("input, textarea, [contenteditable]")) return;
       if (e.key === "ArrowRight") goTo(k + 1);
       else if (e.key === "ArrowLeft") goTo(k - 1);
       else if (e.key === "Escape") onClose();
@@ -637,20 +658,74 @@ export function Book({
   const cancelPress = () => {
     window.clearTimeout(pressTimer.current);
     pressTimer.current = 0;
+    setEarPress(null);
     if (press.get() > 0) animate(press, 0, { duration: 0.15 });
   };
-  const startPress = () => {
-    pressed.current = false;
-    if (!onEdit) return;
-    const step = Math.min(count, Math.max(0, Math.round(t.get())));
-    if (!reduce) animate(press, 1, { duration: LONG_PRESS / 1000, delay: 0.12, ease: "easeIn" });
+  // Welche Seite trägt welche Tafel: links/rechts bei der Doppelseite, sonst die eine Seite
+  const sidePlates = (() => {
+    const pages = pagesAt(book, mode, kt);
+    const pick = (p?: Page) => (p ? pageNos(p)[0] : undefined);
+    return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
+  })();
+  // Ecke, die sich unter dem Finger hebt, solange er dort liegt
+  const [earPress, setEarPress] = useState<"left" | "right" | null>(null);
+  const [earHint, setEarHint] = useState<"left" | "right" | null>(null);
+  const hintTimer = useRef(0);
+  const hintEar = (side: "left" | "right") => {
+    setEarHint(side);
+    window.clearTimeout(hintTimer.current);
+    hintTimer.current = window.setTimeout(() => setEarHint(null), 700);
+  };
+  useEffect(() => () => window.clearTimeout(hintTimer.current), []);
+  const holdThen = (run: () => void, sink = true) => {
+    if (sink && !reduce) animate(press, 1, { duration: LONG_PRESS / 1000, delay: 0.12, ease: "easeIn" });
     pressTimer.current = window.setTimeout(() => {
       pressTimer.current = 0;
       pressed.current = true;
       drag.current = null;
-      haptic("select");
-      onEdit(step);
+      setEarPress(null);
+      run();
     }, LONG_PRESS + 120);
+  };
+  /** Wo der Finger liegt: Seite, obere Außenecke, Stelle auf dem Foto */
+  const spotAt = (p: Pt) => {
+    const r = bookRef.current?.getBoundingClientRect();
+    if (!r) return null;
+    const side: "left" | "right" = mode === "spread" && p.x < r.left + r.width / 2 ? "left" : "right";
+    const corner = p.y - r.top < CORNER && (side === "right" ? r.right - p.x < CORNER : p.x - r.left < CORNER);
+    const no = plateAt(p.x, p.y) ?? sidePlates[side];
+    const box = no !== undefined ? findRect(no) : null;
+    const spot = no !== undefined && box ? { no, x: clamp01((p.x - box.left) / box.width), y: clamp01((p.y - box.top) / box.height) } : null;
+    return { side, corner, spot };
+  };
+  const startPress = (p: Pt) => {
+    pressed.current = false;
+    if (onEdit) {
+      const step = Math.min(count, Math.max(0, Math.round(t.get())));
+      holdThen(() => {
+        haptic("select");
+        onEdit(step);
+      });
+      return;
+    }
+    if (!onEar && !onPin) return;
+    const at = spotAt(p);
+    if (!at) return;
+    const earNo = sidePlates[at.side];
+    if (at.corner && onEar && earNo !== undefined && !ears?.includes(earNo)) {
+      setEarPress(at.side);
+      holdThen(() => {
+        haptic("select");
+        onEar(earNo);
+      }, false);
+      return;
+    }
+    const spot = at.spot;
+    if (!at.corner && onPin && spot)
+      holdThen(() => {
+        haptic("select");
+        onPin(spot);
+      });
   };
   useEffect(() => () => window.clearTimeout(pressTimer.current), []);
 
@@ -658,7 +733,7 @@ export function Book({
     finger.stop();
     const k0 = Math.min(count, Math.round(swipe ? finger.get() : raw.get()));
     drag.current = { x0: p.x, y0: p.y, k0, moved: false, samples: [p] };
-    startPress();
+    startPress(p);
   };
   /** true, solange die Geste dem Buch gehört (waagrecht blättern oder nach unten zurücklegen) */
   const move = (p: Pt): boolean => {
@@ -733,7 +808,7 @@ export function Book({
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0 || e.pointerType === "touch") return;
+    if (e.button !== 0 || e.pointerType === "touch" || (e.target as Element).closest(OWN)) return;
     begin(pointOf(e));
   };
   const onPointerUp = (e: React.PointerEvent) => {
@@ -760,6 +835,7 @@ export function Book({
         touch.current.cancelPress();
         return;
       }
+      if ((e.target as Element).closest?.(OWN)) return;
       const tp = e.changedTouches[0];
       id = tp.identifier;
       touch.current.begin({ x: tp.clientX, y: tp.clientY, time: e.timeStamp });
@@ -782,21 +858,23 @@ export function Book({
       // nach langem Drücken kein Klick hinterher
       if (wasPress && e.cancelable) e.preventDefault();
     };
+    // Bewegen und Loslassen am Fenster: verschwindet das Element unter dem Finger (die Ecke knickt um),
+    // erreichen seine Touch-Ereignisse das Buch nicht mehr
     el.addEventListener("touchstart", start, { passive: true });
-    el.addEventListener("touchmove", onMove, { passive: false });
-    el.addEventListener("touchend", end);
-    el.addEventListener("touchcancel", end);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchcancel", end);
     return () => {
       el.removeEventListener("touchstart", start);
-      el.removeEventListener("touchmove", onMove);
-      el.removeEventListener("touchend", end);
-      el.removeEventListener("touchcancel", end);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", end);
+      window.removeEventListener("touchcancel", end);
     };
   }, []);
 
   // Klick aufs Papier blättert; Treffer auf Tafeln über Geometrie (Touch trifft in 3D-Seiten nicht zuverlässig)
   const onBookClick = (e: React.MouseEvent) => {
-    if (performance.now() < suppressUntil.current) return;
+    if (performance.now() < suppressUntil.current || (e.target as Element).closest(OWN)) return;
     if (!bookRef.current) return;
     const no = plateAt(e.clientX, e.clientY);
     if (no !== null) {
@@ -823,13 +901,36 @@ export function Book({
     goTo(stepForPlate(no));
   };
 
+  // Wo die Fotos mit angehefteten Zetteln liegen, als Anteil ihrer Buchseite; gemessen, sobald die Doppelseite liegt
+  const [pinBoxes, setPinBoxes] = useState<Record<number, { side: "left" | "right"; l: number; t: number; w: number; h: number }>>({});
+  const pinNos = [...new Set((pins ?? []).map((p) => p.no))].join(",");
+  useEffect(() => {
+    if (!pinNos) return;
+    const measure = () => {
+      const r = bookRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const halfW = mode === "spread" ? r.width / 2 : r.width;
+      const next: typeof pinBoxes = {};
+      for (const no of pinNos.split(",").map(Number)) {
+        const box = findRect(no);
+        if (!box) continue;
+        const side = mode === "spread" && box.left + box.width / 2 < r.left + r.width / 2 ? "left" : "right";
+        const x0 = side === "right" && mode === "spread" ? r.left + halfW : r.left;
+        next[no] = { side, l: (box.left - x0) / halfW, t: (box.top - r.top) / r.height, w: box.width / halfW, h: box.height / r.height };
+      }
+      setPinBoxes(next);
+    };
+    const raf = requestAnimationFrame(measure);
+    const late = window.setTimeout(measure, 400);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearTimeout(late);
+      window.removeEventListener("resize", measure);
+    };
+  }, [pinNos, kt, mode, findRect]);
+
   const current = platesOn(pagesAt(book, mode, k));
-  // Welche Seite trägt welche Tafel: links/rechts bei der Doppelseite, sonst die eine Seite
-  const sidePlates = (() => {
-    const pages = pagesAt(book, mode, kt);
-    const pick = (p?: Page) => (p ? pageNos(p)[0] : undefined);
-    return mode === "spread" ? { left: pick(pages[0]), right: pick(pages[1]) } : { left: undefined, right: pick(pages[0]) };
-  })();
   // Zettel auf die Gegenseite seines Fotos; über den Bund oder als Einzelseite bleibt er rechts
   // Zettel auf die Gegenseite der Seite, auf der sein Foto liegt; auch bei mehreren Fotos pro Seite
   const slipSide = (() => {
@@ -1075,27 +1176,57 @@ export function Book({
                         style={{ [side]: 0, width: mode === "spread" ? "50%" : "100%" }}
                       >
                         <AnimatePresence>{on && <Ear key={no} side={side} resting={resting} reduce={reduce} />}</AnimatePresence>
-                        {onEar && !on && (
+                        {/* bleibt nach dem Knicken liegen (unsichtbar): verschwände das Element unter dem Finger,
+                            käme das Loslassen beim Buch nicht mehr an */}
+                        {onEar && (
                           <button
                             type="button"
                             aria-label={`Eselsohr bei Tafel ${no}`}
+                            aria-hidden={on || undefined}
+                            tabIndex={on ? -1 : undefined}
+                            title={on ? undefined : "Ecke gedrückt halten"}
+                            data-lift={!on && (earPress === side || earHint === side) ? "" : undefined}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onEar(no);
+                              if (on) return;
+                              // Tastatur und VoiceOver knicken direkt; der Finger muss die Ecke halten, ein Tipp zeigt nur, dass es geht
+                              if (e.detail === 0) onEar(no);
+                              else if (performance.now() >= suppressUntil.current) hintEar(side);
                             }}
-                            className="group/ear pointer-events-auto absolute top-0 h-12 w-12 focus-visible:outline-ink focus-visible:-outline-offset-4"
+                            className="group/ear pointer-events-auto absolute top-0 h-14 w-14 [-webkit-touch-callout:none] focus-visible:outline-ink focus-visible:-outline-offset-4"
                             style={{ [side]: 0 }}
                           >
-                            {/* Ecke hebt sich beim Zeigen leicht an: hier lässt sich etwas knicken (UX-Kritik K20) */}
+                            {/* Ecke hebt sich beim Zeigen leicht an: hier lässt sich etwas knicken (UX-Kritik K20);
+                                beim Halten hebt sie sich weiter, bis sie umknickt */}
                             <span
                               aria-hidden
-                              className="bg-paper-shade absolute top-0 h-5 w-5 opacity-0 shadow-[0_2px_4px_-1px_rgb(12_10_8/0.35)] transition-opacity duration-200 group-hover/ear:opacity-100 group-focus-visible/ear:opacity-100"
+                              className={`${on ? "hidden" : ""} bg-paper-shade absolute top-0 size-5 opacity-0 shadow-[0_2px_4px_-1px_rgb(12_10_8/0.35)] transition-[opacity,width,height] duration-200 group-hover/ear:opacity-100 group-focus-visible/ear:opacity-100 group-data-lift/ear:size-9 group-data-lift/ear:opacity-100 ${earPress === side ? "ease-in [transition-duration:480ms]" : ""}`}
                               style={{
                                 [side]: 0,
                                 clipPath: side === "right" ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
                               }}
                             />
                           </button>
+                        )}
+                        {/* Zettel und Marker an ihrer Stelle im Foto; während des Umblätterns ausgeblendet */}
+                        {pins && (
+                          <motion.div className="pointer-events-none absolute inset-0 z-[5]" style={{ opacity: resting }}>
+                            {pins.map((pin) => {
+                              const box = pinBoxes[pin.no];
+                              if (!box || box.side !== side) return null;
+                              return (
+                                <div
+                                  key={pin.key}
+                                  data-own-gesture=""
+                                  className="pointer-events-auto absolute"
+                                  style={{ left: `${(box.l + pin.x * box.w) * 100}%`, top: `${(box.t + pin.y * box.h) * 100}%` }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {pin.node}
+                                </div>
+                              );
+                            })}
+                          </motion.div>
                         )}
                       </div>
                     );
@@ -1108,6 +1239,8 @@ export function Book({
                     disabled={k === 0}
                     onClick={(e) => {
                       e.stopPropagation();
+                      // nach langem Drücken (Eselsohr in der Ecke) schickt der Browser noch einen Klick hinterher
+                      if (performance.now() < suppressUntil.current) return;
                       goTo(k - 1);
                     }}
                     className="absolute inset-y-0 left-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"
@@ -1118,6 +1251,8 @@ export function Book({
                     disabled={k === count}
                     onClick={(e) => {
                       e.stopPropagation();
+                      // nach langem Drücken (Eselsohr in der Ecke) schickt der Browser noch einen Klick hinterher
+                      if (performance.now() < suppressUntil.current) return;
                       goTo(k + 1);
                     }}
                     className="absolute inset-y-0 right-0 z-[200] w-[7%] focus-visible:outline-ink focus-visible:-outline-offset-4 disabled:pointer-events-none"

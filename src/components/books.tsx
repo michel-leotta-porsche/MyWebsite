@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode 
 import { flushSync } from "react-dom";
 
 import type { BookData } from "@/content/books";
+import type { Pinned, Spot } from "@/components/book";
 import { OpenBook } from "@/components/table";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
@@ -42,6 +43,8 @@ export function Library({
   ears,
   onEar,
   onEdit,
+  onPin,
+  pins,
 }: {
   books: BookData[];
   /** Der Tisch mit seinen Reihen; jede Reihe schlägt ihre Bände über OpenBook auf */
@@ -51,11 +54,15 @@ export function Library({
   footer?: ReactNode;
   /** Zusätzliche Knöpfe in der Kopfzeile des offenen Buchs */
   bookExtra?: (book: BookData, plates: number[]) => ReactNode;
-  /** Eselsohren im offenen Buch (fest oder je Buch) und was beim Antippen der Ecke passiert */
+  /** Eselsohren im offenen Buch (fest oder je Buch) und was beim Antippen der Ecke passiert (fest oder je Buch) */
   ears?: number[] | Record<string, number[]>;
-  onEar?: (no: number) => void;
+  onEar?: ((no: number) => void) | Record<string, (no: number) => void>;
   /** Nur für eigene Bücher: was langes Drücken oder „Bearbeiten“ im offenen Buch tut; undefined, wenn das Buch nicht dir gehört */
   onEdit?: (id: string) => ((step: number) => void) | undefined;
+  /** Nur in fremden Büchern: langes Drücken aufs Foto heftet dort einen Zettel an (fest oder je Buch) */
+  onPin?: ((spot: Spot) => void) | Record<string, (spot: Spot) => void>;
+  /** Zettel an Stellen im Foto (fest oder je Buch) */
+  pins?: Pinned[] | Record<string, Pinned[]>;
 }) {
   const bookById = (id: string) => books.find((b) => b.id === id);
   const [wide, setWide] = useState<boolean | null>(null);
@@ -146,8 +153,10 @@ export function Library({
         onClose={close}
         extra={bookExtra}
         ears={Array.isArray(ears) ? ears : ears?.[book.id]}
-        onEar={onEar}
+        onEar={typeof onEar === "function" ? onEar : onEar?.[book.id]}
         onEdit={edit}
+        onPin={typeof onPin === "function" ? onPin : onPin?.[book.id]}
+        pins={Array.isArray(pins) ? pins : pins?.[book.id]}
       />
     );
   }

@@ -16,6 +16,9 @@ import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Sheet } from "@/components/ui/sheet";
 import { notify, Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
+import { useFeedback } from "@/components/leave-feedback";
+import { PinNote } from "@/components/pin-note";
+import type { Pinned, Spot } from "@/components/book";
 import { ReportDialog } from "@/components/report-dialog";
 import { ShareDialog } from "@/components/share-dialog";
 import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-carousel";
@@ -102,10 +105,52 @@ function Room({ user }: { user: User }) {
   }, [gifts]);
 
   const all = [...mine, ...given];
-  // im eigenen Buch stehen die Eselsohren der Freunde, wie sie sie geknickt haben
-  const earsById = Object.fromEntries(
-    mine.flatMap((d) => (d.stored ? [[d.book.id, (room.spread[d.stored.id]?.items ?? []).flatMap((n) => (n.kind === "ear" && n.no ? [n.no] : []))]] : [])),
-  );
+  // in Büchern von Freunden: Eselsohren knicken und Zettel einlegen, wie auf ihrem Link
+  const feedback = useFeedback((g) => user.displayName ?? g.to);
+  // im eigenen Buch stehen die Eselsohren der Freunde, wie sie sie geknickt haben; in ihren die eigenen
+  const earsById = Object.fromEntries([
+    ...mine.flatMap((d) => (d.stored ? [[d.book.id, (room.spread[d.stored.id]?.items ?? []).flatMap((n) => (n.kind === "ear" && n.no ? [n.no] : []))]] : [])),
+    ...given.flatMap((d) => (d.gift ? [[d.book.id, feedback.earsOf(d.gift)]] : [])),
+  ]);
+  const pinById = Object.fromEntries(given.flatMap(({ book, gift }) => (gift ? [[book.id, (spot: Spot) => feedback.pin(gift, spot)]] : [])));
+  // Zettel, die Freunde an eine Stelle im Foto geheftet haben: im eigenen Buch als Marker; in ihren Büchern meine eigenen
+  const [openPins, setOpenPins] = useState<string[]>([]);
+  const pinsById = Object.fromEntries([
+    ...mine.flatMap((d) =>
+      d.stored
+        ? [
+            [
+              d.book.id,
+              (room.spread[d.stored.id]?.items ?? []).flatMap((n): Pinned[] =>
+                n.kind === "note" && n.text && n.no !== undefined && typeof n.x === "number" && typeof n.y === "number"
+                  ? [
+                      {
+                        key: n.id,
+                        no: n.no,
+                        x: n.x,
+                        y: n.y,
+                        node: (
+                          <PinNote
+                            kind="theirs"
+                            text={n.text}
+                            who={n.who}
+                            open={openPins.includes(n.id)}
+                            onOpenChange={(o) => setOpenPins((l) => (o ? [...l, n.id] : l.filter((x) => x !== n.id)))}
+                            flipX={n.x > 0.5}
+                            flipY={n.y > 0.6}
+                          />
+                        ),
+                      },
+                    ]
+                  : [],
+              ),
+            ],
+          ]
+        : [],
+    ),
+    ...given.flatMap((d) => (d.gift ? [[d.book.id, feedback.pinsOf(d.gift)]] : [])),
+  ]);
+  const earById = Object.fromEntries(given.flatMap(({ book, gift }) => (gift ? [[book.id, (no: number) => feedback.toggleEar(gift, no)]] : [])));
   const byId = (id: string) => all.find((d) => d.book.id === id);
   const ownLoaded = own !== null;
   const giftsLoaded = gifts !== null;
@@ -368,6 +413,13 @@ function Room({ user }: { user: User }) {
       <Library
         books={all.map((d) => d.book)}
         ears={earsById}
+        onEar={earById}
+        onPin={pinById}
+        pins={pinsById}
+        bookExtra={(b, plates) => {
+          const g = byId(b.id)?.gift;
+          return g && feedback.extra(g, plates);
+        }}
         onEdit={(id) => {
           const s = byId(id)?.stored;
           if (!s) return undefined;
@@ -462,6 +514,7 @@ function Room({ user }: { user: User }) {
         </Table>
       </Library>
 
+      {feedback.sheet}
       {reporting && (
         <ReportDialog share={reporting} reporter={user.uid} onClose={() => setReporting(null)} onBlock={() => room.block(reporting)} />
       )}

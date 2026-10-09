@@ -673,11 +673,22 @@ export async function unshare(token: string) {
   await deleteDoc(doc(db(), "shares", token));
 }
 
-export type Note = { id: string; kind: "note" | "ear"; text?: string; no?: number; from?: string; at?: { seconds: number } };
+/** x und y: Stelle auf dem Foto der Tafel `no` (0 bis 1), wo der Zettel angeheftet ist */
+export type Note = { id: string; kind: "note" | "ear"; text?: string; no?: number; x?: number; y?: number; from?: string; at?: { seconds: number } };
 
 export async function leaveNote(token: string, n: Omit<Note, "id" | "at">) {
   if (MOCK) return;
-  await addDoc(collection(db(), "shares", token, "notes"), { ...n, at: serverTimestamp() });
+  const notes = collection(db(), "shares", token, "notes");
+  try {
+    await addDoc(notes, { ...n, at: serverTimestamp() });
+  } catch (e) {
+    // solange die Regeln die Stelle noch nicht kennen: der Zettel kommt an, nur ohne Stelle
+    if (n.x === undefined && n.y === undefined) throw e;
+    const rest = { ...n };
+    delete rest.x;
+    delete rest.y;
+    await addDoc(notes, { ...rest, at: serverTimestamp() });
+  }
 }
 
 export async function notesOf(token: string, cached = false): Promise<Note[]> {
@@ -700,8 +711,9 @@ export async function keepInInbox(uid: string, share: Share) {
 
 /** Für mich hingelegte Bücher laufend; jeder Eintrag holt sein Buch aus dem geteilten Link, zurückgezogene fallen weg */
 export function watchInbox(uid: string, next: (shares: Share[]) => void, fail: (e: unknown) => void): () => void {
+  // Testmodus: vorab abgelegte Links anderer liegen unter „Für dich“
   if (MOCK) {
-    queueMicrotask(() => next([]));
+    queueMicrotask(() => next([...mem.shares.values()].filter((s) => s.owner !== uid)));
     return () => {};
   }
   let run = 0;
@@ -718,7 +730,7 @@ export function watchInbox(uid: string, next: (shares: Share[]) => void, fail: (
 }
 
 export async function inbox(uid: string): Promise<Share[]> {
-  if (MOCK) return [];
+  if (MOCK) return [...mem.shares.values()].filter((s) => s.owner !== uid);
   const s = await getDocs(collection(db(), "users", uid, "inbox"));
   const shares = await Promise.all(s.docs.map((d) => loadShare(d.id).catch(() => null)));
   return shares.filter((x): x is Share => !!x);

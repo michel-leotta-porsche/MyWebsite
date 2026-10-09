@@ -1184,3 +1184,64 @@ html.ohne-schatten [data-shade] {
   opacity: 0.45;
   cursor: default;
 }
+
+/* Zettel, die an einer Stelle im Foto hängen (pin-note.tsx): Papier mit Büroklammer, klein ein Fähnchen */
+.pin-hand {
+  font-family: var(--font-hand), cursive;
+}
+.pin-slip {
+  z-index: 2;
+  color: var(--ink);
+  background:
+    linear-gradient(170deg, rgb(255 255 255 / 0.35), transparent 40%),
+    #f7f2e4;
+  box-shadow:
+    0 14px 24px -10px rgb(12 10 8 / 0.75),
+    0 1px 2px rgb(12 10 8 / 0.25);
+}
+.pin-clip {
+  position: absolute;
+  top: -9px;
+  width: 10px;
+  height: 26px;
+  border: 2px solid #8f9195;
+  border-radius: 6px;
+  box-shadow: 0 1px 1px rgb(12 10 8 / 0.3);
+}
+/* Marker: umgeknicktes Papierfähnchen mit Anfangsbuchstaben; die Bernsteinkante sagt „hier hängt etwas“ */
+.pin-flag {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  rotate: -7deg;
+  font-family: var(--font-hand), cursive;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  background: #f7f2e4;
+  border-top: 3px solid var(--cloth);
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 70% 100%, 0 100%);
+  transition: scale 150ms ease-out;
+}
+.pin-flag::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 30%;
+  height: 30%;
+  background: linear-gradient(135deg, #d9d1c1 50%, transparent 50%);
+}
+.pin-marker {
+  filter: drop-shadow(0 3px 3px rgb(12 10 8 / 0.55));
+}
+.pin-marker:active .pin-flag {
+  scale: 0.92;
+}
+.pin-marker:focus-visible {
+  outline: 2px solid var(--cloth);
+  outline-offset: -6px;
+}
