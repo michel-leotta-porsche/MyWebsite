@@ -41,6 +41,7 @@ export function Library({
   bookExtra,
   ears,
   onEar,
+  onEdit,
 }: {
   books: BookData[];
   /** Der Tisch mit seinen Reihen; jede Reihe schlägt ihre Bände über OpenBook auf */
@@ -53,6 +54,8 @@ export function Library({
   /** Eselsohren im offenen Buch (fest oder je Buch) und was beim Antippen der Ecke passiert */
   ears?: number[] | Record<string, number[]>;
   onEar?: (no: number) => void;
+  /** Nur für eigene Bücher: was langes Drücken oder „Bearbeiten“ im offenen Buch tut; undefined, wenn das Buch nicht dir gehört */
+  onEdit?: (id: string) => ((step: number) => void) | undefined;
 }) {
   const bookById = (id: string) => books.find((b) => b.id === id);
   const [wide, setWide] = useState<boolean | null>(null);
@@ -121,6 +124,7 @@ export function Library({
   }, [linked, bookReady]);
 
   const book = view ? bookById(view.id) : undefined;
+  const edit = view ? onEdit?.(view.id) : undefined;
   // Zurück auf dem Tisch steht der Fokus wieder auf dem Band, der offen war
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const close = useCallback(() => {
@@ -143,6 +147,7 @@ export function Library({
         extra={bookExtra}
         ears={Array.isArray(ears) ? ears : ears?.[book.id]}
         onEar={onEar}
+        onEdit={edit}
       />
     );
   }
