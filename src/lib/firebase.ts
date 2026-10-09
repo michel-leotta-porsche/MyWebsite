@@ -5,6 +5,8 @@ import {
   deleteUser,
   getAuth,
   GoogleAuthProvider,
+  indexedDBLocalPersistence,
+  initializeAuth,
   OAuthProvider,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
@@ -13,6 +15,7 @@ import {
   signInWithPopup,
   signOut,
   updateProfile,
+  type Auth,
   type User,
 } from "firebase/auth";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
@@ -33,7 +36,17 @@ const config = {
 };
 
 export const app = () => (getApps().length ? getApp() : initializeApp(config));
-export const auth = () => getAuth(app());
+let au: Auth | null = null;
+/**
+ * In der App (capacitor://localhost) bleibt getAuth hängen: es lädt den Helfer für Popups und Weiterleitungen
+ * als iframe von der authDomain, und der meldet sich dort nie. Die App braucht ihn nicht (Anmelden nativ),
+ * also dort ohne Popup-Helfer und mit IndexedDB als Speicher.
+ */
+export const auth = () => {
+  if (au) return au;
+  au = IS_APP ? initializeAuth(app(), { persistence: indexedDBLocalPersistence }) : getAuth(app());
+  return au;
+};
 
 let fs: Firestore | null = null;
 /**
