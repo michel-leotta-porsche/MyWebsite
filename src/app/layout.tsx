@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Caveat, IBM_Plex_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
+import { AppLaunch } from "@/components/app-launch";
 import { langScript } from "@/lib/lang";
 import { shareMeta, SITE_URL } from "@/lib/share-meta";
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-svh">
         <script dangerouslySetInnerHTML={{ __html: flagScript + langScript }} />
         {children}
+        <AppLaunch />
       </body>
     </html>
   );
