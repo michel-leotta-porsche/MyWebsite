@@ -25,12 +25,15 @@ import { getStorage } from "firebase/storage";
 
 import { IS_APP } from "@/lib/app-mode";
 
+const AUTH_HOSTS = ["calima.photo", "calima.web.app"];
+
 // Öffentliche Web-Konfiguration (kein Geheimnis): der Zugriff wird über firestore.rules und storage.rules geregelt
 const config = {
   apiKey: "AIzaSyCh1QxkXtljnVpeZNjZMghO2xFsDj6VygY",
-  // Anmeldung über die eigene Domain: Safari trennt den Speicher fremder Domains, über firebaseapp.com
-  // ginge der Zwischenstand der Google-Anmeldung verloren. Firebase Hosting liefert /__/auth/ hier selbst aus.
-  authDomain: "calima.web.app",
+  // Anmeldung über die Domain, auf der die Seite gerade läuft: Safari trennt den Speicher fremder Domains, über
+  // firebaseapp.com ginge der Zwischenstand der Google-Anmeldung verloren. Firebase Hosting liefert /__/auth/ auf
+  // beiden Adressen selbst aus. calima.web.app bleibt für alte Links erreichbar.
+  authDomain: typeof location !== "undefined" && AUTH_HOSTS.includes(location.hostname) ? location.hostname : "calima.photo",
   projectId: "fujiventura",
   storageBucket: "fujiventura.firebasestorage.app",
   messagingSenderId: "972013615891",
