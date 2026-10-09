@@ -1,7 +1,9 @@
 // Bildbearbeitung als eine Farbabbildung: alle Werkzeuge (Auto, Angleichen, Stimmung, Looks, Feinschliff, Rezept)
 // sind Funktionen Farbe → Farbe. Sie werden zu einem 3D-LUT zusammengerechnet, den Vorschau (WebGL) und
 // Einrechnen (Worker) gleich anwenden. Nur die Körnung ist ein Muster obendrauf.
-// Reine Rechnung ohne DOM, damit sie auch im Worker läuft.
+// Reine Rechnung ohne DOM, damit sie auch im Worker läuft. Der Zuschnitt (geo) ist keine Farbe; er liegt in geo.ts.
+
+import { cleanGeo, describeGeo, geoIsNeutral, type Geo } from "@/lib/develop/geo";
 
 export type Transfer = {
   /** Lab-Mittel und -Streuung des Fotos selbst */
@@ -51,6 +53,8 @@ export type PhotoEdit = {
   rec: RecipeValues;
   /** Name des gewählten Rezepts (auch wenn danach Werte geändert wurden) */
   recName?: string;
+  /** Zuschnitt, Drehen, Spiegeln, Geraderichten */
+  geo?: Geo;
 };
 
 export const REC0 = (): RecipeValues => ({ film: null, wbR: 0, wbB: 0, hl: 0, sh: 0, color: 0, dr: 100, cc: 0, fxb: 0, grain: 0, gsize: "klein" });
@@ -76,8 +80,16 @@ export const recipeIsEmpty = (r: RecipeValues) => sameRecipe(r, REC0());
 /** Ändert die Bearbeitung etwas am Bild? */
 export function isNeutral(e: PhotoEdit | undefined | null): boolean {
   if (!e || typeof e !== "object" || !e.rec || typeof e.rec !== "object") return true;
+  return colorIsNeutral(e) && geoIsNeutral(e.geo);
+}
+
+/** Ändert die Bearbeitung die Farben? (ohne Zuschnitt) */
+export function colorIsNeutral(e: PhotoEdit): boolean {
   return !e.exposure && !e.contrast && !e.shadows && !e.warmth && !e.sat && !e.look && !e.levels && !e.transfer && recipeIsEmpty(e.rec);
 }
+
+/** Schlüssel für alles, was den LUT bestimmt: der Zuschnitt gehört nicht dazu */
+export const colorKey = (e: PhotoEdit) => JSON.stringify({ ...e, geo: undefined });
 
 /* ---------- Prüfen: Bearbeitungen aus fremden Büchern ---------- */
 
@@ -129,6 +141,7 @@ export function cleanEdit(e: unknown): PhotoEdit | undefined {
       gsize: oneOf(r.gsize, ["klein", "groß"] as const, "klein"),
     },
     recName: str(x.recName, 40),
+    geo: cleanGeo(x.geo),
   };
 }
 
@@ -497,6 +510,7 @@ export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   const look = lookOf(e.look);
   if (look) rows.push({ label: "Look", value: `${look.name} ${Math.round(e.amount * 100)} %` });
   for (const [k, label, f] of FINE) if (Math.abs(e[k]) > 0.005) rows.push({ label, value: f(e[k]) });
+  if (e.geo && !geoIsNeutral(e.geo)) rows.push({ label: "Zuschnitt", value: describeGeo(e.geo) });
   return rows;
 }
 

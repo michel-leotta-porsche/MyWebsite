@@ -13,12 +13,13 @@ import { notify } from "@/components/ui/toaster";
 import type { User } from "@/lib/firebase";
 import { pickCover, relayoutFree } from "@/lib/auto-sequence";
 import { bakePhoto } from "@/lib/develop/bake";
+import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
 import { friendlyError } from "@/lib/errors";
 import { withExif } from "@/lib/exif-write";
 import { haptic } from "@/lib/haptics";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
-import { autoPhotos, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
+import { autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_PRINTS, putPrint, removePrint, type Print } from "@/lib/studio-store";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -199,7 +200,8 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
 function PrintTile({ print, i, onOpen }: { print: Print; i: number; onOpen: () => void }) {
   const blobs = useMemo(() => ({ img: print.shot ?? print.thumb }), [print.shot, print.thumb]);
   const { img } = useBlobUrls(blobs);
-  const land = print.w >= print.h;
+  const [pw, ph] = outSize(print.edit?.geo, print.w, print.h);
+  const land = pw >= ph;
   return (
     <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
       <button type="button" onClick={onOpen} className="studio-sheet" aria-label={`${print.name}, ${when(print.at)} bearbeitet. Öffnen`}>
@@ -295,7 +297,7 @@ function summary(e: PhotoEdit | undefined) {
   const rows = describeEdit(e);
   const head = rows.filter((r) => r.label === "Vorschlag" || r.label === "Rezept" || r.label === "Look").map((r) => r.value);
   const fine = rows.filter((r) => !["Vorschlag", "Rezept", "Look", "Filmlook", "Weißabgleich", "Dynamikbereich", "Lichter / Schatten", "Farbe", "Color Chrome / FX Blau", "Körnung"].includes(r.label));
-  return [...head, ...fine.map((r) => `${r.label} ${r.value}`)].slice(0, 3).join(" · ");
+  return [...head, ...fine.map((r) => (r.label === "Zuschnitt" ? r.value : `${r.label} ${r.value}`))].slice(0, 3).join(" · ");
 }
 
 const coarse = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
@@ -329,6 +331,8 @@ function DoneSheet({
   const [busy, setBusy] = useState<string | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
   const [touch] = useState(coarse);
+  // die eben eingerechnete Fassung; bis dahin das Foto ohne Bearbeitung
+  const [shot, setShot] = useState<Blob | null>(null);
   const edit = print.edit;
   const shotRef = useRef(onShot);
   useEffect(() => {
@@ -344,6 +348,7 @@ function DoneSheet({
       lut: buildLut(e, N),
       n: N,
       rec: e.rec,
+      geo: e.geo,
       sizes: { large: STUDIO_LONG, page: SIZES.page, thumb: SIZES.thumb },
       quality: 0.92,
       maxBytes: 40 * 1024 * 1024,
@@ -352,6 +357,7 @@ function DoneSheet({
         const jpeg = await withExif(out.blobs.large, print.meta.exif);
         if (!live) return;
         setFile(new File([jpeg], `${print.name}-calima.jpg`, { type: "image/jpeg", lastModified: Date.now() }));
+        setShot(out.blobs.thumb);
         shotRef.current(out.blobs.thumb);
       })
       .catch((err) => live && setFailed(err instanceof Error ? err.message : String(err)))
@@ -361,7 +367,7 @@ function DoneSheet({
     };
   }, [print, edit, attempt]);
 
-  const blobs = useMemo(() => ({ img: print.shot ?? print.thumb }), [print.shot, print.thumb]);
+  const blobs = useMemo(() => ({ img: shot ?? print.thumb }), [shot, print.thumb]);
   const { img } = useBlobUrls(blobs);
 
   const share = !!file && touch && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
@@ -417,9 +423,9 @@ function DoneSheet({
       if (edit && !isNeutral(edit)) {
         const local = URL.createObjectURL(ph.blobs.large);
         try {
-          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec });
-          const e = await uploadEdited(user.uid, bookId, key, out.blobs);
-          photo = { ...photo, edit, orig: { src: photo.src, large: photo.large, thumb: photo.thumb, color: photo.color }, src: e.page, large: e.large, thumb: e.thumb, color: out.color };
+          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo });
+          const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
+          photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
         } finally {
           URL.revokeObjectURL(local);
         }
@@ -464,7 +470,7 @@ function DoneSheet({
     <MountedSheet title={view === "main" ? "Fertig bearbeitet" : "In welches Buch?"} hideTitle={view === "main"} onClose={onClose} locked={!!busy}>
       {(close) =>
         view === "main" ? (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             <div className="flex items-center gap-3.5">
               {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät */}
               {img && <img src={img} alt="" className="h-[68px] w-auto max-w-[96px] flex-none object-cover shadow-[1px_2px_3px_rgb(58_39_6/0.35)]" />}
