@@ -10,6 +10,13 @@ ausgeliefert (Capacitor, keine Website-Adresse). Die Seiten liegen unter `capaci
 3. `npm run ios:build` baut die App-Fassung, prüft sie und kopiert sie nach `ios/App/App/public`.
 4. `npx cap open ios` öffnet Xcode. Unter Signing & Capabilities das eigene Team wählen, Gerät wählen, Run.
 
+## TestFlight über Xcode Cloud
+
+Jeder Merge auf `main` baut die App in Xcode Cloud und legt sie in TestFlight. `ci_scripts/ci_post_clone.sh` macht
+dort dasselbe wie `npm run ios:build`; das geteilte Schema `App` liegt in `App.xcodeproj/xcshareddata`.
+Im Workflow muss `FUJI_IMPRESSUM_ADRESSE` als geheime Umgebungsvariable stehen. Die Build-Nummer vergibt Xcode Cloud
+selbst; die nächste Nummer steht in App Store Connect unter Xcode Cloud → Einstellungen.
+
 ## Was hier eigens eingestellt ist
 
 - `App/SceneDelegate.swift`: `CalimaRouter` liefert `/zimmer` als `zimmer.html` aus; Capacitors Standard
