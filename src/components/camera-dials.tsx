@@ -89,11 +89,15 @@ export function DialChips({
       </li>
       {DIALS.map((k) => {
         const manual = dials[k] != null;
+        // Halbautomatik: steht nur Zeit oder nur ISO von Hand, gleicht das andere Rad aus. Damit man sieht, dass das Rad
+        // wirkt, läuft der ausgleichende Wert hinter dem A mit („Zeit A 1/4“), wie die Anzeige im Sucher einer Kamera
+        const partner = k === "duration" ? "iso" : k === "iso" ? "duration" : null;
+        const steering = !manual && partner != null && dials[partner] != null && meter != null;
         return (
           <li key={k} className="flex-none">
             <button type="button" onClick={() => onPick(dial === k ? null : k)} aria-pressed={dial === k} className={chip(dial === k, manual)}>
               <span className="opacity-70">{names[k]} </span>
-              {manual ? dialLabel(k, dials, meter) : "A"}
+              {manual ? dialLabel(k, dials, meter) : steering ? <>A <span className="font-medium">{dialLabel(k, dials, meter)}</span></> : "A"}
             </button>
           </li>
         );
