@@ -696,8 +696,9 @@ export async function keepInInbox(uid: string, share: Share) {
 
 /** Für mich hingelegte Bücher laufend; jeder Eintrag holt sein Buch aus dem geteilten Link, zurückgezogene fallen weg */
 export function watchInbox(uid: string, next: (shares: Share[]) => void, fail: (e: unknown) => void): () => void {
+  // Testmodus: vorab abgelegte Links anderer liegen unter „Für dich“
   if (MOCK) {
-    queueMicrotask(() => next([]));
+    queueMicrotask(() => next([...mem.shares.values()].filter((s) => s.owner !== uid)));
     return () => {};
   }
   let run = 0;
@@ -714,7 +715,7 @@ export function watchInbox(uid: string, next: (shares: Share[]) => void, fail: (
 }
 
 export async function inbox(uid: string): Promise<Share[]> {
-  if (MOCK) return [];
+  if (MOCK) return [...mem.shares.values()].filter((s) => s.owner !== uid);
   const s = await getDocs(collection(db(), "users", uid, "inbox"));
   const shares = await Promise.all(s.docs.map((d) => loadShare(d.id).catch(() => null)));
   return shares.filter((x): x is Share => !!x);

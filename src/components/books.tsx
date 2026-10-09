@@ -50,9 +50,9 @@ export function Library({
   footer?: ReactNode;
   /** Zusätzliche Knöpfe in der Kopfzeile des offenen Buchs */
   bookExtra?: (book: BookData, plates: number[]) => ReactNode;
-  /** Eselsohren im offenen Buch (fest oder je Buch) und was beim Antippen der Ecke passiert */
+  /** Eselsohren im offenen Buch (fest oder je Buch) und was beim Antippen der Ecke passiert (fest oder je Buch) */
   ears?: number[] | Record<string, number[]>;
-  onEar?: (no: number) => void;
+  onEar?: ((no: number) => void) | Record<string, (no: number) => void>;
 }) {
   const bookById = (id: string) => books.find((b) => b.id === id);
   const [wide, setWide] = useState<boolean | null>(null);
@@ -142,7 +142,7 @@ export function Library({
         onClose={close}
         extra={bookExtra}
         ears={Array.isArray(ears) ? ears : ears?.[book.id]}
-        onEar={onEar}
+        onEar={typeof onEar === "function" ? onEar : onEar?.[book.id]}
       />
     );
   }

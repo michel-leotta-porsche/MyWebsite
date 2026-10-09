@@ -1,47 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { BookData } from "@/content/books";
-import { BookmarkPlus, Check, Flag, MoreHorizontal, PenLine } from "lucide-react";
+import { BookmarkPlus, Check, Flag, MoreHorizontal } from "lucide-react";
 
 import { Button, buttonClass, IconButton } from "@/components/ui/button";
-import { noteClass } from "@/components/ui/field";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import { Sheet } from "@/components/ui/sheet";
-import { notify, Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Library } from "@/components/books";
+import { useFeedback } from "@/components/leave-feedback";
 import { Shelf, Table } from "@/components/table";
 import { signInError } from "@/lib/errors";
 import { signIn, type SignInProvider } from "@/lib/firebase";
 import { SignInButtons } from "@/components/sign-in-buttons";
 import { ReportDialog } from "@/components/report-dialog";
-import { isAbusive } from "@/lib/note-filter";
-import { blockSender, keepInInbox, leaveNote, loadShare, toBookData, watchBlocked, type Blocked, type Share } from "@/lib/store";
+import { blockSender, keepInInbox, loadShare, toBookData, watchBlocked, type Blocked, type Share } from "@/lib/store";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
-
-const EAR_DELAY_MS = 5000;
 
 /** Ein Buch, das jemand für mich hingelegt hat: ohne Konto lesbar, mit Zettel und Eselsohr zurück */
 export function GuestBook() {
   const token = useQueryParam("t");
   const user = useUser();
   const [share, setShare] = useState<Share | null | undefined>(undefined);
-  const [writing, setWriting] = useState(false);
-  const [text, setText] = useState("");
-  const [ears, setEars] = useState<number[]>([]);
-  // Eselsohren gehen erst nach ein paar Sekunden raus; bis dahin lassen sie sich zurücknehmen (UX-Kritik K12)
-  const earTimers = useRef(new Map<number, number>());
-  const [earsSent, setEarsSent] = useState<number[]>([]);
-  const [failed, setFailed] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
   const [signInFailed, setSignInFailed] = useState<string | null>(null);
   const [keeping, setKeeping] = useState(false);
   const [signingIn, setSigningIn] = useState<SignInProvider | null>(null);
   const [reporting, setReporting] = useState(false);
   const [blocked, setBlocked] = useState<Blocked[] | null>(null);
+  const feedback = useFeedback((s) => user?.displayName ?? s.to);
 
   useEffect(() => {
     if (!user) return;
@@ -84,65 +75,15 @@ export function GuestBook() {
 
   if (hidden && !reporting) return <Empty text={`Bücher von ${share.fromName} hast du ausgeblendet. Im Profil kannst du das zurücknehmen.`} />;
 
-  const from = user?.displayName ?? share.to;
   const mine = !!user && user.uid === share.owner;
-
-  const toggleEar = (no: number) => {
-    if (!token || earsSent.includes(no)) return;
-    const pending = earTimers.current.get(no);
-    if (pending !== undefined) {
-      window.clearTimeout(pending);
-      earTimers.current.delete(no);
-      setEars((e) => e.filter((x) => x !== no));
-      return;
-    }
-    setEars((e) => [...e, no]);
-    notify(`Eselsohr bei Tafel ${no}`, { duration: EAR_DELAY_MS, action: { label: "Rückgängig", onClick: () => toggleEar(no) } });
-    earTimers.current.set(
-      no,
-      window.setTimeout(() => {
-        earTimers.current.delete(no);
-        leaveNote(token, { kind: "ear", no, from })
-          .then(() => setEarsSent((s) => [...s, no]))
-          .catch(() => {
-            setEars((e) => e.filter((x) => x !== no));
-            notify("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal.");
-          });
-      }, EAR_DELAY_MS),
-    );
-  };
 
   return (
     <main>
       <Library
         books={[book]}
-        ears={ears}
-        onEar={toggleEar}
-        bookExtra={(_, plates) => {
-          // Eselsohr an der ersten Tafel der aufgeschlagenen Seite
-          const no = plates[0];
-          return (
-            <>
-              {no !== undefined &&
-                (earsSent.includes(no) ? (
-                  <span className="text-on-table-2 inline-flex min-h-9 items-center gap-1.5">
-                    <Check aria-hidden className="size-4" />
-                    Eselsohr bei {share.fromName}
-                  </span>
-                ) : (
-                  <Button size="sm" aria-pressed={ears.includes(no)} haptic="select" className="aria-pressed:bg-on-table aria-pressed:text-table" onClick={() => toggleEar(no)}>
-                    <Dogear on={ears.includes(no)} />
-                    Eselsohr
-                  </Button>
-                ))}
-              <Button size="sm" onClick={() => setWriting(true)}>
-                <PenLine aria-hidden />
-                Zettel
-              </Button>
-              {!mine && <MoreMenu onReport={() => setReporting(true)} />}
-            </>
-          );
-        }}
+        ears={feedback.earsOf(share)}
+        onEar={(no) => feedback.toggleEar(share, no)}
+        bookExtra={(_, plates) => feedback.extra(share, plates, !mine && <MoreMenu onReport={() => setReporting(true)} />)}
       >
         <Table
           label={`Ein Buch für ${share.to}`}
@@ -202,50 +143,7 @@ export function GuestBook() {
           .
         </p>
       </Sheet>
-      <Sheet open={writing} onOpenChange={setWriting} title={`Zettel an ${share.fromName}`} description={`Nur ${share.fromName} liest das.`}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const note = text.trim();
-            if (!note || !token) return;
-            setFailed(null);
-            if (isAbusive(note)) {
-              setFailed("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
-              return;
-            }
-            leaveNote(token, { kind: "note", text: note, from })
-              .then(() => {
-                setText("");
-                setWriting(false);
-                notify(`Dein Zettel liegt bei ${share.fromName}. Danke!`);
-              })
-              .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
-          }}
-        >
-          <label htmlFor="note" className="sr-only">
-            Zettel
-          </label>
-          <textarea
-            id="note"
-            value={text}
-            onChange={(e) => setText(e.target.value.slice(0, 280))}
-            rows={4}
-            className={noteClass}
-            placeholder="Was dir gefällt, eine Frage zum Rezept …"
-          />
-          {failed && (
-            <p role="alert" className="text-danger mt-2 text-sm font-semibold">
-              {failed}
-            </p>
-          )}
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className="text-ink-2 text-[13px] tabular-nums">{text.length} / 280</span>
-            <Button type="submit" variant="ink" disabled={!text.trim()}>
-              Hinlegen
-            </Button>
-          </div>
-        </form>
-      </Sheet>
+      {feedback.sheet}
       {reporting && (
         <ReportDialog
           share={share}
@@ -256,16 +154,6 @@ export function GuestBook() {
       )}
       <Toaster />
     </main>
-  );
-}
-
-/** Ecke eines Blatts, umgeknickt solange das Eselsohr gesetzt ist */
-function Dogear({ on }: { on: boolean }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round">
-      <path d="M5 3h9l5 5v13H5z" />
-      <path d="M14 3v5h5" className={on ? "fill-current" : ""} />
-    </svg>
   );
 }
 
