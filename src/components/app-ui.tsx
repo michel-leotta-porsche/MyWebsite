@@ -60,9 +60,20 @@ const ROOM_TAB = "inline-flex min-h-9 items-center rounded-full px-4 text-sm fon
  * Räume nur mit Anmeldung: solange Firebase prüft, liegt der leere Tisch da, ohne Konto die Anmeldung.
  * Die Daten schützen firestore.rules; das hier ist der Weg, nicht das Schloss.
  */
-export function RequireUser({ title, text, children }: { title: string; text: ReactNode; children: (user: User) => ReactNode }) {
+export function RequireUser({
+  title,
+  text,
+  loading,
+  children,
+}: {
+  title: string;
+  text: ReactNode;
+  /** was auf dem Tisch liegt, solange Firebase prüft (wird mit vorgerendert, läuft also ohne JavaScript) */
+  loading?: ReactNode;
+  children: (user: User) => ReactNode;
+}) {
   const user = useUser();
-  if (user === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
+  if (user === undefined) return loading ? <main>{loading}</main> : <main className="linen table-surface min-h-svh bg-table" />;
   if (user === null) return <SignInTable title={title}>{text}</SignInTable>;
   return <>{children(user)}</>;
 }

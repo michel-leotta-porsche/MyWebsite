@@ -20,6 +20,7 @@ import { useFeedback } from "@/components/leave-feedback";
 import { PinNote } from "@/components/pin-note";
 import type { Pinned, Spot } from "@/components/book";
 import { ReportDialog } from "@/components/report-dialog";
+import { RoomLoading } from "@/components/room-loading";
 import { ShareDialog } from "@/components/share-dialog";
 import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-carousel";
 import { OpenBook, Table } from "@/components/table";
@@ -52,9 +53,37 @@ const some = (n: number) => (n === 1 ? "eines" : numberWord(n).toLowerCase());
  */
 export function BookRoom() {
   return (
-    <RequireUser title="Dein Bücherzimmer" text="Hier liegen deine eigenen Fotobücher und die, die Freunde für dich hingelegt haben.">
+    <RequireUser
+      title="Dein Bücherzimmer"
+      text="Hier liegen deine eigenen Fotobücher und die, die Freunde für dich hingelegt haben."
+      loading={
+        // derselbe Tisch wie im Zimmer, damit der Zettel schon dort liegt, wo gleich das Buch hinkommt
+        <Table label="Bücherzimmer" title={<Wordmark />} headerRight={<RoomNav />}>
+          <RoomHeading count={"\u00a0"} />
+          <section aria-label="Von dir" className="grid gap-2">
+            <RoomLoading />
+          </section>
+        </Table>
+      }
+    >
       {(user) => <Room user={user} />}
     </RequireUser>
+  );
+}
+
+function RoomHeading({ count }: { count: string }) {
+  return (
+    <div className="grid gap-3">
+      <h1
+        className="text-on-table text-[clamp(44px,6.4vw,92px)] leading-[0.88] font-bold tracking-[-0.035em]"
+        style={{ fontVariationSettings: '"wdth" 75, "opsz" 96' }}
+      >
+        Bücherzimmer
+      </h1>
+      <p className="text-on-table-2 text-base" aria-live="polite">
+        {count}
+      </p>
+    </div>
   );
 }
 
@@ -168,7 +197,7 @@ function Room({ user }: { user: User }) {
       </div>
     );
 
-  // bis die Bücher da sind, hält ein unsichtbarer Platz die Höhe eines Buchs
+  // bis die Bücher da sind, hält ein unsichtbarer Platz die Höhe eines Buchs; bei den eigenen liegt dort der Zettel
   const placeholder = <div aria-hidden className="carousel" style={{ height: "calc(var(--tw) * 1.5 + 58px)" }} />;
 
   // das leere Buch: ein Rohling in ungefärbtem Leinen, wie ein Band vor dem Bezug
@@ -343,7 +372,7 @@ function Room({ user }: { user: User }) {
         );
       }}
     >
-      {!ownReady && placeholder}
+      {!ownReady && <RoomLoading />}
       <input
         ref={importInput}
         type="file"
@@ -428,17 +457,7 @@ function Room({ user }: { user: User }) {
         }}
       >
         <Table label="Bücherzimmer" title={<Wordmark />} headerRight={<RoomNav />}>
-          <div className="grid gap-3">
-            <h1
-              className="text-on-table text-[clamp(44px,6.4vw,92px)] leading-[0.88] font-bold tracking-[-0.035em]"
-              style={{ fontVariationSettings: '"wdth" 75, "opsz" 96' }}
-            >
-              Bücherzimmer
-            </h1>
-            <p className="text-on-table-2 text-base" aria-live="polite">
-              {count}
-            </p>
-          </div>
+          <RoomHeading count={count} />
           {giftsFirst ? [forYou, fromYou] : [fromYou, forYou]}
           <Studio user={user} books={own} />
           {putAway.length > 0 && (
