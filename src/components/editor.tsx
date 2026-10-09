@@ -198,6 +198,14 @@ export function Editor() {
         if (!alive || !b) return;
         savedOnce.current = true;
         setLoaded(b);
+        // aus dem offenen Buch (langes Drücken, „Bearbeiten“): gleich die Doppelseite, die dort aufgeschlagen war
+        const at = new URLSearchParams(location.search).get("doppelseite");
+        if (!at) return;
+        window.history.replaceState(null, "", `/neu?id=${b.id}`);
+        const s = b.spreads[Number(at) - 1];
+        if (!s?.id) return;
+        if (s.text) setSel({ type: "spread", id: s.id });
+        else setStageId(s.id);
       })
       .catch(() => {});
     return () => {
@@ -475,7 +483,21 @@ export function Editor() {
 
   if (preview && data && wide !== null)
     // auch auf dem Telefon die ganze Doppelseite, wie das Buch auf der Startseite
-    return <Book book={data} mode="spread" autoOpen onClose={() => setPreview(false)} />;
+    return (
+      <Book
+        book={data}
+        mode="spread"
+        autoOpen
+        onClose={() => setPreview(false)}
+        onEdit={(step) => {
+          setPreview(false);
+          const s = book.spreads[step - 2];
+          if (!s?.id) return;
+          if (s.text) setSel({ type: "spread", id: s.id });
+          else setStageId(s.id);
+        }}
+      />
+    );
 
   const byKey = new Map(book.photos.map((p) => [p.key, p]));
   const auto = new Map(autoPhotos(book.photos).map((p) => [p.key, p]));

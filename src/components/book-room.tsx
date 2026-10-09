@@ -375,6 +375,12 @@ function Room({ user }: { user: User }) {
           const g = byId(b.id)?.gift;
           return g && feedback.extra(g, plates);
         }}
+        onEdit={(id) => {
+          const s = byId(id)?.stored;
+          if (!s) return undefined;
+          // Schritt 0 Einband, 1 Titel, ab 2 die Doppelseiten der Werkbank (wie toBookData sie reiht)
+          return (step) => router.push(`/neu?id=${s.id}${step >= 2 && step - 2 < s.spreads.length ? `&doppelseite=${step - 1}` : ""}`);
+        }}
       >
         <Table label="Bücherzimmer" title={<Wordmark />} headerRight={<RoomNav />}>
           <div className="grid gap-3">

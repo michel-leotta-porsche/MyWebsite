@@ -1,23 +1,26 @@
 "use client";
 
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
-import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
+import { CurvePad } from "@/components/curve-pad";
 import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/segmented";
 import { Swatches } from "@/components/ui/swatches";
 import { bakePhoto } from "@/lib/develop/bake";
+import { estimateTilt } from "@/lib/develop/detail";
 import { cropFor, fitCrop, GEO0, geoIsNeutral, outMap, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
 import {
   applyLut,
   cleanEdit,
   colorIsNeutral,
   colorKey,
+  curveIsNeutral,
   autoEdit,
   buildLut,
   FINE,
@@ -48,6 +51,7 @@ import {
 } from "@/lib/develop/model";
 import { createPreviewer, type Previewer } from "@/lib/develop/preview";
 import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
+import { haptic } from "@/lib/haptics";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Bearbeiten auf der Werkbank: immer ein Foto, die anderen der Doppelseite liegen daneben und lassen sich antippen.
@@ -176,17 +180,57 @@ const fullOf = (p: StoredPhoto, long: number): [number, number] => {
 
 /* ---------- Mehr Werkzeuge: Gruppen, die sich unter die fünf Regler klappen ---------- */
 
-type Group = "light" | "color" | "hsl" | "vignette";
+type Group = "light" | "color" | "hsl" | "vignette" | "curve";
 const GROUPS: [Group, string, string, LucideIcon][] = [
-  ["light", "Licht genauer", "Lichter, Weiß, Schwarz", Sun],
+  ["light", "Licht genauer", "Lichter, Weiß, Schwarz, Klarheit", Sun],
   ["color", "Farbe genauer", "Tönung, Dynamik", Droplet],
   ["hsl", "Farben einzeln", "acht Farbtöne", Palette],
   ["vignette", "Vignette", "Ränder abdunkeln", Aperture],
+  ["curve", "Gradationskurve", "Helligkeit Punkt für Punkt", Spline],
+];
+/** Die Kurve braucht Maus und Platz: im Menü nur am Rechner; eine schon gesetzte Kurve bleibt überall sichtbar */
+const DESK = "(min-width: 1024px) and (pointer: fine)";
+const onDesk = (cb: () => void) => {
+  const mq = window.matchMedia(DESK);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const useDesk = () => useSyncExternalStore(onDesk, () => window.matchMedia(DESK).matches, () => false);
+const CURVES: [string, [number, number][]][] = [
+  ["Gerade", []],
+  [
+    "Mehr Kontrast",
+    [
+      [0, 0],
+      [0.25, 0.19],
+      [0.75, 0.82],
+      [1, 1],
+    ],
+  ],
+  [
+    "Weicher",
+    [
+      [0, 0],
+      [0.25, 0.3],
+      [0.75, 0.71],
+      [1, 1],
+    ],
+  ],
+  [
+    "Matt",
+    [
+      [0, 0.08],
+      [0.25, 0.27],
+      [0.75, 0.76],
+      [1, 0.96],
+    ],
+  ],
 ];
 const GROUPS_KEY = "calima-dev-groups";
 /** Was in einer Gruppe verstellt ist, kurz; leer, wenn nichts */
 function groupNote(m: More | undefined, g: Group): string {
   if (!m) return "";
+  if (g === "curve") return curveIsNeutral(m.curve) ? "" : "angepasst";
   if (g === "hsl") {
     const n = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([name]) => name);
     return n.length ? n.join(", ") : "";
@@ -491,6 +535,7 @@ export function DevelopDialog({
   });
   const [folded, setFolded] = useState<Group[]>([]);
   const [hue, setHue] = useState(1);
+  const desk = useDesk();
   const croppingNow = useRef(cropping);
   croppingNow.current = cropping;
 
@@ -607,7 +652,7 @@ export function DevelopDialog({
     const sdir: [number, number] = ([[1, 0], [0, -1], [-1, 0], [0, 1]] as const)[gg.quarter].map((v) => (gg.flip ? -v : v)) as [number, number];
     const at = gg.crop[0] + split * gg.crop[2];
     const vmap = outMap(edit.geo, fw, fh);
-    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? at : null, original: holding, sdir, vignette: edit.more?.vignette, vmap });
+    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? at : null, original: holding, sdir, vignette: edit.more?.vignette, vmap, clarity: edit.more?.clarity });
     const raf = requestAnimationFrame(() => draw(lutCache.has(`${FINE_N}|${key}`) ? FINE_N : FAST));
     const t = window.setTimeout(() => draw(FINE_N), 140);
     return () => {
@@ -743,6 +788,27 @@ export function DevelopDialog({
     });
   const flipIt = () => actGeo((g) => ({ ...g, flip: !g.flip, angle: -g.angle, crop: [1 - g.crop[0] - g.crop[2], g.crop[1], g.crop[2], g.crop[3]] }));
   const straighten = (a: number) => setGeo((g) => ({ ...g, angle: a, crop: fitCrop(dialBase.current ?? g.crop, a, TW, TH) }));
+  // Auto: Neigung der Kanten im ganzen Foto schätzen; gespiegelt kippt sie in die andere Richtung
+  const [autoBusy, setAutoBusy] = useState(false);
+  const autoStraighten = async () => {
+    const b = bitmaps.current.get(photo.key);
+    if (!b || autoBusy) return;
+    setAutoBusy(true);
+    try {
+      const px = pixelsOf(await b, 480);
+      const t = estimateTilt(px.data, px.width, px.height);
+      if (t == null) return setNote("Keine klare Kante gefunden. Dreh am Rad, bis es passt.");
+      const a = Math.max(-45, Math.min(45, geo.flip ? t : -t));
+      if (Math.abs(a - geo.angle) < 0.1) return setNote("Das Foto ist schon gerade.");
+      actGeo((g) => ({ ...g, angle: a, crop: fitCrop(g.crop, a, TW, TH) }));
+      haptic("select");
+      setNote(`Um ${a > 0 ? "+" : "−"}${Math.abs(a).toFixed(1).replace(".", ",")}° gerade gerichtet. Das Rad stellt nach.`);
+    } catch (e) {
+      console.warn("[bearbeiten] Auto gerade", reasonOf(e));
+    } finally {
+      setAutoBusy(false);
+    }
+  };
   const openCrop = () => {
     setCompare(false);
     setHolding(false);
@@ -754,6 +820,19 @@ export function DevelopDialog({
   /* ----- Vorschläge ----- */
 
   const me = loaded[photo.key]?.st;
+  // Helligkeit des Fotos hinter der Kurve: alles außer der Kurve selbst eingerechnet, am kleinen Abzug
+  const thumbNow = loaded[photo.key]?.thumb;
+  const wantHist = tab === "f" && (groups.includes("curve") || !curveIsNeutral(edit.more?.curve));
+  const histEdit = edit.more ? { ...edit, more: { ...edit.more, curve: [] } } : edit;
+  const histKey = wantHist ? colorKey(histEdit) : "";
+  const curveHist = useMemo(() => {
+    if (!histKey || !thumbNow) return undefined;
+    const out = new Uint8ClampedArray(thumbNow.data.length);
+    applyLut(thumbNow.data, out, lutFor(JSON.parse(histKey) as PhotoEdit, FAST, histKey), FAST);
+    const bins = new Array<number>(64).fill(0);
+    for (let i = 0; i < out.length; i += 4) bins[Math.min(63, Math.floor((0.2126 * out[i] + 0.7152 * out[i + 1] + 0.0722 * out[i + 2]) / 4))]++;
+    return bins;
+  }, [histKey, thumbNow]);
   const otherStats = others.map((o) => loaded[o.key]?.st).filter((s): s is PhotoStats => !!s);
   const moodSrc = others.length ? others[moodIdx % others.length] : null;
   const moodSt = moodSrc ? loaded[moodSrc.key]?.st : undefined;
@@ -1071,7 +1150,7 @@ export function DevelopDialog({
           continue;
         }
         setBusy(changed.length > 1 ? `Speichere Foto ${i + 1} von ${changed.length} …` : "Speichere das Foto …");
-        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo, vignette: e.more?.vignette });
+        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo, vignette: e.more?.vignette, clarity: e.more?.clarity });
         if (cancelled.current) return;
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
         if (cancelled.current) return;
@@ -1298,11 +1377,14 @@ export function DevelopDialog({
               onStart={() => {
                 remember();
                 dialBase.current = geo.crop;
+                setNote(null);
               }}
               onChange={straighten}
               onEnd={() => (dialBase.current = null)}
               onTurn={turnLeft}
               onFlip={flipIt}
+              onAuto={autoStraighten}
+              autoBusy={autoBusy}
             />
           )}
           {/* Telefon: Fotos und Knöpfe in einer Zeile, damit für die Werkzeuge mehr Höhe bleibt */}
@@ -1613,6 +1695,7 @@ export function DevelopDialog({
               (() => {
                 const m = edit.more ?? MORE0();
                 const shownGroups = GROUPS.filter(([g]) => groups.includes(g) || groupNote(edit.more, g));
+                const offered = GROUPS.filter(([g]) => g !== "curve" || desk || shownGroups.some(([x]) => x === g));
                 const pick = (g: Group) => {
                   const changed = !!groupNote(edit.more, g);
                   if (groups.includes(g) && !changed) return keepGroups(groups.filter((x) => x !== g));
@@ -1651,7 +1734,32 @@ export function DevelopDialog({
                             )}
                           </div>
                           <div id={`dv-gb-${g}`} hidden={!open} className="grid gap-x-[22px] gap-y-2.5 pt-1 pb-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-4">
-                            {g === "hsl" ? (
+                            {g === "curve" ? (
+                              <div className="grid gap-2.5 sm:col-span-2 lg:col-span-1">
+                                <CurvePad points={m.curve} hist={curveHist} onStart={burst} onChange={(c) => liveMore(() => ({ curve: c }))} />
+                                <div role="group" aria-label="Vorlagen" className="flex flex-wrap gap-1.5">
+                                  {CURVES.map(([name, c]) => (
+                                    <button
+                                      key={name}
+                                      type="button"
+                                      aria-pressed={JSON.stringify(c) === JSON.stringify(m.curve)}
+                                      onClick={() => {
+                                        remember();
+                                        fade();
+                                        setEdit((e) => {
+                                          const next = { ...(e.more ?? MORE0()), curve: c };
+                                          return { ...e, more: moreIsNeutral(next) ? undefined : next };
+                                        });
+                                      }}
+                                      className={chip(JSON.stringify(c) === JSON.stringify(m.curve))}
+                                    >
+                                      {name}
+                                    </button>
+                                  ))}
+                                </div>
+                                <p className="text-ink-2 text-xs">Auf die Fläche klicken setzt einen Punkt. Aus der Fläche ziehen oder doppelklicken nimmt ihn weg.</p>
+                              </div>
+                            ) : g === "hsl" ? (
                               <div className="grid gap-2.5 sm:col-span-2 lg:col-span-1">
                                 <Swatches
                                   label={`${HUES[hue][0]}: ${HUES[hue][3]}`}
@@ -1692,13 +1800,13 @@ export function DevelopDialog({
                           </button>
                         }
                       >
-                        {GROUPS.map(([g, name, txt, Icon]) => (
+                        {offered.map(([g, name, txt, Icon]) => (
                           <MenuItem key={g} icon={<Icon />} hint={txt} checked={shownGroups.some(([x]) => x === g)} onClick={() => pick(g)}>
                             {name}
                           </MenuItem>
                         ))}
                       </Menu>
-                      <span className="text-ink-2 text-xs">{shownGroups.length ? `${shownGroups.length} von ${GROUPS.length} offen` : "Lichter, Tönung, einzelne Farben, Vignette"}</span>
+                      <span className="text-ink-2 text-xs">{shownGroups.length ? `${shownGroups.length} von ${offered.length} offen` : desk ? "Lichter, Klarheit, Farben, Vignette, Kurve" : "Lichter, Klarheit, Farben, Vignette"}</span>
                     </div>
                   </div>
                 );

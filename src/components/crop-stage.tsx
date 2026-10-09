@@ -2,7 +2,7 @@
 
 import { useRef, useState, type CSSProperties } from "react";
 
-import { FlipHorizontal2, RotateCcwSquare } from "lucide-react";
+import { FlipHorizontal2, RotateCcwSquare, WandSparkles } from "lucide-react";
 
 import { IconButton } from "@/components/ui/button";
 import { cropFits, toward, type Geo } from "@/lib/develop/geo";
@@ -167,6 +167,8 @@ export function StraightenDial({
   onEnd,
   onTurn,
   onFlip,
+  onAuto,
+  autoBusy = false,
 }: {
   angle: number;
   onStart: () => void;
@@ -174,6 +176,9 @@ export function StraightenDial({
   onEnd: () => void;
   onTurn: () => void;
   onFlip: () => void;
+  /** Horizont schätzen und gerade richten */
+  onAuto?: () => void;
+  autoBusy?: boolean;
 }) {
   const drag = useRef<{ x: number; from: number; snapped: boolean } | null>(null);
   const snap = (a: number) => (Math.abs(a) < 0.6 ? 0 : Math.round(a * 10) / 10);
@@ -196,6 +201,18 @@ export function StraightenDial({
         <output aria-hidden className={`block text-center text-xs font-semibold tabular-nums ${angle ? "text-on-table" : "text-on-table-2"}`}>
           {label}
         </output>
+        {onAuto && (
+          <button
+            type="button"
+            onClick={onAuto}
+            disabled={autoBusy}
+            title="Horizont suchen und gerade richten"
+            className="text-on-table hover:bg-on-table/10 absolute -top-1.5 right-0 flex min-h-7 items-center gap-1 rounded-full px-2 text-xs font-semibold disabled:opacity-50 pointer-coarse:-top-3 pointer-coarse:min-h-11"
+          >
+            <WandSparkles aria-hidden className="size-3.5" />
+            Auto<span className="sr-only">: gerade richten</span>
+          </button>
+        )}
         <div
           data-dial=""
           className="relative mt-1 h-9 cursor-ew-resize touch-none overflow-hidden select-none [mask-image:linear-gradient(to_right,transparent,black_18%,black_82%,transparent)]"

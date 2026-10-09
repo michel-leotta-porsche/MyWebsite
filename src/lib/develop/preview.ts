@@ -3,6 +3,7 @@
 // Vorschau beim Bearbeiten: WebGL2 wendet den LUT als 3D-Textur an (Hardware-Interpolation) und legt die
 // Körnung mit demselben Hash wie beim Einrechnen darüber. Ohne WebGL2 rechnet die CPU dasselbe auf einem 2D-Canvas.
 
+import { applyClarity, blurMap, blurSize, type BlurMap } from "@/lib/develop/detail";
 import { applyGrain, applyLut, GRAIN, type RecipeValues } from "@/lib/develop/model";
 
 export type PreviewState = { lut: Uint8Array; n: number; rec: RecipeValues; /** 0..1: links davon Original; null = kein Vergleich */ split: number | null; original: boolean;
@@ -11,6 +12,8 @@ export type PreviewState = { lut: Uint8Array; n: number; rec: RecipeValues; /** 
   /** Vignette −1..1 und die Abbildung Bild → Ergebnis (outMap), damit sie am Rand des Zuschnitts sitzt */
   vignette?: number;
   vmap?: [number, number, number, number, number, number];
+  /** Klarheit −1..1, mit der weichgezeichneten Kopie aus setImage */
+  clarity?: number;
 };
 
 const VS = `#version 300 es
@@ -24,6 +27,8 @@ precision highp sampler3D;
 in vec2 uv;
 uniform sampler2D img;
 uniform sampler3D lut;
+uniform sampler2D blur;
+uniform float clar;
 uniform float n;
 uniform float split;
 uniform vec2 sdir;
@@ -42,6 +47,12 @@ float hash2(uint x, uint y) {
 void main() {
   vec3 c = texture(img, uv).rgb;
   if (dot(uv - 0.5, sdir) + 0.5 < split) { o = vec4(c, 1.0); return; }
+  if (clar != 0.0) {
+    // wie applyClarity: Unterschied zur Umgebung, in den Mitten am stärksten
+    float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    float m = 2.0 * l - 1.0;
+    c = clamp(c + (l - texture(blur, uv).r) * clar * 1.2 * (1.0 - m * m), 0.0, 1.0);
+  }
   c = texture(lut, c * ((n - 1.0) / n) + 0.5 / n).rgb;
   if (vig != 0.0) {
     vec2 q = (vmap * vec3(uv, 1.0)).xy;
@@ -97,8 +108,10 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
   const u = (name: string) => gl.getUniformLocation(prog, name);
   const imgTex = gl.createTexture();
   const lutTex = gl.createTexture();
+  const blurTex = gl.createTexture();
   gl.uniform1i(u("img"), 0);
   gl.uniform1i(u("lut"), 1);
+  gl.uniform1i(u("blur"), 2);
   let full: [number, number] = [1, 1];
   let lastLut: Uint8Array | null = null;
   let lost = false;
@@ -123,6 +136,15 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const m = smallBlur(src, w, h);
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, blurTex);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, m.w, m.h, 0, gl.RED, gl.UNSIGNED_BYTE, m.data);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       lastLut = null;
     },
     draw(s) {
@@ -141,6 +163,7 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
       gl.uniform1f(u("split"), s.original ? 2 : (s.split ?? -1));
       gl.uniform2f(u("sdir"), ...(s.sdir ?? [1, 0]));
       gl.uniform1f(u("vig"), s.vignette ?? 0);
+      gl.uniform1f(u("clar"), s.clarity ?? 0);
       const [a, b, c, d, e, f] = s.vmap ?? [1, 0, 0, 1, 0, 0];
       // spaltenweise: erste Spalte (a, b, 0), zweite (c, d, 0), dritte (e, f, 1)
       gl.uniformMatrix3fv(u("vmap"), false, [a, b, 0, c, d, 0, e, f, 1]);
@@ -152,6 +175,7 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
     dispose() {
       gl.deleteTexture(imgTex);
       gl.deleteTexture(lutTex);
+      gl.deleteTexture(blurTex);
       gl.deleteBuffer(buf);
       gl.deleteProgram(prog);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
@@ -165,6 +189,7 @@ function cpuPreviewer(canvas: HTMLCanvasElement): Previewer {
   if (!ctx) throw new Error("Weder WebGL2 noch eine Zeichenfläche verfügbar");
   let src: ImageData | null = null;
   let out: ImageData | null = null;
+  let blur: BlurMap | null = null;
   let full: [number, number] = [1, 1];
   return {
     gpu: false,
@@ -176,11 +201,16 @@ function cpuPreviewer(canvas: HTMLCanvasElement): Previewer {
       ctx.drawImage(img, 0, 0);
       src = ctx.getImageData(0, 0, w, h);
       out = new ImageData(w, h);
+      blur = smallBlur(img, w, h);
     },
     draw(s) {
       if (!src || !out) return;
       if (s.original) return ctx.putImageData(src, 0, 0);
-      applyLut(src.data, out.data, s.lut, s.n);
+      if (s.clarity && blur) {
+        out.data.set(src.data);
+        applyClarity(out.data, src.width, src.height, s.clarity, blur);
+        applyLut(out.data, out.data, s.lut, s.n);
+      } else applyLut(src.data, out.data, s.lut, s.n);
       // Körnung in Vorschaugröße, aber mit der Zellgröße des großen Bilds
       if (s.rec.grain) applyGrain(out.data, src.width, s.rec, 0, full[0] / src.width);
       ctx.putImageData(out, 0, 0);
@@ -188,4 +218,20 @@ function cpuPreviewer(canvas: HTMLCanvasElement): Previewer {
     },
     dispose() {},
   };
+}
+
+/** weichgezeichnete Helligkeit fürs ganze Bild, klein; dieselbe Größe wie beim Einrechnen */
+function smallBlur(src: Src, w: number, h: number): BlurMap {
+  const [bw, bh] = blurSize(w, h);
+  const c = document.createElement("canvas");
+  c.width = bw;
+  c.height = bh;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return { data: new Uint8Array(bw * bh).fill(128), w: bw, h: bh };
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, 0, 0, bw, bh);
+  const m = blurMap(ctx.getImageData(0, 0, bw, bh).data, bw, bh);
+  c.width = 0;
+  c.height = 0;
+  return m;
 }
