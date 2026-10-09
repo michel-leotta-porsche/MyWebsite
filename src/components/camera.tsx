@@ -541,7 +541,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           {film
             ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
-              ? t("{n} im Stapel. Schließen bringt dich zu Fertig.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
+              ? t("{n} im Stapel. Nach dem Schließen liegen sie im Fotostudio.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
               : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}
         </p>
       </footer>
