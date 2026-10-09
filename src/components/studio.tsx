@@ -8,11 +8,13 @@ import { BookPlus, ChevronLeft, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ListGroup, ListRow } from "@/components/ui/list";
+import { Segmented } from "@/components/ui/segmented";
 import { MountedSheet } from "@/components/ui/sheet";
 import { notify } from "@/components/ui/toaster";
 import type { User } from "@/lib/firebase";
 import { pickCover, relayoutFree } from "@/lib/auto-sequence";
 import { bakePhoto } from "@/lib/develop/bake";
+import type { SharpenLevel } from "@/lib/develop/detail";
 import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
 import { friendlyError } from "@/lib/errors";
@@ -302,6 +304,22 @@ function summary(e: PhotoEdit | undefined) {
 
 const coarse = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
+/** „Für die Datei schärfen“ gilt fürs Gerät, nicht pro Foto: es hängt an der Größe der Datei, nicht am Bild */
+const SHARPEN_KEY = "calima-studio-sharpen";
+const SHARPEN_OPTS: { value: `${SharpenLevel}`; label: string }[] = [
+  { value: "0", label: "Aus" },
+  { value: "1", label: "Leicht" },
+  { value: "2", label: "Stark" },
+];
+const savedSharpen = (): SharpenLevel => {
+  try {
+    const v = Number(localStorage.getItem(SHARPEN_KEY));
+    return v === 1 || v === 2 ? v : 0;
+  } catch {
+    return 0;
+  }
+};
+
 /**
  * Blatt nach „Fertig“: rechnet beim Öffnen die Datei (4096 px, Aufnahmedaten ohne Ort). Das Teilen-Blatt von iOS
  * öffnet sich nur direkt auf einen Tipp, deshalb wird vorher gerechnet und der Knopf erst dann aktiv.
@@ -333,6 +351,7 @@ function DoneSheet({
   const [touch] = useState(coarse);
   // die eben eingerechnete Fassung; bis dahin das Foto ohne Bearbeitung
   const [shot, setShot] = useState<Blob | null>(null);
+  const [sharpen, setSharpen] = useState<SharpenLevel>(savedSharpen);
   const edit = print.edit;
   const shotRef = useRef(onShot);
   useEffect(() => {
@@ -350,6 +369,8 @@ function DoneSheet({
       rec: e.rec,
       geo: e.geo,
       vignette: e.more?.vignette,
+      clarity: e.more?.clarity,
+      sharpen,
       sizes: { large: STUDIO_LONG, page: SIZES.page, thumb: SIZES.thumb },
       quality: 0.92,
       maxBytes: 40 * 1024 * 1024,
@@ -366,7 +387,18 @@ function DoneSheet({
     return () => {
       live = false;
     };
-  }, [print, edit, attempt]);
+  }, [print, edit, attempt, sharpen]);
+  const pickSharpen = (v: SharpenLevel) => {
+    setSharpen(v);
+    // neu rechnen; bis dahin ist die alte Datei nicht mehr die gewählte
+    setFile(null);
+    setFailed(null);
+    try {
+      localStorage.setItem(SHARPEN_KEY, String(v));
+    } catch {
+      // privates Fenster: gilt dann nur jetzt
+    }
+  };
 
   const blobs = useMemo(() => ({ img: shot ?? print.thumb }), [shot, print.thumb]);
   const { img } = useBlobUrls(blobs);
@@ -424,7 +456,7 @@ function DoneSheet({
       if (edit && !isNeutral(edit)) {
         const local = URL.createObjectURL(ph.blobs.large);
         try {
-          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette });
+          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette, clarity: edit.more?.clarity });
           const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
           photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
         } finally {
@@ -506,6 +538,12 @@ function DoneSheet({
                   Noch einmal versuchen
                 </Button>
               )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <span aria-hidden className="text-[15px] font-semibold">
+                Für die Datei schärfen
+              </span>
+              <Segmented label="Für die Datei schärfen" tone="paper" options={SHARPEN_OPTS} value={`${sharpen}`} onChange={(v) => pickSharpen(Number(v) as SharpenLevel)} />
             </div>
             <ListGroup paper>
               <ListRow paper lead={<BookPlus aria-hidden />} title="In ein Buch legen …" onClick={() => setView("books")} />

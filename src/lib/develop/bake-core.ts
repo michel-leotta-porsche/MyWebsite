@@ -1,6 +1,7 @@
 // Einrechnen: das unbearbeitete große Foto holen, LUT und Körnung anwenden, in drei Größen neu kodieren.
 // Läuft im Worker (OffscreenCanvas) und, wo der fehlt, genauso im Hauptthread.
 
+import { applyClarity, blurMap, blurSize, sharpenRows, type SharpenLevel } from "@/lib/develop/detail";
 import { outSize, placeOn, type Geo } from "@/lib/develop/geo";
 import { applyGrain, applyLut, applyVignette, toLab, type RecipeValues } from "@/lib/develop/model";
 
@@ -18,6 +19,10 @@ export type BakeJob = {
   geo?: Geo;
   /** Vignette −1..1, nach dem LUT und vor der Körnung */
   vignette?: number;
+  /** Klarheit −1..1, vor dem LUT (wie in der Vorschau) */
+  clarity?: number;
+  /** „Für die Datei schärfen“, nach der Vignette und vor der Körnung */
+  sharpen?: SharpenLevel;
 };
 export type BakeResult = { w: number; h: number; blobs: { large: Blob; page: Blob; thumb: Blob }; color: [number, number, number] };
 
@@ -73,15 +78,46 @@ export async function bake(
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   } else ctx.drawImage(bmp, 0, 0, w, h);
   if ("close" in bmp) bmp.close();
+  // Klarheit braucht die Umgebung: kleine weichgezeichnete Kopie, Radius bezogen aufs ganze Foto wie in der Vorschau
+  let blur: ReturnType<typeof blurMap> | null = null;
+  if (job.clarity) {
+    const [mw, mh] = blurSize(w, h, Math.max(bw, bh) * s);
+    const mc = make(mw, mh);
+    const mx = ctxOf(mc, true);
+    mx.imageSmoothingQuality = "high";
+    mx.drawImage(large, 0, 0, mw, mh);
+    blur = blurMap(mx.getImageData(0, 0, mw, mh).data, mw, mh);
+    free(mc);
+  }
+  const sharpen = job.sharpen ?? 0;
   // in Streifen, damit nie zwei volle Pixelpuffer gleichzeitig im Speicher liegen
   const STRIP = 256;
   for (let y = 0; y < h; y += STRIP) {
     const sh = Math.min(STRIP, h - y);
     const img = ctx.getImageData(0, y, w, sh);
+    if (blur && job.clarity) applyClarity(img.data, w, h, job.clarity, blur, y);
     applyLut(img.data, img.data, job.lut, job.n);
     if (job.vignette) applyVignette(img.data, w, h, job.vignette, y);
-    applyGrain(img.data, w, job.rec, y);
+    if (!sharpen) applyGrain(img.data, w, job.rec, y);
     ctx.putImageData(img, 0, y);
+  }
+  // Schärfen braucht die Nachbarzeilen: zweiter Durchgang, die Zeile darüber wird vor dem Schreiben gemerkt
+  if (sharpen) {
+    let above: Uint8ClampedArray | null = null;
+    for (let y = 0; y < h; y += STRIP) {
+      const sh = Math.min(STRIP, h - y);
+      const more = y + sh < h ? 1 : 0;
+      const img = ctx.getImageData(0, y, w, sh + more);
+      const all = img.data;
+      const rows = all.subarray(0, w * sh * 4);
+      const below = more ? all.slice(w * sh * 4) : null;
+      const last = rows.slice(w * (sh - 1) * 4);
+      sharpenRows(rows, w, sharpen, above, below);
+      applyGrain(rows, w, job.rec, y);
+      above = last;
+      // nur die eigenen Zeilen zurückschreiben, die Randzeile darunter bleibt unberührt
+      ctx.putImageData(img, 0, y, 0, 0, w, sh);
+    }
   }
   const shrink = (from: AnyCanvas, long: number) => {
     const k = Math.min(1, long / Math.max(from.width, from.height));
