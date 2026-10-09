@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { createPortal } from "react-dom";
 
 import { allAuto, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
+import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Meter } from "@/lib/camera";
@@ -69,6 +70,26 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   const [flash, setFlash] = useState(false);
   const [count, setCount] = useState(0);
   const [last, setLast] = useState<string | null>(null);
+  /** das letzte Foto groß (Seitengröße, mit Look, sobald eingerechnet); ein Tipp aufs Vorschaubild zeigt es */
+  const [review, setReview] = useState<string | null>(null);
+  const [viewing, setViewing] = useState(false);
+  useEffect(() => () => void (review && URL.revokeObjectURL(review)), [review]);
+  // zum Hineinzoomen: das letzte Foto groß (2560 px) mit Look, erst beim Öffnen gerechnet, damit Auslösen nichts kostet
+  const lastShot = useRef<{ work: Blob; edit?: PhotoEdit } | null>(null);
+  const [sharp, setSharp] = useState<string | null>(null);
+  useEffect(() => () => void (sharp && URL.revokeObjectURL(sharp)), [sharp]);
+  const openReview = () => {
+    const shot = lastShot.current;
+    setViewing(true);
+    if (!shot || sharp) return;
+    if (!shot.edit) return setSharp(URL.createObjectURL(shot.work));
+    const url = URL.createObjectURL(shot.work);
+    const edit = shot.edit;
+    bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.large, page: SIZES.thumb, thumb: SIZES.thumb } })
+      .then((r) => lastShot.current === shot && setSharp(URL.createObjectURL(r.blobs.large)))
+      .catch(() => {})
+      .finally(() => URL.revokeObjectURL(url));
+  };
   const [reticle, setReticle] = useState<{ x: number; y: number; k: number } | null>(null);
   // Werkzeug (E1): offen oder zu bleibt gemerkt; die Räder selbst fangen bei jedem Öffnen auf A an
   const [tools, setTools] = useState(() => {
@@ -382,19 +403,24 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           if (old) URL.revokeObjectURL(old);
           return URL.createObjectURL(s.thumb);
         });
+        setReview(URL.createObjectURL(s.page));
+        lastShot.current = { work: s.work, edit };
+        setSharp(null);
       }
       // das letzte Bild unten links zeigt den Look, sobald er klein eingerechnet ist
       if (edit) {
         const url = URL.createObjectURL(s.page);
-        bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: SIZES.thumb, thumb: SIZES.thumb } })
+        bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: onFilm ? SIZES.thumb : SIZES.page, thumb: SIZES.thumb } })
           .then((r) => {
             onShot({ ...print, shot: r.blobs.thumb }, onFilm?.stack);
             // auf dem Film bleibt das Bild im Dunkeln, bis er entwickelt ist
-            if (!onFilm)
+            if (!onFilm) {
               setLast((old) => {
                 if (old) URL.revokeObjectURL(old);
                 return URL.createObjectURL(r.blobs.thumb);
               });
+              setReview(URL.createObjectURL(r.blobs.page));
+            }
           })
           .catch(() => {})
           .finally(() => URL.revokeObjectURL(url));
@@ -584,7 +610,13 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         )}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-7">
           <span className="justify-self-start">
-            <span className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60">
+            <button
+              type="button"
+              onClick={openReview}
+              disabled={!!film || !review}
+              aria-label={t("Letztes Foto ansehen")}
+              className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60"
+            >
               {film ? (
                 // auf dem Film kein Vorschaubild: das gibt es erst nach dem Entwickeln
                 <FilmIcon aria-hidden className="text-on-table-2 h-5 w-5" />
@@ -595,7 +627,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
               {(film ? film.count : count) > 0 && (
                 <span className="bg-cloth text-cloth-ink absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums">{film ? film.count : count}</span>
               )}
-            </span>
+            </button>
           </span>
           <button
             type="button"
@@ -624,6 +656,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
               : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}
         </p>
       </footer>
+      {viewing && review && !film && <PhotoZoom src={sharp ?? review} alt={t("Letztes Foto")} onClose={() => setViewing(false)} />}
     </div>,
     document.body,
   );

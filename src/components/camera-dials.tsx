@@ -154,11 +154,18 @@ export function Ruler({
     if (dial === "focus") return meter?.lens ?? 0.5;
     return Math.round((meter?.kelvin ?? 5500) / KELVIN.step) * KELVIN.step;
   };
+  /** Lage eines Werts auf der Skala in Pixeln: 26 px je Stufe, 320 px für den ganzen Fokusweg, 14 px je 100 K */
+  const posOf = (v: number): number => {
+    if (dial === "focus") return v * 320;
+    if (dial === "kelvin") return ((v - KELVIN.min) / KELVIN.step) * 14;
+    return Math.max(0, stops.indexOf(nearest(stops, v))) * 26;
+  };
+  // die Skala läuft mit dem Finger wie ein Rad: nach links ziehen bringt die größeren Werte unter die Marke
   const valueAt = (start: number, dx: number): number => {
-    if (dial === "focus") return Math.min(1, Math.max(0, start + dx / 320));
-    if (dial === "kelvin") return Math.min(KELVIN.max, Math.max(KELVIN.min, Math.round((start + (dx / 14) * KELVIN.step) / KELVIN.step) * KELVIN.step));
+    if (dial === "focus") return Math.min(1, Math.max(0, start - dx / 320));
+    if (dial === "kelvin") return Math.min(KELVIN.max, Math.max(KELVIN.min, Math.round((start - (dx / 14) * KELVIN.step) / KELVIN.step) * KELVIN.step));
     const i = stops.indexOf(nearest(stops, start));
-    return stops[Math.min(stops.length - 1, Math.max(0, i + Math.round(dx / 26)))];
+    return stops[Math.min(stops.length - 1, Math.max(0, i - Math.round(dx / 26)))];
   };
   const onDown = (e: ReactPointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -176,7 +183,13 @@ export function Ruler({
     drag.current = null;
     onDragging?.(false);
   };
-  const ticks = dial === "focus" ? 21 : dial === "kelvin" ? 12 : Math.min(stops.length, 15);
+  // Striche: je Stufe einer (jede dritte, also volle Blende, lang), beim Fokus alle 5 %, bei Weiß je 100 K (je 500 K lang)
+  const ticks: { x: number; major: boolean }[] =
+    dial === "focus"
+      ? Array.from({ length: 21 }, (_, i) => ({ x: i * 16, major: i % 5 === 0 }))
+      : dial === "kelvin"
+        ? Array.from({ length: (KELVIN.max - KELVIN.min) / KELVIN.step + 1 }, (_, i) => ({ x: i * 14, major: (KELVIN.min / KELVIN.step + i) % 5 === 0 }))
+        : stops.map((_, i) => ({ x: i * 26, major: i % 3 === 0 }));
   const hint = dial === "duration" ? t("Zeit") : dial === "iso" ? t("ISO") : dial === "focus" ? t("Schärfe von Hand, mit Lupe") : t("Farbtemperatur");
   return (
     <div className="flex items-center gap-3 px-4">
@@ -201,10 +214,12 @@ export function Ruler({
         aria-valuetext={dialLabel(dial, dials, meter)}
         tabIndex={0}
       >
-        <div className="flex h-7 items-end justify-between" aria-hidden>
-          {Array.from({ length: ticks }, (_, i) => (
-            <span key={i} className={`w-px ${i % 3 === 0 ? "bg-on-table-2 h-3" : "bg-on-table-2/50 h-1.5"}`} />
-          ))}
+        <div className="relative h-7 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)]" aria-hidden>
+          <div className="absolute inset-y-0 left-1/2 transition-transform duration-100 ease-out" style={{ transform: `translateX(${-posOf(current())}px)` }}>
+            {ticks.map((tk) => (
+              <span key={tk.x} className={`absolute bottom-0 w-px -translate-x-1/2 ${tk.major ? "bg-on-table-2 h-3" : "bg-on-table-2/50 h-1.5"}`} style={{ left: tk.x }} />
+            ))}
+          </div>
         </div>
         <span aria-hidden className="bg-cloth pointer-events-none absolute top-0 left-1/2 h-7 w-0.5 -translate-x-1/2 rounded-full" />
         <p className={`mt-1 text-center text-[13px] font-semibold tabular-nums ${manual ? "text-cloth" : "text-on-table"}`}>
