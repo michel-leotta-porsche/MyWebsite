@@ -109,7 +109,8 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   }, [recent, own, t]);
   // ein eingelegter Film legt den Look fest; sonst der zuletzt gewählte, sonst der zuletzt mitgenommene („So fotografieren“), sonst Sommerlicht
   const chosen = looks.find((l) => l.id === lookId) ?? (recent.length ? looks[1] : (looks.find((l) => l.id === PRESETS[0].id) ?? looks[0]));
-  const active: Look = film ? { id: "film", name: film.name, approx: film.approx, edit: film.edit } : chosen;
+  // gemerkt, damit der Look-Effekt (190 kB LUT an die App) nur bei einem echten Wechsel läuft, nicht bei jedem Zoom- oder Belichtungsschritt
+  const active = useMemo<Look>(() => (film ? { id: "film", name: film.name, approx: film.approx, edit: film.edit } : chosen), [film, chosen]);
 
   const frameOf = useCallback((): Frame | null => {
     const r = box.current?.getBoundingClientRect();
