@@ -493,6 +493,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         magnify = false
         queue.async {
             self.dials = Dials()
+            self.tapLock = false
             if self.running {
                 self.session.stopRunning()
                 self.running = false
@@ -586,7 +587,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Danach den Zoom so setzen, dass der Ausschnitt gleich bleibt.
     private func fitLens() {
         guard let virtualDevice, !front, let current = input?.device else { return }
-        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil
+        // auch eine Sperre per Tipp braucht das echte Objektiv: die virtuelle Kamera hält Schärfe und Licht nicht fest
+        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil || tapLock
         let target = manual ? lens(for: wantedZoom) : (virtualDevice, CGFloat(1))
         guard let target else { return }
         if target.device != current, let next = try? AVCaptureDeviceInput(device: target.device) {
@@ -627,6 +629,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func flip(_ done: @escaping (String?) -> Void) {
         queue.async {
             self.dials = Dials()
+            self.tapLock = false
             do {
                 try self.configure(position: self.front ? .back : .front)
                 done(nil)
@@ -758,9 +761,16 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func focus(x: CGFloat, y: CGFloat, lock: Bool = false) {
         let p = CGPoint(x: min(max(y, 0), 1), y: min(max(1 - x, 0), 1))
         queue.async {
+            // Sperren oder Lösen wechselt, wenn nötig, zwischen virtueller Kamera und echtem Objektiv. fitLens stellt ein
+            // neues Objektiv frisch auf Automatik und vergisst dabei die Sperre; sie gilt aber gerade diesem Objektiv
+            let was = self.tapLock
+            self.tapLock = lock
+            if lock != was {
+                self.fitLens()
+                self.tapLock = lock
+            }
             guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
             defer { device.unlockForConfiguration() }
-            self.tapLock = lock
             if !self.front, self.dials.focus == nil, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
                 device.focusPointOfInterest = p
                 device.focusMode = .autoFocus
