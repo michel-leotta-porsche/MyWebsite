@@ -207,6 +207,36 @@ body {
 .book-block-l {
   --block-dir: to left;
 }
+/* Untere Schnittkante des Buchblocks: von vorn gesehen, Blatt über Blatt */
+.book-foot {
+  background:
+    linear-gradient(to bottom, transparent 40%, rgb(12 10 8 / 0.22)),
+    repeating-linear-gradient(to bottom, var(--edge) 0 1px, var(--paper-shade) 1px 2px);
+}
+/* Buchdecke: Pappe in Leinen, die Kante oben im Licht, unten im Schatten; liegt flach auf dem Tisch */
+.book-board {
+  /* die Pappe liegt unter dem Buchblock und etwas in seinem Schatten: einen Ton tiefer als der Einband */
+  background-image:
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06), transparent 25%, transparent 70%, rgb(12 10 8 / 0.25)),
+    linear-gradient(rgb(12 10 8 / 0.14), rgb(12 10 8 / 0.14));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    inset 0 -1px 0 rgb(12 10 8 / 0.35),
+    0 1px 2px rgb(12 10 8 / 0.5);
+}
+/* Wölbung der offenen Seiten (Licht von oben rechts): neben dem Falz hebt sich das Papier und fängt Licht,
+   zur Außenkante biegt es sich weg und wird dunkler; unten liegt es etwas im eigenen Schatten.
+   Der Falz selbst kommt aus book-look.ts. Ruht, nur die Deckkraft wechselt beim Umblättern. */
+.book-curve-r {
+  background:
+    linear-gradient(to right, rgb(255 250 240 / 0) 0%, rgb(255 250 240 / 0.1) 8%, rgb(255 250 240 / 0) 24%, rgb(12 10 8 / 0) 70%, rgb(12 10 8 / 0.12) 100%),
+    linear-gradient(to bottom, rgb(255 250 240 / 0.05), transparent 35%, transparent 75%, rgb(12 10 8 / 0.08));
+}
+.book-curve-l {
+  background:
+    linear-gradient(to left, rgb(255 250 240 / 0) 0%, rgb(255 250 240 / 0.06) 8%, rgb(255 250 240 / 0) 24%, rgb(12 10 8 / 0) 70%, rgb(12 10 8 / 0.15) 100%),
+    linear-gradient(to bottom, rgb(255 250 240 / 0.04), transparent 35%, transparent 75%, rgb(12 10 8 / 0.09));
+}
 
 /* Gedruckt statt aufgeklebt (Werte: book-look.ts, PRINT). Ruht, wird nie animiert. */
 .printed {

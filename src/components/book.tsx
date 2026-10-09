@@ -13,7 +13,7 @@ import {
   useTransform,
   type MotionValue,
 } from "motion/react";
-import { ChevronLeft, ScrollText } from "lucide-react";
+import { ChevronLeft, Pencil, ScrollText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { pageNos, plateName, plateOf, type BookData, type Page } from "@/content/books";
@@ -25,6 +25,7 @@ import { PlateOpenProvider, PlateViewer } from "@/components/plate-viewer";
 import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { buttonClass } from "@/components/ui/button-class";
+import { haptic } from "@/lib/haptics";
 
 export type Mode = "spread" | "single";
 export type Leaf = { front: Page; back: Page };
@@ -293,6 +294,11 @@ export function pageWidth(book: BookData, mode: Mode) {
 }
 
 const SWIPED = "fuji:swiped";
+// so lange (ms) liegt der Finger still, bis langes Drücken in die Werkbank führt
+const LONG_PRESS = 480;
+
+type Pt = { x: number; y: number; time: number };
+const pointOf = (e: { clientX: number; clientY: number; timeStamp: number }): Pt => ({ x: e.clientX, y: e.clientY, time: e.timeStamp });
 
 export function Book({
   book,
@@ -303,6 +309,7 @@ export function Book({
   extra,
   ears,
   onEar,
+  onEdit,
 }: {
   book: BookData;
   mode: Mode;
@@ -318,6 +325,8 @@ export function Book({
   ears?: number[];
   /** Ecke antippen setzt ein Eselsohr */
   onEar?: (no: number) => void;
+  /** Nur im eigenen Buch: in die Werkbank, an die aufgeschlagene Stelle (step wie k: 0 Einband, 1 Titel, …) */
+  onEdit?: (step: number) => void;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -388,6 +397,13 @@ export function Book({
   const leftEdge = useTransform(t, (v) => clamp01((v - 1) / count));
   const rightEdgeT = useMotionTemplate`scaleX(${rightEdge})`;
   const leftEdgeT = useMotionTemplate`scaleX(${leftEdge})`;
+  const rightFootT = useMotionTemplate`scaleY(${rightEdge})`;
+  const leftFootT = useMotionTemplate`scaleY(${leftEdge})`;
+  const edgeW = Math.round(3 + count / 4);
+  // Wölbung der Seiten nur, solange das Buch ruhig offen liegt: beim Umblättern zeichnet WebGL das Licht
+  const still = useTransform<number, number>([t, outro], ([v, x]) =>
+    v < 0.5 ? 0 : clamp01(1 - Math.abs(v - Math.round(v)) * 12) * (1 - x),
+  );
 
   const range = Array.from({ length: count + 1 }, (_, s) => s);
 
@@ -565,7 +581,12 @@ export function Book({
     return null;
   };
   const onPointerMove = (e: React.PointerEvent) => {
-    if (drag.current) return onDragMove(e);
+    if (e.pointerType === "touch") return;
+    if (drag.current) {
+      if (move(pointOf(e)) && drag.current?.moved && !bookRef.current?.hasPointerCapture(e.pointerId))
+        bookRef.current?.setPointerCapture(e.pointerId);
+      return;
+    }
     if (!hoverable.current || !bookRef.current) return;
     const r = bookRef.current.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
@@ -582,45 +603,73 @@ export function Book({
 
   // Ziehen mit Maus oder Finger: die Kante der Seite bleibt unter dem Zeiger.
   // Auf dem Telefon legt Ziehen nach unten das Buch zurück auf den Tisch.
+  // Maus und Stift kommen als Pointer Events, der Finger als Touch Events (siehe unten): Safari auf dem iPhone
+  // bricht Pointer Events ab, sobald es die Geste selbst zum Scrollen nimmt, auch mit touch-action pan-y.
   const drag = useRef<{
     x0: number;
     y0: number;
     k0: number;
     moved: "x" | "y" | false;
-    samples: { x: number; y: number; time: number }[];
+    samples: Pt[];
   } | null>(null);
-  const suppressClick = useRef(false);
+  // nach einem Ziehen oder langen Drücken ist der Klick, den der Browser hinterherschickt, kein Blättern
+  const suppressUntil = useRef(0);
   const pull = useMotionValue(0);
-  const pullScale = useTransform(pull, [0, 240], [1, 0.9]);
+  // Langes Drücken (nur im eigenen Buch): das Buch gibt unter dem Finger leicht nach, dann geht es in die Werkbank
+  const press = useMotionValue(0);
+  const pullScale = useTransform<number, number>([pull, press], ([p, q]) => (1 - (0.1 * Math.min(240, p)) / 240) * (1 - 0.03 * q));
   const pullT = useMotionTemplate`translateY(${pull}px) scale(${pullScale})`;
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+  const pressTimer = useRef(0);
+  const pressed = useRef(false);
+  const cancelPress = () => {
+    window.clearTimeout(pressTimer.current);
+    pressTimer.current = 0;
+    if (press.get() > 0) animate(press, 0, { duration: 0.15 });
+  };
+  const startPress = () => {
+    pressed.current = false;
+    if (!onEdit) return;
+    const step = Math.min(count, Math.max(0, Math.round(t.get())));
+    if (!reduce) animate(press, 1, { duration: LONG_PRESS / 1000, delay: 0.12, ease: "easeIn" });
+    pressTimer.current = window.setTimeout(() => {
+      pressTimer.current = 0;
+      pressed.current = true;
+      drag.current = null;
+      haptic("select");
+      onEdit(step);
+    }, LONG_PRESS + 120);
+  };
+  useEffect(() => () => window.clearTimeout(pressTimer.current), []);
+
+  const begin = (p: Pt) => {
     finger.stop();
     const k0 = Math.min(count, Math.round(swipe ? finger.get() : raw.get()));
-    drag.current = { x0: e.clientX, y0: e.clientY, k0, moved: false, samples: [{ x: e.clientX, y: e.clientY, time: e.timeStamp }] };
+    drag.current = { x0: p.x, y0: p.y, k0, moved: false, samples: [p] };
+    startPress();
   };
-  const onDragMove = (e: React.PointerEvent) => {
+  /** true, solange die Geste dem Buch gehört (waagrecht blättern oder nach unten zurücklegen) */
+  const move = (p: Pt): boolean => {
     const d = drag.current;
-    if (!d || !bookRef.current) return;
-    const dx = e.clientX - d.x0;
-    const dy = e.clientY - d.y0;
+    if (!d || !bookRef.current) return false;
+    const dx = p.x - d.x0;
+    const dy = p.y - d.y0;
     if (!d.moved) {
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return;
-      // Doppelseite: senkrecht scrollt der Browser selbst (touch-action pan-y), das Ziehen endet hier
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 6) return false;
+      cancelPress();
+      // Doppelseite: senkrecht scrollt der Browser selbst, das Ziehen endet hier
       if (!swipe && Math.abs(dy) > Math.abs(dx)) {
         drag.current = null;
-        return;
+        return false;
       }
       d.moved = swipe && dy > Math.abs(dx) * 1.2 ? "y" : "x";
-      bookRef.current.setPointerCapture(e.pointerId);
       curlR.set(0);
       curlL.set(0);
     }
-    d.samples.push({ x: e.clientX, y: e.clientY, time: e.timeStamp });
+    d.samples.push(p);
     if (d.samples.length > 5) d.samples.shift();
     if (d.moved === "y") {
       pull.set(Math.max(0, dy));
-      return;
+      return true;
     }
     // Breite einer Seite; bei der Doppelseite wandert die Kante über den Bund, also zwei Breiten
     const w = bookRef.current.getBoundingClientRect().width / (swipe ? 1 : 2);
@@ -630,28 +679,35 @@ export function Book({
     // auf dem Telefon über den Rückdeckel hinaus: zurück auf den Tisch
     if (swipe && dx < 0 && d.k0 === count) {
       pull.set(Math.min(240, -dx * 0.6));
-      return;
+      return true;
     }
     const target = Math.max(0, Math.min(count, dx < 0 ? d.k0 + s : d.k0 - s));
     // weniger Bewegung: das Blatt folgt dem Finger nicht, beim Loslassen springt die Seite um
-    if (reduce) return;
+    if (reduce) return true;
     if (swipe) finger.set(target);
     else scrollToT(target);
+    return true;
   };
-  const onPointerUp = (e: React.PointerEvent) => {
+  const finish = (p: Pt) => {
+    cancelPress();
+    if (pressed.current) {
+      pressed.current = false;
+      suppressUntil.current = performance.now() + 600;
+      return;
+    }
     const d = drag.current;
     drag.current = null;
     if (!d || !d.moved) return;
-    suppressClick.current = true;
+    suppressUntil.current = performance.now() + 400;
     const first = d.samples[0];
-    const dt = Math.max(1, e.timeStamp - first.time);
+    const dt = Math.max(1, p.time - first.time);
     if (d.moved === "y" || pull.get() > 0) {
-      const vy = (e.clientY - first.y) / dt;
+      const vy = (p.y - first.y) / dt;
       if (pull.get() > 80 || vy > 0.6 || (d.moved === "x" && pull.get() > 60)) onClose();
       else animate(pull, 0, { type: "spring", stiffness: 300, damping: 28 });
       return;
     }
-    const v = (e.clientX - first.x) / dt; // px pro ms
+    const v = (p.x - first.x) / dt; // px pro ms
     // weniger Bewegung: nur die Richtung des Wischens zählt
     const prog = reduce ? -Math.sign(d.samples[d.samples.length - 1].x - d.x0) : (swipe ? finger.get() : raw.get()) - d.k0;
     let target = d.k0;
@@ -663,12 +719,71 @@ export function Book({
     else animate(finger, target, { type: "spring", stiffness: 210, damping: 26, velocity: -v * 2.2 });
   };
 
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0 || e.pointerType === "touch") return;
+    begin(pointOf(e));
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch") return;
+    finish(pointOf(e));
+  };
+
+  // Finger: eigene Touch-Listener, nicht passiv, damit ein waagrechtes Wischen das Scrollen der Seite verhindern kann.
+  // Die Handler wechseln mit jedem Rendern; der Listener ruft immer die aktuellen auf.
+  const touch = useRef({ begin, move, finish, cancelPress });
+  useEffect(() => {
+    touch.current = { begin, move, finish, cancelPress };
+  });
+  useEffect(() => {
+    const el = bookRef.current;
+    if (!el) return;
+    let id: number | null = null;
+    const find = (list: TouchList) => Array.from(list).find((tp) => tp.identifier === id);
+    const start = (e: TouchEvent) => {
+      // zwei Finger: zoomen ist Sache des Browsers
+      if (e.touches.length > 1) {
+        id = null;
+        drag.current = null;
+        touch.current.cancelPress();
+        return;
+      }
+      const tp = e.changedTouches[0];
+      id = tp.identifier;
+      touch.current.begin({ x: tp.clientX, y: tp.clientY, time: e.timeStamp });
+    };
+    const onMove = (e: TouchEvent) => {
+      const tp = find(e.changedTouches);
+      if (!tp) return;
+      const d = drag.current;
+      const ours = touch.current.move({ x: tp.clientX, y: tp.clientY, time: e.timeStamp });
+      // klar waagrecht, auch unter der Schwelle: Safari darf die Geste gar nicht erst als Scrollen beginnen
+      const sideways = !!d && !d.moved && Math.abs(tp.clientX - d.x0) > 2 * Math.abs(tp.clientY - d.y0);
+      if ((ours || sideways) && e.cancelable) e.preventDefault();
+    };
+    const end = (e: TouchEvent) => {
+      const tp = find(e.changedTouches);
+      if (!tp) return;
+      id = null;
+      const wasPress = pressed.current;
+      touch.current.finish({ x: tp.clientX, y: tp.clientY, time: e.timeStamp });
+      // nach langem Drücken kein Klick hinterher
+      if (wasPress && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, []);
+
   // Klick aufs Papier blättert; Treffer auf Tafeln über Geometrie (Touch trifft in 3D-Seiten nicht zuverlässig)
   const onBookClick = (e: React.MouseEvent) => {
-    if (suppressClick.current) {
-      suppressClick.current = false;
-      return;
-    }
+    if (performance.now() < suppressUntil.current) return;
     if (!bookRef.current) return;
     const no = plateAt(e.clientX, e.clientY);
     if (no !== null) {
@@ -768,6 +883,7 @@ export function Book({
             </span>
             <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
             {extra?.(book, current)}
+            {onEdit && <EditButton onEdit={() => onEdit(k)} />}
           </div>
           <p className="text-on-table-2 ml-auto justify-self-end text-right text-sm flat:col-start-3" aria-live="polite">
             <span className="text-on-table">{book.title}</span>
@@ -790,6 +906,7 @@ export function Book({
             <span className="flex shrink-0 flex-wrap justify-end gap-x-3 flat:col-start-3 flat:row-start-2 flat:justify-self-end">
               <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
               {extra?.(book, current)}
+              {onEdit && <EditButton onEdit={() => onEdit(k)} />}
             </span>
           </div>
         </header>
@@ -817,8 +934,30 @@ export function Book({
                     width: mode === "spread" ? "calc(var(--pw) * 2)" : "var(--pw)",
                     height: `calc(var(--pw) * ${book.aspect})`,
                     ["--pw" as string]: pw,
+                    // Überstand der Buchdecke über den Buchblock
+                    ["--board" as string]: "max(3px, calc(var(--pw) * 0.018))",
                   }}
                 >
+                  {/* Buchdecke: die Pappe steht rundum ein Stück über den Buchblock, in Leinen bezogen.
+                      Geschlossen ist der Einband selbst die Decke; sie zeigt sich, wenn das Buch aufgeht. */}
+                  <motion.div
+                    aria-hidden
+                    className="book-board absolute top-[calc(var(--board)*-1)] bottom-[calc(var(--board)*-1)]"
+                    style={{
+                      left: mode === "spread" ? "50%" : 0,
+                      right: `calc(-${edgeW}px - var(--board))`,
+                      backgroundColor: book.cloth.base,
+                      opacity: open,
+                    }}
+                  />
+                  {mode === "spread" && (
+                    <motion.div
+                      aria-hidden
+                      className="book-board absolute top-[calc(var(--board)*-1)] bottom-[calc(var(--board)*-1)]"
+                      style={{ left: `calc(-${edgeW}px - var(--board))`, right: "50%", backgroundColor: book.cloth.base, opacity: open }}
+                    />
+                  )}
+
                   {/* Schatten auf dem Tisch, nur unter dem geöffneten Teil */}
                   <div
                     aria-hidden
@@ -845,6 +984,20 @@ export function Book({
                     />
                   )}
 
+                  {/* Buchblock von vorn: die untere Schnittkante, so dick wie der Stapel auf jeder Seite */}
+                  <motion.div
+                    aria-hidden
+                    className="book-foot absolute top-full right-0 origin-top"
+                    style={{ left: mode === "spread" ? "50%" : 0, height: `min(${Math.ceil(edgeW / 2)}px, calc(var(--board) - 1px))`, transform: rightFootT }}
+                  />
+                  {mode === "spread" && (
+                    <motion.div
+                      aria-hidden
+                      className="book-foot absolute top-full right-1/2 left-0 origin-top"
+                      style={{ height: `min(${Math.ceil(edgeW / 2)}px, calc(var(--board) - 1px))`, transform: leftFootT }}
+                    />
+                  )}
+
                   {/* letzte Seite liegt unten rechts */}
                   <div
                     className="absolute inset-y-0 overflow-hidden"
@@ -861,6 +1014,12 @@ export function Book({
                   {bend && !reduce && (
                     <PageCurl book={book} leaves={leaves} t={t} k={kt} mode={mode} store={curl} bookRef={bookRef} />
                   )}
+
+                  {/* Wölbung: am Bund hebt sich das Papier ins Licht, zur Außenkante fällt es ab */}
+                  <motion.div aria-hidden className="pointer-events-none absolute inset-0 z-[140] flex" style={{ opacity: still }}>
+                    {mode === "spread" && <div className="book-curve-l h-full w-1/2" />}
+                    <div className="book-curve-r h-full flex-1" />
+                  </motion.div>
 
                   <div
                     aria-hidden
@@ -1033,6 +1192,16 @@ export function Book({
         />
       )}
     </section>
+  );
+}
+
+/** In die Werkbank, an die aufgeschlagene Doppelseite; dasselbe wie langes Drücken aufs Buch */
+function EditButton({ onEdit }: { onEdit: () => void }) {
+  return (
+    <button type="button" onClick={onEdit} title="Oder lange aufs Buch drücken" className={buttonClass("quiet", "sm")}>
+      <Pencil aria-hidden />
+      Bearbeiten
+    </button>
   );
 }
 
