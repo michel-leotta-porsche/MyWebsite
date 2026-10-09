@@ -282,6 +282,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private var wantedZoom: CGFloat = 1
     /// Schärfe und Helligkeit per zweitem Tipp festgehalten (focus(lock:)); applyDials lässt sie dann stehen
     private var tapLock = false
+    /// zählt die Tipps, damit ein verspätetes Festhalten keinen neueren Tipp überschreibt
+    private var lockTicket = 0
 
     // MARK: Expertenmodus E1: Räder, Messer, Lupe, Wasserwaage (expertenmodus-workshop-2026-10-09/)
 
@@ -587,8 +589,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Danach den Zoom so setzen, dass der Ausschnitt gleich bleibt.
     private func fitLens() {
         guard let virtualDevice, !front, let current = input?.device else { return }
-        // auch eine Sperre per Tipp braucht das echte Objektiv: die virtuelle Kamera hält Schärfe und Licht nicht fest
-        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil || tapLock
+        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil
         let target = manual ? lens(for: wantedZoom) : (virtualDevice, CGFloat(1))
         guard let target else { return }
         if target.device != current, let next = try? AVCaptureDeviceInput(device: target.device) {
@@ -761,24 +762,29 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func focus(x: CGFloat, y: CGFloat, lock: Bool = false) {
         let p = CGPoint(x: min(max(y, 0), 1), y: min(max(1 - x, 0), 1))
         queue.async {
-            // Sperren oder Lösen wechselt, wenn nötig, zwischen virtueller Kamera und echtem Objektiv. fitLens stellt ein
-            // neues Objektiv frisch auf Automatik und vergisst dabei die Sperre; sie gilt aber gerade diesem Objektiv
-            let was = self.tapLock
-            self.tapLock = lock
-            if lock != was {
-                self.fitLens()
-                self.tapLock = lock
-            }
             guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
             defer { device.unlockForConfiguration() }
-            if !self.front, self.dials.focus == nil, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+            self.tapLock = lock
+            self.lockTicket &+= 1
+            let focusFree = !self.front && self.dials.focus == nil
+            let exposureFree = self.dials.duration == nil && self.dials.iso == nil
+            // erst an der Stelle messen (fortlaufend, wie die Kamera-App: folgt der Stelle, bis man woanders tippt)
+            if focusFree, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.continuousAutoFocus) {
                 device.focusPointOfInterest = p
-                device.focusMode = .autoFocus
+                device.focusMode = .continuousAutoFocus
             }
-            let mode: AVCaptureDevice.ExposureMode = lock ? .autoExpose : .continuousAutoExposure
-            if self.dials.duration == nil, self.dials.iso == nil, device.isExposurePointOfInterestSupported, device.isExposureModeSupported(mode) {
+            if exposureFree, device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposurePointOfInterest = p
-                device.exposureMode = mode
+                device.exposureMode = .continuousAutoExposure
+            }
+            guard lock else { return }
+            // dann festhalten, sobald Schärfe und Licht sich gesetzt haben; ein neuer Tipp in der Zwischenzeit gewinnt
+            let ticket = self.lockTicket
+            self.queue.asyncAfter(deadline: .now() + 0.6) {
+                guard ticket == self.lockTicket, self.tapLock, let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+                defer { device.unlockForConfiguration() }
+                if focusFree, device.isFocusModeSupported(.locked) { device.focusMode = .locked }
+                if exposureFree, device.isExposureModeSupported(.locked) { device.exposureMode = .locked }
             }
         }
     }
