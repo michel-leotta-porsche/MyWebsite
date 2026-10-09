@@ -5,8 +5,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, PenLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { noteClass } from "@/components/ui/field";
-import { Sheet } from "@/components/ui/sheet";
 import { notify } from "@/components/ui/toaster";
 import { isAbusive } from "@/lib/note-filter";
 import type { Pinned, Spot } from "@/components/book";
@@ -39,9 +37,6 @@ export function useFeedback(from: (share: Share) => string) {
   const [saved, setSaved] = useState<Record<string, Saved>>({});
   const [draftPin, setDraftPin] = useState<(Spot & { token: string }) | null>(null);
   const [openPins, setOpenPins] = useState<string[]>([]);
-  const [writing, setWriting] = useState<Share | null>(null);
-  const [text, setText] = useState("");
-  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
     const timers = earTimers.current;
@@ -149,101 +144,30 @@ export function useFeedback(from: (share: Share) => string) {
     ];
   };
 
-  /** Knöpfe im Kopf des offenen Buchs: Eselsohr an der ersten Tafel der aufgeschlagenen Seite, Zettel, und was `more` mitbringt */
+  /**
+   * Knöpfe im Kopf des offenen Buchs: ob ein Eselsohr schon angekommen ist, und „Zettel“, der einen Zettel mitten aufs aufgeschlagene Foto heftet.
+   * Knicken geht nur über die gehaltene Ecke; ein Zettel ohne Stelle würde nach dem Hinlegen verschwinden.
+   */
   const extra = (share: Share, plates: number[], more?: ReactNode) => {
     const no = plates[0];
-    const on = no !== undefined && earsOf(share).includes(no);
     return (
       <>
-        {no !== undefined &&
-          (sentOf(share).includes(no) ? (
-            <span className="text-on-table-2 inline-flex min-h-9 items-center gap-1.5">
-              <Check aria-hidden className="size-4" />
-              Eselsohr bei {share.fromName}
-            </span>
-          ) : (
-            <Button size="sm" aria-pressed={on} haptic="select" className="aria-pressed:bg-on-table aria-pressed:text-table" onClick={() => toggleEar(share, no)}>
-              <Dogear on={on} />
-              Eselsohr
-            </Button>
-          ))}
-        <Button
-          size="sm"
-          onClick={() => {
-            setFailed(null);
-            setWriting(share);
-          }}
-        >
-          <PenLine aria-hidden />
-          Zettel
-        </Button>
+        {no !== undefined && sentOf(share).includes(no) && (
+          <span className="text-on-table-2 inline-flex min-h-9 items-center gap-1.5">
+            <Check aria-hidden className="size-4" />
+            Eselsohr bei {share.fromName}
+          </span>
+        )}
+        {no !== undefined && (
+          <Button size="sm" onClick={() => pin(share, { no, x: 0.5, y: 0.4 })}>
+            <PenLine aria-hidden />
+            Zettel
+          </Button>
+        )}
         {more}
       </>
     );
   };
 
-  const sheet = (
-    <Sheet
-      open={writing !== null}
-      onOpenChange={(open) => !open && setWriting(null)}
-      title={`Zettel an ${writing?.fromName ?? ""}`}
-      description={`Nur ${writing?.fromName ?? ""} liest das.`}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const note = text.trim();
-          const share = writing;
-          if (!note || !share) return;
-          setFailed(null);
-          if (isAbusive(note)) {
-            setFailed("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
-            return;
-          }
-          leaveNote(share.token, { kind: "note", text: note, from: from(share) })
-            .then(() => {
-              setText("");
-              setWriting(null);
-              notify(`Dein Zettel liegt bei ${share.fromName}. Danke!`);
-            })
-            .catch(() => setFailed("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
-        }}
-      >
-        <label htmlFor="note" className="sr-only">
-          Zettel
-        </label>
-        <textarea
-          id="note"
-          value={text}
-          onChange={(e) => setText(e.target.value.slice(0, 280))}
-          rows={4}
-          className={noteClass}
-          placeholder="Was dir gefällt, eine Frage zum Rezept …"
-        />
-        {failed && (
-          <p role="alert" className="text-danger mt-2 text-sm font-semibold">
-            {failed}
-          </p>
-        )}
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <span className="text-ink-2 text-[13px] tabular-nums">{text.length} / 280</span>
-          <Button type="submit" variant="ink" disabled={!text.trim()}>
-            Hinlegen
-          </Button>
-        </div>
-      </form>
-    </Sheet>
-  );
-
-  return { earsOf, toggleEar, extra, sheet, pin, pinsOf };
-}
-
-/** Ecke eines Blatts, umgeknickt solange das Eselsohr gesetzt ist */
-function Dogear({ on }: { on: boolean }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round">
-      <path d="M5 3h9l5 5v13H5z" />
-      <path d="M14 3v5h5" className={on ? "fill-current" : ""} />
-    </svg>
-  );
+  return { earsOf, toggleEar, extra, pin, pinsOf };
 }
