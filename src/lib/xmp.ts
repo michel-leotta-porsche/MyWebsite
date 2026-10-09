@@ -9,6 +9,8 @@ export type LightroomSettings = {
   hsl: { color: string; hue: number; sat: number; lum: number }[];
   grading: { shadow: [number, number]; highlight: [number, number] } | null;
   grain: number;
+  /** Schwarzweiß (ConvertToGrayscale) */
+  gray: boolean;
 };
 
 const BASICS: [string, string, string?][] = [
@@ -42,7 +44,7 @@ function attr(xmp: string, name: string): string | undefined {
   const e = xmp.match(new RegExp(`<crs:${name}>([^<]*)</crs:${name}>`));
   return e?.[1];
 }
-const num = (xmp: string, name: string) => {
+export const num = (xmp: string, name: string) => {
   const v = attr(xmp, name);
   return v === undefined ? undefined : Number(v);
 };
@@ -79,11 +81,13 @@ export function parseXmp(xmp: string): LightroomSettings | null {
           }
         : null,
     grain: num(xmp, "GrainAmount") ?? 0,
+    gray: /^true$/i.test(attr(xmp, "ConvertToGrayscale") ?? ""),
   };
 }
 
-// Was nicht in ein Preset gehört: bildbezogene Werte (Zuschnitt, Masken, Retusche, Objektiv, absoluter Weißabgleich)
-const SKIP = /^(Crop|HasCrop|AlreadyApplied|RawFileName|Version|ProcessVersion|WhiteBalance|Temperature|Tint|Lens|Perspective|Upright|AutoLateralCA|Defringe|VignetteAmount|VignetteMidpoint|HasSettings|PresetType|UUID|Name|Cluster|Supports|Requires|ToneMapStrength|ConvertToGrayscale|CameraProfileDigest|Retouch|RedEye|Mask|Paint|Gradient|Circular|OverrideLookVignette|DepthBasedCorrections)/;
+// Was nicht in ein Preset gehört: bildbezogene Werte (Zuschnitt, Masken, Retusche, Objektiv, absoluter Weißabgleich).
+// Schwarzweiß (ConvertToGrayscale) bleibt drin, sonst wird ein SW-Preset farbig.
+const SKIP = /^(Crop|HasCrop|AlreadyApplied|RawFileName|Version|ProcessVersion|WhiteBalance|Temperature|Tint|Lens|Perspective|Upright|AutoLateralCA|Defringe|VignetteAmount|VignetteMidpoint|HasSettings|PresetType|UUID|Name|Cluster|Supports|Requires|ToneMapStrength|CameraProfileDigest|Retouch|RedEye|Mask|Paint|Gradient|Circular|OverrideLookVignette|DepthBasedCorrections)/;
 
 /** Ein importierbares Lightroom-Preset (.xmp) aus den globalen crs:-Werten eines Fotos */
 export function toPreset(xmp: string, name: string): string {

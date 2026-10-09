@@ -4,7 +4,7 @@ import exifr from "exifr";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { exifDate, type ExifFields } from "@/lib/exif-write";
-import { readFujiRecipe, readXmp } from "@/lib/fuji";
+import { readFujiRecipe } from "@/lib/fuji";
 import { findSubject } from "@/lib/subject";
 import { parseXmp, toPreset } from "@/lib/xmp";
 
@@ -213,13 +213,26 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : u
 
 const pick = ["Make", "Model", "LensModel", "FocalLengthIn35mmFormat", "FocalLength", "FNumber", "ExposureTime", "ISO", "ExposureCompensation", "DateTimeOriginal"];
 
+/**
+ * Messpunkt: was eine Datei an Metadaten mitbringt, um Dateiauswahl am Rechner, Datei-Feld auf dem iPhone und
+ * native Fotoauswahl zu vergleichen. Läuft in der Entwicklung immer, sonst nur mit localStorage „calima:meta“ = 1.
+ */
+function logMeta(file: File, found: Record<string, unknown>) {
+  let on = process.env.NODE_ENV !== "production";
+  try {
+    on ||= localStorage.getItem("calima:meta") === "1";
+  } catch {}
+  if (on) console.info("calima:meta", { name: file.name, type: file.type, size: file.size, ...found });
+}
+
 /** Was beim Öffnen gelesen wird: Datum, Kamera, Rezept, dazu die Felder fürs Zurückschreiben (ohne Ort) */
 export type PhotoMeta = { taken?: string; camera?: CameraInfo; recipe?: Recipe; exif: ExifFields };
 
 export async function readMeta(file: File): Promise<PhotoMeta> {
   let meta: Record<string, unknown> = {};
   try {
-    meta = (await exifr.parse(file, { pick })) ?? {};
+    // makerNote: die MakerNote kommt roh mit (für das Fuji-Rezept), aus JPEG, HEIF und DNG gleichermaßen
+    meta = (await exifr.parse(file, { pick: [...pick, "MakerNote"], makerNote: true })) ?? {};
   } catch {}
   const iso = num(meta.ISO);
   const ev = num(meta.ExposureCompensation);
@@ -227,19 +240,23 @@ export async function readMeta(file: File): Promise<PhotoMeta> {
   const taken = meta.DateTimeOriginal instanceof Date ? meta.DateTimeOriginal.toISOString() : undefined;
 
   let recipe: Recipe | undefined;
-  if (/jpe?g$/i.test(file.type) || /\.jpe?g$/i.test(file.name) || isDng(file)) {
-    const buf = await file.arrayBuffer();
-    if (/fujifilm/i.test(make)) recipe = readFujiRecipe(buf, { iso, ev }) ?? undefined;
-    if (!recipe) {
-      const xmp = readXmp(buf);
-      const lr = xmp ? parseXmp(xmp) : null;
-      // nur wenn wirklich Entwicklungswerte drinstehen, nicht bloß ein Profilname
-      if (xmp && lr && lr.basics.some((b) => b.value !== 0)) {
-        const name = lr.name ?? "Lightroom-Einstellungen";
-        recipe = { kind: "lightroom", name, inline: toPreset(xmp, name), placeholder: false };
-      }
+  const note = meta.makerNote instanceof Uint8Array ? meta.makerNote : undefined;
+  if (note && /fujifilm/i.test(make)) recipe = readFujiRecipe(note, { iso, ev }) ?? undefined;
+  // XMP getrennt lesen: mit pick lässt exifr den XMP-Block weg
+  let xmp: string | undefined;
+  try {
+    const x = await exifr.parse(file, { tiff: false, xmp: { parse: false } });
+    xmp = typeof x?.xmp === "string" ? x.xmp : undefined;
+  } catch {}
+  if (!recipe && xmp) {
+    const lr = parseXmp(xmp);
+    // nur wenn wirklich Entwicklungswerte drinstehen, nicht bloß ein Profilname
+    if (lr && (lr.basics.some((b) => b.value !== 0) || lr.gray)) {
+      const name = lr.name ?? "Lightroom-Einstellungen";
+      recipe = { kind: "lightroom", name, inline: toPreset(xmp, name), placeholder: false };
     }
   }
+  logMeta(file, { make, note: !!note, xmp: !!xmp, crs: !!xmp?.includes("camera-raw-settings"), recipe: recipe?.kind });
 
   const camera: CameraInfo | undefined = meta.Model
     ? {

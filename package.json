@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "export": "STATIC_EXPORT=1 next build && node scripts/shrink-export.mjs",
-    "ios:build": "node scripts/ios-build.mjs"
+    "ios:build": "node scripts/ios-build.mjs",
+    "test": "node --experimental-strip-types --no-warnings --import ./scripts/test/alias.mjs --test scripts/test/*.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -1,4 +1,4 @@
-// Liest das Film-Simulation-Rezept aus der Fujifilm-MakerNote eines Original-JPGs.
+// Liest das Film-Simulation-Rezept aus der Fujifilm-MakerNote eines Originals (JPEG, HEIF oder DNG; die MakerNote liefert exifr).
 // Aufbau: "FUJIFILM", danach ein Versatz (little endian) auf ein IFD; alle Versätze zählen ab Beginn der MakerNote.
 // Tag-Nummern und Werte nach der ExifTool-Dokumentation (FujiFilm Tags). Noch nicht mit echten Dateien geprüft:
 // unbekannte Werte erscheinen als Rohwert statt falsch übersetzt.
@@ -22,31 +22,6 @@ function readIfd(v: DataView, ifd: number, le: boolean, base: number): Entry[] {
     out.push({ tag: v.getUint16(e, le), type, count, at });
   }
   return out;
-}
-
-/** MakerNote-Bereich aus dem Exif-Block eines JPGs */
-function findMakerNote(buf: ArrayBuffer): { view: DataView; start: number } | null {
-  const v = new DataView(buf);
-  if (v.getUint16(0) !== 0xffd8) return null;
-  let p = 2;
-  while (p + 4 < v.byteLength) {
-    const marker = v.getUint16(p);
-    const len = v.getUint16(p + 2);
-    // APP1 mit "Exif\0\0"
-    if (marker === 0xffe1 && v.getUint32(p + 4) === 0x45786966) {
-      const tiff = p + 10;
-      const le = v.getUint16(tiff) === 0x4949;
-      const ifd0 = tiff + v.getUint32(tiff + 4, le);
-      const exifPtr = readIfd(v, ifd0, le, tiff).find((e) => e.tag === 0x8769);
-      if (!exifPtr) return null;
-      const exif = tiff + v.getUint32(exifPtr.at, le);
-      const mn = readIfd(v, exif, le, tiff).find((e) => e.tag === 0x927c);
-      return mn ? { view: v, start: mn.at } : null;
-    }
-    if (marker === 0xffda) break;
-    p += 2 + len;
-  }
-  return null;
 }
 
 const FILM: Record<number, string> = {
@@ -119,11 +94,19 @@ const WB: Record<number, string> = {
 const level = (v: number | undefined): 0 | 1 | 2 => (v === 64 ? 2 : v === 32 ? 1 : 0);
 const tone = (v: number | undefined) => (v === undefined ? 0 : -v / 16);
 
-/** Rezept aus einem Fuji-JPG, oder null, wenn die Datei keine Fuji-MakerNote trägt */
-export function readFujiRecipe(buf: ArrayBuffer, exif: { iso?: number; ev?: number }): FujiRecipe | null {
-  const found = findMakerNote(buf);
-  if (!found) return null;
-  const { view: v, start } = found;
+/** Rezept aus einer Fuji-MakerNote, oder null, wenn sie keine ist oder sich nicht lesen lässt */
+export function readFujiRecipe(note: Uint8Array, exif: { iso?: number; ev?: number }): FujiRecipe | null {
+  // eine abgeschnittene oder fremde MakerNote darf nur das Rezept kosten, nicht das ganze Foto
+  try {
+    return parse(new DataView(note.buffer, note.byteOffset, note.byteLength), exif);
+  } catch {
+    return null;
+  }
+}
+
+function parse(v: DataView, exif: { iso?: number; ev?: number }): FujiRecipe | null {
+  const start = 0;
+  if (v.byteLength < 14) return null;
   // "FUJIFILM" am Anfang
   if (v.getUint32(start) !== 0x46554a49 || v.getUint32(start + 4) !== 0x46494c4d) return null;
   const ifd = start + v.getUint32(start + 8, true);
@@ -151,7 +134,8 @@ export function readFujiRecipe(buf: ArrayBuffer, exif: { iso?: number; ev?: numb
   const b = Math.round((s32(0x100a, 1) ?? 0) / 20);
   const drSetting = u16(0x1402);
   const devDr = u16(0x1403);
-  const dr = drSetting === 0 ? "DR Auto" : devDr ? `DR${devDr}` : "DR100";
+  // bei „DR Auto“ steht der tatsächlich angewandte Wert trotzdem in 0x1403
+  const dr = drSetting === 0 ? (devDr ? `DR Auto (DR${devDr})` : "DR Auto") : devDr ? `DR${devDr}` : "DR100";
   const roughness = u16(0x1047) ?? s32(0x1047);
   const size = u16(0x104c);
   const evNum = exif.ev ?? 0;
@@ -180,24 +164,4 @@ export function readFujiRecipe(buf: ArrayBuffer, exif: { iso?: number; ev?: numb
     ev,
     placeholder: false,
   };
-}
-
-/** XMP-Block (APP1 mit Adobe-Namensraum) als Text, für Lightroom-Einstellungen */
-export function readXmp(buf: ArrayBuffer): string | null {
-  const v = new DataView(buf);
-  if (v.getUint16(0) !== 0xffd8) return null;
-  const head = "http://ns.adobe.com/xap/1.0/\0";
-  let p = 2;
-  while (p + 4 < v.byteLength) {
-    const marker = v.getUint16(p);
-    const len = v.getUint16(p + 2);
-    if (marker === 0xffe1) {
-      const bytes = new Uint8Array(buf, p + 4, len - 2);
-      const sig = new TextDecoder("latin1").decode(bytes.subarray(0, head.length));
-      if (sig === head) return new TextDecoder("utf-8").decode(bytes.subarray(head.length));
-    }
-    if (marker === 0xffda) break;
-    p += 2 + len;
-  }
-  return null;
 }

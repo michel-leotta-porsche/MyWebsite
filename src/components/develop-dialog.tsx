@@ -3,7 +3,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { keys, withKeys } from "@/lib/app-mode";
-import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Aperture, BookmarkPlus, Check, ClipboardCopy, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
@@ -53,8 +53,10 @@ import {
   type RecipeValues,
 } from "@/lib/develop/model";
 import { createPreviewer, type Previewer } from "@/lib/develop/preview";
+import { applySettings, asLook, fromEdit, fromRecipe } from "@/lib/develop/settings";
 import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
 import { haptic } from "@/lib/haptics";
+import { copySettings, useCopiedSettings } from "@/lib/settings-clipboard";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Bearbeiten auf der Werkbank: immer ein Foto, die anderen der Doppelseite liegen daneben und lassen sich antippen.
@@ -894,6 +896,35 @@ export function DevelopDialog({
     });
   const saveForm = naming && <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />;
 
+  /* ----- Einstellungen kopieren und einfügen: Farbe und Licht, nie der Zuschnitt ----- */
+
+  const copied = useCopiedSettings();
+  // das Rezept aus der Datei steckt in diesem Foto schon drin; kopiert wird es nur für andere Fotos
+  const fileSettings = useMemo(() => (photo.recipe ? fromRecipe(photo.recipe) : null), [photo.recipe]);
+  const fileLabel = photo.recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
+  const copyEdit = () => {
+    const s = fromEdit(edit, undefined, nameOf(photo));
+    if (!s) return setNote("Noch nichts zu kopieren: Stell zuerst Farbe oder Licht ein.");
+    copySettings(s);
+    haptic("select");
+    setNote(`Einstellungen kopiert. Bei einem anderen Foto unter Vorschläge bei „Kopiert“ einfügen.`);
+  };
+  const copyFile = () => {
+    if (!fileSettings) return;
+    copySettings({ ...fileSettings, from: nameOf(photo) });
+    haptic("select");
+    setNote(`${fileLabel} „${fileSettings.name}“ kopiert, in Calima nachempfunden. Bei einem anderen Foto einfügen.`);
+  };
+  const paste = () => {
+    if (!copied) return setNote("Erst bei einem Foto Einstellungen kopieren.");
+    act((e) => applySettings(e, copied), true);
+    setNote(`„${copied.name}“ eingefügt${copied.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`);
+  };
+  const clip = useRef({ copyEdit, paste });
+  useEffect(() => {
+    clip.current = { copyEdit, paste };
+  });
+
   /* ----- Zoom: Ausschnitt in Bruchteilen der Bühne, damit er Größenwechsel übersteht ----- */
 
   // gilt nur für das Foto, auf dem gezoomt wurde; ein anderes Foto beginnt ganz
@@ -1106,6 +1137,14 @@ export function DevelopDialog({
         e.preventDefault();
         if (e.key.toLowerCase() === "y" || e.shiftKey) steps.current.redo();
         else steps.current.undo();
+        return;
+      }
+      // ⇧⌘C / ⇧⌘V: Einstellungen kopieren und einfügen, wie in Lightroom
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "v")) {
+        if (typing(e.target)) return;
+        e.preventDefault();
+        if (e.key.toLowerCase() === "c") clip.current.copyEdit();
+        else clip.current.paste();
         return;
       }
       if (typing(e.target)) return;
@@ -1698,6 +1737,21 @@ export function DevelopDialog({
                 )}
               </div>
             )}
+            {tab === "s" && copied && (
+              <div className="mt-7">
+                <h3 className={groupTitle}>Kopiert</h3>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
+                  <Tile
+                    img={tileImg}
+                    edit={applySettings(edit, copied)}
+                    name={copied.name}
+                    txt={[copied.from && `von ${copied.from}`, copied.approx ? "nachempfunden" : "Farbe und Licht"].filter(Boolean).join(", ")}
+                    pressed={wearsLook(edit, asLook(copied, ""))}
+                    onClick={paste}
+                  />
+                </div>
+              </div>
+            )}
             {tab === "s" && (
               <div className="mt-7">
                 <h3 className={groupTitle}>Deine Looks</h3>
@@ -1722,10 +1776,22 @@ export function DevelopDialog({
                   <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
                 )}
                 {saveForm || (
-                  <Button variant="paper" size="sm" className="mt-3.5 pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
-                    <BookmarkPlus aria-hidden />
-                    Als eigenen Look speichern
-                  </Button>
+                  <div className="mt-3.5 flex flex-wrap gap-2">
+                    <Button variant="paper" size="sm" className="pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
+                      <BookmarkPlus aria-hidden />
+                      Als eigenen Look speichern
+                    </Button>
+                    <Button variant="paper" size="sm" className="pl-2.5" onClick={copyEdit} disabled={colorIsNeutral(edit)} title="Farbe und Licht ohne Zuschnitt, ⇧⌘C">
+                      <ClipboardCopy aria-hidden />
+                      Einstellungen kopieren
+                    </Button>
+                    {fileSettings && (
+                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyFile} title="für andere Fotos, in Calima nachempfunden">
+                        <ClipboardCopy aria-hidden />
+                        {fileLabel} kopieren
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}

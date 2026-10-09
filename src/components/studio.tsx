@@ -291,6 +291,9 @@ function StudioEditor({ print, uid, onClose, onFinish }: { print: Print; uid: st
     thumb: urls.thumb!,
     color: [0, 0, 0],
     edit: print.edit,
+    // Rezept aus der Datei: im Bearbeiten lässt es sich kopieren
+    recipe: print.meta?.recipe,
+    camera: print.meta?.camera,
   };
   return <DevelopDialog photos={[photo]} start={print.id} uid={uid} title="Fotostudio" long={STUDIO_LONG} onFinish={onFinish} onClose={onClose} />;
 }
