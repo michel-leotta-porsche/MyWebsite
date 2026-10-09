@@ -92,6 +92,7 @@ jobs:
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -102,7 +103,7 @@ jobs:
         run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/dienstkonto.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/dienstkonto.json"
-          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json
+          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json || { echo "channel:list scheiterte:"; cat kanaele.json; exit 1; }
           for id in $(jq -r '.. | objects | .name? // empty | select(test("/channels/")) | split("/")[-1]' kanaele.json | grep "^pr${PR}-" || true); do
             echo "lösche $id"
             npx -y firebase-tools@14 hosting:channel:delete "$id" --site calima --project fujiventura --non-interactive --force
@@ -113,6 +114,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.aufraeumen
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -124,7 +126,7 @@ jobs:
         run: |
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/dienstkonto.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/dienstkonto.json"
-          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json
+          npx -y firebase-tools@14 hosting:channel:list --site calima --project fujiventura --non-interactive --json > kanaele.json || { echo "channel:list scheiterte:"; cat kanaele.json; exit 1; }
           for id in $(jq -r '.. | objects | .name? // empty | select(test("/channels/")) | split("/")[-1]' kanaele.json); do
             [ "$id" = live ] && continue
             n=$(printf '%s' "$id" | sed -n 's/^pr\([0-9][0-9]*\)-.*/\1/p')
