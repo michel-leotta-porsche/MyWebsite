@@ -79,7 +79,7 @@ export function useT() {
   return (de: string, vars?: Vars) => translate(lang, de, vars);
 }
 
-/** Text in Server-Komponenten (Rechtstexte, Hilfe): <T>Deutscher Text</T> */
+/** Text in Server-Komponenten (Rechtstexte, Hilfe): der deutsche Text als Kind von T */
 export function T({ children, vars }: { children: string; vars?: Vars }): ReactNode {
   return useT()(children, vars);
 }
