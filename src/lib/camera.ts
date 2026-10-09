@@ -31,7 +31,7 @@ type Plugin = {
   setZoom(o: { factor: number }): Promise<{ factor: number }>;
   focus(o: { x: number; y: number }): Promise<void>;
   flip(): Promise<CameraInfo>;
-  /** Räder stellen; fehlende oder null-Werte heißen A. Steht nur Zeit oder nur ISO, regelt die Kamera das andere nach (wie Fuji) */
+  /** Räder stellen; fehlende oder null-Werte heißen A. Steht nur Zeit oder nur ISO, bleibt das andere stehen; das Bild wird heller oder dunkler */
   setDials(o: Dials): Promise<void>;
   /** Lupe: der Sucher zeigt die Mitte dreifach vergrößert, zum Scharfstellen von Hand */
   setMagnify(o: { on: boolean }): Promise<void>;

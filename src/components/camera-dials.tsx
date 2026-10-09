@@ -6,8 +6,8 @@ import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELV
 import { useT } from "@/lib/i18n";
 
 // Die Räder der Kamera (Expertenmodus E1, expertenmodus-workshop-2026-10-09/): wie an einer Fujifilm hat jedes Rad eine
-// Raststellung „A“. Alles auf A ist die Kamera von Stufe 1. Es gibt kein Modus-Menü: wer die Zeit festhält, hat eine
-// Zeitvorwahl, wer Zeit und ISO festhält, fotografiert von Hand. Ein Rad wird angetippt und dann auf dem Lineal darunter
+// Raststellung „A“. Alles auf A ist die Kamera von Stufe 1. Es gibt kein Modus-Menü: ein Rad von Hand wirkt sofort
+// sichtbar (der andere Wert bleibt stehen, der Messer zeigt die Abweichung), nichts regelt im Hintergrund nach. Ein Rad wird angetippt und dann auf dem Lineal darunter
 // gedreht; ein Tipp auf „A“ gibt es der Kamera zurück. Brennweiten sind ehrlich: echte Objektive fett, der Rest Ausschnitt.
 
 export type DialKey = keyof Dials;
@@ -59,6 +59,12 @@ export function DialChips({
   if (dial === "focal") {
     return (
       <ul className="flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]" aria-label={t("Brennweite")}>
+        {/* vorn, damit man es nicht suchen muss */}
+        <li className="flex-none">
+          <button type="button" onClick={() => onPick(null)} className={chip(false, false)}>
+            {t("Fertig")}
+          </button>
+        </li>
         {FOCALS.map((mm) => {
           const real = realFocals.includes(mm);
           const on = (focal ?? 24) === mm;
@@ -71,11 +77,6 @@ export function DialChips({
             </li>
           );
         })}
-        <li className="flex-none">
-          <button type="button" onClick={() => onPick(null)} className={chip(false, false)}>
-            {t("Fertig")}
-          </button>
-        </li>
       </ul>
     );
   }
@@ -93,14 +94,15 @@ export function DialChips({
           <li key={k} className="flex-none">
             <button type="button" onClick={() => onPick(dial === k ? null : k)} aria-pressed={dial === k} className={chip(dial === k, manual)}>
               <span className="opacity-70">{names[k]} </span>
-              {manual ? dialLabel(k, dials, meter) : "A"}
+              {/* fmtISO bringt „ISO“ schon mit, der Name steht davor */}
+              {manual ? dialLabel(k, dials, meter).replace(/^ISO /, "") : "A"}
             </button>
           </li>
         );
       })}
       <li className="flex-none">
-        <button type="button" onClick={onGrid} aria-pressed={grid} className={chip(false, grid)} aria-label={t("Raster und Wasserwaage")}>
-          <span aria-hidden className="inline-grid h-3.5 w-3.5 grid-cols-3 grid-rows-3 gap-px align-[-2px]">
+        <button type="button" onClick={onGrid} aria-pressed={grid} className={`${chip(false, grid)} flex h-full items-center`} aria-label={t("Raster und Wasserwaage")}>
+          <span aria-hidden className="grid h-3.5 w-3.5 grid-cols-3 grid-rows-3 gap-px">
             {Array.from({ length: 9 }, (_, i) => (
               <span key={i} className="bg-current opacity-60" />
             ))}

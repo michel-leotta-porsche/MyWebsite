@@ -274,6 +274,11 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private var analyzing = false
     /// bei virtuellen Kameras ist 1,0 das Ultraweitwinkel; die Hauptkamera liegt beim ersten Umschaltpunkt
     private var baseZoom: CGFloat = 1
+    /// Die virtuelle Rückkamera (Dreifach-Kamera). Apple erlaubt auf ihr weder Zeit/ISO von Hand noch festen Fokus oder
+    /// festen Weißabgleich; sobald ein Rad nicht auf A steht, läuft deshalb das passende echte Objektiv (`fitLens`).
+    private var virtualDevice: AVCaptureDevice?
+    /// Zoom in Einheiten der virtuellen Kamera (1,0 = Ultraweitwinkel), den die Seite gerade will
+    private var wantedZoom: CGFloat = 1
 
     // MARK: Expertenmodus E1: Räder, Messer, Lupe, Wasserwaage (expertenmodus-workshop-2026-10-09/)
 
@@ -312,36 +317,43 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         ]
     }
 
-    /// Räder stellen. Steht nur Zeit oder nur ISO, hält die Kamera den Wert und regelt den anderen nach (siehe `meterAndSteer`).
+    /// Räder stellen. Steht nur Zeit oder nur ISO von Hand, bleibt der andere Wert, wo die Automatik ihn zuletzt hatte: das Bild
+    /// wird sichtbar heller oder dunkler, der Messer zeigt, wie weit (Michel, 9.10.: lieber sichtbar als automatisch ausgeglichen).
     func setDials(_ d: Dials) {
-        guard let device = input?.device else { return }
         queue.async {
             self.dials = d
-            guard (try? device.lockForConfiguration()) != nil else { return }
-            defer { device.unlockForConfiguration() }
-            // Belichtung
-            if d.duration == nil && d.iso == nil {
-                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
-            } else if device.isExposureModeSupported(.custom) {
-                device.setExposureModeCustom(duration: self.clampDuration(d.duration), iso: self.clampISO(d.iso), completionHandler: nil)
+            self.fitLens()
+            self.applyDials()
+        }
+    }
+
+    /// Auf der Warteschlange: die Räder ans laufende Objektiv geben
+    private func applyDials() {
+        let d = dials
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        defer { device.unlockForConfiguration() }
+        // Belichtung
+        if d.duration == nil && d.iso == nil {
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        } else if device.isExposureModeSupported(.custom) {
+            device.setExposureModeCustom(duration: clampDuration(d.duration), iso: clampISO(d.iso), completionHandler: nil)
+        }
+        // Schärfe
+        if let focus = d.focus {
+            if device.isLockingFocusWithCustomLensPositionSupported {
+                device.setFocusModeLocked(lensPosition: min(max(focus, 0), 1), completionHandler: nil)
             }
-            // Schärfe
-            if let focus = d.focus {
-                if device.isLockingFocusWithCustomLensPositionSupported {
-                    device.setFocusModeLocked(lensPosition: min(max(focus, 0), 1), completionHandler: nil)
-                }
-            } else if device.isFocusModeSupported(.continuousAutoFocus) {
-                device.focusMode = .continuousAutoFocus
+        } else if device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        // Weiß
+        if let kelvin = d.kelvin {
+            if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: 0)
+                device.setWhiteBalanceModeLocked(with: clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
             }
-            // Weiß
-            if let kelvin = d.kelvin {
-                if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
-                    let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: 0)
-                    device.setWhiteBalanceModeLocked(with: self.clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
-                }
-            } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
-                device.whiteBalanceMode = .continuousAutoWhiteBalance
-            }
+        } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
         }
     }
 
@@ -367,9 +379,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         return out
     }
 
-    /// Alle paar Bilder: Messung an die Seite („meter“) und, wenn nur Zeit oder nur ISO fest steht, das andere nachregeln,
-    /// damit die Belichtung stimmt (Apples Kamera kennt keine Zeit- oder ISO-Vorwahl, nur ganz Auto oder ganz von Hand)
-    private func meterAndSteer() {
+    /// Alle paar Bilder: Messung an die Seite („meter“)
+    private func meter() {
         guard let device = input?.device else { return }
         frameTick &+= 1
         guard frameTick % 6 == 0 else { return }
@@ -381,17 +392,6 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         let gains = device.deviceWhiteBalanceGains
         if gains.redGain >= 1, gains.greenGain >= 1, gains.blueGain >= 1, gains.redGain <= device.maxWhiteBalanceGain, gains.blueGain <= device.maxWhiteBalanceGain {
             kelvin = device.temperatureAndTintValues(for: gains).temperature
-        }
-        let semi = (dials.duration == nil) != (dials.iso == nil)
-        if semi, abs(offset) > 0.15, offset.isFinite, (try? device.lockForConfiguration()) != nil {
-            // halbe Schritte, damit es nicht pendelt
-            let k = pow(2, Double(-offset) * 0.5)
-            if let d = dials.duration {
-                device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
-            } else if let i = dials.iso {
-                device.setExposureModeCustom(duration: clampDuration(duration * k), iso: clampISO(i), completionHandler: nil)
-            }
-            device.unlockForConfiguration()
         }
         let now = (offset: offset, duration: duration, iso: iso, lens: lens, kelvin: kelvin)
         if let l = lastMeter, abs(l.offset - now.offset) < 0.05, abs(l.duration - now.duration) / max(now.duration, 1e-6) < 0.05, abs(l.iso - now.iso) / max(now.iso, 1) < 0.05, abs(l.lens - now.lens) < 0.01, abs(l.kelvin - now.kelvin) < 50 { return }
@@ -528,20 +528,66 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
         // Hauptkamera (24 mm) als Ausgangslage, nicht das Ultraweitwinkel
         baseZoom = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { CGFloat(truncating: $0) } ?? 1
-        // Kamera-Knopf (iOS 18): Wischen darauf zoomt wie zwei Finger; der Web-Teil hört „zoom“ und zeigt die Zahl
-        if #available(iOS 18.0, *), session.supportsControls {
-            for c in session.controls { session.removeControl(c) }
-            let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
-                guard let self else { return }
-                self.onEvent?("zoom", ["factor": Double(CGFloat(factor) / self.baseZoom)])
-            }
-            if session.canAddControl(slider) {
-                session.addControl(slider)
-                session.setControlsDelegate(self, queue: queue)
-            }
-        }
+        wantedZoom = baseZoom
+        virtualDevice = device.isVirtualDevice ? device : nil
+        zoomSlider(for: device)
         try? device.lockForConfiguration()
         device.videoZoomFactor = baseZoom
+        if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+        if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        device.unlockForConfiguration()
+    }
+
+    /// Kamera-Knopf (iOS 18): Wischen darauf zoomt wie zwei Finger; der Web-Teil hört „zoom“ und zeigt die Zahl.
+    /// Nur auf der virtuellen Kamera: auf einem einzelnen Objektiv würde er an den anderen vorbei zoomen.
+    private func zoomSlider(for device: AVCaptureDevice?) {
+        guard #available(iOS 18.0, *), session.supportsControls else { return }
+        for c in session.controls { session.removeControl(c) }
+        guard let device else { return }
+        let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
+            guard let self else { return }
+            self.wantedZoom = factor
+            self.onEvent?("zoom", ["factor": Double(factor / self.baseZoom)])
+        }
+        if session.canAddControl(slider) {
+            session.addControl(slider)
+            session.setControlsDelegate(self, queue: queue)
+        }
+    }
+
+    /// Objektiv der virtuellen Kamera, das den Zoom `v` abdeckt, und wo es in ihren Einheiten anfängt
+    private func lens(for v: CGFloat) -> (device: AVCaptureDevice, start: CGFloat)? {
+        guard let virtualDevice else { return nil }
+        let lenses = virtualDevice.constituentDevices
+        let starts = [CGFloat(1)] + virtualDevice.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
+        guard !lenses.isEmpty, lenses.count == starts.count else { return nil }
+        let i = starts.lastIndex { $0 <= v * 1.001 } ?? 0
+        return (lenses[i], starts[i])
+    }
+
+    /// Auf der Warteschlange: steht ein Rad nicht auf A, läuft das echte Objektiv zur Brennweite, sonst die virtuelle Kamera.
+    /// Danach den Zoom so setzen, dass der Ausschnitt gleich bleibt.
+    private func fitLens() {
+        guard let virtualDevice, !front, let current = input?.device else { return }
+        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil
+        let target = manual ? lens(for: wantedZoom) : (virtualDevice, CGFloat(1))
+        guard let target else { return }
+        if target.device != current, let next = try? AVCaptureDeviceInput(device: target.device) {
+            session.beginConfiguration()
+            if let old = input { session.removeInput(old) }
+            if session.canAddInput(next) {
+                session.addInput(next)
+                input = next
+            } else if let old = input, session.canAddInput(old) {
+                session.addInput(old)
+            }
+            if let c = videoOutput.connection(with: .video) { rotate(c, angle: 90) }
+            session.commitConfiguration()
+            zoomSlider(for: input?.device == virtualDevice ? virtualDevice : nil)
+        }
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        let start = device == virtualDevice ? 1 : target.start
+        device.videoZoomFactor = min(max(wantedZoom / start, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
         if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
         if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
         device.unlockForConfiguration()
@@ -663,6 +709,15 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     @discardableResult
     func setZoom(_ factor: CGFloat) -> Double {
         guard let device = input?.device else { return 1 }
+        if let virtualDevice, device != virtualDevice {
+            // von Hand: der Ausschnitt kann ein anderes Objektiv brauchen
+            return queue.sync {
+                wantedZoom = min(max(baseZoom * factor, virtualDevice.minAvailableVideoZoomFactor), baseZoom * 10)
+                fitLens()
+                applyDials()
+                return Double(wantedZoom / baseZoom)
+            }
+        }
         let lo = device.minAvailableVideoZoomFactor
         let hi = min(device.maxAvailableVideoZoomFactor, baseZoom * 10)
         let v = min(max(baseZoom * factor, lo), hi)
@@ -670,6 +725,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             device.videoZoomFactor = v
             device.unlockForConfiguration()
         }
+        wantedZoom = v
         return Double(v / baseZoom)
     }
 
@@ -695,7 +751,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        meterAndSteer()
+        meter()
         var image = CIImage(cvPixelBuffer: buffer)
         lock.lock()
         if !original, let cube {
