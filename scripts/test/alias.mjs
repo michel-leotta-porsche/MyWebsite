@@ -17,5 +17,10 @@ export async function resolve(spec, ctx, next) {
   }
   return next(spec, ctx);
 }
+// Fotos, die Quellen importieren (Next liefert dafür Maße und Pfad): eine leere Stellvertreterin genügt
+export async function load(url, ctx, next) {
+  if (/\\.(jpe?g|png|webp)$/.test(url)) return { format: "module", source: "export default { src: '', width: 1, height: 1 };", shortCircuit: true };
+  return next(url, ctx);
+}
 `),
 );

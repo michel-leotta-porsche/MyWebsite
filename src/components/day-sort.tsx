@@ -3,6 +3,7 @@
 import { BookPlus, Check, Ellipsis, ImagePlus, PenLine, SlidersHorizontal, Undo2, X } from "lucide-react";
 import { animate, motion, useMotionValue, useMotionValueEvent, useTransform, type PanInfo } from "motion/react";
 import { useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 
 import { OpenBook } from "@/components/table";
@@ -17,6 +18,7 @@ import { friendlyError } from "@/lib/errors";
 import type { User } from "@/lib/firebase";
 import { haptic } from "@/lib/haptics";
 import { de, getLang, locale, useT } from "@/lib/i18n";
+import { STORY_MAX } from "@/lib/day-page";
 import { layDay } from "@/lib/shelve";
 import { toBookData, type ClothId, type StoredBook } from "@/lib/store";
 import type { Print } from "@/lib/studio-store";
@@ -49,6 +51,21 @@ const writeRunning = (id: string) => {
     localStorage.setItem(RUNNING_KEY, id);
   } catch {}
 };
+/** was man zum Tag schreibt, bleibt auf dem Gerät, bis der Tag im Buch liegt (wer schließt, findet es wieder) */
+const storyKey = (stack: string) => `calima:tagtext:${stack}`;
+const readStory = (stack: string) => {
+  try {
+    return localStorage.getItem(storyKey(stack)) ?? "";
+  } catch {
+    return "";
+  }
+};
+const writeStory = (stack: string, text: string) => {
+  try {
+    if (text) localStorage.setItem(storyKey(stack), text);
+    else localStorage.removeItem(storyKey(stack));
+  } catch {}
+};
 
 /** so weit (px) muss ein Foto zur Seite, damit es entschieden ist; schneller geworfen reicht weniger */
 const THRESH = 110;
@@ -59,7 +76,7 @@ const hand: CSSProperties = { fontFamily: "var(--font-hand), cursive" };
 const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 type Target = { book: StoredBook } | { kind: number };
-type Laid = { book: StoredBook; firstKey: string; count: number };
+type Laid = { book: StoredBook; firstKey: string; count: number; spread: number };
 
 export function DaySort({
   stack,
@@ -258,6 +275,7 @@ export function DaySort({
         <LaidView laid={laid} dayLong={dayLong} onClose={onClose} />
       ) : prints.length ? (
         <Finish
+          stack={stack}
           prints={prints}
           user={user}
           books={books}
@@ -537,6 +555,7 @@ function LineNote({ initial, onDone }: { initial: string; onDone: (line: string)
 /* ---------------------------------------------------------------- Fertig für heute */
 
 function Finish({
+  stack,
   prints,
   user,
   books,
@@ -545,6 +564,7 @@ function Finish({
   onLaid,
   onDone,
 }: {
+  stack: string;
   prints: Print[];
   user: User;
   books: StoredBook[] | null;
@@ -562,6 +582,7 @@ function Finish({
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [story, setStory] = useState(() => readStory(stack));
   const runningBook = own.find((b) => b.id === running);
   const chosen: Target = target ?? (runningBook ? { book: runningBook } : { kind: 0 });
 
@@ -584,10 +605,11 @@ function Finish({
     onBusy(true);
     try {
       const into = "book" in chosen ? { book: chosen.book } : { title: t(KINDS[chosen.kind].title), cloth: KINDS[chosen.kind].cloth };
-      const r = await layDay(user, ins, dayLong, into, (i) => setBusy(i));
+      const r = await layDay(user, ins, { heading: dayLong, story }, into, (i) => setBusy(i));
       writeRunning(r.book.id);
+      writeStory(stack, "");
       haptic("success");
-      onLaid({ book: r.book, firstKey: r.firstKey, count: ins.length });
+      onLaid({ book: r.book, firstKey: r.firstKey, count: ins.length, spread: r.spread });
     } catch (e) {
       setError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
     } finally {
@@ -600,7 +622,15 @@ function Finish({
 
   return (
     <Scroll>
-      <Spread prints={ins} dayLong={dayLong} />
+      <Story
+        value={story}
+        disabled={busy !== null}
+        onChange={(v) => {
+          setStory(v);
+          writeStory(stack, v);
+        }}
+      />
+      <Spread prints={ins} dayLong={dayLong} story={story} />
       <p className="text-on-table-2 text-[15px]">
         <span className="text-on-table font-semibold">{ins.length === 1 ? t("Ein Foto kommt ins Buch.") : t("{n} Fotos kommen ins Buch.", { n: ins.length })}</span>{" "}
         {outs > 0 && (outs === 1 ? t("Eins hast du weggelegt, es liegt noch eine Woche unter dem Pult.") : t("{n} hast du weggelegt, sie liegen noch eine Woche unter dem Pult.", { n: outs }))}
@@ -688,6 +718,35 @@ function Finish({
   );
 }
 
+/** „Wie war der Tag?“: einmal für den ganzen Tag, von Hand auf die Tagesseite; leer lassen ist in Ordnung */
+function Story({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (v: string) => void }) {
+  const t = useT();
+  return (
+    <div className="note-paper deal w-full rotate-[-0.6deg] px-4 pt-3 pb-2.5">
+      <label className="text-ink-2 block text-[13px] font-semibold" htmlFor="tages-text">
+        {t("Wie war der Tag?")}
+      </label>
+      <textarea
+        id="tages-text"
+        rows={3}
+        maxLength={STORY_MAX}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={t("Früh los, Nebel am See. Abends Ramen.")}
+        className="text-ink placeholder:text-ink-2/50 mt-1 block w-full resize-none bg-transparent text-[24px] leading-[1.15] outline-none"
+        style={hand}
+      />
+      <p className="text-ink-2 flex justify-between gap-3 text-[12px]">
+        <span>{t("Steht auf der Tagesseite. Leer lassen geht auch.")}</span>
+        <span className="tabular-nums">
+          {value.length}/{STORY_MAX}
+        </span>
+      </p>
+    </div>
+  );
+}
+
 function Scroll({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -705,20 +764,27 @@ function Cover({ book }: { book: StoredBook }) {
   return thumb ? <img src={thumb} alt="" className="h-10 w-[30px] flex-none object-cover" /> : <span className="bg-paper-shade block h-10 w-[30px] flex-none" />;
 }
 
-/** Vorschau: die erste Doppelseite des Tages, links das Datum von Hand, daneben die ersten Fotos */
-function Spread({ prints, dayLong }: { prints: Print[]; dayLong: string }) {
+/** Vorschau der Tagesseite: links das Datum und der Text von Hand, darunter das erste Foto, rechts versetzt die nächsten */
+function Spread({ prints, dayLong, story }: { prints: Print[]; dayLong: string; story: string }) {
   const page = "linen bg-paper relative overflow-hidden";
+  const text = story.trim();
   return (
     <div aria-hidden className="deal grid grid-cols-2 shadow-[0_26px_44px_-16px_rgb(12_10_8/0.95)]" style={{ aspectRatio: "3 / 2" }}>
       <div className={`${page} shadow-[inset_-12px_0_16px_-12px_rgb(12_10_8/0.3)]`}>
-        <p className="text-ink absolute top-[6%] left-[9%] right-[6%] text-[20px] leading-tight" style={hand}>
+        <p className="text-ink absolute top-[6%] right-[6%] left-[9%] text-[18px] leading-tight" style={hand}>
           {dayLong}
         </p>
-        {prints[0] && <Thumb print={prints[0]} className="absolute top-[30%] left-[9%] h-[58%]" />}
+        {text && (
+          <p className="text-ink absolute top-[20%] right-[6%] left-[9%] line-clamp-3 text-[11px] leading-[1.25]" style={hand}>
+            {text}
+          </p>
+        )}
+        {prints[0] && <Thumb print={prints[0]} className={`absolute left-[16%] ${text ? "top-[48%] h-[44%]" : "top-[28%] h-[60%]"}`} />}
       </div>
       <div className={`${page} shadow-[inset_12px_0_16px_-12px_rgb(12_10_8/0.3)]`}>
-        {prints[1] && <Thumb print={prints[1]} className="absolute top-[8%] left-[12%] h-[40%]" />}
-        {prints[2] && <Thumb print={prints[2]} className="absolute top-[53%] left-[12%] h-[40%]" />}
+        {prints[1] && <Thumb print={prints[1]} className="absolute top-[7%] left-[8%] h-[27%]" />}
+        {prints[2] && <Thumb print={prints[2]} className="absolute top-[37%] right-[8%] h-[27%]" />}
+        {prints[3] && <Thumb print={prints[3]} className="absolute top-[67%] left-[8%] h-[27%]" />}
       </div>
     </div>
   );
@@ -730,9 +796,13 @@ function Thumb({ print, className }: { print: Print; className: string }) {
   return url ? <img src={url} alt="" className={`bg-paper w-auto p-[3px] pb-[9px] shadow-[0_1px_1px_rgb(12_10_8/0.4),0_6px_12px_-6px_rgb(12_10_8/0.6)] ${className}`} /> : null;
 }
 
-/** Danach: der Tag liegt im Buch, „Buch aufschlagen“ öffnet es auf seiner ersten Seite */
+/**
+ * Danach: der Tag liegt im Buch. „Seite gestalten“ führt gleich auf die Bühne der Tagesseite (dort geht Schreiben,
+ * Zeichnen, Kleben), „Buch aufschlagen“ zeigt sie zum Lesen.
+ */
 function LaidView({ laid, dayLong, onClose }: { laid: Laid; dayLong: string; onClose: () => void }) {
   const t = useT();
+  const router = useRouter();
   const { open } = useContext(OpenBook);
   const title = laid.book.title || t("Ohne Titel");
   const show = () => {
@@ -750,10 +820,20 @@ function LaidView({ laid, dayLong, onClose }: { laid: Laid; dayLong: string; onC
           {laid.count === 1 ? t("Ein Foto liegt in „{title}“.", { title }) : t("{n} Fotos liegen in „{title}“.", { n: laid.count, title })}
         </p>
       </div>
-      <Button variant="cloth" className="mt-2 w-full" onClick={show}>
+      <Button
+        variant="cloth"
+        className="mt-2 w-full"
+        onClick={() => {
+          onClose();
+          router.push(`/neu?id=${laid.book.id}&doppelseite=${laid.spread + 1}`);
+        }}
+      >
+        {t("Seite gestalten")}
+      </Button>
+      <Button className="w-full" onClick={show}>
         {t("Buch aufschlagen")}
       </Button>
-      <Button className="justify-self-center" onClick={onClose}>
+      <Button variant="quiet" className="justify-self-center" onClick={onClose}>
         {t("Schließen")}
       </Button>
     </Scroll>

@@ -232,10 +232,9 @@ export function Editor() {
         const at = new URLSearchParams(location.search).get("doppelseite");
         if (!at) return;
         window.history.replaceState(null, "", `/neu?id=${b.id}`);
+        // auch eine Textseite: auf der Bühne lässt sie sich beschreiben und bekleben, das Formular bleibt in der Liste
         const s = b.spreads[Number(at) - 1];
-        if (!s?.id) return;
-        if (s.text) setSel({ type: "spread", id: s.id });
-        else setStageId(s.id);
+        if (s?.id) setStageId(s.id);
       })
       .catch(() => {});
     return () => {
@@ -565,9 +564,7 @@ export function Editor() {
         onEdit={(step) => {
           setPreview(false);
           const s = book.spreads[step - 2];
-          if (!s?.id) return;
-          if (s.text) setSel({ type: "spread", id: s.id });
-          else setStageId(s.id);
+          if (s?.id) setStageId(s.id);
         }}
       />
     );
