@@ -99,13 +99,26 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const stacks = piles(prints);
 
   const openCamera = () => setCameraOpen(true);
-  const onShot = (p: Print) => {
+  const onShot = (p: Print, filmStack?: string) => {
+    // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film
+    if (filmStack) return keep([{ ...p, stack: filmStack }]);
     const cur = session.current;
     const i = cur.prints.findIndex((x) => x.id === p.id);
     const print = { ...p, stack: cur.stack, pos: i < 0 ? cur.prints.length : cur.prints[i].pos };
     if (i < 0) cur.prints.push(print);
     else cur.prints[i] = print;
     keep([print]);
+  };
+  // ein voller oder entnommener Film: der Stapel liegt schon im Studio, jetzt zu Fertig
+  const onFilmDone = (stack: string) => {
+    setPrints((list) => {
+      const roll = list.filter((p) => p.stack === stack).sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0));
+      if (roll.length) {
+        setCameraOpen(false);
+        setDone(roll.length === 1 ? [{ ...roll[0], stack: undefined, pos: undefined }] : roll);
+      }
+      return list;
+    });
   };
   const closeCamera = () => {
     setCameraOpen(false);
@@ -269,7 +282,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         </p>
       )}
 
-      {camera && <Camera uid={user.uid} onShot={onShot} onClose={closeCamera} />}
+      {camera && <Camera uid={user.uid} onShot={onShot} onFilmDone={onFilmDone} onClose={closeCamera} />}
       {editing && (
         <StudioEditor
           prints={editing}

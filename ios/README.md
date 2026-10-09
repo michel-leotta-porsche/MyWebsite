@@ -41,6 +41,10 @@ selbst; die nächste Nummer steht in App Store Connect unter Xcode Cloud → Ein
   `calima:settings` ins XMP, damit die Datei ihr Rezept kennt. Prüfen geht nur auf dem Gerät (Kamera-Erlaubnis,
   Sucher, Look-Wechsel, Auslösen); der Simulator hat keine Kamera. Erkenner für Sucherbilder (Reisebuch: Ticket,
   Bordkarte) hängen sich an `CalimaCamera.analyzers` und melden über `CalimaCamera.addListener("event", …)`.
+  Stufe 2: Körnung läuft live im Sucher (`setGrain`, Rauschen je Zelle als weiches Licht, wie `preview.ts`), der
+  Kamera-Knopf und die Lautstärketasten lösen aus (`AVCaptureEventInteraction`, iOS 17.2, Ereignis `shutter`),
+  Wischen am Kamera-Knopf zoomt (`AVCaptureSystemZoomSlider`, iOS 18, Ereignis `zoom`). „Film einlegen“ ist reiner
+  Web-Teil (`localStorage` `calima:film`).
 
 ## Anmelden mit Apple und Google (einmalig einrichten)
 

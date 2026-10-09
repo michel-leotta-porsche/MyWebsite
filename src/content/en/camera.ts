@@ -19,4 +19,11 @@ export const CAMERA: Record<string, string> = {
   "So fotografieren": "Shoot like this",
   "Calima-Look mitnehmen": "Take the Calima look along",
   "Farbe und Licht ohne Zuschnitt, so wie das Foto gesichert wurde.": "Colour and light without the crop, just as the photo was saved.",
+  // Film einlegen (Stufe 2)
+  "Film, {i} von {n}": "Film, {i} of {n}",
+  "{i} von {n}": "{i} of {n}",
+  "Film einlegen": "Load film",
+  "Film entnehmen": "Take out film",
+  "Film raus": "Film out",
+  "Der Film bleibt drin, bis {n} Bilder drauf sind oder du ihn entnimmst. Dann liegt er als Stapel im Fotostudio.": "The film stays in until it has {n} shots or you take it out. Then it's a stack in the photo studio.",
 };
