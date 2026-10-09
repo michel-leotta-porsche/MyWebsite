@@ -83,11 +83,18 @@ export type More = {
   hsl: [number, number, number][];
   /** Vignette: − dunkle Ränder, + helle Ränder */
   vignette: number;
+  /** Klarheit −1..1: Kontrast in der Umgebung, braucht eine weichgezeichnete Kopie, also nicht im LUT */
+  clarity: number;
+  /** Gradationskurve: Punkte [Eingang, Ausgang] in 0..1 samt beiden Enden; leer = gerade */
+  curve: [number, number][];
 };
 
-export const MORE0 = (): More => ({ highlights: 0, whites: 0, blacks: 0, tint: 0, vibrance: 0, hsl: HUES.map(() => [0, 0, 0]), vignette: 0 });
+export const MORE0 = (): More => ({ highlights: 0, whites: 0, blacks: 0, tint: 0, vibrance: 0, hsl: HUES.map(() => [0, 0, 0]), vignette: 0, clarity: 0, curve: [] });
+/** Kurve ohne Wirkung: keine Punkte oder alle auf der Diagonalen */
+export const curveIsNeutral = (c: [number, number][] | undefined) => !c || c.every(([x, y]) => Math.abs(x - y) < 0.002);
 export const moreIsNeutral = (m: More | undefined | null) =>
-  !m || (!m.highlights && !m.whites && !m.blacks && !m.tint && !m.vibrance && !m.vignette && m.hsl.every((t) => !t[0] && !t[1] && !t[2]));
+  !m ||
+  (!m.highlights && !m.whites && !m.blacks && !m.tint && !m.vibrance && !m.vignette && !m.clarity && curveIsNeutral(m.curve) && m.hsl.every((t) => !t[0] && !t[1] && !t[2]));
 
 export const REC0 = (): RecipeValues => ({ film: null, wbR: 0, wbB: 0, hl: 0, sh: 0, color: 0, dr: 100, cc: 0, fxb: 0, grain: 0, gsize: "klein" });
 
@@ -120,8 +127,8 @@ export function colorIsNeutral(e: PhotoEdit): boolean {
   return !e.exposure && !e.contrast && !e.shadows && !e.warmth && !e.sat && !e.look && !e.levels && !e.transfer && recipeIsEmpty(e.rec) && moreIsNeutral(e.more);
 }
 
-/** Schlüssel für alles, was den LUT bestimmt: Zuschnitt und Vignette gehören nicht dazu */
-export const colorKey = (e: PhotoEdit) => JSON.stringify({ ...e, geo: undefined, more: e.more && { ...e.more, vignette: 0 } });
+/** Schlüssel für alles, was den LUT bestimmt: Zuschnitt, Vignette und Klarheit gehören nicht dazu */
+export const colorKey = (e: PhotoEdit) => JSON.stringify({ ...e, geo: undefined, more: e.more && { ...e.more, vignette: 0, clarity: 0 } });
 
 /* ---------- Prüfen: Bearbeitungen aus fremden Büchern ---------- */
 
@@ -190,8 +197,63 @@ function cleanMore(v: unknown): More | undefined {
     vibrance: num(x.vibrance, -1, 1),
     hsl: HUES.map((_, i) => (nums(h[i], 3, -1, 1) as [number, number, number] | null) ?? [0, 0, 0]),
     vignette: num(x.vignette, -1, 1),
+    clarity: num(x.clarity, -1, 1),
+    curve: cleanCurve(x.curve),
   };
   return moreIsNeutral(m) ? undefined : m;
+}
+
+/** höchstens acht Punkte, Eingang steigend mit Abstand, beide Enden bei 0 und 1 */
+export const CURVE_GAP = 0.04;
+function cleanCurve(v: unknown): [number, number][] {
+  if (!Array.isArray(v)) return [];
+  const pts = v
+    .filter((p): p is [number, number] => Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number" && Number.isFinite(n)))
+    .map(([x, y]) => [num(x, 0, 1), num(y, 0, 1)] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const p of pts) if (!out.length || p[0] - out[out.length - 1][0] >= CURVE_GAP) out.push(p);
+  if (out.length < 2 || out[0][0] !== 0 || out[out.length - 1][0] !== 1 || out.length > 8) return [];
+  return curveIsNeutral(out) ? [] : out;
+}
+
+/**
+ * Kurve als Funktion: monotone kubische Interpolation (Fritsch–Carlson), damit sie zwischen den Punkten nicht
+ * über- oder unterschwingt. Läuft nur beim Bau des LUT.
+ */
+export function curveFn(pts: [number, number][]): (x: number) => number {
+  if (curveIsNeutral(pts)) return (x) => x;
+  const n = pts.length;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const d = xs.slice(1).map((x, i) => (ys[i + 1] - ys[i]) / (x - xs[i]));
+  const m = xs.map((_, i) => (i === 0 ? d[0] : i === n - 1 ? d[n - 2] : d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2));
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = m[i] / d[i];
+    const b = m[i + 1] / d[i];
+    const t = a * a + b * b;
+    if (t > 9) {
+      const k = 3 / Math.sqrt(t);
+      m[i] = k * a * d[i];
+      m[i + 1] = k * b * d[i];
+    }
+  }
+  return (x) => {
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[n - 1]) return ys[n - 1];
+    let i = 0;
+    while (x > xs[i + 1]) i++;
+    const h = xs[i + 1] - xs[i];
+    const t = (x - xs[i]) / h;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return cl((2 * t3 - 3 * t2 + 1) * ys[i] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * ys[i + 1] + (t3 - t2) * h * m[i + 1]);
+  };
 }
 
 /* ---------- Farbe ---------- */
@@ -297,7 +359,7 @@ export const PRESETS: NamedRecipe[] = [
 
 /* ---------- Pipeline für eine Farbe (0..1) ---------- */
 
-function pipe(e: PhotoEdit, rgb: RGB): RGB {
+function pipe(e: PhotoEdit, rgb: RGB, curve?: (x: number) => number): RGB {
   let [r, g, b] = rgb;
   if (e.levels) {
     const [bp, wp] = e.levels;
@@ -376,7 +438,7 @@ function pipe(e: PhotoEdit, rgb: RGB): RGB {
   r = cl(r);
   g = cl(g);
   b = cl(b);
-  if (e.more) [r, g, b] = more(e.more, [r, g, b]);
+  if (e.more) [r, g, b] = more(e.more, [r, g, b], curve);
   // Look mit Stärke
   const look = lookOf(e.look);
   if (look) {
@@ -421,7 +483,7 @@ function hueWeight(h: number, i: number): number {
 }
 
 /** Licht genauer, Farbe genauer, Farben einzeln; alles Farbe → Farbe, also im LUT */
-function more(m: More, [r, g, b]: RGB): RGB {
+function more(m: More, [r, g, b]: RGB, curve?: (x: number) => number): RGB {
   if (m.highlights || m.whites || m.blacks) {
     const l = cl(luma(r, g, b));
     const u = cl((l - 0.35) / 0.65);
@@ -458,6 +520,8 @@ function more(m: More, [r, g, b]: RGB): RGB {
     const k = Math.min(1, s * 2.5);
     [r, g, b] = fromHsl(h + dh * 30 * k, cl(s * (1 + ds * k)), cl(l + dl * 0.18 * k * s));
   }
+  // Gradationskurve auf allen drei Kanälen, wie die RGB-Kurve in Lightroom
+  if (curve) return [curve(cl(r)), curve(cl(g)), curve(cl(b))];
   return [cl(r), cl(g), cl(b)];
 }
 
@@ -488,10 +552,11 @@ export function applyVignette(px: Uint8ClampedArray, w: number, h: number, v: nu
 export function buildLut(e: PhotoEdit, n = 33): Uint8Array {
   const lut = new Uint8Array(n * n * n * 4);
   let p = 0;
+  const curve = e.more && !curveIsNeutral(e.more.curve) ? curveFn(e.more.curve) : undefined;
   for (let bi = 0; bi < n; bi++)
     for (let gi = 0; gi < n; gi++)
       for (let ri = 0; ri < n; ri++) {
-        const o = pipe(e, [ri / (n - 1), gi / (n - 1), bi / (n - 1)]);
+        const o = pipe(e, [ri / (n - 1), gi / (n - 1), bi / (n - 1)], curve);
         lut[p++] = Math.round(o[0] * 255);
         lut[p++] = Math.round(o[1] * 255);
         lut[p++] = Math.round(o[2] * 255);
@@ -661,6 +726,7 @@ export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
     for (const [k, label] of MORE_SLIDERS) if (Math.abs(m[k]) > 0.005) rows.push({ label, value: signed100(m[k]) });
     const hues = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([n]) => n);
     if (hues.length) rows.push({ label: "Farben einzeln", value: hues.join(", ") });
+    if (!curveIsNeutral(m.curve)) rows.push({ label: "Gradationskurve", value: "angepasst" });
   }
   if (e.geo && !geoIsNeutral(e.geo)) rows.push({ label: "Zuschnitt", value: describeGeo(e.geo) });
   return rows;
@@ -678,12 +744,13 @@ export { signed as signedStep };
 
 const signed100 = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`;
 /** Regler in „Mehr Werkzeuge“ außer den Farben einzeln: Schlüssel, Name, Gruppe */
-export const MORE_SLIDERS: [Exclude<keyof More, "hsl">, string, "light" | "color" | "vignette"][] = [
+export const MORE_SLIDERS: [Exclude<keyof More, "hsl" | "curve">, string, "light" | "color" | "vignette"][] = [
   ["highlights", "Lichter", "light"],
   ["whites", "Weiß", "light"],
   ["blacks", "Schwarz", "light"],
   ["tint", "Tönung", "color"],
   ["vibrance", "Dynamik", "color"],
+  ["clarity", "Klarheit", "light"],
   ["vignette", "Vignette", "vignette"],
 ];
 export { signed100 };
