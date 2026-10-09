@@ -22,10 +22,10 @@ const GOOGLE = (
 );
 
 /**
- * Apple erst zeigen, wenn der Anbieter in Firebase eingerichtet ist (Services ID, Schlüssel), sonst
- * scheitert die Anmeldung. Danach hier auf true stellen; die App braucht Apple vor der Einreichung (4.8).
+ * Apple nur zeigen, wenn der Anbieter in Firebase eingerichtet ist (Services ID app.calima.web, Schlüssel),
+ * sonst scheitert die Anmeldung. Eingerichtet seit Oktober 2026; die App braucht Apple für die Einreichung (4.8).
  */
-export const APPLE_READY = false;
+export const APPLE_READY = true;
 
 const OPTIONS = [
   { id: "apple.com", label: "Mit Apple anmelden", icon: APPLE },
