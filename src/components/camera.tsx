@@ -1,12 +1,13 @@
 "use client";
 
-import { Film as FilmIcon, SwitchCamera, X } from "lucide-react";
+import { Film as FilmIcon, SlidersHorizontal, SwitchCamera, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { allAuto, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
 import { IconButton } from "@/components/ui/button";
 import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
-import { CalimaCamera, FILM_FRAMES, grainOf, isDenied, LUT_N, lutOf, takeShot, type Frame } from "@/lib/camera";
+import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
@@ -23,11 +24,14 @@ import type { Print } from "@/lib/studio-store";
 // unten macht heller oder dunkler, zwei Finger zoomen, ein Tipp stellt scharf. Jedes Foto wird ein Abzug im Fotostudio,
 // mit dem Look als Bearbeitung; eingerechnet wird erst beim Sichern, dann auch die Klarheit. Die Körnung läuft schon im
 // Sucher mit. „Film einlegen“ (Stufe 2) hält einen Look fest: FILM_FRAMES Bilder, die als ein Stapel im Fotostudio
-// landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus.
+// landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus. Das Werkzeug
+// (Expertenmodus E1, camera-dials.tsx) liegt hinter dem Schieberegler-Knopf oben: Brennweiten, Räder mit „A“, Messer,
+// Raster mit Wasserwaage, Lupe beim Scharfstellen von Hand.
 
 type Look = { id: string; name: string; approx: boolean; edit: PhotoEdit | null };
 const ORIGINAL = "original";
 const LAST_KEY = "calima:kamera-look";
+const TOOLS_KEY = "calima:kamera-werkzeug";
 const HOLD_MS = 220;
 const MOVE_PX = 10;
 const EV_MAX = 2;
@@ -65,6 +69,21 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   const [count, setCount] = useState(0);
   const [last, setLast] = useState<string | null>(null);
   const [reticle, setReticle] = useState<{ x: number; y: number; k: number } | null>(null);
+  // Werkzeug (E1): offen oder zu bleibt gemerkt; die Räder selbst fangen bei jedem Öffnen auf A an
+  const [tools, setTools] = useState(() => {
+    try {
+      return localStorage.getItem(TOOLS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [info, setInfo] = useState<CameraInfo | null>(null);
+  const [dials, setDials] = useState<Dials>(AUTO);
+  const [dial, setDial] = useState<DialKey | "focal" | null>(null);
+  const [focal, setFocal] = useState<number | null>(null);
+  const [grid, setGrid] = useState(false);
+  const [meter, setMeter] = useState<Meter | null>(null);
+  const [roll, setRoll] = useState<number | null>(null);
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
   const [shelf, setShelf] = useState<Shelf>(readShelf);
   const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
@@ -117,6 +136,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         if (!alive) return;
         started.current = true;
         setFront(r.front);
+        setInfo(r);
         setReady(true);
       } catch (e) {
         if (alive) setError(isDenied(e) ? t("Calima darf die Kamera nicht nutzen. Erlaube sie in den Einstellungen des iPhones unter Calima.") : t("Die Kamera lässt sich gerade nicht öffnen."));
@@ -159,6 +179,37 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     haptic("select");
     setLookId(l.id);
   };
+
+  /* ----- Werkzeug (E1): Räder an die App, Raster mit Wasserwaage, Brennweite als Zoom ----- */
+
+  useEffect(() => {
+    if (ready) CalimaCamera.setDials(dials).catch(() => {});
+  }, [dials, ready]);
+  useEffect(() => {
+    if (ready) CalimaCamera.setLevel({ on: tools && grid }).catch(() => {});
+  }, [tools, grid, ready]);
+  const toggleTools = () => {
+    haptic("select");
+    setTools((on) => {
+      try {
+        localStorage.setItem(TOOLS_KEY, on ? "0" : "1");
+      } catch {}
+      return !on;
+    });
+    setDial(null);
+  };
+  const pickFocal = (mm: number) => {
+    haptic("select");
+    setFocal(mm);
+    CalimaCamera.setZoom({ factor: focalZoom(mm) })
+      .then((r) => setZoom(r.factor))
+      .catch(() => {});
+  };
+  const changeDials = (next: Dials) => {
+    if (next[dial as DialKey] !== dials[dial as DialKey]) haptic("select");
+    setDials(next);
+  };
+  const lenses = useMemo(() => realFocals(info?.lenses ?? [1]), [info]);
 
   /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel. Beiseitelegen und später weiter belichten geht; die Bilder
      sieht man erst, wenn der Film entwickelt ist (voll oder bewusst entwickelt) ----- */
@@ -253,6 +304,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       if (!g.second || !g.d0 || !g.z0) return;
       const d = Math.hypot(g.second.x - g.x, g.second.y - g.y);
       const want = Math.min(10, Math.max(0.5, (g.z0 * d) / g.d0));
+      setFocal(null);
       later(() => CalimaCamera.setZoom({ factor: want }).then((r) => setZoom(r.factor)).catch(() => {}));
       return;
     }
@@ -365,7 +417,11 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   useEffect(() => {
     const sub = CalimaCamera.addListener("event", (e) => {
       if (e.name === "shutter") shootRef.current();
-      else if (e.name === "zoom" && typeof e.data.factor === "number") setZoom(e.data.factor);
+      else if (e.name === "zoom" && typeof e.data.factor === "number") {
+        setZoom(e.data.factor);
+        setFocal(null);
+      } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
+      else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -378,7 +434,12 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     CalimaCamera.flip()
       .then((r) => {
         setFront(r.front);
+        setInfo(r);
         setZoom(1);
+        // die Frontkamera kennt die Sperren nicht: alles zurück auf A
+        setDials(AUTO);
+        setFocal(null);
+        setDial(null);
       })
       .catch(() => {});
   };
@@ -404,8 +465,13 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           <p className="truncate text-[15px] leading-tight font-bold tracking-[-0.01em]">{title}</p>
           <p className="text-on-table-2 truncate text-[12px] leading-tight">{sub || " "}</p>
         </div>
-        <span className="text-on-table-2 w-11 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
-          {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
+        <span className="flex items-center gap-1">
+          <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
+            {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
+          </span>
+          <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} aria-pressed={tools} className={tools || !allAuto(dials) ? "text-cloth" : "text-on-table"}>
+            <SlidersHorizontal aria-hidden />
+          </IconButton>
         </span>
       </header>
 
@@ -430,6 +496,8 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
               {error}
             </p>
           )}
+          {tools && grid && <GridOverlay roll={roll} />}
+          {tools && ready && <MeterBadge meter={meter} />}
           {flash && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
           {reticle && (
             <span aria-hidden className="border-cloth pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 border-2 opacity-90" style={{ left: reticle.x, top: reticle.y }} />
@@ -443,6 +511,12 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       </div>
 
       <footer className="bg-table-deep grid gap-3 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
+        {tools && (
+          <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={setDial} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} />
+        )}
+        {tools && dial && dial !== "focal" && (
+          <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
+        )}
         {film ? (
           <div className="flex items-center gap-3 px-4 pb-1">
             <div className="min-w-0 flex-1">
@@ -538,7 +612,11 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
           </span>
         </div>
         <p className="text-on-table-2 px-6 text-center text-[12px]">
-          {film
+          {tools && dial && dial !== "focal"
+            ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
+            : tools && focal != null && !lenses.includes(focal)
+              ? t("{mm} mm ist ein Ausschnitt aus der Hauptkamera, kein eigenes Objektiv.", { mm: focal })
+              : film
             ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
               ? t("{n} im Stapel. Schließen bringt dich zu Fertig.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })

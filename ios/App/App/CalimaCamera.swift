@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import Capacitor
 import CoreImage
+import CoreMotion
 import MetalKit
 import UIKit
 
@@ -28,6 +29,9 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "capture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discard", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setGrain", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setDials", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMagnify", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setLevel", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -77,7 +81,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                         self.detach()
                         call.reject(error, "camera")
                     } else {
-                        call.resolve(["front": self.camera.front])
+                        call.resolve(self.camera.info())
                     }
                 }
             }
@@ -87,6 +91,28 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     /// Körnung live: amount wie GRAIN.amount, cell als Anteil der Bildbreite (GRAIN.cell in model.ts)
     @objc func setGrain(_ call: CAPPluginCall) {
         camera.setGrain(amount: Float(call.getDouble("amount") ?? 0), cell: Float(call.getDouble("cell") ?? 0))
+        call.resolve()
+    }
+
+    /// Die Räder (Expertenmodus E1): fehlt ein Wert oder ist er null, steht das Rad auf A
+    @objc func setDials(_ call: CAPPluginCall) {
+        let d = CalimaCamera.Dials(
+            duration: call.getDouble("duration"),
+            iso: call.getDouble("iso").map { Float($0) },
+            focus: call.getDouble("focus").map { Float($0) },
+            kelvin: call.getDouble("kelvin").map { Float($0) }
+        )
+        camera.setDials(d)
+        call.resolve()
+    }
+
+    @objc func setMagnify(_ call: CAPPluginCall) {
+        camera.magnify = call.getBool("on") ?? false
+        call.resolve()
+    }
+
+    @objc func setLevel(_ call: CAPPluginCall) {
+        camera.setLevel(on: call.getBool("on") ?? false)
         call.resolve()
     }
 
@@ -149,7 +175,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func flip(_ call: CAPPluginCall) {
         camera.flip { error in
-            if let error { call.reject(error, "camera") } else { call.resolve(["front": self.camera.front]) }
+            if let error { call.reject(error, "camera") } else { call.resolve(self.camera.info()) }
         }
     }
 
@@ -215,6 +241,155 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// bei virtuellen Kameras ist 1,0 das Ultraweitwinkel; die Hauptkamera liegt beim ersten Umschaltpunkt
     private var baseZoom: CGFloat = 1
 
+    // MARK: Expertenmodus E1: Räder, Messer, Lupe, Wasserwaage (expertenmodus-workshop-2026-10-09/)
+
+    /// Stellung der Räder; nil heißt A (die Kamera stellt selbst)
+    struct Dials {
+        var duration: Double?
+        var iso: Float?
+        var focus: Float?
+        var kelvin: Float?
+    }
+    private var dials = Dials()
+    /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
+    var magnify = false
+    private var frameTick = 0
+    private var lastMeter: (offset: Float, duration: Double, iso: Float, lens: Float, kelvin: Float)?
+    private var motion: CMMotionManager?
+    private var lastRoll: Double = .nan
+
+    /// was die Kamera kann: Objektive als Zoomfaktoren zur Hauptkamera, Grenzen von Zeit und ISO
+    func info() -> [String: Any] {
+        guard let device = input?.device else { return ["front": front, "lenses": [1.0], "limits": [:]] }
+        let f = device.activeFormat
+        var lenses = device.virtualDeviceSwitchOverVideoZoomFactors.map { Double(CGFloat(truncating: $0) / baseZoom) }
+        // das Ultraweitwinkel liegt vor dem ersten Umschaltpunkt
+        if device.minAvailableVideoZoomFactor < baseZoom { lenses.insert(Double(device.minAvailableVideoZoomFactor / baseZoom), at: 0) }
+        if lenses.isEmpty { lenses = [1] }
+        return [
+            "front": front,
+            "lenses": lenses,
+            "limits": [
+                "minDuration": CMTimeGetSeconds(f.minExposureDuration),
+                "maxDuration": min(CMTimeGetSeconds(f.maxExposureDuration), 1),
+                "minISO": Double(f.minISO),
+                "maxISO": Double(f.maxISO),
+            ],
+        ]
+    }
+
+    /// Räder stellen. Steht nur Zeit oder nur ISO, hält die Kamera den Wert und regelt den anderen nach (siehe `meterAndSteer`).
+    func setDials(_ d: Dials) {
+        guard let device = input?.device else { return }
+        queue.async {
+            self.dials = d
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            // Belichtung
+            if d.duration == nil && d.iso == nil {
+                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            } else if device.isExposureModeSupported(.custom) {
+                device.setExposureModeCustom(duration: self.clampDuration(d.duration), iso: self.clampISO(d.iso), completionHandler: nil)
+            }
+            // Schärfe
+            if let focus = d.focus {
+                if device.isLockingFocusWithCustomLensPositionSupported {
+                    device.setFocusModeLocked(lensPosition: min(max(focus, 0), 1), completionHandler: nil)
+                }
+            } else if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            // Weiß
+            if let kelvin = d.kelvin {
+                if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
+                    let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: 0)
+                    device.setWhiteBalanceModeLocked(with: self.clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
+                }
+            } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+        }
+    }
+
+    private func clampDuration(_ s: Double?) -> CMTime {
+        guard let device = input?.device, let s else { return AVCaptureDevice.currentExposureDuration }
+        let f = device.activeFormat
+        let lo = CMTimeGetSeconds(f.minExposureDuration)
+        let hi = min(CMTimeGetSeconds(f.maxExposureDuration), 1)
+        return CMTime(seconds: min(max(s, lo), hi), preferredTimescale: 1_000_000)
+    }
+
+    private func clampISO(_ iso: Float?) -> Float {
+        guard let device = input?.device, let iso else { return AVCaptureDevice.currentISO }
+        return min(max(iso, device.activeFormat.minISO), device.activeFormat.maxISO)
+    }
+
+    private func clampGains(_ g: AVCaptureDevice.WhiteBalanceGains, _ device: AVCaptureDevice) -> AVCaptureDevice.WhiteBalanceGains {
+        let hi = device.maxWhiteBalanceGain
+        var out = g
+        out.redGain = min(max(g.redGain, 1), hi)
+        out.greenGain = min(max(g.greenGain, 1), hi)
+        out.blueGain = min(max(g.blueGain, 1), hi)
+        return out
+    }
+
+    /// Alle paar Bilder: Messung an die Seite („meter“) und, wenn nur Zeit oder nur ISO fest steht, das andere nachregeln,
+    /// damit die Belichtung stimmt (Apples Kamera kennt keine Zeit- oder ISO-Vorwahl, nur ganz Auto oder ganz von Hand)
+    private func meterAndSteer() {
+        guard let device = input?.device else { return }
+        frameTick &+= 1
+        guard frameTick % 6 == 0 else { return }
+        let offset = device.exposureTargetOffset
+        let duration = CMTimeGetSeconds(device.exposureDuration)
+        let iso = device.iso
+        let lens = device.lensPosition
+        var kelvin: Float = 0
+        let gains = device.deviceWhiteBalanceGains
+        if gains.redGain >= 1, gains.greenGain >= 1, gains.blueGain >= 1, gains.redGain <= device.maxWhiteBalanceGain, gains.blueGain <= device.maxWhiteBalanceGain {
+            kelvin = device.temperatureAndTintValues(for: gains).temperature
+        }
+        let semi = (dials.duration == nil) != (dials.iso == nil)
+        if semi, abs(offset) > 0.15, offset.isFinite, (try? device.lockForConfiguration()) != nil {
+            // halbe Schritte, damit es nicht pendelt
+            let k = pow(2, Double(-offset) * 0.5)
+            if let d = dials.duration {
+                device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
+            } else if let i = dials.iso {
+                device.setExposureModeCustom(duration: clampDuration(duration * k), iso: clampISO(i), completionHandler: nil)
+            }
+            device.unlockForConfiguration()
+        }
+        let now = (offset: offset, duration: duration, iso: iso, lens: lens, kelvin: kelvin)
+        if let l = lastMeter, abs(l.offset - now.offset) < 0.05, abs(l.duration - now.duration) / max(now.duration, 1e-6) < 0.05, abs(l.iso - now.iso) / max(now.iso, 1) < 0.05, abs(l.lens - now.lens) < 0.01, abs(l.kelvin - now.kelvin) < 50 { return }
+        lastMeter = now
+        onEvent?("meter", ["offset": Double(offset), "duration": duration, "iso": Double(iso), "lens": Double(lens), "kelvin": Double(kelvin)])
+    }
+
+    /// Wasserwaage aus der Lage des Telefons; meldet „level“ mit roll in Grad (0 = gerade, hochkant gehalten)
+    func setLevel(on: Bool) {
+        if !on {
+            motion?.stopDeviceMotionUpdates()
+            motion = nil
+            lastRoll = .nan
+            return
+        }
+        guard motion == nil else { return }
+        let m = CMMotionManager()
+        guard m.isDeviceMotionAvailable else { return }
+        m.deviceMotionUpdateInterval = 1 / 15
+        motion = m
+        m.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let g = data?.gravity else { return }
+            var roll = atan2(g.x, -g.y) * 180 / .pi
+            // quer gehalten: die Waage bezieht sich auf die nächste Kante
+            if roll > 45 { roll -= 90 } else if roll < -45 { roll += 90 }
+            if roll.isFinite, abs(roll - self.lastRoll) >= 0.2 || self.lastRoll.isNaN {
+                self.lastRoll = roll
+                self.onEvent?("level", ["roll": roll])
+            }
+        }
+    }
+
     // MARK: Aufbau
 
     func attach(to host: UIView, frame: CGRect) {
@@ -263,7 +438,10 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         if let shutterInteraction { view?.superview?.removeInteraction(shutterInteraction) }
         shutterInteraction = nil
         view?.removeFromSuperview()
+        setLevel(on: false)
+        magnify = false
         queue.async {
+            self.dials = Dials()
             if self.running {
                 self.session.stopRunning()
                 self.running = false
@@ -345,6 +523,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func flip(_ done: @escaping (String?) -> Void) {
         queue.async {
+            self.dials = Dials()
             do {
                 try self.configure(position: self.front ? .back : .front)
                 done(nil)
@@ -466,6 +645,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        meterAndSteer()
         var image = CIImage(cvPixelBuffer: buffer)
         lock.lock()
         if !original, let cube {
@@ -499,7 +679,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         drawPending = false
         let image = latest
         lock.unlock()
-        guard let image, let ciContext, let commandQueue, let drawable = view.currentDrawable, let buffer = commandQueue.makeCommandBuffer() else { return }
+        guard var image, let ciContext, let commandQueue, let drawable = view.currentDrawable, let buffer = commandQueue.makeCommandBuffer() else { return }
+        // Lupe: das mittlere Drittel füllt den Sucher, zum Scharfstellen von Hand
+        if magnify {
+            let e = image.extent
+            image = image.cropped(to: CGRect(x: e.midX - e.width / 6, y: e.midY - e.height / 6, width: e.width / 3, height: e.height / 3))
+        }
         // Bild in die Ansicht einpassen (das Seitenverhältnis stellt der Web-Teil, 3:4 wie das Foto)
         let size = view.drawableSize
         let scale = min(size.width / image.extent.width, size.height / image.extent.height)
