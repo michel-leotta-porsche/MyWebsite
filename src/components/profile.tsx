@@ -176,7 +176,7 @@ function Card({ user }: { user: User }) {
             <ListRow lead={<Trash2 aria-hidden />} title="Konto löschen" detail="Mit allen Büchern und Links" danger onClick={() => setDeleting(true)} />
           </ListGroup>
           <p className="text-on-table-2 mt-3 max-w-xl text-sm leading-relaxed">
-            Deine Bücher sieht nur, wem du einen Link gibst. Ein Buch sicherst du beim Bearbeiten unter „Verlauf“ als Datei.
+            Deine Bücher sieht nur, wem du einen Link gibst. Den Aufbau eines Buchs sicherst du beim Bearbeiten unter „Verlauf“ als Datei; die Fotos bleiben in deinem Konto.
           </p>
         </section>
 

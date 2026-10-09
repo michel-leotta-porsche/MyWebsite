@@ -42,6 +42,8 @@ import {
   type SpreadItem,
 } from "@/lib/free-layout";
 import type { StoredPhoto } from "@/lib/store";
+import { haptic, warmHaptics } from "@/lib/haptics";
+import { IS_APP } from "@/lib/app-mode";
 
 // Die Bühne: eine Doppelseite groß, Fotos und Texte direkt auf der Seite bewegen, vergrößern, zuschneiden.
 // Kanten rasten am Raster (6 Spalten, 9 Zeilen), an Seitenkanten, Bund und Nachbarn ein.
@@ -513,9 +515,11 @@ export function Stage({
         setDraft(null);
         setGuides({ xs: [], ys: [] });
         held.current = { cx: clientX, cy: clientY, id: it.id };
-        navigator.vibrate?.(10);
+        haptic("press");
       }, 550);
     }
+    snapped.current = [];
+    warmHaptics();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     speed.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, v: 0 };
     drag.current = { id: it.id, edges, end, sx: e.clientX, sy: e.clientY, box0: boxOf(it, geom), moved: false, shift: e.shiftKey, touch };
@@ -537,6 +541,8 @@ export function Stage({
   };
   /** letzte Zeigerlage; beim Loslassen zählt sie, auch wenn ihr Bild noch nicht gezeichnet war */
   const last = useRef<{ clientX: number; clientY: number; shiftKey: boolean; altKey: boolean } | null>(null);
+  // eingerastete Hilfslinien des letzten Schritts, für das Klopfen beim Einrasten
+  const snapped = useRef<string[]>([]);
   const compute = (clientX: number, clientY: number, shiftKey: boolean, altKey: boolean) => {
     const d = drag.current;
     if (!d) return null;
@@ -560,6 +566,10 @@ export function Stage({
     if (!c) return;
     setDraft({ id: c.it.id, box: c.box, original: c.r.original, from: c.from });
     setGuides({ xs: c.r.xs, ys: c.r.ys });
+    // leichtes Klopfen nur, wenn eine neue Hilfslinie einrastet, nicht solange man auf ihr bleibt
+    const prev = snapped.current;
+    snapped.current = [...c.r.xs.map((x) => `x${x}`), ...c.r.ys.map((y) => `y${y}`)];
+    if (snapped.current.some((g) => !prev.includes(g))) haptic("select");
   };
   const onUp = (e?: React.PointerEvent) => {
     cancelAnimationFrame(frame.current);
@@ -861,13 +871,16 @@ export function Stage({
     setMenu({ cx, cy, id, at: pointOf(cx, cy) });
   };
   const copyItem = (it: SpreadItem) => {
-    navigator.clipboard?.writeText(remember(it)).catch(() => {});
+    const marker = remember(it);
+    // in der App gehen nur Texte ins System; Fotos und Formen bleiben in Calimas eigener Ablage (Workshop Paket 6)
+    if (!IS_APP || it.t === "text") navigator.clipboard?.writeText(marker).catch(() => {});
     setSay("Kopiert");
   };
   const pasteFromMenu = async (at?: { x: number; y: number }) => {
     if (clipboard) return paste(clipboard.item, at);
     const text = await navigator.clipboard?.readText().catch(() => "");
-    if (text?.trim()) addText("body", at ? pageAt(at.x) : curPage, at, text.trim());
+    // eingesetzter Text bleibt ein Textfeld, kein Roman
+    if (text?.trim()) addText("body", at ? pageAt(at.x) : curPage, at, text.trim().slice(0, 2000));
   };
   const menuEntries = (): MenuEntry[] => {
     if (!menu) return [];

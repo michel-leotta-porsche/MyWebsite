@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, Check, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, Share, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,6 +44,9 @@ import {
   type StoredPhoto,
   type Version,
 } from "@/lib/store";
+import { IS_APP } from "@/lib/app-mode";
+import { haptic } from "@/lib/haptics";
+import { safeFileName, saveFile } from "@/lib/native";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 import { useWide } from "@/lib/use-wide";
@@ -1478,8 +1481,14 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
   useEffect(() => {
     load();
   }, [load]);
-  const fileUrl = useMemo(() => URL.createObjectURL(exportBook(book)), [book]);
-  useEffect(() => () => URL.revokeObjectURL(fileUrl), [fileUrl]);
+  // Datei erst beim Tippen erzeugen; in der App über das Teilen-Blatt („In Dateien sichern“), im Browser als Download
+  const saveProject = async () => {
+    const r = await saveFile(safeFileName(book.title || "Fotobuch", ".calima.json"), exportBook(book), "application/json");
+    if (r === "shared" && IS_APP) {
+      notify("Projekt gesichert.");
+      haptic("success");
+    } else if (r === "failed") notify("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal.");
+  };
 
   const shown = list && !all ? list.slice(0, 8) : list;
 
@@ -1536,12 +1545,14 @@ function HistoryDialog({ book, onRestore, onClose }: { book: StoredBook; onResto
           </div>
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <a href={fileUrl} download={`${book.title || "fotobuch"}.calima.json`} className={buttonClass("paper", "sm")}>
-              <Download aria-hidden />
-              Projekt als Datei sichern
-            </a>
-            <span className="text-ink-2 text-[13px]">Öffnen über das Bücherzimmer</span>
+            <Button variant="paper" size="sm" onClick={saveProject}>
+              {IS_APP ? <Share aria-hidden /> : <Download aria-hidden />}
+              {IS_APP ? "Projekt als Datei sichern …" : "Projekt als Datei sichern"}
+            </Button>
           </div>
+          <p className="text-ink-2 mt-2 text-[13px] leading-relaxed">
+            Enthält Aufbau und Texte, nicht die Fotos: Die bleiben in deinem Konto. Wieder öffnen: Bücherzimmer › Neues Buch › Aus Datei öffnen.
+          </p>
         </>
       )}
     </MountedSheet>

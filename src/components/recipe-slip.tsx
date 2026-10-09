@@ -1,10 +1,14 @@
 "use client";
 
-import { ArrowLeft, Camera, Check, Download, X } from "lucide-react";
+import { ArrowLeft, Camera, Check, Download, Share, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-import { buttonClass } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
+import { notify } from "@/components/ui/toaster";
+import { IS_APP } from "@/lib/app-mode";
+import { haptic } from "@/lib/haptics";
+import { safeFileName, saveFile } from "@/lib/native";
 import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
 import { describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
@@ -205,11 +209,15 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
     };
   }, [recipe.inline, recipe.xmp]);
   const s = inline ?? loaded;
-  // Preset zum Laden: Datei auf dem Server oder aus dem Foto erzeugt
-  const href = useMemo(
-    () => recipe.xmp ?? (recipe.inline ? `data:application/rdf+xml;charset=utf-8,${encodeURIComponent(recipe.inline)}` : undefined),
-    [recipe.inline, recipe.xmp],
-  );
+  // Preset sichern: Datei auf dem Server oder aus dem Foto erzeugt; in der App über das Teilen-Blatt
+  const savePreset = async () => {
+    const text = recipe.inline ?? (recipe.xmp ? await fetch(recipe.xmp).then((r) => r.text()).catch(() => null) : null);
+    const r = text ? await saveFile(safeFileName(recipe.name, ".xmp"), text, "application/rdf+xml") : "failed";
+    if (r === "shared" && IS_APP) {
+      notify("Preset gesichert.");
+      haptic("success");
+    } else if (r === "failed") notify("Die Datei ließ sich nicht anlegen. Versuch es bitte noch einmal.");
+  };
   if (!s) return <p className="text-ink-2 text-sm">Lade Preset …</p>;
   const path = s.curve.map(([x, y], i) => `${i ? "L" : "M"}${(x / 255) * 100},${100 - (y / 255) * 100}`).join(" ");
   const fmt = (v: number, unit?: string) => (unit === "EV" ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}` : signed(v));
@@ -269,10 +277,10 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
         ))}
       </ul>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <a href={href} download={`${recipe.name}.xmp`} className={buttonClass("paper", "sm", "pl-2.5")}>
-          <Download aria-hidden />
-          Preset laden (.xmp)
-        </a>
+        <Button variant="paper" size="sm" className="pl-2.5" onClick={savePreset}>
+          {IS_APP ? <Share aria-hidden /> : <Download aria-hidden />}
+          {IS_APP ? "Als Lightroom-Preset sichern …" : "Preset sichern (.xmp)"}
+        </Button>
         {recipe.source && (
           <a href={recipe.source.url} className="text-ink-2 text-[12px] underline underline-offset-2" target="_blank" rel="noreferrer">
             {recipe.source.label}

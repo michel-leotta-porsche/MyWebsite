@@ -50,7 +50,7 @@ export default function Page() {
       <LegalSection title="Verfügbarkeit und Haftung">
         <p>
           Calima ist kostenlos und ohne Gewähr. Ich gebe mir Mühe, dass alles läuft und nichts verloren geht, kann es aber nicht versprechen; sichere
-          wichtige Bücher deshalb selbst als Datei. Ich hafte unbeschränkt für Vorsatz und grobe Fahrlässigkeit sowie für Schäden an Leben, Körper
+          bei wichtigen Büchern deshalb den Aufbau als Datei und behalte deine Originalfotos. Ich hafte unbeschränkt für Vorsatz und grobe Fahrlässigkeit sowie für Schäden an Leben, Körper
           und Gesundheit, sonst nur nach den gesetzlichen Regeln für unentgeltliche Leistungen.
         </p>
       </LegalSection>
