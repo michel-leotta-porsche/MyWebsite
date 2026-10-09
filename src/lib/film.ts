@@ -7,7 +7,9 @@ import type { PhotoEdit } from "@/lib/develop/model";
 // belichten. Die Bilder darauf sieht man erst, wenn der Film entwickelt ist (voll oder bewusst entwickelt): bis dahin
 // zeigt die Kamera kein Vorschaubild und das Fotostudio keinen Stapel. Liegt im Gerät (localStorage), nicht am Konto.
 
-export type Film = { stack: string; name: string; approx: boolean; edit: PhotoEdit | null; count: number };
+/** Regeln einer Einwegkamera-Vorlage (disposable.ts): so viele Bilder, fester Ausschnitt (Zoom zur Hauptkamera), Blitz */
+export type FilmRules = { id: string; frames: number; zoom: number; flash: boolean };
+export type Film = { stack: string; name: string; approx: boolean; edit: PhotoEdit | null; count: number; rules?: FilmRules };
 export type Shelf = { loaded: string | null; films: Film[] };
 
 const KEY = "calima:films";

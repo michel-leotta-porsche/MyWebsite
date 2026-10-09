@@ -39,7 +39,8 @@ type Plugin = {
   setMagnify(o: { on: boolean }): Promise<void>;
   /** Wasserwaage: die App meldet die Neigung als Ereignis „level“ (data.roll in Grad, 0 = gerade) */
   setLevel(o: { on: boolean }): Promise<void>;
-  capture(): Promise<{ path: string }>;
+  /** flash: echter Blitz für dieses Bild (Einwegkamera-Vorlagen); eine App ohne Blitz-Unterstützung löst ohne aus */
+  capture(o?: { flash?: boolean }): Promise<{ path: string }>;
   discard(o: { path: string }): Promise<void>;
   /** Körnung live im Sucher: amount wie GRAIN.amount, cell wie GRAIN.cell (Anteil der Bildbreite); 0 schaltet sie ab */
   setGrain(o: { amount: number; cell: number }): Promise<void>;
