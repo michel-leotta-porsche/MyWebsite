@@ -556,7 +556,6 @@ function Room({ user }: { user: User }) {
         </Table>
       </Library>
 
-      {feedback.sheet}
       {reporting && (
         <ReportDialog share={reporting} reporter={user.uid} onClose={() => setReporting(null)} onBlock={() => room.block(reporting)} />
       )}

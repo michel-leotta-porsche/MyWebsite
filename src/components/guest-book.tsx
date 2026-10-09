@@ -164,7 +164,6 @@ export function GuestBook() {
           .
         </p>
       </Sheet>
-      {feedback.sheet}
       {reporting && (
         <ReportDialog
           share={share}
