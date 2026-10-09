@@ -17,6 +17,10 @@ export const CAMERA: Record<string, string> = {
   "Aus der Datei gelesen, in Calima nachempfunden": "Read from the file, approximated in Calima",
   "Aus der Datei gelesen, so wie das Foto gesichert wurde": "Read from the file, just as the photo was saved",
   "So fotografieren": "Shoot like this",
+  "Für die Kamera brauchst du ein Konto. Mitgenommen ist der Look trotzdem.": "The camera needs an account. The look is taken along anyway.",
+  "Das Foto liegt im Fotostudio.": "The photo is in the photo studio.",
+  "Die {n} Fotos liegen als Stapel im Fotostudio.": "The {n} photos are a stack in the photo studio.",
+  "Der Film liegt im Fotostudio.": "The film is in the photo studio.",
   "Calima-Look mitnehmen": "Take the Calima look along",
   "Farbe und Licht ohne Zuschnitt, so wie das Foto gesichert wurde.": "Colour and light without the crop, just as the photo was saved.",
   // Film einlegen (Stufe 2)
