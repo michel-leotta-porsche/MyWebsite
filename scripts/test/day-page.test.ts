@@ -10,7 +10,7 @@ const portrait = (key: string, title?: string): DayPhoto & { taken: string } => 
 const landscape = (key: string, title?: string): DayPhoto & { taken: string } => ({ key, w: 3000, h: 2000, title, taken: key });
 
 function check(aspect: number, bottom: number, story: string, photos: (DayPhoto & { taken: string })[]) {
-  const g = { aspect, bottom, tape: "#e8a72c" };
+  const g = { aspect, bottom };
   const { lead, others } = pickForPage(photos, photos[0].key);
   const sp = dayPage(g, "Freitag, 9. Oktober", story, lead, others);
   assert.ok(sp.pages && sp.pinned);
@@ -18,8 +18,8 @@ function check(aspect: number, bottom: number, story: string, photos: (DayPhoto 
   for (const it of items) {
     const b = boxOf(it, g);
     assert.ok(b.x >= -0.01 && b.x + b.w <= 200.01, `${it.t} läuft seitlich raus`);
-    if (it.t !== "shape") assert.ok(b.y >= 0 && b.y + b.h <= 100.01, `${it.t} läuft unten raus (${b.y + b.h})`);
-    if (it.t !== "shape") assert.ok(!collides(items, it.id, b, g), `${it.t} liegt auf etwas`);
+    assert.ok(b.y >= 0 && b.y + b.h <= 100.01, `${it.t} läuft unten raus (${b.y + b.h})`);
+    assert.ok(!collides(items, it.id, b, g), `${it.t} liegt auf etwas`);
   }
   return sp;
 }

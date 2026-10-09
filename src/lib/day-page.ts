@@ -5,8 +5,8 @@ import { itemId, type Geom } from "@/lib/free-layout";
 
 // Tagesseite (Journaling-Workshop 9.10.2026, journaling-workshop-2026-10-09/workshop.md): „Fertig für heute“ legt den
 // Tag nicht als Katalogseite ins Buch, sondern wie eingeklebt. Links das Datum von Hand und was man zum Tag geschrieben
-// hat, darunter das schönste Foto; rechts bis zu drei weitere, versetzt, jedes mit seinem Satz daneben und einem
-// Klebestreifen über einer Ecke. Alles sind gewöhnliche Elemente einer freien Doppelseite: auf der Bühne bleibt jedes
+// hat, darunter das schönste Foto; rechts bis zu drei weitere, versetzt, jedes mit seinem Satz daneben. Klebestreifen
+// legt man selbst auf der Bühne dazu (Michel, 9.10.: nicht automatisch). Alles sind gewöhnliche Elemente einer freien Doppelseite: auf der Bühne bleibt jedes
 // davon verschiebbar. Was nicht auf die Tagesseite passt, legt die Automatik ruhig dahinter.
 
 /** so viele Fotos liegen auf der Tagesseite, eins links, drei rechts */
@@ -32,14 +32,13 @@ const fit = (p: DayPhoto, maxW: number, maxH: number) => {
 
 /**
  * Die Tagesseite als freie Doppelseite. lead ist das schönste Foto, others die übrigen der Seite (höchstens drei) in
- * der Reihenfolge der Aufnahme. tape ist die Farbe der Klebestreifen (das Leinen des Buchs, wie auf der Bühne).
+ * der Reihenfolge der Aufnahme.
  */
-export function dayPage(g: Geom & { tape: string }, heading: string, story: string, lead: DayPhoto, others: DayPhoto[]): SpreadDraft {
+export function dayPage(g: Geom, heading: string, story: string, lead: DayPhoto, others: DayPhoto[]): SpreadDraft {
   const H = g.aspect * 100;
   const pct = (v: number) => (v / H) * 100;
   const left: FreeItem[] = [];
   const right: FreeItem[] = [];
-  const tapes: [FreeItem[], FreeItem[]] = [[], []];
 
   const photo = (to: FreeItem[], p: DayPhoto, x: number, y: number, w: number, h: number) =>
     to.push({ t: "photo", id: itemId(), key: p.key, box: { x, y: pct(y), w, h: pct(h) }, caption: "off" });
@@ -48,15 +47,6 @@ export function dayPage(g: Geom & { tape: string }, heading: string, story: stri
     to.push({ t: "text", id: itemId(), text: s, role, look, box: { x, y: pct(y), w, h: pct(h) } });
     return h;
   };
-  /** Klebestreifen schräg über eine obere Ecke des Fotos */
-  const tape = (page: 0 | 1, x: number, y: number, w: number, corner: "l" | "r") =>
-    tapes[page].push({
-      t: "shape",
-      id: itemId(),
-      kind: "tape",
-      look: { color: g.tape, weight: 2 },
-      ...(corner === "l" ? { from: "bl" as const, box: { x: x - 4, y: pct(y - 3), w: 10, h: pct(7) } } : { from: "tl" as const, box: { x: x + w - 6, y: pct(y - 3), w: 10, h: pct(7) } }),
-    });
   const noteH = (s: string | undefined, w: number) => (s ? textHeight(s, "note", w, NOTE) : 0);
 
   // links: Datum, Text zum Tag, darunter das schönste Foto, wenn rechts noch etwas liegt und Platz bleibt
@@ -72,7 +62,6 @@ export function dayPage(g: Geom & { tape: string }, heading: string, story: stri
     const { w, h } = fit(lead, colWidth(5), room);
     const x = la.x + Math.round((la.w - w) * 0.3);
     photo(left, lead, x, y, w, h);
-    tape(0, x, y, w, "l");
     if (lead.title) text(left, lead.title, "note", NOTE, x, y + h + 2.5, Math.max(w, leadNoteW));
   }
 
@@ -87,7 +76,6 @@ export function dayPage(g: Geom & { tape: string }, heading: string, story: stri
     const x = atLeft ? ra.x : ra.x + ra.w - w;
     const py = top + (slot - h) / 2;
     photo(right, p, x, py, w, h);
-    tape(1, x, py, w, atLeft ? "r" : "l");
     if (p.title) {
       const nw = ra.w - w - 4;
       const nx = atLeft ? x + w + 4 : ra.x;
@@ -95,8 +83,7 @@ export function dayPage(g: Geom & { tape: string }, heading: string, story: stri
     }
   });
 
-  // Klebestreifen liegen über den Fotos
-  const pages: [PageDraft, PageDraft] = [{ items: [...left, ...tapes[0]] }, { items: [...right, ...tapes[1]] }];
+  const pages: [PageDraft, PageDraft] = [{ items: left }, { items: right }];
   const keys = [...new Set(pages.flatMap((pg) => pg.items.flatMap((it) => (it.t === "photo" ? [it.key] : []))))];
   return { id: spreadId(), keys, layout: 0, pinned: true, pages };
 }

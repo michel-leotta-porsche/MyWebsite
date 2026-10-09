@@ -6,7 +6,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, isNeutral } from "@/lib/develop/model";
 import type { User } from "@/lib/firebase";
 import type { Geom } from "@/lib/free-layout";
-import { aspectFor, autoPhotos, bottomFor, CLOTHS, pageAspect, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
+import { aspectFor, autoPhotos, bottomFor, pageAspect, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { workOf, type Print } from "@/lib/studio-store";
 
 // Abzüge vom Pult in ein Buch legen: hochladen, Bearbeitung einrechnen, ins Buch schreiben. Das Fotostudio legt sie
@@ -80,7 +80,7 @@ export function newBook(user: User, id: string, photos: StoredPhoto[], spreads: 
  * mit ihren Sätzen), dahinter die übrigen in der Reihenfolge der Aufnahme. Alle fixiert, damit die Automatik die Tage
  * später nicht ineinander mischt.
  */
-export function daySpreads(photos: StoredPhoto[], heading: string, story: string, g: Geom & { tape: string }): { spreads: SpreadDraft[]; coverKey: string } {
+export function daySpreads(photos: StoredPhoto[], heading: string, story: string, g: Geom): { spreads: SpreadDraft[]; coverKey: string } {
   const auto = autoPhotos(photos);
   const coverKey = pickCover(auto);
   const { lead, others } = pickForPage(photos, coverKey);
@@ -106,7 +106,7 @@ export async function layDay(
   const photos = await uploadPrints(user.uid, bookId, prints, step);
   const base = "book" in into ? ((await loadBook(into.book.id)) ?? into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
   const aspect = pageAspect(base.aspect);
-  const g = { aspect, bottom: bottomFor(aspect), tape: CLOTHS[base.cloth]?.base ?? CLOTHS.ringelblume.base };
+  const g = { aspect, bottom: bottomFor(aspect) };
   const d = daySpreads(photos, day.heading, day.story, g);
   const book: StoredBook =
     "book" in into
