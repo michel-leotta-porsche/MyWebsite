@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 
 import { EN } from "@/content/en";
 import { LANG_KEY as KEY, type Lang } from "@/lib/lang";
@@ -58,6 +58,9 @@ export function useLang(): Lang {
 
 type Vars = Record<string, string | number>;
 
+/** Für Datum und Zahlen: toLocaleDateString(locale(lang)) statt fest "de-DE" */
+export const locale = (lang: Lang) => (lang === "en" ? "en-GB" : "de-DE");
+
 /** Markiert einen deutschen Text, den t() erst später übersetzt (Konstanten außerhalb von Komponenten); gibt ihn unverändert zurück */
 export const de = (text: string) => text;
 
@@ -74,4 +77,9 @@ export const t = (de: string, vars?: Vars) => translate(getLang(), de, vars);
 export function useT() {
   const lang = useLang();
   return (de: string, vars?: Vars) => translate(lang, de, vars);
+}
+
+/** Text in Server-Komponenten (Rechtstexte, Hilfe): <T>Deutscher Text</T> */
+export function T({ children, vars }: { children: string; vars?: Vars }): ReactNode {
+  return useT()(children, vars);
 }

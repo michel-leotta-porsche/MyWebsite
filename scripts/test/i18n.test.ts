@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { EN } from "@/content/en";
+import { EN, PARTS } from "@/content/en";
 import { translate } from "@/lib/i18n";
 
 const SRC = new URL("../../src/", import.meta.url).pathname;
@@ -16,7 +16,10 @@ const files = (dir: string): string[] =>
 
 const used = new Map<string, string>();
 for (const f of files(SRC)) {
-  for (const m of readFileSync(f, "utf8").matchAll(/\b(?:t|de)\(\s*"((?:\\.|[^"\\])*)"/g)) used.set(JSON.parse(`"${m[1]}"`), f.slice(SRC.length));
+  const code = readFileSync(f, "utf8");
+  for (const m of code.matchAll(/\b(?:t|de)\(\s*"((?:\\.|[^"\\])*)"/g)) used.set(JSON.parse(`"${m[1]}"`), f.slice(SRC.length));
+  // <T>…</T> in Server-Komponenten: JSX fasst Zeilenumbrüche samt Einrückung zu einem Leerzeichen zusammen
+  for (const m of code.matchAll(/<T(?:\s[^>]*)?>([^<{]+)<\/T>/g)) used.set(m[1].trim().replace(/\s*\n\s*/g, " "), f.slice(SRC.length));
 }
 
 const holes = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
@@ -24,6 +27,17 @@ const holes = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort
 test("jeder Text hat eine englische Fassung", () => {
   const missing = [...used].filter(([de]) => !(de in EN)).map(([de, f]) => `${f}: ${de}`);
   assert.deepEqual(missing, []);
+});
+
+test("derselbe Text ist überall gleich übersetzt", () => {
+  const seen = new Map<string, string>();
+  const clashes: string[] = [];
+  for (const [part, dict] of Object.entries(PARTS))
+    for (const [de, en] of Object.entries(dict)) {
+      if (seen.has(de) && seen.get(de) !== en) clashes.push(`${part}: ${de}`);
+      seen.set(de, en);
+    }
+  assert.deepEqual(clashes, []);
 });
 
 test("Platzhalter stimmen überein", () => {

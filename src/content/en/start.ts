@@ -1,8 +1,6 @@
-// Englische Fassung: deutscher Text aus dem Code → englischer Text. t() in lib/i18n.ts liest hier.
-// Begriffe: Bücherzimmer = Library, Werkbank = Workbench, Zettel = note, Eselsohr = dog-ear, Tafel = plate, hinlegen = hand over.
-// {name} bleibt stehen und wird beim Aufruf ersetzt. scripts/test/i18n.test.ts meldet Texte ohne Eintrag.
+// Englisch für Rahmen, Anmeldung, Fehler und Startseite (siehe index.ts)
 
-export const EN: Record<string, string> = {
+export const START: Record<string, string> = {
   // Rahmen
   Rechtliches: "Legal",
   Impressum: "Legal notice",
