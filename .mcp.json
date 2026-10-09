@@ -1,6 +1,26 @@
 {
   "mcpServers": {
-    "figma": { "type": "http", "url": "https://mcp.figma.com/mcp" },
-    "playwright": { "type": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@0.0.83", "--headless", "--isolated"] }
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@0.0.83",
+        "--headless",
+        "--isolated"
+      ]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@4.1.1"
+      ]
+    }
   }
 }

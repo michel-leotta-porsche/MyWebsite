@@ -20,7 +20,7 @@ const problems = [];
 for (const f of ["impressum.html", "datenschutz.html", "hilfe.html", "nutzungsbedingungen.html"]) if (!html.includes(f)) problems.push(`${f} fehlt`);
 for (const f of ["kritik.html", "qfd.html", "umfrage.html"]) if (html.includes(f)) problems.push(`${f} darf nicht live gehen`);
 if (html.includes("impressum.html") && (await readFile(path.join(out, "impressum.html"), "utf8")).includes("ANSCHRIFT FEHLT"))
-  problems.push("Impressum ohne Anschrift: FUJI_IMPRESSUM_ADRESSE in photos/.env.local setzen (Zeilen mit | trennen)");
+  problems.push("Impressum ohne Anschrift: FUJI_IMPRESSUM_ADRESSE in .env.local setzen (Zeilen mit | trennen)");
 if (problems.length) {
   console.error(problems.join("\n"));
   process.exit(1);

@@ -6,7 +6,7 @@ ausgeliefert (Capacitor, keine Website-Adresse). Die Seiten liegen unter `capaci
 ## Bauen (auf dem Mac)
 
 1. Einmalig: Xcode aus dem App Store installieren und einmal öffnen.
-2. In `photos/.env.local` muss `FUJI_IMPRESSUM_ADRESSE` stehen, sonst bricht der Build ab (Impressum).
+2. In `.env.local` muss `FUJI_IMPRESSUM_ADRESSE` stehen, sonst bricht der Build ab (Impressum).
 3. `npm run ios:build` baut die App-Fassung, prüft sie und kopiert sie nach `ios/App/App/public`.
 4. `npx cap open ios` öffnet Xcode. Unter Signing & Capabilities das eigene Team wählen, Gerät wählen, Run.
 
