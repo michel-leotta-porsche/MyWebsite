@@ -98,6 +98,30 @@ service cloud.firestore {
         && f.amount is number && f.amount >= 0 && f.amount <= 1;
     }
 
+    // Meldungen zu geteilten Büchern (App Store 1.2): jeder darf melden, auch ohne Konto; lesen nur der Admin
+    match /reports/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['token', 'owner', 'fromName', 'title', 'reason', 'text', 'reporter', 'at'])
+        && request.resource.data.token is string && request.resource.data.token.size() <= 64
+        && request.resource.data.owner is string && request.resource.data.owner.size() <= 128
+        && request.resource.data.reason in ['anstoessig', 'gewalt', 'belaestigung', 'rechte', 'anderes']
+        && request.resource.data.text is string && request.resource.data.text.size() <= 500
+        && request.resource.data.fromName is string && request.resource.data.fromName.size() <= 80
+        && request.resource.data.title is string && request.resource.data.title.size() <= 80
+        && (request.resource.data.reporter == null || (signedIn() && request.resource.data.reporter == request.auth.uid))
+        && request.resource.data.at == request.time;
+      allow read, delete: if isAdmin();
+    }
+
+    // Eigene Angaben: wann den Nutzungsbedingungen zugestimmt
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Personen, deren Bücher ich nicht mehr sehen will
+    match /users/{uid}/blocked/{sender} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
     // Bücher, die jemand für mich hingelegt hat
     match /users/{uid}/inbox/{token} {
       allow read, write: if signedIn() && request.auth.uid == uid;
