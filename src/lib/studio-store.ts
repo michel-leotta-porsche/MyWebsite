@@ -1,6 +1,6 @@
 "use client";
 
-import { isDayStack } from "@/lib/day-stack";
+import { dayStack, isDayStack } from "@/lib/day-stack";
 import type { PhotoEdit } from "@/lib/develop/model";
 import { t } from "@/lib/i18n";
 import type { PhotoMeta } from "@/lib/ingest";
@@ -208,6 +208,18 @@ export async function putPrints(uid: string, ps: Print[]) {
   // Tagesstapel räumt niemand weg, also ändert ein Foto darauf nichts an den anderen: nicht alles neu lesen
   if (ps.every((p) => isDayStack(p.stack))) return;
   for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
+}
+
+/**
+ * Ein entwickelter Film kommt auf den Abendstapel: jedes Bild auf den Stapel seines Tages, eingereiht nach der
+ * Aufnahmezeit. So wird es abends mit den anderen Fotos des Tages einsortiert und nie mit alten Stapeln weggeräumt.
+ */
+export const toDayStack = (p: Print): Print => ({ ...p, stack: dayStack(p.at), pos: p.at });
+
+/** einen Film aus der Kamera über dem Buch entwickeln, ohne dass das Studio offen ist */
+export async function developFilm(uid: string, stack: string) {
+  const roll = (await listPrints(uid)).filter((p) => p.stack === stack);
+  if (roll.length) await putPrints(uid, roll.map(toDayStack));
 }
 
 export async function removePrint(id: string) {

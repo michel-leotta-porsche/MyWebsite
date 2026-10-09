@@ -262,7 +262,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     haptic("select");
     update((s) => ({ loaded: null, films: film.count ? s.films : s.films.filter((f) => f.stack !== film.stack) }));
   };
-  /** Film entwickeln: erst jetzt werden die Bilder sichtbar, als Stapel im Fotostudio */
+  /** Film entwickeln: erst jetzt werden die Bilder sichtbar, auf dem Abendstapel ihres Tages */
   const develop = (f: Film) => {
     update((s) => ({ loaded: null, films: s.films.filter((x) => x.stack !== f.stack) }));
     if (f.count) onFilmDone(f.stack);
@@ -406,7 +406,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       if (onFilm) {
         const next = { ...onFilm, count: onFilm.count + 1 };
         if (next.count >= FILM_FRAMES) {
-          // voll: der Film wird entwickelt und liegt als Stapel im Fotostudio, die Kamera bleibt offen
+          // voll: der Film wird entwickelt und kommt auf den Abendstapel
           haptic("success");
           develop(next);
         } else {

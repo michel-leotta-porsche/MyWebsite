@@ -34,7 +34,7 @@ import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { listPrints, MAX_STACK, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
+import { listPrints, MAX_STACK, piles, putPrints, removePrint, toDayStack, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -101,11 +101,15 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       .catch(() => {});
   }, [user.uid]);
 
+  // nacheinander sichern: ein Bild, das gerade noch auf dem Film gesichert wird, darf nicht nach dem Entwickeln ankommen
+  const saving = useRef<Promise<unknown>>(Promise.resolve());
   // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist. Liegt ein Abzug
   // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher
   const keep = (ps: Print[]) => {
     setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
-    putPrints(user.uid, ps)
+    saving.current = saving.current
+      .catch(() => {})
+      .then(() => putPrints(user.uid, ps))
       .then(() => setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x))))
       .catch(() => {});
   };
@@ -129,22 +133,30 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     window.addEventListener(OPEN_CAMERA, on);
     return () => window.removeEventListener(OPEN_CAMERA, on);
   }, []);
+  // Bilder auf dem Film, auch die noch nicht gezeichneten: das letzte Bild eines vollen Films kommt im selben Zug wie das
+  // Entwickeln. Ohne Arbeitsfassung, die ist dann schon gesichert (keep sichert nacheinander)
+  const onFilm = useRef<Print[]>([]);
   // Abendstapel: ohne Film legt die Kamera jedes Foto auf den Stapel seines Tages, sortiert nach der Aufnahmezeit
   const onShot = (p: Print, filmStack?: string) => {
     // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film
-    if (filmStack) return keep([{ ...p, stack: filmStack }]);
+    if (filmStack) {
+      const q = { ...p, stack: filmStack };
+      onFilm.current = [...onFilm.current, { ...q, work: undefined }];
+      return keep([q]);
+    }
     keep([{ ...p, stack: dayStack(p.at), pos: p.at }]);
   };
-  // ein voller oder entnommener Film: der Stapel liegt schon im Studio, jetzt zu Fertig
+  // ein entwickelter Film (voll oder bewusst entwickelt) kommt auf den Abendstapel: abends mit dem Tag einsortieren,
+  // nicht sofort ins Buch legen müssen (Michel 9.10.2026)
   const onFilmDone = (stack: string) => {
-    setPrints((list) => {
-      const roll = list.filter((p) => p.stack === stack).sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0));
-      if (roll.length) {
-        setCameraOpen(false);
-        setDone(roll.length === 1 ? [{ ...roll[0], stack: undefined, pos: undefined }] : roll);
-      }
-      return list;
-    });
+    const fresh = onFilm.current.filter((p) => p.stack === stack);
+    onFilm.current = onFilm.current.filter((p) => p.stack !== stack);
+    const roll = [...prints.filter((p) => p.stack === stack && !fresh.some((q) => q.id === p.id)), ...fresh].map(toDayStack);
+    setCameraOpen(false);
+    if (wantsCamera) router.replace("/zimmer");
+    if (!roll.length) return;
+    keep(roll);
+    notify(roll.length === 1 ? t("Entwickelt. Das Bild liegt auf dem Stapel seines Tages.") : t("Entwickelt. Die {n} Bilder liegen auf dem Stapel ihres Tages.", { n: roll.length }));
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
   const closeCamera = () => {
@@ -156,7 +168,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const addToDay = async (stack: string, given: File[]) => {
     const images = given.filter((x) => !x.type.startsWith("video/") && x.size <= MAX_FILE).slice(0, MAX_STACK);
     const { studioSource } = await import("@/lib/ingest");
-    const at = Date.now();
+    const at = Date.now(); // eslint-disable-line react-hooks/purity -- läuft beim Hinzufügen, nicht beim Zeichnen
     let broken = 0;
     for (const [i, file] of images.entries()) {
       setPreparing(t("Öffne {i} von {n} …", { i: i + 1, n: images.length }));
@@ -192,7 +204,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (images.some((f) => f.size > MAX_FILE)) notes.push(t("Fotos über 60 MB bleiben draußen."));
     if (!files.length) return setError(notes.join(" ") || t("Dieses Foto lässt sich nicht öffnen."));
     const stack = files.length > 1 ? newId() : undefined;
-    const at = Date.now();
+    const at = Date.now(); // eslint-disable-line react-hooks/purity -- läuft beim Öffnen, nicht beim Zeichnen
     const made: Print[] = [];
     let broken = 0;
     let reason = "";

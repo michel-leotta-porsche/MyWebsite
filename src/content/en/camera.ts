@@ -21,6 +21,9 @@ export const CAMERA: Record<string, string> = {
   "Das Foto liegt auf dem Stapel von heute.": "The photo is on today's stack.",
   "Die {n} Fotos liegen auf dem Stapel von heute.": "The {n} photos are on today's stack.",
   "Der Film liegt im Fotostudio.": "The film is in the photo studio.",
+  "Entwickelt. Das Bild liegt auf dem Stapel seines Tages.": "Developed. The picture is on the stack for its day.",
+  "Entwickelt. Die {n} Bilder liegen auf dem Stapel ihres Tages.": "Developed. The {n} pictures are on the stack for their day.",
+  "Entwickelt. Die Bilder liegen auf dem Stapel ihres Tages.": "Developed. The pictures are on the stack for their day.",
   "Calima-Look mitnehmen": "Take the Calima look along",
   "Farbe und Licht ohne Zuschnitt, so wie das Foto gesichert wurde.": "Colour and light without the crop, just as the photo was saved.",
   // Film einlegen (Stufe 2)
