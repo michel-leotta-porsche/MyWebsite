@@ -3,7 +3,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { keys, withKeys } from "@/lib/app-mode";
-import { Aperture, BookmarkPlus, Check, ClipboardCopy, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
+import { Aperture, BookmarkPlus, Check, ClipboardCopy, Copy, Layers, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, ChevronUp, Spline, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
@@ -45,6 +45,7 @@ import {
   fineOf as lookFineOf,
   wearsLook,
   signedStep,
+  spreadEdit,
   stats,
   type More,
   type NamedRecipe,
@@ -497,8 +498,8 @@ export function DevelopDialog({
   bookId?: string;
   /** geänderte Fotos, als ein Schritt fürs Rückgängig */
   onDone?: (patches: Record<string, DevelopPatch>) => void;
-  /** Fotostudio: „Fertig“ gibt nur die Bearbeitung zurück, eingerechnet wird draußen */
-  onFinish?: (edit: PhotoEdit) => void;
+  /** Fotostudio: „Fertig“ gibt nur die Bearbeitungen aller Fotos zurück, eingerechnet wird draußen */
+  onFinish?: (edits: Record<string, PhotoEdit>) => void;
   title?: string;
   /** lange Kante der eingerechneten Fassung, damit die Körnung in der Vorschau stimmt */
   long?: number;
@@ -702,8 +703,9 @@ export function DevelopDialog({
   const lastLive = useRef(0);
   // nach Rückgängig das Foto zeigen, das sich dabei ändert
   const showChanged = (to: Record<string, PhotoEdit>) => {
-    const k = photos.find((p) => JSON.stringify(to[p.key]) !== JSON.stringify(editsNow.current[p.key]))?.key;
-    if (k && k !== sel) setSel(k);
+    const changed = photos.filter((p) => JSON.stringify(to[p.key]) !== JSON.stringify(editsNow.current[p.key]));
+    // ändert ein Schritt mehrere Fotos (Auf alle, Angleichen), bleibt das gezeigte Foto
+    if (changed.length === 1 && changed[0].key !== sel) setSel(changed[0].key);
   };
   const remember = () => {
     setPast((p) => [...p.slice(-79), editsNow.current]);
@@ -857,6 +859,72 @@ export function DevelopDialog({
     // otherStats ist pro Render neu; die Länge und die Fotos genügen als Schlüssel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, moodSt, otherStats.length]);
+
+  /* ----- Stapel im Fotostudio: auf alle übertragen, angleichen ----- */
+
+  const series = !!onFinish && photos.length > 1;
+  // Abzüge im Streifen springen kurz hoch, wenn sie etwas bekommen (beide Streifen, Telefon und Rechner)
+  const hop = (keys: string[]) => {
+    if (reduce) return;
+    keys.forEach((k, i) =>
+      document.querySelectorAll<HTMLElement>(`[data-strip-key="${k}"]`).forEach((el) =>
+        el.animate(
+          [{ transform: "none" }, { transform: `translateY(-14px) rotate(${i % 2 ? 3 : -3}deg)`, offset: 0.4 }, { transform: "none" }],
+          { duration: 460, delay: i * 45, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+        ),
+      ),
+    );
+  };
+  const spreadTo = (keys: string[]) => {
+    const from = editsNow.current[photo.key];
+    setEdits((m) => ({ ...m, ...Object.fromEntries(keys.map((k) => [k, spreadEdit(from, m[k], loaded[k]?.st)])) }));
+    hop(keys);
+  };
+  // kurz groß über dem Foto, damit man es auch auf dem Telefon sieht (dort steht kein Hinweistext)
+  const flash = (value: string, label: string) => {
+    setBig({ value, label });
+    window.setTimeout(() => setBig((b) => (b?.value === value ? null : b)), 1600);
+  };
+  const spreadAll = () => {
+    const keys = others.map((p) => p.key);
+    remember();
+    spreadTo(keys);
+    haptic("success");
+    flash(`Auf alle ${photos.length}`, "jedes mit eigenem Auto");
+    setNote(`Auf ${photos.length} Fotos, jedes mit eigenem Auto. Zuschnitt bleibt je Foto. Rückgängig nimmt es zurück.`);
+  };
+  const alignAll = () => {
+    const all = photos.map((p) => ({ k: p.key, st: loaded[p.key]?.st })).filter((x): x is { k: string; st: PhotoStats } => !!x.st);
+    if (all.length < 2) return;
+    remember();
+    fade();
+    setEdits((m) => ({
+      ...m,
+      ...Object.fromEntries(all.map(({ k, st }) => [k, { ...m[k], transfer: matchTransfer(st, all.filter((o) => o.k !== k).map((o) => o.st)), levels: null, origin: "match" as const, moodFrom: undefined }])),
+    }));
+    hop(all.map((x) => x.k));
+    flash("Angeglichen", `${all.length} Fotos rücken zusammen`);
+    setNote("Die Fotos sind in Licht und Farbe zueinander gerückt. Rückgängig nimmt es zurück.");
+  };
+  // Mias Wisch: vom eigenen Abzug über die anderen ziehen, jeder gestreifte bekommt die Bearbeitung
+  const wipe = useRef<{ id: number; done: Set<string> } | null>(null);
+  const wipeMove = (e: React.PointerEvent) => {
+    const w = wipe.current;
+    if (!w || w.id !== e.pointerId) return;
+    const k = (document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-strip-key]") as HTMLElement | null)?.dataset.stripKey;
+    if (!k || k === photo.key || w.done.has(k)) return;
+    if (!w.done.size) remember();
+    w.done.add(k);
+    spreadTo([k]);
+    haptic("select");
+  };
+  const wipeEnd = () => {
+    const n = wipe.current?.done.size ?? 0;
+    wipe.current = null;
+    if (!n) return;
+    flash(`+${n}`, n === 1 ? "Foto übernimmt die Bearbeitung" : "Fotos übernehmen die Bearbeitung");
+    setNote(`Auf ${n} ${n === 1 ? "Foto" : "Fotos"} gewischt, jedes mit eigenem Auto.`);
+  };
 
   /* ----- Rezepte ----- */
 
@@ -1181,7 +1249,7 @@ export function DevelopDialog({
   };
 
   const finish = async () => {
-    if (onFinish) return onFinish(edits[photo.key]);
+    if (onFinish) return onFinish(edits);
     if (!bookId || !onDone) return onClose();
     const changed = photos.filter((p) => JSON.stringify(edits[p.key]) !== JSON.stringify(initial[p.key]));
     if (!changed.length) return onClose();
@@ -1224,7 +1292,9 @@ export function DevelopDialog({
       : compare
       ? "Den Strich auf dem Foto ziehen. Links ist das Original."
       : tab === "s"
-        ? "Ein Tipp genügt. Danach kannst du unter Feinschliff nachstellen."
+        ? series
+          ? "Ein Foto einstellen, dann „Auf alle“. Oder sein Bild im Streifen über die anderen ziehen."
+          : "Ein Tipp genügt. Danach kannst du unter Feinschliff nachstellen."
         : tab === "l"
           ? edit.look
             ? "Auf dem Foto wischen ändert die Stärke. Den Look noch einmal antippen oder „Ohne Look“ nimmt ihn weg."
@@ -1248,7 +1318,7 @@ export function DevelopDialog({
   // damit das Foto die ganze Höhe bekommt
   const strip = (className: string, thumb: string) =>
     photos.length > 1 && (
-      <div role="group" aria-label="Fotos dieser Doppelseite" className={`flex gap-3 ${className}`}>
+      <div role="group" aria-label={series ? "Fotos dieses Stapels" : "Fotos dieser Doppelseite"} className={`flex gap-3 select-none ${className}`}>
         {photos.map((p) => {
           const on = p.key === photo.key;
           const img = loaded[p.key]?.thumb;
@@ -1257,17 +1327,30 @@ export function DevelopDialog({
               key={p.key}
               type="button"
               aria-pressed={on}
+              data-strip-key={p.key}
+              onPointerDown={
+                series && on
+                  ? (e) => {
+                      if (e.button !== 0) return;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      wipe.current = { id: e.pointerId, done: new Set() };
+                    }
+                  : undefined
+              }
+              onPointerMove={series && on ? wipeMove : undefined}
+              onPointerUp={series && on ? wipeEnd : undefined}
+              onPointerCancel={series && on ? wipeEnd : undefined}
               onClick={() => {
                 setSel(p.key);
                 setNote(null);
                 setNaming(false);
               }}
-              className={`group relative ${thumb} min-w-11 flex-none outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
+              className={`group relative ${thumb} min-w-11 flex-none ${series && on ? "touch-none" : ""} outline-3 outline-offset-2 transition-[outline-color] duration-150 ${on ? "outline-mark" : "outline-transparent"}`}
               style={{ aspectRatio: `${p.w} / ${p.h}` }}
             >
               {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
               {!on && <span aria-hidden className="bg-paper/55 absolute inset-0 transition-opacity duration-150 group-hover:opacity-50" />}
-              <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung` : `${nameOf(p)} bearbeiten`}</span>
+              <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung${series ? ". Über die anderen ziehen überträgt die Bearbeitung" : ""}` : `${nameOf(p)} bearbeiten`}</span>
             </button>
           );
         })}
@@ -1666,6 +1749,18 @@ export function DevelopDialog({
               ))}
             </div>
           </div>
+          {series && (
+            <div hidden={tucked} className="mt-2 flex items-center gap-2">
+              <Button variant="cloth" size="sm" onClick={spreadAll} disabled={!!busy} className="min-w-0 flex-1 pl-2.5">
+                <Copy aria-hidden />
+                Auf alle {photos.length}
+              </Button>
+              <Button variant="paper" size="sm" onClick={alignAll} disabled={!!busy || photos.some((p) => !loaded[p.key])} className="min-w-0 flex-1 pl-2.5">
+                <Layers aria-hidden />
+                Angleichen
+              </Button>
+            </div>
+          )}
           </div>
 
           <p aria-hidden className={`text-ink-2 -mt-1 text-[13px] leading-snug max-lg:hidden ${cropping ? "lg:hidden" : ""}`}>

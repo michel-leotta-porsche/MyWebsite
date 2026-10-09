@@ -21,14 +21,16 @@ import { friendlyError } from "@/lib/errors";
 import { withExif } from "@/lib/exif-write";
 import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
-import { safeFileName, saveFile } from "@/lib/native";
+import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/native";
+import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { listPrints, MAX_PRINTS, putPrint, removePrint, type Print } from "@/lib/studio-store";
+import { listPrints, MAX_PRINTS, MAX_STACK, piles, putPrints, removePrint, trimPiles, type Print } from "@/lib/studio-store";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
 // bearbeiten, dann sichern oder in ein Buch legen. Bis dahin bleibt alles auf dem Gerät. Die letzten Fotos liegen als Abzüge
-// auf dem Pult und lassen sich wieder öffnen.
+// auf dem Pult und lassen sich wieder öffnen. Mehrere Fotos auf einmal werden ein Stapel (mehrere-fotos-wettbewerb/): im
+// Editor „Auf alle“ und Angleichen, danach alle zusammen sichern oder in ein Buch legen.
 
 // der Editor ist groß und wird erst geladen, wenn jemand ein Foto öffnet
 const DevelopDialog = dynamic(() => import("@/components/develop-dialog").then((m) => m.DevelopDialog), { ssr: false });
@@ -60,50 +62,74 @@ function useBlobUrls(blobs: Record<string, Blob | undefined>) {
 
 export function Studio({ user, books }: { user: User; books: StoredBook[] | null }) {
   const [prints, setPrints] = useState<Print[]>([]);
-  const [preparing, setPreparing] = useState(false);
+  const [preparing, setPreparing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<Print | null>(null);
-  const [done, setDone] = useState<Print | null>(null);
+  const [editing, setEditing] = useState<Print[] | null>(null);
+  const [done, setDone] = useState<Print[] | null>(null);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listPrints(user.uid)
-      .then((p) => setPrints(p.slice(0, MAX_PRINTS)))
+      .then((p) => setPrints(trimPiles(piles(p)).keep.flat()))
       .catch(() => {});
   }, [user.uid]);
 
-  // ohne IndexedDB (privates Fenster) hält das Studio den Abzug nur, solange die Seite offen ist
-  const keep = (p: Print) => {
-    setPrints((list) => [p, ...list.filter((x) => x.id !== p.id)].slice(0, MAX_PRINTS));
-    putPrint(user.uid, p).catch(() => {});
+  // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist
+  const keep = (ps: Print[]) => {
+    setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
+    putPrints(user.uid, ps).catch(() => {});
   };
+  const stacks = piles(prints);
 
-  const open = async (file: File) => {
+  const open = async (given: File[]) => {
     setError(null);
-    if (file.size > MAX_FILE) return setError("Die Datei ist zu groß. Fotos bis 60 MB lassen sich öffnen.");
-    setPreparing(true);
+    const images = given.filter((x) => x.type.startsWith("image/") || /\.(heic|heif|dng)$/i.test(x.name));
+    const files = images.filter((f) => f.size <= MAX_FILE).slice(0, MAX_STACK);
+    const notes: string[] = [];
+    if (images.length > MAX_STACK) notes.push(`Höchstens ${MAX_STACK} Fotos auf einmal, die ersten ${MAX_STACK} sind offen.`);
+    if (images.some((f) => f.size > MAX_FILE)) notes.push("Fotos über 60 MB bleiben draußen.");
+    if (!files.length) return setError(notes.join(" ") || "Dieses Foto lässt sich nicht öffnen.");
+    const stack = files.length > 1 ? newId() : undefined;
+    const at = Date.now();
+    const made: Print[] = [];
+    let broken = 0;
+    let reason = "";
+    setPreparing(files.length > 1 ? `Öffne 1 von ${files.length} …` : "Wird geöffnet …");
     try {
       const { studioSource } = await import("@/lib/ingest");
-      const s = await studioSource(file);
-      const p: Print = { id: newId(), name: stem(file.name), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta };
-      keep(p);
-      setEditing(p);
-    } catch (e) {
-      setError(e instanceof Error && /format|DNG/i.test(e.message) ? `Dieses Foto lässt sich nicht öffnen: ${e.message}.` : "Dieses Foto lässt sich nicht öffnen.");
+      // nacheinander, nie alle zugleich: jedes Foto wird in voller Größe entpackt
+      for (const [i, file] of files.entries()) {
+        if (files.length > 1) setPreparing(`Öffne ${i + 1} von ${files.length} …`);
+        try {
+          const s = await studioSource(file);
+          made.push({ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: i });
+        } catch (e) {
+          broken++;
+          if (e instanceof Error && /format|DNG/i.test(e.message)) reason = `: ${e.message}`;
+        }
+      }
     } finally {
-      setPreparing(false);
+      setPreparing(null);
     }
+    if (broken) notes.push(files.length === 1 ? `Dieses Foto lässt sich nicht öffnen${reason}.` : `${broken === 1 ? "Ein Foto ließ" : `${numberWord(broken)} Fotos ließen`} sich nicht öffnen.`);
+    if (notes.length) setError(notes.join(" "));
+    if (!made.length) return;
+    // bleibt nur eins übrig, ist es ein einzelner Abzug
+    const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
+    keep(ps);
+    setEditing(ps);
   };
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setOver(false);
-    const f = [...e.dataTransfer.files].find((x) => x.type.startsWith("image/") || /\.(heic|heif|dng)$/i.test(x.name));
-    if (f) open(f);
+    if (e.dataTransfer.files.length) open([...e.dataTransfer.files]);
   };
 
-  const sub = prints.length ? `${abzuege(prints.length)} · zuletzt ${when(prints[0].at)}` : "Ein Foto bearbeiten, sichern oder in ein Buch legen.";
+  const sub = prints.length
+    ? `${stacks.length < prints.length ? `${abzuege(prints.length)} in ${stacks.length === 1 ? "einem Stapel" : `${numberWord(stacks.length)} Stapeln`}` : abzuege(prints.length)} · zuletzt ${when(prints[0].at)}`
+    : "Fotos bearbeiten, sichern oder in ein Buch legen. Gern mehrere auf einmal.";
 
   return (
     <section
@@ -125,14 +151,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       </div>
 
       <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label="Abzüge">
-        {prints.map((p, i) => (
-          <PrintTile key={p.id} print={p} i={i} onOpen={() => setEditing(p)} />
-        ))}
-        <OnTable i={prints.length} tilt={2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
+        {stacks.map((pile, i) => (pile.length > 1 ? <StackTile key={pile[0].stack} pile={pile} i={i} onOpen={() => setEditing(pile)} /> : <PrintTile key={pile[0].id} print={pile[0]} i={i} onOpen={() => setEditing(pile)} />))}
+        <OnTable i={stacks.length} tilt={2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
             type="button"
             onClick={() => input.current?.click()}
-            disabled={preparing}
+            disabled={!!preparing}
             className="studio-sheet linen bg-paper-shade text-cloth-ink/70 grid h-[132px] w-[104px] content-between p-3 text-left disabled:opacity-70 md:h-[156px] md:w-[124px]"
             aria-describedby="studio-h"
           >
@@ -140,7 +164,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
               +
             </span>
             <span className="text-[15px] leading-tight font-bold" aria-live="polite">
-              {preparing ? "Wird geöffnet …" : prints.length ? "Neues Foto" : "Foto wählen"}
+              {preparing ?? (prints.length ? "Neue Fotos" : "Fotos wählen")}
             </span>
           </button>
         </OnTable>
@@ -149,16 +173,17 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         ref={input}
         type="file"
         accept={ACCEPT}
+        multiple
         className="sr-only"
         tabIndex={-1}
         aria-hidden
         onChange={(e) => {
-          const f = e.target.files?.[0];
+          const fs = [...(e.target.files ?? [])];
           e.target.value = "";
-          if (f) open(f);
+          if (fs.length) open(fs);
         }}
       />
-      {prints.length > 0 && <p className="text-on-table-2 mt-2 text-[13px]">Ein Abzug öffnet das Foto wieder, so wie du es bearbeitet hast. Nichts davon wird hochgeladen.</p>}
+      {prints.length > 0 && <p className="text-on-table-2 mt-2 text-[13px]">Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.</p>}
       {error && (
         <p role="alert" className="text-on-table text-sm">
           {error}
@@ -167,32 +192,33 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
 
       {editing && (
         <StudioEditor
-          print={editing}
+          prints={editing}
           uid={user.uid}
           onClose={() => setEditing(null)}
-          onFinish={(edit) => {
-            const p = { ...editing, edit, at: Date.now() };
-            keep(p);
+          onFinish={(edits) => {
+            const at = Date.now();
+            const ps = editing.map((p) => ({ ...p, edit: edits[p.id] ?? p.edit, at }));
+            keep(ps);
             setEditing(null);
-            setDone(p);
+            setDone(ps);
           }}
         />
       )}
       {done && (
         <DoneSheet
-          key={`${done.id}-${done.at}`}
-          print={done}
+          key={`${done[0].id}-${done[0].at}`}
+          prints={done}
           user={user}
           books={books}
           onClose={() => setDone(null)}
-          onShot={(shot) => keep({ ...done, shot })}
+          onShots={(shots) => keep(done.filter((p) => shots[p.id]).map((p) => ({ ...p, shot: shots[p.id] })))}
           onEdit={() => {
             setDone(null);
             setEditing(done);
           }}
           onRemove={() => {
-            setPrints((list) => list.filter((x) => x.id !== done.id));
-            removePrint(done.id).catch(() => {});
+            setPrints((list) => list.filter((x) => !done.some((p) => p.id === x.id)));
+            for (const p of done) removePrint(p.id).catch(() => {});
             setDone(null);
           }}
         />
@@ -213,6 +239,42 @@ function PrintTile({ print, i, onOpen }: { print: Print; i: number; onOpen: () =
           {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
           {img && <img src={img} alt="" draggable={false} className={`block object-cover ${land ? "h-[96px] w-[132px] md:h-[112px] md:w-[156px]" : "h-[132px] w-[96px] md:h-[156px] md:w-[112px]"}`} />}
           <span aria-hidden className="studio-sheen" />
+        </span>
+      </button>
+    </OnTable>
+  );
+}
+
+/** Fotopapier mit dem Abzug eines Fotos, quer oder hoch wie sein Zuschnitt */
+function Paper({ print, className = "", children }: { print: Print; className?: string; children?: ReactNode }) {
+  const blobs = useMemo(() => ({ img: print.shot ?? print.thumb }), [print.shot, print.thumb]);
+  const { img } = useBlobUrls(blobs);
+  const [pw, ph] = outSize(print.edit?.geo, print.w, print.h);
+  const land = pw >= ph;
+  return (
+    <span className={`studio-paper ${className}`}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
+      {img && <img src={img} alt="" draggable={false} className={`block object-cover ${land ? "h-[96px] w-[132px] md:h-[112px] md:w-[156px]" : "h-[132px] w-[96px] md:h-[156px] md:w-[112px]"}`} />}
+      {children}
+    </span>
+  );
+}
+
+/** Ein Stapel auf dem Pult: oben der erste Abzug, darunter zwei weitere, die sich beim Anheben auffächern */
+function StackTile({ pile, i, onOpen }: { pile: Print[]; i: number; onOpen: () => void }) {
+  return (
+    <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={`Stapel mit ${numberWord(pile.length)} Fotos, ${when(pile[0].at)} bearbeitet. Öffnen`}>
+        {pile.slice(1, 3).map((p, j) => (
+          <span key={p.id} aria-hidden className="studio-fan absolute inset-0 grid place-items-end" style={{ ["--f" as string]: j ? -1 : 1 } as CSSProperties}>
+            <Paper print={p} className="shadow-[1px_2px_4px_rgb(12_10_8/0.35)]" />
+          </span>
+        ))}
+        <Paper print={pile[0]}>
+          <span aria-hidden className="studio-sheen" />
+        </Paper>
+        <span aria-hidden className="bg-cloth text-cloth-ink absolute -top-2.5 -right-2.5 z-[1] grid h-7 min-w-7 place-items-center rounded-full px-2 text-[13px] font-bold tabular-nums shadow-[0_2px_6px_rgb(12_10_8/0.45)]">
+          {pile.length}
         </span>
       </button>
     </OnTable>
@@ -276,26 +338,29 @@ function OnTable({ i, tilt, className = "", children }: { i: number; tilt: numbe
   );
 }
 
-/** Der Editor der Werkbank für ein Foto vom Gerät: Vorschau aus der Seitengröße, eingerechnet wird später aus der Arbeitsfassung */
-function StudioEditor({ print, uid, onClose, onFinish }: { print: Print; uid: string; onClose: () => void; onFinish: (e: PhotoEdit) => void }) {
-  const blobs = useMemo(() => ({ work: print.work, page: print.page, thumb: print.thumb }), [print.work, print.page, print.thumb]);
+/** Der Editor der Werkbank für Fotos vom Gerät: Vorschau aus der Seitengröße, eingerechnet wird später aus der Arbeitsfassung */
+function StudioEditor({ prints, uid, onClose, onFinish }: { prints: Print[]; uid: string; onClose: () => void; onFinish: (e: Record<string, PhotoEdit>) => void }) {
+  // Seitengröße und Abzug genügen der Vorschau; die Arbeitsfassung (4096 px) bleibt als Blob, bis gerechnet wird
+  const blobs = useMemo(() => Object.fromEntries(prints.flatMap((p) => [[`${p.id}:page`, p.page], [`${p.id}:thumb`, p.thumb]])), [prints]);
   const urls = useBlobUrls(blobs);
-  const photo: StoredPhoto = {
-    key: print.id,
-    title: print.name,
-    alt: "",
-    w: print.w,
-    h: print.h,
-    src: urls.page!,
-    large: urls.work!,
-    thumb: urls.thumb!,
-    color: [0, 0, 0],
-    edit: print.edit,
-    // Rezept aus der Datei: im Bearbeiten lässt es sich kopieren
-    recipe: print.meta?.recipe,
-    camera: print.meta?.camera,
-  };
-  return <DevelopDialog photos={[photo]} start={print.id} uid={uid} title="Fotostudio" long={STUDIO_LONG} onFinish={onFinish} onClose={onClose} />;
+  const [photos] = useState<StoredPhoto[]>(() =>
+    prints.map((p) => ({
+      key: p.id,
+      title: prints.length > 1 ? "" : p.name,
+      alt: "",
+      w: p.w,
+      h: p.h,
+      src: urls[`${p.id}:page`]!,
+      large: urls[`${p.id}:page`]!,
+      thumb: urls[`${p.id}:thumb`]!,
+      color: [0, 0, 0],
+      edit: p.edit,
+      // Rezept aus der Datei: im Bearbeiten lässt es sich kopieren
+      recipe: p.meta?.recipe,
+      camera: p.meta?.camera,
+    })),
+  );
+  return <DevelopDialog photos={photos} start={prints[0].id} uid={uid} title={prints.length > 1 ? `${prints.length} Fotos` : "Fotostudio"} long={STUDIO_LONG} onFinish={onFinish} onClose={onClose} />;
 }
 
 /** „Kalkwand · Licht +0,3“: was am Foto gemacht ist, kurz */
@@ -326,78 +391,99 @@ const savedSharpen = (): SharpenLevel => {
 };
 
 /**
- * Blatt nach „Fertig“: rechnet beim Öffnen die Datei (4096 px, Aufnahmedaten ohne Ort). Das Teilen-Blatt von iOS
- * öffnet sich nur direkt auf einen Tipp, deshalb wird vorher gerechnet und der Knopf erst dann aktiv.
+ * Blatt nach „Fertig“: rechnet beim Öffnen die Dateien (4096 px, Aufnahmedaten ohne Ort), bei einem Stapel nacheinander.
+ * Das Teilen-Blatt von iOS öffnet sich nur direkt auf einen Tipp, deshalb wird vorher gerechnet und der Knopf erst dann aktiv.
  */
 function DoneSheet({
-  print,
+  prints,
   user,
   books,
   onClose,
-  onShot,
+  onShots,
   onEdit,
   onRemove,
 }: {
-  print: Print;
+  prints: Print[];
   user: User;
   books: StoredBook[] | null;
   onClose: () => void;
-  onShot: (b: Blob) => void;
+  onShots: (shots: Record<string, Blob>) => void;
   onEdit: () => void;
   onRemove: () => void;
 }) {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
+  const many = prints.length > 1;
+  const [files, setFiles] = useState<File[]>([]);
+  const [zip, setZip] = useState<Blob | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState<"main" | "books">("main");
   const [busy, setBusy] = useState<string | null>(null);
   const [bookError, setBookError] = useState<string | null>(null);
   const [touch] = useState(coarse);
-  // die eben eingerechnete Fassung; bis dahin das Foto ohne Bearbeitung
+  // die eben eingerechnete Fassung des ersten Fotos; bis dahin das Foto ohne Bearbeitung
   const [shot, setShot] = useState<Blob | null>(null);
   const [sharpen, setSharpen] = useState<SharpenLevel>(savedSharpen);
-  const edit = print.edit;
-  const shotRef = useRef(onShot);
+  const first = prints[0];
+  const shotsRef = useRef(onShots);
   useEffect(() => {
-    shotRef.current = onShot;
+    shotsRef.current = onShots;
   });
+  const ready = files.length === prints.length;
 
   useEffect(() => {
     let live = true;
-    const url = URL.createObjectURL(print.work);
-    const e = edit ?? neutralEdit();
-    bakePhoto({
-      url,
-      lut: buildLut(e, N),
-      n: N,
-      rec: e.rec,
-      geo: e.geo,
-      vignette: e.more?.vignette,
-      clarity: e.more?.clarity,
-      sharpen,
-      sizes: { large: STUDIO_LONG, page: SIZES.page, thumb: SIZES.thumb },
-      quality: 0.92,
-      maxBytes: 40 * 1024 * 1024,
-    })
-      .then(async (out) => {
-        const jpeg = await withExif(out.blobs.large, print.meta.exif);
-        if (!live) return;
-        setFile(new File([jpeg], `${print.name}-calima.jpg`, { type: "image/jpeg", lastModified: Date.now() }));
-        setShot(out.blobs.thumb);
-        shotRef.current(out.blobs.thumb);
-      })
-      .catch((err) => live && setFailed(err instanceof Error ? err.message : String(err)))
-      .finally(() => URL.revokeObjectURL(url));
+    const shots: Record<string, Blob> = {};
+    (async () => {
+      const out: File[] = [];
+      // nacheinander: jedes Foto braucht in voller Größe viel Speicher
+      for (const p of prints) {
+        const url = URL.createObjectURL(p.work);
+        const e = p.edit ?? neutralEdit();
+        try {
+          const baked = await bakePhoto({
+            url,
+            lut: buildLut(e, N),
+            n: N,
+            rec: e.rec,
+            geo: e.geo,
+            vignette: e.more?.vignette,
+            clarity: e.more?.clarity,
+            sharpen,
+            sizes: { large: STUDIO_LONG, page: SIZES.page, thumb: SIZES.thumb },
+            quality: 0.92,
+            maxBytes: 40 * 1024 * 1024,
+          });
+          const jpeg = await withExif(baked.blobs.large, p.meta.exif);
+          if (!live) return;
+          out.push(new File([jpeg], `${p.name}-calima.jpg`, { type: "image/jpeg", lastModified: Date.now() }));
+          shots[p.id] = baked.blobs.thumb;
+          if (p === first) setShot(baked.blobs.thumb);
+          setFiles([...out]);
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+      shotsRef.current(shots);
+      // am Rechner wird ein Stapel eine ZIP-Datei, damit der Browser nicht für jedes Foto fragt
+      if (many && !IS_APP && !touch) {
+        const z = await zipFiles(out);
+        if (live) setZip(z);
+      }
+    })().catch((err) => live && setFailed(err instanceof Error ? err.message : String(err)));
     return () => {
       live = false;
     };
-  }, [print, edit, attempt, sharpen]);
+  }, [prints, first, many, touch, attempt, sharpen]);
+  const restart = () => {
+    setFiles([]);
+    setZip(null);
+    setFailed(null);
+  };
   const pickSharpen = (v: SharpenLevel) => {
     setSharpen(v);
-    // neu rechnen; bis dahin ist die alte Datei nicht mehr die gewählte
-    setFile(null);
-    setFailed(null);
+    // neu rechnen; bis dahin sind die alten Dateien nicht mehr die gewählten
+    restart();
     try {
       localStorage.setItem(SHARPEN_KEY, String(v));
     } catch {
@@ -405,35 +491,42 @@ function DoneSheet({
     }
   };
 
-  const blobs = useMemo(() => ({ img: shot ?? print.thumb }), [shot, print.thumb]);
+  const blobs = useMemo(() => ({ img: shot ?? first.thumb }), [shot, first.thumb]);
   const { img } = useBlobUrls(blobs);
 
-  const share = !!file && touch && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
-  const download = (f: File) => {
+  const share = ready && touch && typeof navigator.canShare === "function" && navigator.canShare({ files });
+  const download = (b: Blob, name: string) => {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(f);
-    a.download = f.name;
+    a.href = URL.createObjectURL(b);
+    a.download = name;
     document.body.append(a);
     a.click();
     a.remove();
     window.setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
   };
+  const downloadAll = () => {
+    if (zip) download(zip, `Calima ${prints.length} Fotos.zip`);
+    else for (const f of files) download(f, f.name);
+  };
+  const canSave = ready && (!many || IS_APP || touch || !!zip);
   const save = () => {
-    if (!file) return;
-    // in der App: Datei ins Teilen-Blatt, dort „Bild sichern“; einen Download gibt es dort nicht
-    if (IS_APP)
-      saveFile(safeFileName(file.name.replace(/\.jpe?g$/i, ""), ".jpg"), file, file.type).then((r) => {
+    if (!canSave) return;
+    // in der App: Dateien ins Teilen-Blatt, dort „Bild sichern“; einen Download gibt es dort nicht
+    if (IS_APP) {
+      const done = (r: ShareResult) => {
         if (r === "shared") haptic("success");
-        else if (r === "failed") notify("Die Datei ließ sich nicht sichern. Versuch es bitte noch einmal.");
-      });
-    else if (share)
+        else if (r === "failed") notify(many ? "Die Dateien ließen sich nicht sichern. Versuch es bitte noch einmal." : "Die Datei ließ sich nicht sichern. Versuch es bitte noch einmal.");
+      };
+      if (many) saveFilesInApp(files).then(done);
+      else saveFile(safeFileName(files[0].name.replace(/\.jpe?g$/i, ""), ".jpg"), files[0], files[0].type).then(done);
+    } else if (share)
       // muss direkt im Tipp laufen, sonst lehnt Safari ab
-      navigator.share({ files: [file] }).then(
+      navigator.share({ files }).then(
         () => haptic("success"),
-        (e) => e?.name !== "AbortError" && download(file),
+        (e) => e?.name !== "AbortError" && downloadAll(),
       );
     else {
-      download(file);
+      downloadAll();
       haptic("success");
       notify(touch ? "Gesichert." : "Liegt in deinen Downloads.");
     }
@@ -441,45 +534,53 @@ function DoneSheet({
 
   const shelve = async (target: StoredBook | null) => {
     setBookError(null);
-    setBusy(target ? `Lege das Foto in „${target.title || "Ohne Titel"}“ …` : "Lege ein neues Buch an …");
+    const into = target ? `„${target.title || "Ohne Titel"}“` : "ein neues Buch";
+    setBusy(many ? `Lege Foto 1 von ${prints.length} in ${into} …` : target ? `Lege das Foto in ${into} …` : "Lege ein neues Buch an …");
     try {
       const { ingest } = await import("@/lib/ingest");
       const bookId = target?.id ?? newId();
-      const key = newId().slice(0, 10);
-      // das unbearbeitete Foto wird zum Original im Buch, die Bearbeitung liegt darüber: auf der Werkbank bleibt sie änderbar
-      const ph = await ingest(new File([print.work], `${print.name}.jpg`, { type: "image/jpeg" }), key, print.meta);
-      const urls = await uploadPhoto(user.uid, bookId, ph);
-      let photo: StoredPhoto = {
-        key,
-        title: "",
-        alt: "",
-        w: ph.w,
-        h: ph.h,
-        src: urls.page,
-        large: urls.large,
-        thumb: urls.thumb,
-        color: ph.color,
-        subject: ph.subject,
-        taken: ph.taken,
-        recipe: ph.recipe,
-        camera: ph.camera,
-      };
-      if (edit && !isNeutral(edit)) {
-        const local = URL.createObjectURL(ph.blobs.large);
-        try {
-          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette, clarity: edit.more?.clarity });
-          const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
-          photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
-        } finally {
-          URL.revokeObjectURL(local);
+      const photos: StoredPhoto[] = [];
+      for (const [i, p] of prints.entries()) {
+        if (many) setBusy(`Lege Foto ${i + 1} von ${prints.length} in ${into} …`);
+        const key = newId().slice(0, 10);
+        const edit = p.edit;
+        // das unbearbeitete Foto wird zum Original im Buch, die Bearbeitung liegt darüber: auf der Werkbank bleibt sie änderbar
+        const ph = await ingest(new File([p.work], `${p.name}.jpg`, { type: "image/jpeg" }), key, p.meta);
+        const urls = await uploadPhoto(user.uid, bookId, ph);
+        let photo: StoredPhoto = {
+          key,
+          title: "",
+          alt: "",
+          w: ph.w,
+          h: ph.h,
+          src: urls.page,
+          large: urls.large,
+          thumb: urls.thumb,
+          color: ph.color,
+          subject: ph.subject,
+          taken: ph.taken,
+          recipe: ph.recipe,
+          camera: ph.camera,
+        };
+        if (edit && !isNeutral(edit)) {
+          const local = URL.createObjectURL(ph.blobs.large);
+          try {
+            const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette, clarity: edit.more?.clarity });
+            const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
+            photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
+          } finally {
+            URL.revokeObjectURL(local);
+          }
         }
+        photos.push(photo);
       }
       if (target) {
         // frisch laden: auf einem anderen Gerät kann sich das Buch seitdem geändert haben
         const fresh = (await loadBook(target.id)) ?? target;
-        await saveBook({ ...fresh, photos: [...fresh.photos, { ...photo, shelved: true }] });
+        await saveBook({ ...fresh, photos: [...fresh.photos, ...photos.map((p) => ({ ...p, shelved: true }))] });
       } else {
-        const { spreads, coverKey } = relayoutFree([], autoPhotos([photo]), new Set());
+        const auto = autoPhotos(photos);
+        const { spreads, coverKey } = relayoutFree([], auto, new Set());
         await saveBook({
           schema: SCHEMA,
           id: bookId,
@@ -488,14 +589,15 @@ function DoneSheet({
           title: "",
           subtitle: "",
           cloth: "ringelblume",
-          aspect: photo.h > photo.w ? 0.75 : 1.5,
-          coverKey: coverKey || pickCover(autoPhotos([photo])) || key,
-          photos: [photo],
+          aspect: photos[0].h > photos[0].w ? 0.75 : 1.5,
+          coverKey: coverKey || pickCover(auto) || photos[0].key,
+          photos,
           spreads,
         });
       }
       haptic("success");
-      notify(target ? `Liegt in der Ablage von „${target.title || "Ohne Titel"}“.` : "Neues Buch mit diesem Foto angelegt.", {
+      const n = many ? `Die ${numberWord(prints.length)} Fotos liegen` : "Liegt";
+      notify(target ? `${n} in der Ablage von „${target.title || "Ohne Titel"}“.` : many ? `Neues Buch mit ${numberWord(prints.length)} Fotos angelegt.` : "Neues Buch mit diesem Foto angelegt.", {
         duration: 8000,
         action: { label: "Öffnen", onClick: () => router.push(`/neu?id=${bookId}`) },
       });
@@ -509,32 +611,48 @@ function DoneSheet({
 
   const own = (books ?? []).filter((b) => !b.trashed);
   const coverOf = (b: StoredBook) => (b.photos.find((p) => p.key === b.coverKey) ?? b.photos.find((p) => !p.shelved))?.thumb;
+  const title = many ? `${numberWord(prints.length)} Fotos fertig` : "Fertig bearbeitet";
+  const label = !canSave && !failed ? (many ? `Rechne ${Math.min(files.length + 1, prints.length)} von ${prints.length} …` : "Wird vorbereitet …") : IS_APP || share || touch ? (many ? `Alle ${prints.length} in Fotos sichern …` : "In Fotos sichern …") : many ? "Alle herunterladen" : "Herunterladen";
 
   return (
-    <MountedSheet title={view === "main" ? "Fertig bearbeitet" : "In welches Buch?"} hideTitle={view === "main"} onClose={onClose} locked={!!busy}>
+    <MountedSheet title={view === "main" ? title : "In welches Buch?"} hideTitle={view === "main"} onClose={onClose} locked={!!busy}>
       {(close) =>
         view === "main" ? (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             <div className="flex items-center gap-3.5">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät */}
-              {img && <img src={img} alt="" className="h-[68px] w-auto max-w-[96px] flex-none object-cover shadow-[1px_2px_3px_rgb(58_39_6/0.35)]" />}
+              <span className="relative flex-none">
+                {many && <span aria-hidden className="bg-paper-shade absolute inset-0 rotate-[5deg] shadow-[1px_2px_3px_rgb(58_39_6/0.3)]" />}
+                {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät */}
+                {img && <img src={img} alt="" className="relative h-[68px] w-auto max-w-[96px] object-cover shadow-[1px_2px_3px_rgb(58_39_6/0.35)]" />}
+              </span>
               <div className="min-w-0">
-                <p className="text-xl font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 82' }}>
-                  Fertig bearbeitet
+                <p className="text-xl font-bold tracking-[-0.02em] first-letter:uppercase" style={{ fontVariationSettings: '"wdth" 82' }}>
+                  {title}
                 </p>
-                <p className="text-ink-2 truncate text-sm">{summary(edit)}</p>
+                <p className="text-ink-2 truncate text-sm">{summary(first.edit)}</p>
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Button variant="cloth" onClick={save} disabled={!file} className="w-full">
-                {!file && !failed ? "Wird vorbereitet …" : IS_APP || share || touch ? "In Fotos sichern …" : "Herunterladen"}
+              <Button variant="cloth" onClick={save} disabled={!canSave} className="w-full">
+                {label}
               </Button>
+              {many && !canSave && !failed && (
+                <span aria-hidden className="bg-ink/10 block h-1 overflow-hidden rounded-full">
+                  <span className="bg-cloth-deep block h-full transition-[width] duration-300" style={{ width: `${(files.length / prints.length) * 100}%` }} />
+                </span>
+              )}
               <p className="text-ink-2 text-center text-[13px]" aria-live="polite">
                 {failed
-                  ? "Die Datei ließ sich nicht rechnen."
+                  ? many
+                    ? "Die Dateien ließen sich nicht rechnen."
+                    : "Die Datei ließ sich nicht rechnen."
                   : IS_APP || share
-                    ? "Im nächsten Fenster „Bild sichern“ wählen. Ohne Ortsangabe."
-                    : `JPEG, ${STUDIO_LONG} px, ohne Ortsangabe.`}
+                    ? many
+                      ? `Im nächsten Fenster „${prints.length} Bilder sichern“ wählen. Ohne Ortsangabe.`
+                      : "Im nächsten Fenster „Bild sichern“ wählen. Ohne Ortsangabe."
+                    : many && !touch
+                      ? `Eine ZIP-Datei mit ${prints.length} JPEGs, ${STUDIO_LONG} px, ohne Ortsangabe.`
+                      : `JPEG, ${STUDIO_LONG} px, ohne Ortsangabe.`}
               </p>
               {failed && (
                 <Button
@@ -542,7 +660,7 @@ function DoneSheet({
                   size="sm"
                   className="justify-self-center"
                   onClick={() => {
-                    setFailed(null);
+                    restart();
                     setAttempt((n) => n + 1);
                   }}
                 >
@@ -557,9 +675,9 @@ function DoneSheet({
               <Segmented label="Für die Datei schärfen" tone="paper" options={SHARPEN_OPTS} value={`${sharpen}`} onChange={(v) => pickSharpen(Number(v) as SharpenLevel)} />
             </div>
             <ListGroup paper>
-              <ListRow paper lead={<BookPlus aria-hidden />} title="In ein Buch legen …" onClick={() => setView("books")} />
+              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? "Alle in ein Buch legen …" : "In ein Buch legen …"} onClick={() => setView("books")} />
               <ListRow paper lead={<Pencil aria-hidden />} title="Weiter bearbeiten" onClick={() => close(onEdit)} />
-              <ListRow paper danger lead={<Trash2 aria-hidden />} title="Vom Pult nehmen" onClick={() => close(onRemove)} />
+              <ListRow paper danger lead={<Trash2 aria-hidden />} title={many ? "Stapel vom Pult nehmen" : "Vom Pult nehmen"} onClick={() => close(onRemove)} />
             </ListGroup>
           </div>
         ) : (
@@ -568,7 +686,7 @@ function DoneSheet({
               <ChevronLeft aria-hidden />
               Zurück
             </Button>
-            <p className="text-ink-2 text-sm">Das Foto kommt in die Ablage. Deine Seiten bleiben, wie sie sind.</p>
+            <p className="text-ink-2 text-sm">{many ? `Die ${numberWord(prints.length)} Fotos kommen in die Ablage.` : "Das Foto kommt in die Ablage."} Deine Seiten bleiben, wie sie sind.</p>
             <ListGroup paper label="Deine Bücher">
               {own.map((b) => {
                 const t = coverOf(b);
@@ -590,7 +708,7 @@ function DoneSheet({
                   />
                 );
               })}
-              <ListRow paper lead={<BookPlus aria-hidden />} title="Neues Buch mit diesem Foto" onClick={busy ? undefined : () => shelve(null)} />
+              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? "Neues Buch mit diesen Fotos" : "Neues Buch mit diesem Foto"} onClick={busy ? undefined : () => shelve(null)} />
             </ListGroup>
             <p className="text-ink-2 min-h-5 text-[13px]" aria-live="polite">
               {busy ?? bookError}
