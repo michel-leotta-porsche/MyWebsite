@@ -711,6 +711,20 @@ export function pickEdit(st: PhotoStats, id: PickId, base: PhotoEdit): PhotoEdit
   return { ...neutralEdit(), rec: base.rec, recName: base.recName, geo: base.geo, ...autoEdit(st), ...p.e, more: { ...MORE0(), ...p.more }, origin: "pick", pick: id };
 }
 
+/**
+ * „Auf alle“: die Bearbeitung von einem Foto auf ein anderes übertragen. Look, Rezept, Feinschliff und „Mehr“ kommen
+ * mit; was vom Foto selbst abhängt, rechnet jedes Foto neu: Auto, Vorschlag und Stimmung bekommen sein eigenes Auto
+ * darunter, damit ein dunkles und ein helles Foto beide beim selben Stil landen. Zuschnitt und Geraderichten bleiben.
+ */
+export function spreadEdit(from: PhotoEdit, to: PhotoEdit, st: PhotoStats | undefined): PhotoEdit {
+  const own = !!from.transfer || !!from.levels;
+  const base = { ...from, geo: to.geo, moodFrom: undefined, more: from.more ? { ...from.more, hsl: from.more.hsl.map((t) => [...t] as [number, number, number]), curve: from.more.curve.map((p) => [...p] as [number, number]) } : undefined };
+  if (!own) return { ...base, levels: null, transfer: null };
+  // ohne Zahlen zum Foto (noch nicht geladen) lieber ohne Auto als mit dem Auto eines anderen Fotos
+  if (!st) return { ...base, levels: null, transfer: null, origin: from.origin === "pick" ? "pick" : null };
+  return { ...base, ...autoEdit(st), origin: from.origin === "pick" ? "pick" : "auto" };
+}
+
 export function autoEdit(st: PhotoStats): Pick<PhotoEdit, "levels" | "transfer"> {
   return {
     levels: [Math.min(0.1, st.p01 * 0.8), Math.max(0.88, st.p99 + (1 - st.p99) * 0.2)],
@@ -746,7 +760,7 @@ const LEVEL = ["Aus", "Schwach", "Stark"];
 export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [];
   if (e.origin === "auto") rows.push({ label: "Vorschlag", value: "Auto" });
-  if (e.origin === "match") rows.push({ label: "Vorschlag", value: "an die Doppelseite angeglichen" });
+  if (e.origin === "match") rows.push({ label: "Vorschlag", value: "an die anderen Fotos angeglichen" });
   if (e.origin === "mood") rows.push({ label: "Vorschlag", value: e.moodFrom ? `Stimmung von ${e.moodFrom}` : "Stimmung übernommen" });
   if (e.origin === "pick") rows.push({ label: "Vorschlag", value: PICKS.find((p) => p.id === e.pick)?.name ?? "fertiger Vorschlag" });
   const R = e.rec;

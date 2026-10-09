@@ -25,9 +25,40 @@ export type Print = {
   shot?: Blob;
   /** uid des Kontos; ältere Abzüge ohne Besitzer zeigt das Studio niemandem mehr */
   owner?: string;
+  /** Stapel: zusammen gewählte Fotos tragen dieselbe Kennung und ihre Stelle darin */
+  stack?: string;
+  pos?: number;
 };
 
-/** so viele Abzüge bleiben je Konto liegen; ältere räumt das Studio selbst weg */
+/** so viele Fotos lassen sich auf einmal wählen; mehr sprengt auf älteren iPhones den Speicher */
+export const MAX_STACK = 20;
+/** so viele Fotos bleiben je Konto höchstens liegen, über alle Stapel (je etwa 5 MB) */
+const MAX_KEPT = 40;
+
+/** Abzüge in Stapel gruppiert, neuester Stapel zuerst; ein einzelnes Foto ist ein Stapel aus einem */
+export function piles(prints: Print[]): Print[][] {
+  const by = new Map<string, Print[]>();
+  for (const p of prints) {
+    const k = p.stack ?? p.id;
+    by.set(k, [...(by.get(k) ?? []), p]);
+  }
+  const at = (pile: Print[]) => Math.max(...pile.map((p) => p.at));
+  return [...by.values()].map((pile) => pile.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))).sort((a, b) => at(b) - at(a));
+}
+
+/** was liegen bleibt: höchstens MAX_PRINTS Stapel und MAX_KEPT Fotos, der neueste Stapel immer ganz */
+export function trimPiles(all: Print[][]): { keep: Print[][]; drop: Print[] } {
+  const keep: Print[][] = [];
+  let n = 0;
+  for (const pile of all) {
+    if (keep.length && (keep.length >= MAX_PRINTS || n + pile.length > MAX_KEPT)) continue;
+    keep.push(pile);
+    n += pile.length;
+  }
+  return { keep, drop: all.filter((p) => !keep.includes(p)).flat() };
+}
+
+/** so viele Stapel (oder einzelne Abzüge) bleiben je Konto liegen; ältere räumt das Studio selbst weg */
 export const MAX_PRINTS = 8;
 
 const DB = "calima-studio";
@@ -64,12 +95,10 @@ export async function listPrints(uid: string): Promise<Print[]> {
   return all.filter((p) => p.owner === uid).sort((a, b) => b.at - a.at);
 }
 
-/** Für dieses Konto speichern und, was über MAX_PRINTS hinausgeht, wegräumen; gibt die neue Liste zurück */
-export async function putPrint(uid: string, p: Print): Promise<Print[]> {
-  await run("readwrite", (s) => s.put({ ...p, owner: uid }));
-  const all = await listPrints(uid);
-  for (const old of all.slice(MAX_PRINTS)) await removePrint(old.id);
-  return all.slice(0, MAX_PRINTS);
+/** Für dieses Konto speichern und, was über die Grenzen hinausgeht, wegräumen */
+export async function putPrints(uid: string, ps: Print[]) {
+  for (const p of ps) await run("readwrite", (s) => s.put({ ...p, owner: uid }));
+  for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
 }
 
 export async function removePrint(id: string) {
