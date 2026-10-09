@@ -229,7 +229,8 @@ export function GridOverlay({ roll }: { roll: number | null }) {
       ))}
       {roll != null && (
         <span
-          className={`absolute top-1/2 left-1/2 h-0.5 w-[38%] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors ${level ? "bg-cloth" : "bg-on-table/70"}`}
+          className={`absolute top-1/2 left-1/2 h-0.5 w-[38%] rounded-full transition-colors ${level ? "bg-cloth" : "bg-on-table/70"}`}
+          // nur hier verschieben: Tailwinds translate-Klassen kämen als eigene CSS-Eigenschaft noch obendrauf (Linie saß links)
           style={{ transform: `translate(-50%, -50%) rotate(${roll}deg)` }}
         />
       )}
