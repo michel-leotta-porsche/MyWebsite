@@ -6,8 +6,8 @@ import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELV
 import { useT } from "@/lib/i18n";
 
 // Die Räder der Kamera (Expertenmodus E1, expertenmodus-workshop-2026-10-09/): wie an einer Fujifilm hat jedes Rad eine
-// Raststellung „A“. Alles auf A ist die Kamera von Stufe 1. Es gibt kein Modus-Menü: ein Rad von Hand wirkt sofort
-// sichtbar (der andere Wert bleibt stehen, der Messer zeigt die Abweichung), nichts regelt im Hintergrund nach. Ein Rad wird angetippt und dann auf dem Lineal darunter
+// Raststellung „A“. Alles auf A ist die Kamera von Stufe 1. Es gibt kein Modus-Menü: wer die Zeit festhält, hat eine
+// Zeitvorwahl (ISO gleicht aus, der Chip zeigt „ISO A 640“), wer Zeit und ISO festhält, fotografiert von Hand. Ein Rad wird angetippt und dann auf dem Lineal darunter
 // gedreht; ein Tipp auf „A“ gibt es der Kamera zurück. Brennweiten sind ehrlich: echte Objektive fett, der Rest Ausschnitt.
 
 export type DialKey = keyof Dials;
@@ -90,12 +90,24 @@ export function DialChips({
       </li>
       {DIALS.map((k) => {
         const manual = dials[k] != null;
+        // Halbautomatik: steht nur Zeit oder nur ISO von Hand, gleicht das andere Rad aus. Damit man sieht, dass das Rad
+        // wirkt, läuft der ausgleichende Wert hinter dem A mit („Zeit A 1/4“), wie die Anzeige im Sucher einer Kamera
+        const partner = k === "duration" ? "iso" : k === "iso" ? "duration" : null;
+        const steering = !manual && partner != null && dials[partner] != null && meter != null;
         return (
           <li key={k} className="flex-none">
             <button type="button" onClick={() => onPick(dial === k ? null : k)} aria-pressed={dial === k} className={chip(dial === k, manual)}>
               <span className="opacity-70">{names[k]} </span>
               {/* fmtISO bringt „ISO“ schon mit, der Name steht davor */}
-              {manual ? dialLabel(k, dials, meter).replace(/^ISO /, "") : "A"}
+              {manual ? (
+                dialLabel(k, dials, meter).replace(/^ISO /, "")
+              ) : steering ? (
+                <>
+                  A <span className="font-medium">{dialLabel(k, dials, meter).replace(/^ISO /, "")}</span>
+                </>
+              ) : (
+                "A"
+              )}
             </button>
           </li>
         );

@@ -379,7 +379,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         return out
     }
 
-    /// Alle paar Bilder: Messung an die Seite („meter“)
+    /// Alle paar Bilder: Messung an die Seite („meter“) und, wenn nur Zeit oder nur ISO fest steht, das andere nachregeln
     private func meter() {
         guard let device = input?.device else { return }
         frameTick &+= 1
@@ -392,6 +392,18 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         let gains = device.deviceWhiteBalanceGains
         if gains.redGain >= 1, gains.greenGain >= 1, gains.blueGain >= 1, gains.redGain <= device.maxWhiteBalanceGain, gains.blueGain <= device.maxWhiteBalanceGain {
             kelvin = device.temperatureAndTintValues(for: gains).temperature
+        }
+        // Halbautomatik (Michels Wahl „Ausgleichen“): steht nur Zeit oder nur ISO von Hand, regelt die Kamera das andere nach,
+        // damit das Foto richtig belichtet bleibt. Der Chip zeigt den ausgleichenden Wert („Zeit A 1/4“). Halbe Schritte, sonst pendelt es
+        let semi = (dials.duration == nil) != (dials.iso == nil)
+        if semi, abs(offset) > 0.15, offset.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
+            let k = pow(2, Double(-offset) * 0.5)
+            if let d = dials.duration {
+                device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
+            } else if let i = dials.iso {
+                device.setExposureModeCustom(duration: clampDuration(duration * k), iso: clampISO(i), completionHandler: nil)
+            }
+            device.unlockForConfiguration()
         }
         let now = (offset: offset, duration: duration, iso: iso, lens: lens, kelvin: kelvin)
         if let l = lastMeter, abs(l.offset - now.offset) < 0.05, abs(l.duration - now.duration) / max(now.duration, 1e-6) < 0.05, abs(l.iso - now.iso) / max(now.iso, 1) < 0.05, abs(l.lens - now.lens) < 0.01, abs(l.kelvin - now.kelvin) < 50 { return }
