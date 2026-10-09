@@ -548,6 +548,8 @@ function Room({ user }: { user: User }) {
               )}
             </section>
           )}
+          {/* Platz für den Auslöser, der in der App unten über dem Zimmer liegt (Fotostudio) */}
+          {IS_APP && <div aria-hidden className="-mt-8 h-16" />}
           {returns && (
             <ReturnsDialog
               book={returns.book}

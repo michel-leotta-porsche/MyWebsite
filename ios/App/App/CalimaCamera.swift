@@ -27,6 +27,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "capture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discard", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setGrain", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -36,6 +37,17 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         // Ereignisse der Erkenner kommen als `event` mit `name` und `data` auf der Seite an
         camera.onEvent = { [weak self] name, data in
             DispatchQueue.main.async { self?.notifyListeners("event", data: ["name": name, "data": data]) }
+        }
+        // Quick Action, während die Seite schon läuft: melden, dass etwas wartet; abgeholt wird mit `launch`
+        _ = NotificationCenter.default.addObserver(forName: CalimaLaunch.waiting, object: nil, queue: .main) { [weak self] _ in
+            self?.notifyListeners("event", data: ["name": "launch", "data": [:]])
+        }
+    }
+
+    /// Die wartende Aktion vom App-Symbol abholen (einmal): `action` ist „kamera“ oder fehlt
+    @objc func launch(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            if let action = CalimaLaunch.take() { call.resolve(["action": action]) } else { call.resolve() }
         }
     }
     private var wasBackground: UIColor?
@@ -168,6 +180,28 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             try? FileManager.default.removeItem(atPath: path)
         }
         call.resolve()
+    }
+}
+
+/// Quick Action am App-Symbol („Ins Reisebuch fotografieren“, Info.plist): die Aktion bleibt liegen, bis die Seite sie
+/// abholt. Beim Kaltstart läuft die Seite noch nicht und fragt selbst nach; aus dem Hintergrund kommt ein `event`.
+/// Nur auf dem Hauptthread benutzt (SceneDelegate und DispatchQueue.main).
+enum CalimaLaunch {
+    static let kamera = "app.calima.kamera"
+    static let waiting = Notification.Name("CalimaLaunchWaiting")
+    private static var pending: String?
+
+    /// true, wenn die Aktion von Calima ist
+    static func receive(_ item: UIApplicationShortcutItem) -> Bool {
+        guard item.type == kamera else { return false }
+        pending = "kamera"
+        NotificationCenter.default.post(name: waiting, object: nil)
+        return true
+    }
+
+    static func take() -> String? {
+        defer { pending = nil }
+        return pending
     }
 }
 

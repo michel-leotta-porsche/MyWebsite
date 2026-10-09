@@ -1,5 +1,6 @@
 "use client";
 
+import { isDayStack } from "@/lib/day-stack";
 import type { PhotoEdit } from "@/lib/develop/model";
 import type { PhotoMeta } from "@/lib/ingest";
 
@@ -28,6 +29,11 @@ export type Print = {
   /** Stapel: zusammen gewählte Fotos tragen dieselbe Kennung und ihre Stelle darin */
   stack?: string;
   pos?: number;
+  /** Abendstapel: eingeordnet ins Buch oder weggelegt, und wann (für Rückgängig); bleibt beim Schließen erhalten */
+  pick?: "in" | "out";
+  pickAt?: number;
+  /** der Satz zum Foto, wird im Buch sein Titel */
+  line?: string;
 };
 
 /** so viele Fotos lassen sich auf einmal wählen; mehr sprengt auf älteren iPhones den Speicher */
@@ -46,13 +52,23 @@ export function piles(prints: Print[]): Print[][] {
   return [...by.values()].map((pile) => pile.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))).sort((a, b) => at(b) - at(a));
 }
 
-/** was liegen bleibt: höchstens MAX_PRINTS Stapel und MAX_KEPT Fotos, der neueste Stapel immer ganz */
+/**
+ * was liegen bleibt: höchstens MAX_PRINTS Stapel und MAX_KEPT Fotos, der neueste Stapel immer ganz.
+ * Tagesstapel (Abendstapel) räumt das Studio nie selbst weg und zählt sie nicht mit: Fotos aus Calimas Kamera
+ * gibt es nur hier, bis sie im Buch liegen.
+ */
 export function trimPiles(all: Print[][]): { keep: Print[][]; drop: Print[] } {
   const keep: Print[][] = [];
+  let kept = 0;
   let n = 0;
   for (const pile of all) {
-    if (keep.length && (keep.length >= MAX_PRINTS || n + pile.length > MAX_KEPT)) continue;
+    if (isDayStack(pile[0].stack)) {
+      keep.push(pile);
+      continue;
+    }
+    if (kept && (kept >= MAX_PRINTS || n + pile.length > MAX_KEPT)) continue;
     keep.push(pile);
+    kept++;
     n += pile.length;
   }
   return { keep, drop: all.filter((p) => !keep.includes(p)).flat() };
@@ -97,6 +113,8 @@ export async function listPrints(uid: string): Promise<Print[]> {
 
 /** Für dieses Konto speichern und, was über die Grenzen hinausgeht, wegräumen */
 export async function putPrints(uid: string, ps: Print[]) {
+  // ein Tag auf dem Pult: iOS soll den Speicher bei Platzmangel nicht von selbst leeren
+  if (ps.some((p) => isDayStack(p.stack))) navigator.storage?.persist?.().catch(() => {});
   for (const p of ps) await run("readwrite", (s) => s.put({ ...p, owner: uid }));
   for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
 }
