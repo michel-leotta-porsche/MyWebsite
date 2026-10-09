@@ -1,6 +1,6 @@
 "use client";
 
-import { Film as FilmIcon, Lock, SlidersHorizontal, SwitchCamera, X } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizontal, Sun, SwitchCamera, X, Zap } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -8,6 +8,7 @@ import { allAuto, DIALS, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey
 import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
+import { DISPOSABLE_FRAMES, DISPOSABLES, disposableEdit, type Disposable } from "@/lib/disposable";
 import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
@@ -48,6 +49,8 @@ const stamp = () => {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
 };
+/** so viele Bilder passen auf den Film: eine Einwegkamera bringt ihre eigene Zahl mit */
+const framesOf = (f: Film) => f.rules?.frames ?? FILM_FRAMES;
 const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
 
 /** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
@@ -98,7 +101,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   /** Marke, wo zuletzt scharf gestellt wurde; locked: Schärfe und Helligkeit sind festgehalten (zweiter Tipp auf die Marke) */
   const [reticle, setReticle] = useState<{ x: number; y: number; k: number; locked?: boolean } | null>(null);
   // Werkzeug (E1): offen oder zu bleibt gemerkt; die Räder selbst fangen bei jedem Öffnen auf A an
-  const [tools, setTools] = useState(() => {
+  const [toolsOpen, setTools] = useState(() => {
     try {
       return localStorage.getItem(TOOLS_KEY) === "1";
     } catch {
@@ -115,6 +118,15 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
   const [shelf, setShelf] = useState<Shelf>(readShelf);
   const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
+  // Einwegkamera: der Film bringt feste Regeln mit; Werkzeug, Zoom, Tippen und Heller/Dunkler gibt es dann nicht
+  const fixed = film?.rules ?? null;
+  const fixedRef = useRef(fixed);
+  useEffect(() => {
+    fixedRef.current = fixed;
+  });
+  const tools = toolsOpen && !fixed;
+  /** Reihe unter dem Sucher: Looks oder Einwegkamera-Vorlagen */
+  const [tab, setTab] = useState<"looks" | "einweg">("looks");
   const aside = shelf.films.filter((f) => f.stack !== shelf.loaded);
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -310,10 +322,44 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     const f: Film = { name: active.name, approx: active.approx, edit: active.edit, stack: newId(), count: 0 };
     update((s) => ({ loaded: f.stack, films: [...s.films, f] }));
   };
+  /** Einwegkamera-Vorlage: ein Film mit festen Regeln (disposable.ts) */
+  const loadDisposable = (d: Disposable) => {
+    if (!ready || film) return;
+    haptic("press");
+    const name = t(d.name);
+    const f: Film = {
+      name,
+      approx: false,
+      edit: disposableEdit(d, name),
+      stack: newId(),
+      count: 0,
+      rules: { id: d.id, frames: DISPOSABLE_FRAMES, zoom: focalZoom(d.mm), flash: d.flash },
+    };
+    takeFixed();
+    update((s) => ({ loaded: f.stack, films: [...s.films, f] }));
+  };
+  /** eine Einwegkamera kommt in die Hand: Räder auf A, keine Marke, kein Heller/Dunkler */
+  const takeFixed = () => {
+    setFocal(null);
+    setDial(null);
+    setReticle(null);
+    setDials(AUTO);
+    setEv(0);
+  };
+  // fester Ausschnitt, solange sie eingelegt ist; beim Herausnehmen zurück auf die Hauptkamera
+  const fixedZoom = fixed?.zoom ?? null;
+  useEffect(() => {
+    if (!ready) return;
+    if (fixedZoom != null) CalimaCamera.setExposure({ ev: 0 }).catch(() => {});
+    CalimaCamera.setZoom({ factor: fixedZoom ?? 1 })
+      .then((r) => setZoom(r.factor))
+      .catch(() => {});
+  }, [fixedZoom, ready]);
   /** einen beiseitegelegten Film wieder einlegen */
   const resumeFilm = (stack: string) => {
     if (!ready || film) return;
     haptic("press");
+    if (shelf.films.find((f) => f.stack === stack)?.rules) takeFixed();
     update((s) => ({ ...s, loaded: stack }));
   };
   /** Film herausnehmen, aber behalten: wie zurückspulen und in die Tasche stecken. Ein leerer Film fliegt raus. */
@@ -353,6 +399,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     if (!ready) return;
     const g = gesture.current;
     if (g && g.mode !== "done" && e.pointerId !== g.id) {
+      // die Einwegkamera hat keinen Zoom
+      if (fixed) return;
       // zweiter Finger: ab jetzt wird gezoomt
       window.clearTimeout(g.timer);
       if (g.mode === "hold") holdOriginal(false);
@@ -395,8 +443,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     const dy = e.clientY - g.y;
     if (g.mode === "wait" && Math.hypot(e.clientX - g.x, dy) > MOVE_PX) {
       window.clearTimeout(g.timer);
-      g.mode = "drag";
-      setShowEv(true);
+      // Einwegkamera: nichts einzustellen, auch kein Heller/Dunkler
+      g.mode = fixed ? "done" : "drag";
+      if (!fixed) setShowEv(true);
     }
     if (g.mode === "drag") {
       const next = Math.round(Math.min(EV_MAX, Math.max(-EV_MAX, g.ev0 - dy / 120)) * 10) / 10;
@@ -419,7 +468,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     window.clearTimeout(g.timer);
     if (g.mode === "hold") holdOriginal(false);
     if (g.mode === "drag") window.setTimeout(() => setShowEv(false), 900);
-    if (g.mode === "wait" && e.type !== "pointercancel") {
+    // die Einwegkamera stellt selbst scharf, Tippen tut nichts
+    if (g.mode === "wait" && e.type !== "pointercancel" && !fixed) {
       // kurzer Tipp: scharf stellen, die Marke zeigt wo. Noch ein Tipp auf die Marke hält Schärfe und Helligkeit fest,
       // ein Tipp auf die festgehaltene Marke löst sie wieder; ein Tipp woanders stellt dort neu scharf
       const r = box.current?.getBoundingClientRect();
@@ -456,7 +506,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
     try {
-      const { path } = await CalimaCamera.capture();
+      const { path } = await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = lookNow.edit ?? undefined;
@@ -465,7 +515,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       onShot(print, onFilm?.stack);
       if (onFilm) {
         const next = { ...onFilm, count: onFilm.count + 1 };
-        if (next.count >= FILM_FRAMES) {
+        if (next.count >= framesOf(next)) {
           // voll: der Film wird entwickelt und kommt auf den Abendstapel
           haptic("success");
           develop(next);
@@ -520,6 +570,14 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     const sub = CalimaCamera.addListener("event", (e) => {
       if (e.name === "shutter") shootRef.current();
       else if (e.name === "zoom" && typeof e.data.factor === "number") {
+        // die Einwegkamera hat keinen Zoom: zurück auf ihren Ausschnitt
+        const keep = fixedRef.current?.zoom;
+        if (keep != null) {
+          CalimaCamera.setZoom({ factor: keep })
+            .then((r) => setZoom(r.factor))
+            .catch(() => {});
+          return;
+        }
         setZoom(e.data.factor);
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
@@ -550,7 +608,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   const sub = holding
     ? t("Loslassen bringt den Look zurück")
     : film
-      ? t("Film, {i} von {n}", { i: film.count, n: FILM_FRAMES })
+      ? fixed
+        ? t("Einwegkamera, {i} von {n}", { i: film.count, n: framesOf(film) })
+        : t("Film, {i} von {n}", { i: film.count, n: FILM_FRAMES })
       : active.approx
         ? t("nachempfunden")
         : active.edit
@@ -571,7 +631,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
             {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
           </span>
-          <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} aria-pressed={tools} className={tools || !allAuto(dials) ? "text-cloth" : "text-on-table"}>
+          <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} disabled={!!fixed} aria-pressed={tools} className={`${tools || !allAuto(dials) ? "text-cloth" : "text-on-table"} disabled:opacity-30`}>
             <SlidersHorizontal aria-hidden />
           </IconButton>
         </span>
@@ -685,11 +745,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2 text-[13px]">
                 <span className="truncate font-semibold">{film.name}</span>
-                <span className="text-on-table-2 flex-none tabular-nums">{t("{i} von {n}", { i: film.count, n: FILM_FRAMES })}</span>
+                <span className="text-on-table-2 flex-none tabular-nums">{t("{i} von {n}", { i: film.count, n: framesOf(film) })}</span>
               </div>
               {/* der Zählstreifen: ein Strich je Bild, so viele voll wie belichtet */}
               <div className="mt-1.5 flex gap-[3px]" aria-hidden>
-                {Array.from({ length: FILM_FRAMES }, (_, i) => (
+                {Array.from({ length: framesOf(film) }, (_, i) => (
                   <span key={i} className={`h-1.5 flex-1 rounded-full ${i < film.count ? "bg-cloth" : "bg-on-table-2/30"}`} />
                 ))}
               </div>
@@ -703,12 +763,57 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               </button>
             )}
           </div>
+        ) : tab === "einweg" ? (
+        // Einwegkamera-Vorlagen: ein Tipp legt sie als Film ein, mit festen Regeln
+        <ul className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t("Einwegkamera")}>
+          <li className="flex-none">
+            <button
+              type="button"
+              onClick={() => {
+                haptic("select");
+                setTab("looks");
+              }}
+              className="border-on-table-2/50 text-on-table-2 flex items-center gap-1 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap"
+            >
+              <ChevronLeft aria-hidden className="h-4 w-4" />
+              {t("Looks")}
+            </button>
+          </li>
+          {DISPOSABLES.map((d) => (
+            <li key={d.id} className="flex-none">
+              <button
+                type="button"
+                onClick={() => loadDisposable(d)}
+                disabled={!ready}
+                aria-label={t("Einwegkamera „{name}“ einlegen: {txt}", { name: t(d.name), txt: t(d.txt) })}
+                className="border-on-table-2/50 text-on-table flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50"
+              >
+                {d.flash ? <Zap aria-hidden className="text-cloth h-4 w-4" /> : <Sun aria-hidden className="text-on-table-2 h-4 w-4" />}
+                {t(d.name)}
+              </button>
+            </li>
+          ))}
+        </ul>
         ) : (
         <ul className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t("Looks")}>
           <li className="flex-none">
             <button type="button" onClick={loadFilm} disabled={!ready} className="border-on-table-2/50 text-on-table flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50">
               <FilmIcon aria-hidden className="h-4 w-4" />
               {t("Film einlegen")}
+            </button>
+          </li>
+          <li className="flex-none">
+            <button
+              type="button"
+              onClick={() => {
+                haptic("select");
+                setTab("einweg");
+              }}
+              className="border-on-table-2/50 text-on-table flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap"
+            >
+              <Box aria-hidden className="h-4 w-4" />
+              {t("Einwegkamera")}
+              <ChevronRight aria-hidden className="text-on-table-2 -mr-1 h-4 w-4" />
             </button>
           </li>
           {/* beiseitegelegte Filme: wieder einlegen und weiter belichten */}
@@ -718,12 +823,12 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
                 type="button"
                 onClick={() => resumeFilm(f.stack)}
                 disabled={!ready}
-                aria-label={t("Film „{name}“ weiter belichten, {i} von {n}", { name: f.name, i: f.count, n: FILM_FRAMES })}
+                aria-label={t("Film „{name}“ weiter belichten, {i} von {n}", { name: f.name, i: f.count, n: framesOf(f) })}
                 className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50"
               >
                 <FilmIcon aria-hidden className="text-cloth h-4 w-4" />
                 {f.name}
-                <span className="text-on-table-2 tabular-nums">{t("{i}/{n}", { i: f.count, n: FILM_FRAMES })}</span>
+                <span className="text-on-table-2 tabular-nums">{t("{i}/{n}", { i: f.count, n: framesOf(f) })}</span>
               </button>
             </li>
           ))}
@@ -791,6 +896,10 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
             : tools && focal != null && !lenses.includes(focal)
               ? t("{mm} mm ist ein Ausschnitt aus der Hauptkamera, kein eigenes Objektiv.", { mm: focal })
+              : fixed
+                ? fixed.flash
+                  ? t("Einwegkamera: fester Ausschnitt, nichts einzustellen, jedes Bild mit Blitz. Entwickelt wird bei {n}.", { n: fixed.frames })
+                  : t("Einwegkamera: fester Ausschnitt, nichts einzustellen, ohne Blitz. Entwickelt wird bei {n}.", { n: fixed.frames })
               : film
             ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
