@@ -83,6 +83,8 @@ export function GuestBook() {
         books={[book]}
         ears={feedback.earsOf(share)}
         onEar={(no) => feedback.toggleEar(share, no)}
+        onPin={(spot) => feedback.pin(share, spot)}
+        pins={feedback.pinsOf(share)}
         bookExtra={(_, plates) => feedback.extra(share, plates, !mine && <MoreMenu onReport={() => setReporting(true)} />)}
       >
         <Table

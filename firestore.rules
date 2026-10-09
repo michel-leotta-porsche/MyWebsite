@@ -30,11 +30,14 @@ service cloud.firestore {
       // Zettel und Eselsohren der Gäste: nur der Macher liest sie
       match /notes/{note} {
         allow create: if exists(/databases/$(db)/documents/shares/$(token))
-          && request.resource.data.keys().hasOnly(['kind', 'text', 'no', 'from', 'at'])
+          && request.resource.data.keys().hasOnly(['kind', 'text', 'no', 'x', 'y', 'from', 'at'])
           && request.resource.data.kind in ['note', 'ear']
           && (!('text' in request.resource.data) || (request.resource.data.text is string && request.resource.data.text.size() <= 280))
           && (!('from' in request.resource.data) || (request.resource.data.from is string && request.resource.data.from.size() <= 80))
           && (!('no' in request.resource.data) || request.resource.data.no is number)
+          // Stelle eines angehefteten Zettels auf dem Foto, 0 bis 1
+          && (!('x' in request.resource.data) || (request.resource.data.x is number && request.resource.data.x >= 0 && request.resource.data.x <= 1))
+          && (!('y' in request.resource.data) || (request.resource.data.y is number && request.resource.data.y >= 0 && request.resource.data.y <= 1))
           && request.resource.data.at == request.time;
         allow read, delete: if (signedIn()
           && get(/databases/$(db)/documents/shares/$(token)).data.owner == request.auth.uid) || isAdmin();

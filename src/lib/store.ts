@@ -670,11 +670,22 @@ export async function unshare(token: string) {
   await deleteDoc(doc(db(), "shares", token));
 }
 
-export type Note = { id: string; kind: "note" | "ear"; text?: string; no?: number; from?: string; at?: { seconds: number } };
+/** x und y: Stelle auf dem Foto der Tafel `no` (0 bis 1), wo der Zettel angeheftet ist */
+export type Note = { id: string; kind: "note" | "ear"; text?: string; no?: number; x?: number; y?: number; from?: string; at?: { seconds: number } };
 
 export async function leaveNote(token: string, n: Omit<Note, "id" | "at">) {
   if (MOCK) return;
-  await addDoc(collection(db(), "shares", token, "notes"), { ...n, at: serverTimestamp() });
+  const notes = collection(db(), "shares", token, "notes");
+  try {
+    await addDoc(notes, { ...n, at: serverTimestamp() });
+  } catch (e) {
+    // solange die Regeln die Stelle noch nicht kennen: der Zettel kommt an, nur ohne Stelle
+    if (n.x === undefined && n.y === undefined) throw e;
+    const rest = { ...n };
+    delete rest.x;
+    delete rest.y;
+    await addDoc(notes, { ...rest, at: serverTimestamp() });
+  }
 }
 
 export async function notesOf(token: string): Promise<Note[]> {
