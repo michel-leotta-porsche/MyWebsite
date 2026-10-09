@@ -49,6 +49,7 @@ await writeFile(
 	<key>destination</key><string>upload</string>
 	<key>signingStyle</key><string>automatic</string>
 	<key>teamID</key><string>F8NKDCY59H</string>
+	<key>uploadSymbols</key><true/>
 	<key>manageAppVersionAndBuildNumber</key><false/>
 </dict>
 </plist>
