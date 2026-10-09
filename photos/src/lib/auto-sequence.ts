@@ -82,12 +82,21 @@ const paperRich = (spread: readonly Spec[]) =>
   spread.some((s) => s.kind === "small" || s.kind === "plate" || s.kind === "landscape" || s.kind === "blank" || s.kind === "verso");
 const fullPair = (spread: readonly Spec[]) => spread.length === 2 && spread.every((s) => s.kind === "full" || s.kind === "tall");
 
+/**
+ * Titelbild ohne eigene Wahl: zuerst unter den Fotos mit Stern, sonst unter allen;
+ * darin der farbigste Hochformat-Abzug (er erscheint im Buch trotzdem).
+ */
+export function pickCover(photos: AutoPhoto[]): string {
+  const starred = photos.filter((p) => p.star);
+  const pool = starred.length ? starred : photos;
+  return [...pool].filter((p) => !isLandscape(p)).sort((a, b) => chroma(b) - chroma(a))[0]?.key ?? pool[0]?.key;
+}
+
 /** Buch aus losen Fotos: Gruppen bilden, Layouts im Rhythmus wählen, Einband bestimmen */
 export function autoSequence(photos: AutoPhoto[]): { spreads: SpreadDraft[]; coverKey: string } {
   const byKey = new Map(photos.map((p) => [p.key, p]));
   const rest = [...photos].sort((a, b) => (a.taken ?? "").localeCompare(b.taken ?? ""));
-  // der farbigste ruhige Hochformat-Abzug kommt auf den Einband, er erscheint im Buch trotzdem
-  const coverKey = [...photos].filter((p) => !isLandscape(p)).sort((a, b) => chroma(b) - chroma(a))[0]?.key ?? photos[0]?.key;
+  const coverKey = pickCover(photos);
 
   const groups: string[][] = [];
   let acrossUsed = 0;
