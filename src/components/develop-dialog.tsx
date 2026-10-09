@@ -774,6 +774,50 @@ export function DevelopDialog({
     setEdits(next);
     lastLive.current = 0;
   };
+  // langes Drücken auf Rückgängig: mehrere Schritte auf einmal zurück, bis vor den gewählten
+  const undoTo = (i: number) => {
+    const to = past[i];
+    if (!to || busy) return;
+    fade(true);
+    setPast((p) => p.slice(0, i));
+    setFuture((f) => [...past.slice(i + 1), editsNow.current, ...f]);
+    showChanged(to);
+    setEdits(to);
+    lastLive.current = 0;
+  };
+  /** was ein Schritt geändert hat, in einem Wort oder zwei */
+  const stepName = (a: Record<string, PhotoEdit>, b: Record<string, PhotoEdit>) => {
+    const changed = photos.filter((p) => JSON.stringify(a[p.key]) !== JSON.stringify(b[p.key]));
+    if (changed.length > 1) return t("{n} Fotos auf einmal", { n: changed.length });
+    const p = changed[0];
+    if (!p) return t("Nichts geändert");
+    const x = a[p.key] ?? neutralEdit();
+    const y = b[p.key] ?? neutralEdit();
+    const same = (k: keyof PhotoEdit) => JSON.stringify(x[k]) === JSON.stringify(y[k]);
+    let what: string;
+    if (y.origin && (y.origin !== x.origin || y.pick !== x.pick || !same("transfer")))
+      what =
+        y.origin === "pick"
+          ? t(PICKS.find((q) => q.id === y.pick)?.name ?? "")
+          : y.origin === "auto"
+            ? t("Auto")
+            : y.origin === "match"
+              ? t("Angleichen")
+              : t("Stimmung übernehmen");
+    else if (!same("geo")) what = t("Zuschnitt");
+    else if (!same("look")) what = y.look ? t(lookOf(y.look)?.name ?? "") : t("Ohne Look");
+    else if (!same("amount")) what = t("Stärke {name}", { name: t(lookOf(y.look)?.name ?? "") });
+    else if (!same("rec")) what = y.recName ?? t("Rezept");
+    else {
+      const f = FINE.find(([k]) => !same(k));
+      what = f ? t(f[1]) : !same("more") ? t("Feinschliff") : t("Einstellungen");
+    }
+    return photos.length > 1 ? `${what} · ${nameOf(p)}` : what;
+  };
+  const history = past
+    .map((before, i) => ({ i, name: stepName(before, past[i + 1] ?? edits) }))
+    .reverse()
+    .slice(0, 15);
   const steps = useRef({ undo, redo, crop: () => {} });
   useEffect(() => {
     steps.current = { undo, redo, crop: () => (croppingNow.current ? setCropping(false) : openCrop()) };
@@ -1489,9 +1533,33 @@ export function DevelopDialog({
           <h2 className="text-xl font-bold tracking-[-0.02em]">{title ?? t("Bearbeiten")}</h2>
           <div className="flex items-center gap-2 lg:gap-3">
             <ToolGroup label={t("Verlauf")}>
-              <IconButton label={withKeys(t("Rückgängig"), "⌘Z")} onClick={undo} disabled={!past.length || !!busy}>
-                <Undo2 aria-hidden />
-              </IconButton>
+              <ContextMenu
+                container={dialog}
+                className="inline-flex"
+                menu={
+                  <>
+                    <MenuLabel>{t("Zurück bis vor …")}</MenuLabel>
+                    {history.map((h, n) => (
+                      <MenuItem key={h.i} hint={n === 0 ? t("der letzte Schritt") : t("{n} Schritte zurück", { n: n + 1 })} onClick={() => undoTo(h.i)}>
+                        {h.name}
+                      </MenuItem>
+                    ))}
+                    {past.length > history.length && (
+                      <>
+                        <MenuSeparator />
+                        <MenuItem icon={<RotateCcw />} onClick={() => undoTo(0)}>
+                          {t("Ganz an den Anfang")}
+                        </MenuItem>
+                      </>
+                    )}
+                    {!past.length && <MenuItem disabled>{t("Noch nichts zum Zurücknehmen")}</MenuItem>}
+                  </>
+                }
+              >
+                <IconButton label={withKeys(t("Rückgängig"), "⌘Z")} title={t("Rückgängig, lange drücken zeigt den Verlauf")} onClick={undo} disabled={!past.length || !!busy}>
+                  <Undo2 aria-hidden />
+                </IconButton>
+              </ContextMenu>
               <IconButton label={withKeys(t("Wiederholen"), "⇧⌘Z")} onClick={redo} disabled={!future.length || !!busy}>
                 <Redo2 aria-hidden />
               </IconButton>

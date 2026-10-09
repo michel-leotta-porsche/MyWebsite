@@ -2,7 +2,7 @@
 
 import { ArrowLeft, BookmarkPlus, Camera, Check, ClipboardCopy, Download, Share, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, buttonClass } from "@/components/ui/button";
@@ -16,11 +16,15 @@ import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from 
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
+import { putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
 // Werte rollen wie ein Zählwerk ein, die Filmsimulation wird gestempelt, Stufen füllen sich.
 // Alle Werte stehen sofort im DOM; die Bewegung ist nur der Weg dorthin.
+
+// die Kamera ist groß und kommt erst, wenn jemand „So fotografieren“ antippt
+const CameraView = dynamic(() => import("@/components/camera").then((m) => m.Camera), { ssr: false });
 
 const EXPO = [0.16, 1, 0.3, 1] as const;
 const signed = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : "0");
@@ -385,7 +389,6 @@ const noopSubscribe = () => () => {};
  */
 function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof recipeOf> }) {
   const t = useT();
-  const router = useRouter();
   const from = plateName(plate.no, plate.title);
   const file = recipe ? fromRecipe(recipe, from) : null;
   const clean = isNeutral(plate.edit) ? null : cleanEdit(plate.edit);
@@ -393,6 +396,7 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
   const [which, setWhich] = useState<"file" | "edit" | null>(null);
   const done = which === "file" ? file : which === "edit" ? edit : null;
   const [say, setSay] = useState<string | null>(null);
+  const [shooting, setShooting] = useState<string | null>(null);
   if (!file && !edit) return null;
   const take = (w: "file" | "edit", s: CopiedSettings) => {
     copySettings(s);
@@ -403,12 +407,7 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
     if (!done) return;
     setSay(t("Speichere …"));
     try {
-      let uid: string | null = process.env.NEXT_PUBLIC_FUJI_MOCK === "1" ? "test" : null;
-      if (!uid) {
-        const { auth } = await import("@/lib/firebase");
-        await auth().authStateReady();
-        uid = auth().currentUser?.uid ?? null;
-      }
+      const uid = await currentUid();
       if (!uid) return setSay(t("Zum Speichern als Look brauchst du ein Konto. Mitgenommen ist es trotzdem."));
       const { saveRecipe } = await import("@/lib/store");
       await saveRecipe(uid, asLook(done, `own-${Date.now().toString(36)}`));
@@ -418,16 +417,20 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
     }
   };
   const fuji = recipe?.kind === "fuji";
-  // „So fotografieren“ (Kamera-Workshop): der Look geht mit in Calimas Kamera, die im Fotostudio aufgeht. Nur in der App.
-  const shoot = () => {
+  // „So fotografieren“ (Kamera-Workshop): der Look geht mit in Calimas Kamera. Nur in der App. Die Kamera legt sich über das
+  // offene Buch, statt ins Zimmer zu wechseln: wer sie schließt, steht wieder an derselben Tafel, und die Werkbank bleibt offen
+  const shoot = async () => {
     const s = file ?? edit;
     if (!s) return;
     copySettings(s);
     haptic("tap");
-    router.push("/zimmer?kamera=1");
+    const uid = await currentUid().catch(() => null);
+    if (!uid) return setSay(t("Für die Kamera brauchst du ein Konto. Mitgenommen ist der Look trotzdem."));
+    setShooting(uid);
   };
   return (
     <div className="mt-4 border-t border-ink/15 pt-4">
+      {shooting && <SlipCamera uid={shooting} onClose={() => setShooting(null)} />}
       {IS_APP && (
         <button type="button" className={`${buttonClass("cloth", "sm", "pl-2.5")} mb-2`} onClick={shoot}>
           <Camera aria-hidden />
@@ -473,6 +476,46 @@ function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof
  * side: auf welcher Seite der Zettel liegt. Er liegt auf der Gegenseite seines Fotos, damit er
  * nie das Nachbarbild verdeckt und klar ist, zu welchem Bild er gehört (UX-Kritik K10).
  */
+async function currentUid(): Promise<string | null> {
+  if (process.env.NEXT_PUBLIC_FUJI_MOCK === "1") return "test";
+  const { auth } = await import("@/lib/firebase");
+  await auth().authStateReady();
+  return auth().currentUser?.uid ?? null;
+}
+
+/**
+ * Calimas Kamera über dem Buch. Die Aufnahmen landen wie aus dem Fotostudio als Abzüge auf dem Gerät (mehrere als ein
+ * Stapel); statt „Fertig“ im Studio sagt ein Hinweis, wo sie liegen, und das Buch bleibt, wie es war.
+ */
+function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
+  const t = useT();
+  const session = useRef<{ stack: string; prints: Print[]; films: Set<string> } | null>(null);
+  const now = () => (session.current ??= { stack: `cam-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, prints: [], films: new Set() });
+  const onShot = (p: Print, filmStack?: string) => {
+    const cur = now();
+    // auf einem Film zählt die Kamera selbst, der Stapel ist der Film
+    if (filmStack) {
+      cur.films.add(filmStack);
+      putPrints(uid, [{ ...p, stack: filmStack }]).catch(() => {});
+      return;
+    }
+    const i = cur.prints.findIndex((x) => x.id === p.id);
+    const print = { ...p, stack: cur.stack, pos: i < 0 ? cur.prints.length : cur.prints[i].pos };
+    if (i < 0) cur.prints.push(print);
+    else cur.prints[i] = print;
+    putPrints(uid, [print]).catch(() => {});
+  };
+  const close = () => {
+    const { prints: made, films } = now();
+    onClose();
+    // ein einzelnes Foto ist ein Abzug, kein Stapel
+    if (made.length === 1) putPrints(uid, [{ ...made[0], stack: undefined, pos: undefined }]).catch(() => {});
+    if (made.length) notify(made.length === 1 ? t("Das Foto liegt im Fotostudio.") : t("Die {n} Fotos liegen als Stapel im Fotostudio.", { n: made.length }));
+    else if (films.size) notify(t("Der Film liegt im Fotostudio."));
+  };
+  return <CameraView uid={uid} onShot={onShot} onFilmDone={() => {}} onClose={close} />;
+}
+
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {
   const t = useT();
   const reduce = useReducedMotion() ?? false;

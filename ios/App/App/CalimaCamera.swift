@@ -559,8 +559,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         lock.unlock()
     }
 
-    /// Körnung wie preview.ts: Rauschen je Zelle, als weiches Licht gemischt (Mitten am stärksten, Lichter und Tiefen kaum).
-    /// Das Rauschen wandert je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
+    /// Körnung wie preview.ts: Rauschen je Zelle, nur auf der Helligkeit (Mitten am stärksten, Lichter und Tiefen kaum).
+    /// Das Rauschen springt je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
     /// Wie applyGrain in model.ts: Rauschen ±amount um Mittelgrau, overlay-artig, in den Mitten am stärksten. Gemischt wird in
     /// Gamma-Werten (sRGB) wie im Web, nicht im linearen Arbeitsraum von Core Image: dort hellte dieselbe Körnung dunkle Stellen
     /// um ein Vielfaches auf (Salz-und-Pfeffer statt Korn).
@@ -587,8 +587,21 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             // groß und würde beim Einpassen in den Sucher auf nichts verkleinert (schwarzer Sucher)
             .cropped(to: image.extent)
         let gamma = image.applyingFilter("CILinearToSRGBToneCurve")
+        // Das Korn nur auf die Helligkeit legen, nie auf die Farbkanäle einzeln: Overlay entscheidet je Kanal, ob es aufhellt
+        // oder abdunkelt, und bei einer satten Farbe geht Rot hoch, während Blau runtergeht. Das sah aus wie buntes Rauschen.
+        // Im Web (applyGrain) bekommt jeder Kanal denselben Zuschlag; hier: Korn über das Grauwertbild, dann nur die Helligkeit
+        // davon ins Farbbild übernehmen (CILuminosityBlendMode: Farbton und Sättigung vom Hintergrund, Helligkeit vom Korn).
+        let luma = CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0)
+        let grey = gamma.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": luma,
+            "inputGVector": luma,
+            "inputBVector": luma,
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        ])
         return grain
-            .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: gamma])
+            .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: grey])
+            .applyingFilter("CILuminosityBlendMode", parameters: [kCIInputBackgroundImageKey: gamma])
             .applyingFilter("CISRGBToneCurveToLinear")
     }
 
