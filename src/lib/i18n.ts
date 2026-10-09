@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
 
 import { EN } from "@/content/en";
 import { LANG_KEY as KEY, type Lang } from "@/lib/lang";
@@ -89,7 +89,8 @@ export const t = (de: string, vars?: Vars) => translate(getLang(), de, vars);
 /** Für Komponenten: zeichnet neu, wenn die Sprache wechselt */
 export function useT() {
   const lang = useLang();
-  return (de: string, vars?: Vars) => translate(lang, de, vars);
+  // gleich bleibend, solange die Sprache bleibt: sonst rechnet jedes useMemo mit t bei jedem Render neu
+  return useCallback((de: string, vars?: Vars) => translate(lang, de, vars), [lang]);
 }
 
 /** Text in Server-Komponenten (Rechtstexte, Hilfe): der deutsche Text als Kind von T */
