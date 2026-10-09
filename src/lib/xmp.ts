@@ -118,8 +118,9 @@ export function toPreset(xmp: string, name: string): string {
 /* ---------- Calimas eigener Block: die kopierbaren Einstellungen, damit ein gesichertes Foto sein Rezept behält ---------- */
 
 const NS = "https://calima.web.app/ns/1.0/";
-const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const unescapeXml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+// auch Anführungszeichen, weil der Wert in einem Attribut steht (calima:source)
+const escapeXml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const unescapeXml = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 
 /**
  * XMP-Paket mit `calima:settings` (JSON der Einstellungen, wie sie die Zwischenablage hält) und `calima:name`.
