@@ -5,7 +5,10 @@
 
 import { applyGrain, applyLut, GRAIN, type RecipeValues } from "@/lib/develop/model";
 
-export type PreviewState = { lut: Uint8Array; n: number; rec: RecipeValues; /** 0..1: links davon Original; null = kein Vergleich */ split: number | null; original: boolean };
+export type PreviewState = { lut: Uint8Array; n: number; rec: RecipeValues; /** 0..1: links davon Original; null = kein Vergleich */ split: number | null; original: boolean;
+  /** Richtung der Trennlinie im Bild, wenn es gedreht oder gespiegelt gezeigt wird; ohne: links nach rechts */
+  sdir?: [number, number];
+};
 
 const VS = `#version 300 es
 in vec2 p;
@@ -20,6 +23,7 @@ uniform sampler2D img;
 uniform sampler3D lut;
 uniform float n;
 uniform float split;
+uniform vec2 sdir;
 uniform float amount;
 uniform float cell;
 uniform vec2 full;
@@ -32,7 +36,7 @@ float hash2(uint x, uint y) {
 }
 void main() {
   vec3 c = texture(img, uv).rgb;
-  if (uv.x < split) { o = vec4(c, 1.0); return; }
+  if (dot(uv - 0.5, sdir) + 0.5 < split) { o = vec4(c, 1.0); return; }
   c = texture(lut, c * ((n - 1.0) / n) + 0.5 / n).rgb;
   if (amount > 0.0) {
     vec2 px = floor(uv * full / cell);
@@ -124,6 +128,7 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
       }
       gl.uniform1f(u("n"), s.n);
       gl.uniform1f(u("split"), s.original ? 2 : (s.split ?? -1));
+      gl.uniform2f(u("sdir"), ...(s.sdir ?? [1, 0]));
       gl.uniform1f(u("amount"), GRAIN.amount[s.rec.grain]);
       gl.uniform1f(u("cell"), Math.max(1, full[0] * GRAIN.cell[s.rec.gsize]));
       gl.uniform2f(u("full"), full[0], full[1]);

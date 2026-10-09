@@ -23,7 +23,8 @@ import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } fr
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
-import { cleanEdit, fineOf, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
+import { mapPoint, outSize } from "@/lib/develop/geo";
+import { cleanEdit, fineOf, isNeutral, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
 
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
@@ -64,7 +65,7 @@ export type StoredPhoto = {
   /** Nachbearbeitung im Editor; src, large und thumb zeigen dann auf die eingerechnete Fassung */
   edit?: PhotoEdit;
   /** das unbearbeitete Foto: Neu gerechnet wird immer von hier, Zurücksetzen holt es zurück */
-  orig?: { src: string; large: string; thumb: string; color: [number, number, number] };
+  orig?: { src: string; large: string; thumb: string; color: [number, number, number]; /** Größe und Motiv vor dem Zuschnitt */ w?: number; h?: number; subject?: [number, number] };
 };
 
 /** Schema der gespeicherten Bücher; ältere Stände werden beim Laden angehoben (migrate) */
@@ -235,6 +236,37 @@ export async function uploadEdited(uid: string, bookId: string, key: string, blo
     }),
   );
   return Object.fromEntries(sizes.map((s, i) => [s, urls[i]])) as Record<SizeName, string>;
+}
+
+/** Das unbearbeitete Foto eines Fotos, auch wenn es noch nie bearbeitet wurde */
+export const origOf = (p: StoredPhoto): NonNullable<StoredPhoto["orig"]> => ({
+  w: p.w,
+  h: p.h,
+  subject: p.subject,
+  ...(p.orig ?? { src: p.src, large: p.large, thumb: p.thumb, color: p.color }),
+});
+
+/**
+ * Änderungen am Foto nach dem Bearbeiten. Ändert sich der Zuschnitt, ändert sich die Größe: der Ausschnitt im Rahmen
+ * geht zurück auf die Mitte, der Motivpunkt wird mit umgerechnet (oder fällt weg, wenn er weggeschnitten ist).
+ * Ohne urls (neutral) kommt das Original zurück.
+ */
+export function editedPatch(
+  p: StoredPhoto,
+  e: PhotoEdit,
+  baked?: { urls: Record<SizeName, string>; color: [number, number, number] },
+): Partial<StoredPhoto> {
+  const orig = origOf(p);
+  const ow = orig.w ?? p.w;
+  const oh = orig.h ?? p.h;
+  const geoChanged = JSON.stringify(cleanEdit(p.edit)?.geo ?? null) !== JSON.stringify(e.geo ?? null);
+  const geo = baked && !isNeutral(e) ? e.geo : undefined;
+  const [w, h] = outSize(geo, ow, oh);
+  const shape: Partial<StoredPhoto> = geoChanged
+    ? { w, h, focus: undefined, zoom: undefined, subject: orig.subject && (geo ? (mapPoint(geo, ow, oh, orig.subject) ?? undefined) : orig.subject) }
+    : {};
+  if (!baked || isNeutral(e)) return { ...shape, src: orig.src, large: orig.large, thumb: orig.thumb, color: orig.color, edit: undefined, orig: undefined };
+  return { ...shape, edit: e, orig, src: baked.urls.page, large: baked.urls.large, thumb: baked.urls.thumb, color: baked.color };
 }
 
 // Eigene Rezepte im Profil: users/{uid}/recipes/{id}; im Testmodus nur im Browser

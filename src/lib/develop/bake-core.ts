@@ -1,6 +1,7 @@
 // Einrechnen: das unbearbeitete große Foto holen, LUT und Körnung anwenden, in drei Größen neu kodieren.
 // Läuft im Worker (OffscreenCanvas) und, wo der fehlt, genauso im Hauptthread.
 
+import { outSize, placeOn, type Geo } from "@/lib/develop/geo";
 import { applyGrain, applyLut, toLab, type RecipeValues } from "@/lib/develop/model";
 
 export type BakeJob = {
@@ -13,6 +14,8 @@ export type BakeJob = {
   quality?: number;
   /** Höchstgröße des Originals in Byte */
   maxBytes?: number;
+  /** Zuschnitt; vor LUT und Körnung, damit die Körnung am Ergebnis gleich groß ist */
+  geo?: Geo;
 };
 export type BakeResult = { w: number; h: number; blobs: { large: Blob; page: Blob; thumb: Blob }; color: [number, number, number] };
 
@@ -54,13 +57,19 @@ export async function bake(
   const bmp = await load(job.url, job.maxBytes);
   const bw = "naturalWidth" in bmp ? bmp.naturalWidth : bmp.width;
   const bh = "naturalHeight" in bmp ? bmp.naturalHeight : bmp.height;
-  const s = Math.min(1, job.sizes.large / Math.max(bw, bh));
-  const w = Math.round(bw * s);
-  const h = Math.round(bh * s);
+  // Zuschnitt macht die Fläche kleiner; hochgerechnet wird nie
+  const [ow, oh] = outSize(job.geo, bw, bh);
+  const s = Math.min(1, job.sizes.large / Math.max(ow, oh));
+  const w = Math.max(1, Math.round(ow * s));
+  const h = Math.max(1, Math.round(oh * s));
   const large = make(w, h);
   const ctx = ctxOf(large, true);
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(bmp, 0, 0, w, h);
+  if (job.geo) {
+    placeOn(ctx, job.geo, bw, bh, s);
+    ctx.drawImage(bmp, -bw / 2, -bh / 2, bw, bh);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  } else ctx.drawImage(bmp, 0, 0, w, h);
   if ("close" in bmp) bmp.close();
   // in Streifen, damit nie zwei volle Pixelpuffer gleichzeitig im Speicher liegen
   const STRIP = 256;

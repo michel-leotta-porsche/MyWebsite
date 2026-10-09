@@ -1,17 +1,22 @@
 "use client";
 
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { BookmarkPlus, Check, ChevronDown, Columns2, Redo2, RotateCcw, Trash, Undo2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Redo2, RotateCcw, Trash, Undo2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { motion } from "motion/react";
 
+import { CropStage, StraightenDial } from "@/components/crop-stage";
 import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
+import { Segmented } from "@/components/ui/segmented";
 import { bakePhoto } from "@/lib/develop/bake";
+import { cropFor, fitCrop, GEO0, geoIsNeutral, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
 import {
   applyLut,
   cleanEdit,
+  colorIsNeutral,
+  colorKey,
   autoEdit,
   buildLut,
   FINE,
@@ -35,7 +40,7 @@ import {
   type RecipeValues,
 } from "@/lib/develop/model";
 import { createPreviewer, type Previewer } from "@/lib/develop/preview";
-import { deleteRecipe, myRecipes, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
+import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Bearbeiten auf der Werkbank: immer ein Foto, die anderen der Doppelseite liegen daneben und lassen sich antippen.
@@ -71,7 +76,7 @@ const groupTitle = "text-ink mb-2.5 text-[15px] font-bold tracking-[-0.01em]";
 /* ---------- LUT-Speicher: dieselbe Bearbeitung wird nicht zweimal gerechnet ---------- */
 
 const lutCache = new Map<string, Uint8Array>();
-function lutFor(e: PhotoEdit, n: number, key = JSON.stringify(e)): Uint8Array {
+function lutFor(e: PhotoEdit, n: number, key = colorKey(e)): Uint8Array {
   const k = `${n}|${key}`;
   let lut = lutCache.get(k);
   if (!lut) {
@@ -155,9 +160,36 @@ function pixelsOf(pic: Pic, maxW: number): ImageData {
 
 /** Größe des eingerechneten großen Bilds, damit die Körnung in der Vorschau gleich groß ist */
 const fullOf = (p: StoredPhoto, long: number): [number, number] => {
-  const s = Math.min(1, long / Math.max(p.w, p.h));
-  return [Math.round(p.w * s), Math.round(p.h * s)];
+  // Größe vor dem Zuschnitt: gerechnet wird immer vom Original
+  const o = origOf(p);
+  const [w, h] = [o.w ?? p.w, o.h ?? p.h];
+  const s = Math.min(1, long / Math.max(w, h));
+  return [Math.round(w * s), Math.round(h * s)];
 };
+
+/**
+ * Lage der Vorschau in der Bühne: die Bühne zeigt den Rahmen, die Zeichenfläche (ganzes Bild) liegt gedreht und
+ * gespiegelt darunter. Nur transform, damit Drehen und Ziehen nichts neu rechnen.
+ */
+function geoBox(g: Geo, w: number, h: number): CSSProperties {
+  const [W, H] = turned(w, h, g.quarter);
+  const cw = g.crop[2] * W;
+  const ch = g.crop[3] * H;
+  const bw = (w / cw) * 100;
+  const bh = (h / ch) * 100;
+  const cx = ((W / 2 - g.crop[0] * W) / cw) * 100;
+  const cy = ((H / 2 - g.crop[1] * H) / ch) * 100;
+  return {
+    width: `${bw}%`,
+    height: `${bh}%`,
+    left: `${cx - bw / 2}%`,
+    top: `${cy - bh / 2}%`,
+    transform: `rotate(${g.angle}deg) scaleX(${g.flip ? -1 : 1}) rotate(${g.quarter * 90}deg)`,
+  };
+}
+const FULL: Geo["crop"] = [0, 0, 1, 1];
+/** neutraler Zuschnitt fällt weg, damit „unbearbeitet“ unbearbeitet bleibt */
+const keepGeo = (g: Geo): Geo | undefined => (geoIsNeutral(g) ? undefined : g);
 
 /* ---------- Zoom ---------- */
 
@@ -419,6 +451,9 @@ export function DevelopDialog({
   const [moodIdx, setMoodIdx] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [cropping, setCropping] = useState(false);
+  const croppingNow = useRef(cropping);
+  croppingNow.current = cropping;
 
   const dialog = useRef<HTMLDialogElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -433,6 +468,10 @@ export function DevelopDialog({
   const others = photos.filter((p) => p.key !== photo.key);
   const deferred = useDeferredValue(edits);
   const dirty = photos.some((p) => JSON.stringify(edits[p.key]) !== JSON.stringify(initial[p.key]));
+  // Zuschnitt: Größe des Ergebnisses ohne Zuschnitt, Fläche nach dem Drehen in Vierteln
+  const [fw, fh] = fullOf(photo, long);
+  const geo = edit.geo ?? GEO0();
+  const [TW, TH] = turned(fw, fh, geo.quarter);
 
   // Dialog modal öffnen: Fokus bleibt drin, Seite dahinter ist inert
   useEffect(() => {
@@ -523,8 +562,12 @@ export function DevelopDialog({
   useEffect(() => {
     const p = previewer.current;
     if (!p || !shown) return;
-    const key = JSON.stringify(edit);
-    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? split : null, original: holding });
+    const key = colorKey(edit);
+    // Trennlinie: Stelle auf der Bühne → Stelle im Bild, so wie es gedreht und gespiegelt gezeigt wird
+    const gg = edit.geo ?? GEO0();
+    const sdir: [number, number] = ([[1, 0], [0, -1], [-1, 0], [0, 1]] as const)[gg.quarter].map((v) => (gg.flip ? -v : v)) as [number, number];
+    const at = gg.crop[0] + split * gg.crop[2];
+    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? at : null, original: holding, sdir });
     const raf = requestAnimationFrame(() => draw(lutCache.has(`${FINE_N}|${key}`) ? FINE_N : FAST));
     const t = window.setTimeout(() => draw(FINE_N), 140);
     return () => {
@@ -592,9 +635,9 @@ export function DevelopDialog({
     setEdits(next);
     lastLive.current = 0;
   };
-  const steps = useRef({ undo, redo });
+  const steps = useRef({ undo, redo, crop: () => {} });
   useEffect(() => {
-    steps.current = { undo, redo };
+    steps.current = { undo, redo, crop: () => (croppingNow.current ? setCropping(false) : openCrop()) };
   });
 
   const act = (fn: (e: PhotoEdit) => PhotoEdit, slow = false) => {
@@ -616,6 +659,40 @@ export function DevelopDialog({
   const liveRec = (patch: Partial<RecipeValues>) => {
     burst();
     setEdit((e) => ({ ...e, rec: { ...e.rec, ...patch } }));
+  };
+
+  /* ----- Zuschneiden ----- */
+
+  const setGeo = (fn: (g: Geo) => Geo) => setEdit((e) => ({ ...e, geo: keepGeo(fn(e.geo ?? GEO0())) }));
+  const actGeo = (fn: (g: Geo) => Geo) => {
+    remember();
+    setGeo(fn);
+  };
+  // Drehrad: der Rahmen beim Ansetzen ist das Ziel; beim Drehen wird er nur so weit kleiner, wie es sein muss
+  const dialBase = useRef<Geo["crop"] | null>(null);
+  const kOf = (g: Geo, W = TW, H = TH) => ratioOf(g.ratio, g.portrait, W, H);
+  const pickRatio = (r: Ratio) =>
+    actGeo((g) => {
+      // 4:5 ist meist hochkant gemeint, die anderen folgen der Fläche
+      const portrait = r === "4:5" ? true : TH > TW;
+      const k = ratioOf(r, portrait, TW, TH);
+      return { ...g, ratio: r, portrait, crop: r === "free" ? g.crop : cropFor(k, g.crop, g.angle, TW, TH) };
+    });
+  const pickPortrait = (portrait: boolean) => actGeo((g) => ({ ...g, portrait, crop: cropFor(ratioOf(g.ratio, portrait, TW, TH), g.crop, g.angle, TW, TH) }));
+  // 90° nach links: das ganze Ergebnis dreht sich, der Rahmen dreht mit
+  const turnLeft = () =>
+    actGeo((g) => {
+      const [x, y, w, h] = g.crop;
+      return { ...g, quarter: ((g.quarter + (g.flip ? 1 : 3)) % 4) as Geo["quarter"], portrait: !g.portrait, crop: [y, 1 - x - w, h, w] };
+    });
+  const flipIt = () => actGeo((g) => ({ ...g, flip: !g.flip, angle: -g.angle, crop: [1 - g.crop[0] - g.crop[2], g.crop[1], g.crop[2], g.crop[3]] }));
+  const straighten = (a: number) => setGeo((g) => ({ ...g, angle: a, crop: fitCrop(dialBase.current ?? g.crop, a, TW, TH) }));
+  const openCrop = () => {
+    setCompare(false);
+    setHolding(false);
+    setBig(null);
+    setNote(null);
+    setCropping(true);
   };
 
   /* ----- Vorschläge ----- */
@@ -677,7 +754,7 @@ export function DevelopDialog({
 
   // gilt nur für das Foto, auf dem gezoomt wurde; ein anderes Foto beginnt ganz
   const [zoom, setZoom] = useState<View & { key: string; ease: boolean }>({ ...FIT, key: "", ease: false });
-  const view: View = zoom.key === photo.key ? zoom : FIT;
+  const view: View = zoom.key === photo.key && !cropping ? zoom : FIT;
   const viewNow = useRef(view);
   viewNow.current = view;
   const frame = useRef<HTMLDivElement>(null);
@@ -704,6 +781,7 @@ export function DevelopDialog({
     if (!el) return;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (croppingNow.current) return;
       const r = el.getBoundingClientRect();
       const v = viewNow.current;
       const z = Math.min(ZMAX, Math.max(1, v.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015))));
@@ -890,6 +968,7 @@ export function DevelopDialog({
       // \ liegt auf deutschen Tastaturen hinter Alt (Mac) oder AltGr; deshalb ohne Prüfung der Zusatztasten
       if ((e.key === "\\" || e.key === "m") && !e.repeat) setHolding(true);
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "c" || e.key === "C") return steps.current.crop();
       if (e.key === "+" || e.key === "-" || e.key === "0") return zoomKeys.current(e.key);
       const t = ({ 1: "s", 2: "l", 3: "f", 4: "r" } as Record<string, Tab>)[e.key];
       if (t) {
@@ -929,18 +1008,18 @@ export function DevelopDialog({
     try {
       for (const [i, p] of changed.entries()) {
         const e = edits[p.key];
-        const orig = p.orig ?? { src: p.src, large: p.large, thumb: p.thumb, color: p.color };
+        const orig = origOf(p);
         if (isNeutral(e)) {
           // zurück zum Original: nichts rechnen, die alten Dateien gelten wieder
-          if (p.orig) patches[p.key] = { src: orig.src, large: orig.large, thumb: orig.thumb, color: orig.color, edit: undefined, orig: undefined };
+          if (p.orig) patches[p.key] = editedPatch(p, e);
           continue;
         }
         setBusy(changed.length > 1 ? `Speichere Foto ${i + 1} von ${changed.length} …` : "Speichere das Foto …");
-        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec });
+        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo });
         if (cancelled.current) return;
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
         if (cancelled.current) return;
-        patches[p.key] = { edit: e, orig, src: urls.page, large: urls.large, thumb: urls.thumb, color: out.color };
+        patches[p.key] = editedPatch(p, e, { urls, color: out.color });
       }
     } catch (e) {
       if (cancelled.current) return;
@@ -957,7 +1036,9 @@ export function DevelopDialog({
 
   const hint =
     note ??
-    (compare
+    (cropping
+      ? `Rahmen ziehen verschiebt ihn, Ecken ändern die Größe. Das Rad darunter richtet gerade.${bookId ? " Die Seite schneidet im Rahmen zusätzlich zu." : ""}`
+      : compare
       ? "Den Strich auf dem Foto ziehen. Links ist das Original."
       : tab === "s"
         ? "Ein Tipp genügt. Danach kannst du unter Feinschliff nachstellen."
@@ -973,7 +1054,11 @@ export function DevelopDialog({
     setTab(t);
     setNote(null);
   };
-  const aspect = photo.w / photo.h;
+  // Bühne: zeigt den Rahmen; beim Zuschneiden die ganze Fläche mit dem Rahmen darüber
+  const shownGeo: Geo = cropping ? { ...geo, crop: FULL } : geo;
+  const [sw, sh] = cropping ? [TW, TH] : outSize(geo, fw, fh);
+  const aspect = sw / sh;
+  const [pxW, pxH] = outSize(geo, fw, fh);
   const tileImg = loaded[photo.key]?.tile;
 
   // Fotos der Doppelseite: auf dem Telefon als Streifen unter dem Foto, am Desktop senkrecht direkt links daneben,
@@ -1014,8 +1099,9 @@ export function DevelopDialog({
       className="bg-table text-on-table fixed inset-0 z-[700] m-0 h-full max-h-none w-full max-w-none overflow-hidden overscroll-contain p-0"
       onCancel={(e) => {
         e.preventDefault();
-        // Escape schließt zuerst die Rückfrage
+        // Escape schließt zuerst die Rückfrage, dann den Zuschnitt
         if (ask) setAsk(null);
+        else if (cropping) setCropping(false);
         else close();
       }}
     >
@@ -1045,8 +1131,8 @@ export function DevelopDialog({
 
         {/* Bühne: das Foto ganz sichtbar; auf dem Telefon steht sie fest, nur die Werkzeuge rollen. Quer stehen Foto und Werkzeuge nebeneinander */}
         <div className="bg-table flex flex-none flex-col gap-2 flat:min-h-0 pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] lg:min-h-0 lg:gap-4 lg:p-0">
-          <div className="grid h-[clamp(170px,36svh,460px)] place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]">
-            <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${photo.w} / ${photo.h}` }}>
+          <div className={`grid ${cropping ? "h-[clamp(220px,50svh,560px)]" : "h-[clamp(170px,36svh,460px)]"} place-items-center [container-type:size] flat:h-auto flat:min-h-0 flat:flex-1 lg:h-auto lg:min-h-0 lg:flex-1 lg:px-[88px]`}>
+            <div className="relative" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, aspectRatio: `${sw} / ${sh}` }}>
               {strip("absolute top-0 right-full bottom-0 mr-5 w-[64px] flex-col items-center justify-center overflow-y-auto px-1 py-1 max-lg:hidden", "w-14")}
               <div
                 ref={frame}
@@ -1064,11 +1150,37 @@ export function DevelopDialog({
                   className={`absolute inset-0 origin-top-left ${zoom.ease && zoom.key === photo.key ? "ease-out transition-transform duration-500" : ""}`}
                   style={{ transform: `translate(${view.x * 100}%, ${view.y * 100}%) scale(${view.z})` }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
-                  {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
-                  <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
-                  <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+                  {/* Zuschnitt: das ganze Bild liegt gedreht unter dem Rahmen */}
+                  <div className="absolute" style={geoBox(shownGeo, fw, fh)}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Platzhalter, bis die Vorschau steht */}
+                    {!shown && <img src={photo.orig?.thumb ?? photo.thumb} alt="" className="absolute inset-0 size-full object-cover" />}
+                    <canvas ref={canvas} aria-hidden className={`absolute inset-0 size-full ${shown ? "" : "opacity-0"}`} />
+                    <canvas ref={ghost} aria-hidden className="pointer-events-none absolute inset-0 size-full opacity-0" />
+                  </div>
                 </div>
+                {cropping && shown && (
+                  <>
+                    <CropStage
+                      geo={geo}
+                      W={TW}
+                      H={TH}
+                      ratio={kOf(geo)}
+                      onChange={(c) => {
+                        burst();
+                        setGeo((g) => ({ ...g, crop: c }));
+                      }}
+                      onEnd={() => {}}
+                    />
+                    <span
+                      aria-hidden
+                      className="text-on-table pointer-events-none absolute z-[8] rounded-full bg-[rgb(12_10_8/0.6)] px-2 py-0.5 text-[11px] font-semibold tabular-nums"
+                      style={{ left: `calc(${geo.crop[0] * 100}% + 6px)`, top: `calc(${geo.crop[1] * 100}% + 6px)` }}
+                    >
+                      {geo.ratio === "free" ? "" : `${ratioLabel(geo.ratio === "orig" ? "orig" : geo.ratio, geo.portrait)} · `}
+                      {pxW} × {pxH} px
+                    </span>
+                  </>
+                )}
                 {failed && !shown && (
                   <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
                     <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
@@ -1124,11 +1236,36 @@ export function DevelopDialog({
               </div>
             </div>
           </div>
+          {cropping && (
+            <StraightenDial
+              angle={geo.angle}
+              onStart={() => {
+                remember();
+                dialBase.current = geo.crop;
+              }}
+              onChange={straighten}
+              onEnd={() => (dialBase.current = null)}
+              onTurn={turnLeft}
+              onFlip={flipIt}
+            />
+          )}
           {/* Telefon: Fotos und Knöpfe in einer Zeile, damit für die Werkzeuge mehr Höhe bleibt */}
-          <div className="flex items-center gap-2 lg:contents">
+          <div className={cropping ? "hidden" : "flex items-center gap-2 lg:contents"}>
             {strip("min-w-0 flex-1 overflow-x-auto px-1 py-1.5 lg:hidden", "h-14")}
 
             <div className="flex flex-none items-center gap-2 max-lg:ml-auto lg:flex-wrap lg:justify-center">
+              <button
+                type="button"
+                disabled={!shown}
+                title="Auch: Taste C"
+                onClick={openCrop}
+                className={buttonClass("quiet", "sm", `pl-2.5 ${photos.length > 1 ? "max-sm:min-w-11 max-sm:px-0" : ""}`)}
+              >
+                <Crop aria-hidden />
+                <span className={photos.length > 1 ? "max-sm:sr-only" : ""}>Zuschneiden</span>
+                {!geoIsNeutral(edit.geo) && <span aria-hidden className="bg-mark size-1.5 rounded-full" />}
+                {!geoIsNeutral(edit.geo) && <span className="sr-only">, zugeschnitten</span>}
+              </button>
               <button
                 type="button"
                 aria-pressed={compare}
@@ -1186,7 +1323,58 @@ export function DevelopDialog({
               Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
             </p>
           )}
+          {cropping && (
+            <div className="grid gap-4">
+              <div className="flex items-center justify-between gap-2">
+                <Button variant="paper" size="sm" className="pl-2" onClick={() => setCropping(false)}>
+                  <ChevronLeft aria-hidden />
+                  Werkzeuge
+                </Button>
+                <h3 className="text-[15px] font-bold tracking-[-0.01em]">Zuschnitt</h3>
+                <Button variant="paper" size="sm" className="pl-2.5" disabled={geoIsNeutral(edit.geo)} onClick={() => actGeo(() => GEO0())}>
+                  <RotateCcw aria-hidden />
+                  Zurücksetzen
+                </Button>
+              </div>
+              <Chips<Ratio> label="Format" opts={RATIOS} cur={geo.ratio} onPick={pickRatio} />
+              {geo.ratio !== "orig" && geo.ratio !== "free" && geo.ratio !== "1:1" && (
+                <div>
+                  <h3 className={groupTitle}>Ausrichtung</h3>
+                  <Segmented
+                    tone="paper"
+                    label="Ausrichtung"
+                    options={[
+                      { value: "hoch", label: "Hoch" },
+                      { value: "quer", label: "Quer" },
+                    ]}
+                    value={geo.portrait ? "hoch" : "quer"}
+                    onChange={(v) => pickPortrait(v === "hoch")}
+                  />
+                </div>
+              )}
+              {/* am Rechner zusätzlich als gewöhnlicher Regler, für Tastatur und genaue Werte */}
+              <div className="max-lg:hidden">
+                <Slider
+                  id="dv-angle"
+                  label="Geraderichten"
+                  value={geo.angle}
+                  min={-45}
+                  max={45}
+                  step={0.1}
+                  zero={0}
+                  format={(v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1).replace(".", ",")}°`}
+                  onFocus={() => (dialBase.current = geo.crop)}
+                  onChange={(v) => {
+                    burst();
+                    straighten(v);
+                  }}
+                />
+              </div>
+              <p className="text-ink-2 text-[13px] leading-snug">{hint}</p>
+            </div>
+          )}
           <div
+            hidden={cropping}
             role="tablist"
             aria-label="Werkzeuge"
             className="slip sticky -top-4 z-[2] -mx-4 -mt-4 px-4 pt-4 pb-1 lg:-top-5 lg:-mx-5 lg:-mt-5 lg:px-5 lg:pt-5"
@@ -1228,10 +1416,10 @@ export function DevelopDialog({
             </div>
           </div>
 
-          <p aria-hidden className="text-ink-2 -mt-1 text-[13px] leading-snug max-lg:hidden">
+          <p aria-hidden className={`text-ink-2 -mt-1 text-[13px] leading-snug max-lg:hidden ${cropping ? "lg:hidden" : ""}`}>
             {hint}
           </p>
-          <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`}>
+          <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`} hidden={cropping}>
             {tab === "s" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile
@@ -1302,7 +1490,7 @@ export function DevelopDialog({
                   <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
                 )}
                 {saveForm || (
-                  <Button variant="paper" size="sm" className="mt-3.5 pl-2.5" onClick={() => setNaming(true)} disabled={isNeutral(edit)}>
+                  <Button variant="paper" size="sm" className="mt-3.5 pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
                     <BookmarkPlus aria-hidden />
                     Als eigenen Look speichern
                   </Button>
