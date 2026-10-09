@@ -68,6 +68,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 webView.isOpaque = false
                 webView.backgroundColor = .clear
                 webView.scrollView.backgroundColor = .clear
+                webView.underPageBackgroundColor = .clear
                 self.camera.attach(to: host, frame: frame)
                 if let lut { self.camera.setLut(base64: lut, n: n) }
                 self.camera.start { error in
@@ -112,6 +113,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             webView.isOpaque = wasOpaque
             webView.backgroundColor = wasBackground
             webView.scrollView.backgroundColor = wasBackground
+            webView.underPageBackgroundColor = wasBackground ?? .clear
         }
     }
 

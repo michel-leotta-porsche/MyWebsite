@@ -405,8 +405,8 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         </span>
       </header>
 
-      {/* Sucher: 3:4 wie das Foto, durchsichtig; dahinter zeichnet die App */}
-      <div className="bg-table-deep relative flex min-h-0 flex-1 flex-col">
+      {/* Sucher: 3:4 wie das Foto, durchsichtig; dahinter zeichnet die App. Hier darf nichts einen Hintergrund malen. */}
+      <div className="relative flex min-h-0 flex-1 flex-col bg-transparent">
         <div
           ref={box}
           className="relative mx-auto w-full max-w-full touch-none"
