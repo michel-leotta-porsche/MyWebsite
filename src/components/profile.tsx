@@ -14,6 +14,7 @@ import { OPERATOR } from "@/components/legal";
 import { confirmIdentity, deleteAccountUser, providerOf, renameUser, signOutNow, type AppleRevoke, type User } from "@/lib/firebase";
 import { friendlyError, signInError } from "@/lib/errors";
 import { setSessionHint } from "@/lib/session-hint";
+import { clearPrints } from "@/lib/studio-store";
 import { isAdmin } from "@/lib/admin";
 import {
   closeReport,
@@ -261,6 +262,7 @@ function DeleteAccount({ user, counts, onClose }: { user: User; counts: { books?
       await deleteAccountData(user.uid, (s) => setStep(`${s} werden gelöscht`));
       setStep("Konto wird gelöscht");
       if (!mock) await deleteAccountUser(user, revoke);
+      await clearPrints(user.uid).catch(() => {});
       setSessionHint(false);
       router.replace("/konto-geloescht");
     } catch (e) {
