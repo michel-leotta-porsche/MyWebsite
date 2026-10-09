@@ -4,7 +4,8 @@ import { Film as FilmIcon, Lock, SlidersHorizontal, SwitchCamera, X } from "luci
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { allAuto, DialChips, GridOverlay, MeterBadge, Ruler, WhitePad, type DialKey } from "@/components/camera-dials";
+import { allAuto, DIALS, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
+import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
@@ -33,6 +34,7 @@ import type { Print } from "@/lib/studio-store";
 type Look = { id: string; name: string; approx: boolean; edit: PhotoEdit | null };
 const ORIGINAL = "original";
 const LAST_KEY = "calima:kamera-look";
+const SHIFT_KEY = "calima:kamera-weiss";
 const TOOLS_KEY = "calima:kamera-werkzeug";
 const HOLD_MS = 220;
 const MOVE_PX = 10;
@@ -138,6 +140,46 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   const chosen = looks.find((l) => l.id === lookId) ?? (recent.length ? looks[1] : (looks.find((l) => l.id === PRESETS[0].id) ?? looks[0]));
   // gemerkt, damit der Look-Effekt (190 kB LUT an die App) nur bei einem echten Wechsel läuft, nicht bei jedem Zoom- oder Belichtungsschritt
   const active = useMemo<Look>(() => (film ? { id: "film", name: film.name, approx: film.approx, edit: film.edit } : chosen), [film, chosen]);
+  // Weiß-Feinabstimmung wie bei Fuji: verschiebt wbR/wbB des Looks, je Look auf dem Gerät gemerkt; der Film behält seine
+  /** Werkzeug weggezogen: die Räder bleiben gestellt, der Sucher bekommt den Platz */
+  const [toolsDown, setToolsDown] = useState(false);
+  const grip = useRef<number | null>(null);
+  /** Fingerweg am Griff, solange gezogen wird */
+  const [pull, setPull] = useState<number | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [panelH, setPanelH] = useState(0);
+  useEffect(() => {
+    const el = panel.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setPanelH(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tools]);
+  const [shifts, setShifts] = useState<Record<string, Shift>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SHIFT_KEY) ?? "{}") as Record<string, Shift>;
+    } catch {
+      return {};
+    }
+  });
+  const base: Shift = { r: active.edit?.rec.wbR ?? 0, b: active.edit?.rec.wbB ?? 0 };
+  const shift = (!film && shifts[active.id]) || base;
+  const setShift = (s: Shift) =>
+    setShifts((prev) => {
+      const next = { ...prev, [active.id]: s };
+      try {
+        localStorage.setItem(SHIFT_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  /** der Look, wie er gerade in den Sucher und ins Foto geht: mit Weiß-Verschiebung */
+  const lookNow = useMemo<Look>(() => {
+    if (shift.r === base.r && shift.b === base.b) return active;
+    const e = active.edit ?? neutralEdit();
+    return { ...active, edit: { ...e, rec: { ...e.rec, wbR: shift.r, wbB: shift.b } } };
+    // base hängt an active
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, shift.r, shift.b]);
 
   const frameOf = useCallback((): Frame | null => {
     const r = box.current?.getBoundingClientRect();
@@ -171,8 +213,12 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       if (frame && started.current) CalimaCamera.layout({ frame }).catch(() => {});
     };
     window.addEventListener("resize", onResize);
+    // der Sucher wächst, wenn das Werkzeug zuklappt: das Bild der App folgt seinem Kasten
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
+    if (box.current) ro?.observe(box.current);
     return () => {
       alive = false;
+      ro?.disconnect();
       window.removeEventListener("resize", onResize);
       delete document.documentElement.dataset.kamera;
       CalimaCamera.stop().catch(() => {});
@@ -182,20 +228,30 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Look wechseln: der LUT geht hinüber, der Name bleibt gemerkt
+  // Look wechseln: der LUT geht hinüber, der Name bleibt gemerkt. Beim Ziehen im Weiß-Raster höchstens alle 120 ms ein
+  // neuer LUT (190 kB über die Brücke), der letzte Stand kommt immer an
+  const lutSent = useRef(0);
+  const lutTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     if (!ready) return;
-    const l = active.edit ? lutOf(active.edit) : null;
-    if (l) CalimaCamera.setLut(l).catch(() => {});
-    else CalimaCamera.setOriginal({ on: true }).catch(() => {});
-    if (l && !holding) CalimaCamera.setOriginal({ on: false }).catch(() => {});
-    CalimaCamera.setGrain(grainOf(active.edit)).catch(() => {});
+    const send = () => {
+      lutSent.current = performance.now();
+      const l = lookNow.edit ? lutOf(lookNow.edit) : null;
+      if (l) CalimaCamera.setLut(l).catch(() => {});
+      else CalimaCamera.setOriginal({ on: true }).catch(() => {});
+      if (l && !holding) CalimaCamera.setOriginal({ on: false }).catch(() => {});
+      CalimaCamera.setGrain(grainOf(lookNow.edit)).catch(() => {});
+    };
+    window.clearTimeout(lutTimer.current);
+    const wait = 120 - (performance.now() - lutSent.current);
+    if (wait <= 0) send();
+    else lutTimer.current = window.setTimeout(send, wait);
     try {
       localStorage.setItem(LAST_KEY, active.id);
     } catch {}
     // holding gehört nicht dazu: beim Loslassen stellt der Zeiger den Look selbst zurück
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, ready]);
+  }, [lookNow, ready]);
 
   const pick = (l: Look) => {
     if (l.id === active.id) return;
@@ -213,6 +269,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   }, [tools, grid, ready]);
   const toggleTools = () => {
     haptic("select");
+    setToolsDown(false);
     setTools((on) => {
       try {
         localStorage.setItem(TOOLS_KEY, on ? "0" : "1");
@@ -229,7 +286,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       .catch(() => {});
   };
   const changeDials = (next: Dials) => {
-    if (next[dial as DialKey] !== dials[dial as DialKey] || (next.tint === 0) !== (dials.tint === 0)) haptic("select");
+    if (dial !== "kelvin" && next[dial as DialKey] !== dials[dial as DialKey]) haptic("select");
     setDials(next);
   };
   const lenses = useMemo(() => realFocals(info?.lenses ?? [1]), [info]);
@@ -284,7 +341,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   };
 
   const holdOriginal = (on: boolean) => {
-    if (!active.edit) return;
+    if (!lookNow.edit) return;
     setHolding(on);
     CalimaCamera.setOriginal({ on }).catch(() => {});
   };
@@ -399,7 +456,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       const { path } = await CalimaCamera.capture();
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
-      const edit = active.edit ?? undefined;
+      const edit = lookNow.edit ?? undefined;
       const onFilm = film;
       const print: Print = { id: newId(), name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit, pos: onFilm?.count };
       onShot(print, onFilm?.stack);
@@ -565,12 +622,61 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
 
       <footer className="bg-table-deep grid gap-3 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
         {tools && (
-          <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={setDial} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} />
+          // Griff: das Werkzeug folgt dem Finger nach unten weg und wieder herauf; der Sucher wächst mit
+          <div
+            onPointerDown={(e) => {
+              (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+              grip.current = e.clientY;
+              setPull(0);
+            }}
+            onPointerMove={(e) => grip.current != null && setPull(e.clientY - grip.current)}
+            onPointerUp={(e) => {
+              const dy = grip.current == null ? 0 : e.clientY - grip.current;
+              grip.current = null;
+              setPull(null);
+              // ein Drittel des Wegs reicht; ein kurzer Tipp klappt um
+              const next = Math.abs(dy) < 8 ? !toolsDown : toolsDown ? dy > -panelH / 3 : dy > panelH / 3;
+              if (next !== toolsDown) haptic("select");
+              setToolsDown(next);
+            }}
+            onPointerCancel={() => {
+              grip.current = null;
+              setPull(null);
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setToolsDown((d) => !d)}
+            aria-expanded={!toolsDown}
+            aria-label={toolsDown ? t("Werkzeug hervorholen") : t("Werkzeug wegziehen, Sucher größer")}
+            className="-mt-3 -mb-2 flex h-8 cursor-grab touch-none items-center justify-center gap-2 select-none"
+          >
+            <span aria-hidden className="bg-on-table-2/60 h-1 w-9 rounded-full" />
+            {toolsDown && (
+              <span className="text-on-table-2 flex items-center gap-1.5 text-[11px] font-semibold tabular-nums">
+                {DIALS.filter((k) => dials[k] != null).length ? t("{n} von Hand", { n: DIALS.filter((k) => dials[k] != null).length }) : t("alles auf A")}
+                {(shift.r !== base.r || shift.b !== base.b) && ` · ${fmtShift(shift)}`}
+              </span>
+            )}
+          </div>
         )}
-        {tools && dial === "kelvin" && <WhitePad dials={dials} meter={meter} onChange={changeDials} />}
-        {tools && dial && dial !== "focal" && dial !== "kelvin" && (
-          <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
-        )}
+        {/* weggezogen bleibt alles stehen (auch ein offenes Raster), es ist nur versteckt */}
+        <div
+          className={tools ? "-mt-3 overflow-hidden" : "hidden"}
+          style={{
+            height: pull == null ? (toolsDown ? 0 : panelH || "auto") : Math.max(0, Math.min(panelH, toolsDown ? -pull : panelH - pull)),
+            transition: pull == null ? "height .28s cubic-bezier(.2,.8,.2,1)" : "none",
+          }}
+        >
+          <div ref={panel} className="grid gap-3 pt-3">
+            {tools && (
+              <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={setDial} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} />
+            )}
+            {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} />}
+            {tools && dial && dial !== "focal" && dial !== "kelvin" && (
+              <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
+            )}
+          </div>
+        </div>
         {film ? (
           <div className="flex items-center gap-3 px-4 pb-1">
             <div className="min-w-0 flex-1">
@@ -677,7 +783,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
             : reticle
               ? t("Noch ein Tipp auf die Marke hält Schärfe und Licht fest.")
               : tools && dial === "kelvin"
-                ? t("Links kälter, rechts wärmer, oben grüner, unten magenta. Doppeltipp gibt es der Kamera zurück.")
+                ? t("Ziehen oder tippen wählt das Licht. Feinabstimmung verschiebt die Farbe wie bei Fuji.")
                 : tools && dial && dial !== "focal"
             ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
             : tools && focal != null && !lenses.includes(focal)

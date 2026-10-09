@@ -280,6 +280,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private var virtualDevice: AVCaptureDevice?
     /// Zoom in Einheiten der virtuellen Kamera (1,0 = Ultraweitwinkel), den die Seite gerade will
     private var wantedZoom: CGFloat = 1
+    /// Schärfe und Helligkeit per zweitem Tipp festgehalten (focus(lock:)); applyDials lässt sie dann stehen
+    private var tapLock = false
 
     // MARK: Expertenmodus E1: Räder, Messer, Lupe, Wasserwaage (expertenmodus-workshop-2026-10-09/)
 
@@ -335,9 +337,9 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         let d = dials
         guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
         defer { device.unlockForConfiguration() }
-        // Belichtung
+        // Belichtung; auf A nur zurück zur Automatik, wenn vorher von Hand gestellt war (eine Sperre per Tipp bleibt)
         if d.duration == nil && d.iso == nil {
-            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            if device.exposureMode == .custom, device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
         } else if device.isExposureModeSupported(.custom) {
             device.setExposureModeCustom(duration: clampDuration(d.duration), iso: clampISO(d.iso), completionHandler: nil)
         }
@@ -346,7 +348,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             if device.isLockingFocusWithCustomLensPositionSupported {
                 device.setFocusModeLocked(lensPosition: min(max(focus, 0), 1), completionHandler: nil)
             }
-        } else if device.isFocusModeSupported(.continuousAutoFocus) {
+        } else if !tapLock, device.focusMode == .locked, device.isFocusModeSupported(.continuousAutoFocus) {
             device.focusMode = .continuousAutoFocus
         }
         // Weiß
@@ -599,12 +601,18 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             if let c = videoOutput.connection(with: .video) { rotate(c, angle: 90) }
             session.commitConfiguration()
             zoomSlider(for: input?.device == virtualDevice ? virtualDevice : nil)
+            // neues Objektiv: frisch auf Automatik, die Räder legt applyDials gleich danach darüber
+            tapLock = false
+            if let device = input?.device, (try? device.lockForConfiguration()) != nil {
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+                device.unlockForConfiguration()
+            }
         }
+        // sonst nur den Zoom: Belichtung und Schärfe auf Automatik zurückzusetzen ließ sie bei jeder Rad-Bewegung pumpen
         guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
         let start = device == virtualDevice ? 1 : target.start
         device.videoZoomFactor = min(max(wantedZoom / start, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
-        if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
-        if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
         device.unlockForConfiguration()
     }
 
@@ -752,6 +760,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         queue.async {
             guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
             defer { device.unlockForConfiguration() }
+            self.tapLock = lock
             if !self.front, self.dials.focus == nil, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
                 device.focusPointOfInterest = p
                 device.focusMode = .autoFocus
