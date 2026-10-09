@@ -353,13 +353,28 @@ export const fineOf = (e: PhotoEdit): LookFine => ({ exposure: e.exposure, contr
 /** trägt ein Foto genau diesen eigenen Look? */
 export const wearsLook = (e: PhotoEdit, r: NamedRecipe) => sameRecipe(r.v, e.rec) && (!r.f || JSON.stringify(r.f) === JSON.stringify(fineOf(e)));
 
+// Namen beschreiben das Bild, wie Apples Fotografische Stile; keine fremden Filmnamen (Looknamen-Workshop 2026-10-09).
+// Die ids bleiben die alten, weil die Kamera sich den gewählten Look per id merkt.
 export const PRESETS: NamedRecipe[] = [
-  { id: "sommerlicht", name: de("Sommerlicht"), txt: de("warm, weiche Lichter"), v: { film: "sommer", wbR: 2, wbB: -4, hl: -1, sh: 1, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },
-  { id: "nachmittag", name: de("Nachmittag"), txt: de("satt, kühle Tiefen"), v: { film: "daemmerung", wbR: 1, wbB: -2, hl: 0, sh: -1, color: 3, dr: 200, cc: 1, fxb: 0, grain: 2, gsize: "klein" } },
-  { id: "kalkwand", name: de("Kalkwand"), txt: de("golden, harte Sonne"), v: { film: "messing", wbR: 3, wbB: -5, hl: -2, sh: 0, color: 1, dr: 100, cc: 2, fxb: 2, grain: 1, gsize: "groß" } },
-  { id: "hafen", name: de("Hafen"), txt: de("kühl, tiefes Blau"), v: { film: "salz", wbR: -2, wbB: 3, hl: 0, sh: 1, color: -1, dr: 200, cc: 1, fxb: 2, grain: 0, gsize: "klein" } },
-  { id: "kohle", name: de("Kohle"), txt: de("Schwarzweiß, kräftig"), v: { film: "kohle", wbR: 0, wbB: 0, hl: 1, sh: 2, color: 0, dr: 100, cc: 0, fxb: 0, grain: 2, gsize: "groß" } },
+  { id: "sommerlicht", name: de("Honig"), txt: de("warm, weiche Lichter"), v: { film: "sommer", wbR: 1, wbB: -2, hl: -1, sh: 0, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },
+  { id: "pastell", name: de("Pastell"), txt: de("matt, blasse Farben"), v: { film: "kreide", wbR: 1, wbB: -1, hl: -1, sh: -1, color: -1, dr: 200, cc: 0, fxb: 0, grain: 1, gsize: "klein" } },
+  { id: "hafen", name: de("Tiefblau"), txt: de("kühl, klares Blau"), v: { film: "salz", wbR: -1, wbB: 2, hl: 0, sh: 1, color: 0, dr: 200, cc: 1, fxb: 2, grain: 0, gsize: "klein" } },
+  { id: "kalkwand", name: de("Leuchtend"), txt: de("satte Farben, tiefer Himmel"), v: { film: null, wbR: 0, wbB: 0, hl: 0, sh: 2, color: 4, dr: 100, cc: 2, fxb: 2, grain: 0, gsize: "klein" } },
+  { id: "nachmittag", name: de("Herb"), txt: de("gedämpfte Farben, harter Kontrast"), v: { film: "daemmerung", wbR: 0, wbB: 0, hl: 0, sh: 2, color: -2, dr: 200, cc: 2, fxb: 0, grain: 1, gsize: "groß" } },
+  { id: "kohle", name: de("Tiefschwarz"), txt: de("Schwarzweiß, kräftig"), v: { film: "kohle", wbR: 0, wbB: 0, hl: 1, sh: 2, color: 0, dr: 100, cc: 0, fxb: 0, grain: 2, gsize: "groß" } },
 ];
+/** frühere Voreinstellungen: alte Fotos tragen ihre Werte und den alten Namen und sollen weiter erkannt werden */
+export const OLD_PRESETS: { name: string; v: RecipeValues }[] = [
+  { name: de("Sommerlicht"), v: { film: "sommer", wbR: 2, wbB: -4, hl: -1, sh: 1, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },
+  { name: de("Nachmittag"), v: { film: "daemmerung", wbR: 1, wbB: -2, hl: 0, sh: -1, color: 3, dr: 200, cc: 1, fxb: 0, grain: 2, gsize: "klein" } },
+  { name: de("Kalkwand"), v: { film: "messing", wbR: 3, wbB: -5, hl: -2, sh: 0, color: 1, dr: 100, cc: 2, fxb: 2, grain: 1, gsize: "groß" } },
+  { name: de("Hafen"), v: { film: "salz", wbR: -2, wbB: 3, hl: 0, sh: 1, color: -1, dr: 200, cc: 1, fxb: 2, grain: 0, gsize: "klein" } },
+  { name: de("Kohle"), v: { film: "kohle", wbR: 0, wbB: 0, hl: 1, sh: 2, color: 0, dr: 100, cc: 0, fxb: 0, grain: 2, gsize: "groß" } },
+];
+/** Name der Voreinstellung (heutige oder frühere) mit genau diesen Werten, deutsch wie in recName */
+export const presetNameOf = (r: RecipeValues) => (PRESETS.find((p) => sameRecipe(p.v, r)) ?? OLD_PRESETS.find((p) => sameRecipe(p.v, r)))?.name;
+/** heißt so eine Voreinstellung (heute oder früher)? Dann wird der Name übersetzt */
+export const isPresetName = (n: string) => PRESETS.some((p) => p.name === n) || OLD_PRESETS.some((p) => p.name === n);
 
 /* ---------- Pipeline für eine Farbe (0..1) ---------- */
 
@@ -814,8 +829,8 @@ export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   }
   const R = e.rec;
   if (!recipeIsEmpty(R)) {
-    const preset = [...PRESETS].find((p) => sameRecipe(p.v, R));
-    rows.push({ label: t("Rezept"), value: preset ? t(preset.name) : e.recName ? t("{name}, angepasst", { name: e.recName }) : t("eigene Werte") });
+    const preset = presetNameOf(R);
+    rows.push({ label: t("Rezept"), value: preset ? t(preset) : e.recName ? t("{name}, angepasst", { name: isPresetName(e.recName) ? t(e.recName) : e.recName }) : t("eigene Werte") });
     const film = lookOf(R.film);
     rows.push({ label: t("Filmlook"), value: film ? t(film.name) : t("Ohne") });
     rows.push({ label: t("Weißabgleich"), value: `R${signed(R.wbR)} B${signed(R.wbB)}` });

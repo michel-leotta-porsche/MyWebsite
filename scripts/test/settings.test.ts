@@ -6,7 +6,7 @@ import exifr from "exifr";
 
 import { readFujiRecipe } from "@/lib/fuji";
 import { applySettings, bookLooks, cleanSettings, fromEdit, fromFuji, fromLightroom, sameSettings, thinCurve } from "@/lib/develop/settings";
-import { neutralEdit, PRESETS } from "@/lib/develop/model";
+import { describeEdit, neutralEdit, OLD_PRESETS, PRESETS, sameRecipe } from "@/lib/develop/model";
 import { parseXmp, toPreset } from "@/lib/xmp";
 import { CLASSIC_CHROME, dng, fujiNote, jpeg, LR_XMP } from "./fixtures.mjs";
 
@@ -141,4 +141,15 @@ test("Looks in diesem Buch: zusammengefasst, meistbenutzte zuerst, Kleinigkeiten
   assert.equal(looks[1].name, "Look von Doppelseite 3");
   assert.ok(sameSettings(looks[0], fromEdit(warm)!));
   assert.ok(!sameSettings(looks[0], looks[1]));
+});
+
+test("Voreinstellungen: alle unterscheidbar, frühere Werte zeigen weiter ihren Namen", () => {
+  PRESETS.forEach((a, i) => PRESETS.slice(i + 1).forEach((b) => assert.ok(!sameRecipe(a.v, b.v), `${a.name} = ${b.name}`)));
+  const rezept = (rec: (typeof PRESETS)[number]["v"], recName?: string) => describeEdit({ ...neutralEdit(), rec: { ...rec }, recName }).find((r) => r.label === "Rezept")?.value;
+  assert.equal(rezept(PRESETS[0].v), "Honig");
+  const kalkwand = OLD_PRESETS.find((p) => p.name === "Kalkwand")!;
+  assert.equal(rezept(kalkwand.v, "Kalkwand"), "Kalkwand");
+  assert.equal(rezept({ ...kalkwand.v, color: 4 }, "Kalkwand"), "Kalkwand, angepasst");
+  // Kohle hat ihre Werte behalten und heißt jetzt Tiefschwarz
+  assert.equal(rezept(OLD_PRESETS.find((p) => p.name === "Kohle")!.v, "Kohle"), "Tiefschwarz");
 });

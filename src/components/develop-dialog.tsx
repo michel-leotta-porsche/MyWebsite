@@ -40,6 +40,8 @@ import {
   PICKS,
   PICKS_SHOWN,
   PRESETS,
+  presetNameOf,
+  isPresetName,
   REC0,
   recipeIsEmpty,
   sameRecipe,
@@ -1019,8 +1021,9 @@ export function DevelopDialog({
   const recMatch = allRecipes.find((r) => sameRecipe(r.v, edit.rec));
   const recEmpty = recipeIsEmpty(edit.rec);
   // voreingestellte Rezepte heißen deutsch (so stehen sie auch in recName); eigene Namen bleiben, wie sie sind
-  const shownName = (n: string) => (PRESETS.some((p) => p.name === n) ? t(n) : n);
-  const recLabel = recMatch ? shownName(recMatch.name) : recEmpty ? "" : edit.recName ? t("{name} · geändert", { name: shownName(edit.recName) }) : t("Eigene Werte");
+  const shownName = (n: string) => (isPresetName(n) ? t(n) : n);
+  const oldPreset = recMatch ? undefined : presetNameOf(edit.rec);
+  const recLabel = recMatch ? shownName(recMatch.name) : oldPreset ? t(oldPreset) : recEmpty ? "" : edit.recName ? t("{name} · geändert", { name: shownName(edit.recName) }) : t("Eigene Werte");
 
   // eigener Look: nimmt Feinschliff und Look mit, die Auto-Werte des Fotos (Tonwerte, Farbübertragung) bleiben
   const applyOwn = (r: NamedRecipe) => act((e) => ({ ...e, ...r.f, rec: { ...r.v }, recName: r.name }), true);

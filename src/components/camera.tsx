@@ -136,10 +136,10 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     };
     recent.forEach((s, i) => add(lookOfSettings(s, `recent-${i}`)));
     own.forEach((r) => add(lookOfRecipe(r)));
-    PRESETS.forEach((r) => add(lookOfRecipe(r)));
+    PRESETS.forEach((r) => add({ ...lookOfRecipe(r), name: t(r.name) }));
     return out;
   }, [recent, own, t]);
-  // ein eingelegter Film legt den Look fest; sonst der zuletzt gewählte, sonst der zuletzt mitgenommene („So fotografieren“), sonst Sommerlicht
+  // ein eingelegter Film legt den Look fest; sonst der zuletzt gewählte, sonst der zuletzt mitgenommene („So fotografieren“), sonst Honig
   const chosen = looks.find((l) => l.id === lookId) ?? (recent.length ? looks[1] : (looks.find((l) => l.id === PRESETS[0].id) ?? looks[0]));
   // gemerkt, damit der Look-Effekt (190 kB LUT an die App) nur bei einem echten Wechsel läuft, nicht bei jedem Zoom- oder Belichtungsschritt
   const active = useMemo<Look>(() => (film ? { id: "film", name: film.name, approx: film.approx, edit: film.edit } : chosen), [film, chosen]);

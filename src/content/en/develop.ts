@@ -238,6 +238,17 @@ export const DEVELOP: Record<string, string> = {
   "kräftig wie Diafilm, gedämpftes Grün": "punchy like slide film, muted greens",
 
   // Voreingestellte Rezepte
+  Honig: "Honey",
+  Pastell: "Pastel",
+  "matt, blasse Farben": "matte, pale colors",
+  Tiefblau: "Deep blue",
+  "kühl, klares Blau": "cool, clear blue",
+  Leuchtend: "Vivid",
+  "satte Farben, tiefer Himmel": "rich colors, deep skies",
+  Herb: "Moody",
+  "gedämpfte Farben, harter Kontrast": "muted colors, hard contrast",
+  Tiefschwarz: "Ink",
+  // frühere Namen, alte Fotos tragen sie noch
   Sommerlicht: "Summer light",
   "warm, weiche Lichter": "warm, soft highlights",
   Nachmittag: "Afternoon",
