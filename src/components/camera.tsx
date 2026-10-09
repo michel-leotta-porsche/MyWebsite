@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { createPortal } from "react-dom";
 
 import { IconButton } from "@/components/ui/button";
+import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { CalimaCamera, FILM_FRAMES, grainOf, isDenied, LUT_N, lutOf, takeShot, type Frame } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
@@ -25,26 +26,8 @@ import type { Print } from "@/lib/studio-store";
 // landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus.
 
 type Look = { id: string; name: string; approx: boolean; edit: PhotoEdit | null };
-/** ein eingelegter Film: bleibt im Gerät, bis er voll ist oder entnommen wird */
-type Film = { name: string; approx: boolean; edit: PhotoEdit | null; stack: string; count: number };
-
 const ORIGINAL = "original";
 const LAST_KEY = "calima:kamera-look";
-const FILM_KEY = "calima:film";
-const readFilm = (): Film | null => {
-  try {
-    const f = JSON.parse(localStorage.getItem(FILM_KEY) ?? "null");
-    return f && typeof f.stack === "string" && typeof f.count === "number" ? (f as Film) : null;
-  } catch {
-    return null;
-  }
-};
-const writeFilm = (f: Film | null) => {
-  try {
-    if (f) localStorage.setItem(FILM_KEY, JSON.stringify(f));
-    else localStorage.removeItem(FILM_KEY);
-  } catch {}
-};
 const HOLD_MS = 220;
 const MOVE_PX = 10;
 const EV_MAX = 2;
@@ -82,7 +65,10 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
   const [count, setCount] = useState(0);
   const [last, setLast] = useState<string | null>(null);
   const [reticle, setReticle] = useState<{ x: number; y: number; k: number } | null>(null);
-  const [film, setFilm] = useState<Film | null>(readFilm);
+  // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
+  const [shelf, setShelf] = useState<Shelf>(readShelf);
+  const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
+  const aside = shelf.films.filter((f) => f.stack !== shelf.loaded);
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -174,21 +160,38 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
     setLookId(l.id);
   };
 
-  /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel; bleibt eingelegt, bis er voll ist oder entnommen wird ----- */
+  /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel. Beiseitelegen und später weiter belichten geht; die Bilder
+     sieht man erst, wenn der Film entwickelt ist (voll oder bewusst entwickelt) ----- */
 
+  // immer vom letzten Stand aus: ein Foto ist noch unterwegs, während der Film schon beiseitegelegt sein kann
+  const update = (fn: (s: Shelf) => Shelf) =>
+    setShelf((prev) => {
+      const next = fn(prev);
+      writeShelf(next);
+      return next;
+    });
   const loadFilm = () => {
     if (!ready || film) return;
     haptic("press");
     const f: Film = { name: active.name, approx: active.approx, edit: active.edit, stack: newId(), count: 0 };
-    writeFilm(f);
-    setFilm(f);
+    update((s) => ({ loaded: f.stack, films: [...s.films, f] }));
   };
-  const ejectFilm = () => {
+  /** einen beiseitegelegten Film wieder einlegen */
+  const resumeFilm = (stack: string) => {
+    if (!ready || film) return;
+    haptic("press");
+    update((s) => ({ ...s, loaded: stack }));
+  };
+  /** Film herausnehmen, aber behalten: wie zurückspulen und in die Tasche stecken. Ein leerer Film fliegt raus. */
+  const setAside = () => {
     if (!film) return;
     haptic("select");
-    writeFilm(null);
-    setFilm(null);
-    if (film.count) onFilmDone(film.stack);
+    update((s) => ({ loaded: null, films: film.count ? s.films : s.films.filter((f) => f.stack !== film.stack) }));
+  };
+  /** Film entwickeln: erst jetzt werden die Bilder sichtbar, als Stapel im Fotostudio */
+  const develop = (f: Film) => {
+    update((s) => ({ loaded: null, films: s.films.filter((x) => x.stack !== f.stack) }));
+    if (f.count) onFilmDone(f.stack);
   };
 
   /* ----- Gesten im Sucher: halten (Original), wischen (Licht), zwei Finger (Zoom), tippen (Schärfe) ----- */
@@ -311,34 +314,34 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
       const onFilm = film;
       const print: Print = { id: newId(), name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit, pos: onFilm?.count };
       onShot(print, onFilm?.stack);
-      setCount((n) => n + 1);
       if (onFilm) {
         const next = { ...onFilm, count: onFilm.count + 1 };
         if (next.count >= FILM_FRAMES) {
-          // voll: der Film kommt als Stapel ins Fotostudio, die Kamera bleibt offen
-          writeFilm(null);
-          setFilm(null);
+          // voll: der Film wird entwickelt und liegt als Stapel im Fotostudio, die Kamera bleibt offen
           haptic("success");
-          onFilmDone(onFilm.stack);
+          develop(next);
         } else {
-          writeFilm(next);
-          setFilm(next);
+          update((s) => ({ ...s, films: s.films.map((f) => (f.stack === next.stack ? next : f)) }));
         }
+      } else {
+        setCount((n) => n + 1);
+        setLast((old) => {
+          if (old) URL.revokeObjectURL(old);
+          return URL.createObjectURL(s.thumb);
+        });
       }
-      setLast((old) => {
-        if (old) URL.revokeObjectURL(old);
-        return URL.createObjectURL(s.thumb);
-      });
       // das letzte Bild unten links zeigt den Look, sobald er klein eingerechnet ist
       if (edit) {
         const url = URL.createObjectURL(s.page);
         bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: SIZES.thumb, thumb: SIZES.thumb } })
           .then((r) => {
             onShot({ ...print, shot: r.blobs.thumb }, onFilm?.stack);
-            setLast((old) => {
-              if (old) URL.revokeObjectURL(old);
-              return URL.createObjectURL(r.blobs.thumb);
-            });
+            // auf dem Film bleibt das Bild im Dunkeln, bis er entwickelt ist
+            if (!onFilm)
+              setLast((old) => {
+                if (old) URL.revokeObjectURL(old);
+                return URL.createObjectURL(r.blobs.thumb);
+              });
           })
           .catch(() => {})
           .finally(() => URL.revokeObjectURL(url));
@@ -454,9 +457,14 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
                 ))}
               </div>
             </div>
-            <button type="button" onClick={ejectFilm} className="border-on-table-2/50 text-on-table flex-none rounded-full border px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap">
-              {film.count ? t("Film entnehmen") : t("Film raus")}
+            <button type="button" onClick={setAside} className="border-on-table-2/50 text-on-table flex-none rounded-full border px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap">
+              {film.count ? t("Beiseitelegen") : t("Film raus")}
             </button>
+            {film.count > 0 && (
+              <button type="button" onClick={() => develop(film)} className="bg-cloth border-cloth text-cloth-ink flex-none rounded-full border px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap">
+                {t("Entwickeln")}
+              </button>
+            )}
           </div>
         ) : (
         <ul className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t("Looks")}>
@@ -466,6 +474,22 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
               {t("Film einlegen")}
             </button>
           </li>
+          {/* beiseitegelegte Filme: wieder einlegen und weiter belichten */}
+          {aside.map((f) => (
+            <li key={f.stack} className="flex-none">
+              <button
+                type="button"
+                onClick={() => resumeFilm(f.stack)}
+                disabled={!ready}
+                aria-label={t("Film „{name}“ weiter belichten, {i} von {n}", { name: f.name, i: f.count, n: FILM_FRAMES })}
+                className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50"
+              >
+                <FilmIcon aria-hidden className="text-cloth h-4 w-4" />
+                {f.name}
+                <span className="text-on-table-2 tabular-nums">{t("{i}/{n}", { i: f.count, n: FILM_FRAMES })}</span>
+              </button>
+            </li>
+          ))}
           {looks.map((l) => {
             const on = l.id === active.id;
             return (
@@ -485,11 +509,16 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         )}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-7">
           <span className="justify-self-start">
-            <span className="relative block h-12 w-12 overflow-hidden rounded-[10px] border-2 border-on-table-2/60">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät */}
-              {last && <img src={last} alt="" className="h-full w-full object-cover" />}
-              {count > 0 && (
-                <span className="bg-cloth text-cloth-ink absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums">{count}</span>
+            <span className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60">
+              {film ? (
+                // auf dem Film kein Vorschaubild: das gibt es erst nach dem Entwickeln
+                <FilmIcon aria-hidden className="text-on-table-2 h-5 w-5" />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät
+                last && <img src={last} alt="" className="h-full w-full object-cover" />
+              )}
+              {(film ? film.count : count) > 0 && (
+                <span className="bg-cloth text-cloth-ink absolute -top-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold tabular-nums">{film ? film.count : count}</span>
               )}
             </span>
           </span>
@@ -510,7 +539,7 @@ export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onSh
         </div>
         <p className="text-on-table-2 px-6 text-center text-[12px]">
           {film
-            ? t("Der Film bleibt drin, bis {n} Bilder drauf sind oder du ihn entnimmst. Dann liegt er als Stapel im Fotostudio.", { n: FILM_FRAMES })
+            ? t("Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.", { n: FILM_FRAMES })
             : count
               ? t("{n} im Stapel. Schließen bringt dich zu Fertig.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
               : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}

@@ -23,7 +23,10 @@ export const CAMERA: Record<string, string> = {
   "Film, {i} von {n}": "Film, {i} of {n}",
   "{i} von {n}": "{i} of {n}",
   "Film einlegen": "Load film",
-  "Film entnehmen": "Take out film",
   "Film raus": "Film out",
-  "Der Film bleibt drin, bis {n} Bilder drauf sind oder du ihn entnimmst. Dann liegt er als Stapel im Fotostudio.": "The film stays in until it has {n} shots or you take it out. Then it's a stack in the photo studio.",
+  "Die Bilder siehst du erst nach dem Entwickeln. Voll ist der Film bei {n}; beiseitegelegt wartet er auf dich.": "You'll see the pictures only once the film is developed. It's full at {n}; set aside, it waits for you.",
+  Beiseitelegen: "Set aside",
+  Entwickeln: "Develop",
+  "Film „{name}“ weiter belichten, {i} von {n}": "Keep shooting film “{name}”, {i} of {n}",
+  "{i}/{n}": "{i}/{n}",
 };
