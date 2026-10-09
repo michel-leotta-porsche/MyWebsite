@@ -24,7 +24,7 @@ import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/native";
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
-import { autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
+import { aspectFor, autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_PRINTS, MAX_STACK, piles, putPrints, removePrint, trimPiles, type Print } from "@/lib/studio-store";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -589,7 +589,7 @@ function DoneSheet({
           title: "",
           subtitle: "",
           cloth: "ringelblume",
-          aspect: photos[0].h > photos[0].w ? 0.75 : 1.5,
+          aspect: aspectFor(photos),
           coverKey: coverKey || pickCover(auto) || photos[0].key,
           photos,
           spreads,

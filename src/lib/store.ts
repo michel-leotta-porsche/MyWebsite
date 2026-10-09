@@ -126,11 +126,27 @@ export function numberWord(n: number): string {
 export const autoPhotos = (photos: StoredPhoto[]): AutoPhoto[] =>
   photos.map((p) => ({ key: p.key, w: p.w, h: p.h, color: p.color, taken: p.taken, star: p.star }));
 
+/**
+ * Seitenformat (Höhe durch Breite) aus den Fotos: Hochformat 2:3 oder 3:4, je nachdem, welchem die Hochkant-Fotos
+ * näher sind; ohne Hochkant-Fotos 2:3. Seiten sind immer hochkant, das Format ist also nie unter 1.
+ */
+export function aspectFor(photos: Pick<StoredPhoto, "w" | "h" | "shelved">[]) {
+  const portraits = photos.filter((p) => p.h > p.w && !p.shelved).map((p) => p.h / p.w);
+  if (!portraits.length) return 1.5;
+  const avg = portraits.reduce((a, b) => a + b, 0) / portraits.length;
+  return Math.abs(avg - 4 / 3) < Math.abs(avg - 1.5) ? 4 / 3 : 1.5;
+}
+/** Bücher aus dem Fotostudio bekamen bis Oktober 2026 Breite durch Höhe (0.75): umdrehen statt das Buch zu stauchen */
+const pageAspect = (a: number) => (a > 0 && a < 1 ? 1 / a : a);
+
 /** Ältere Stände auf das aktuelle Schema heben: Doppelseiten bekommen feste Kennungen */
 export function migrate(b: StoredBook): StoredBook {
+  if (b.aspect !== pageAspect(b.aspect)) b = { ...b, aspect: pageAspect(b.aspect) };
   if ((b.schema ?? 1) >= SCHEMA) return b;
   return { ...b, schema: SCHEMA, spreads: b.spreads.map((s) => ({ ...s, id: s.id ?? spreadId() })) };
 }
+
+const photographs = (n: number) => (n === 1 ? "Eine Fotografie" : `${numberWord(n)} Fotografien`);
 
 /** Gespeichertes Buch → BookData mit denselben Seitentypen wie Michels Bücher */
 export function toBookData(b: StoredBook): BookData {
@@ -160,18 +176,18 @@ export function toBookData(b: StoredBook): BookData {
     id: b.id,
     author: b.ownerName,
     title: b.title || "Ohne Titel",
-    subtitle: b.subtitle || `${numberWord(used.size)} Fotografien`,
+    subtitle: b.subtitle || photographs(used.size),
     places: b.places,
     colophon: [
       b.title || "Ohne Titel",
-      `${numberWord(used.size)} Fotografien.`,
+      `${photographs(used.size)}.`,
       `Fotografie: ${b.ownerName}`,
       "Gebunden mit Calima.",
       `© ${year} ${b.ownerName}`,
     ],
-    aspect: b.aspect,
+    aspect: pageAspect(b.aspect),
     scale: 1,
-    bottom: bottomFor(b.aspect),
+    bottom: bottomFor(pageAspect(b.aspect)),
     cloth: { base: cloth.base, deep: cloth.deep, ink: cloth.ink },
     light: cloth.light,
     coverKey: used.has(b.coverKey) ? b.coverKey : [...used][0],

@@ -28,6 +28,7 @@ import { buildLut, cleanEdit, neutralEdit } from "@/lib/develop/model";
 import { applySettings, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { ingest } from "@/lib/ingest";
 import {
+  aspectFor,
   autoPhotos,
   bottomFor,
   CLOTHS,
@@ -96,13 +97,6 @@ const UNDO = 60;
 const AUTO_VERSION_MS = 10 * 60 * 1000;
 
 /** Seitenformat nach den Fotos: iPhone-Hochformate 3:4, Kamera 2:3 */
-function aspectFor(photos: StoredPhoto[]) {
-  const portraits = photos.filter((p) => p.h > p.w && !p.shelved).map((p) => p.h / p.w);
-  if (!portraits.length) return 1.5;
-  const avg = portraits.reduce((a, b) => a + b, 0) / portraits.length;
-  return Math.abs(avg - 4 / 3) < Math.abs(avg - 1.5) ? 4 / 3 : 1.5;
-}
-
 const recipeLabel = (p: StoredPhoto) =>
   p.recipe?.kind === "fuji"
     ? `Fuji-Rezept erkannt: ${p.recipe.film}`
