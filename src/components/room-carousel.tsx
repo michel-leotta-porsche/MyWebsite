@@ -6,6 +6,7 @@ import type { BookData } from "@/content/books";
 import { roomLoadingSeen } from "@/components/room-loading";
 import { ClosedBook } from "@/components/table";
 import { haptic } from "@/lib/haptics";
+import { useT } from "@/lib/i18n";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** Ein Platz im Karussell: ein Buch (mit dem, was darauf liegt) oder etwas anderes in Buchgröße, z. B. das leere Buch */
@@ -127,6 +128,7 @@ export function Carousel({
   const [near, setNear] = useState(0);
   const moving = useRef(false);
   const reduce = useReducedMotion();
+  const t = useT();
   const books = slides.filter((s) => s.book).length;
   const shown = slides.length > 0;
   const clamp = (i: number) => Math.min(Math.max(i, 0), Math.max(0, slides.length - 1));
@@ -325,7 +327,7 @@ export function Carousel({
               ref={list}
               className="carousel relative"
               aria-label={heading}
-              aria-roledescription="Karussell"
+              aria-roledescription={t("Karussell")}
               tabIndex={0}
               // Fotos nicht als Bild aus der Reihe ziehen, die Maus zieht die Reihe
               onDragStart={(e) => e.preventDefault()}
@@ -388,7 +390,7 @@ export function Carousel({
             {slides.length > 1 && (
               <>
                 {/* Pfeile nur mit Maus; auf dem Telefon wischt man */}
-                <button type="button" onClick={() => go(near - 1)} disabled={near === 0} className="room-arrow left-0" aria-label="Voriges Buch">
+                <button type="button" onClick={() => go(near - 1)} disabled={near === 0} className="room-arrow left-0" aria-label={t("Voriges Buch")}>
                   <span aria-hidden>←</span>
                 </button>
                 <button
@@ -396,7 +398,7 @@ export function Carousel({
                   onClick={() => go(near + 1)}
                   disabled={near === slides.length - 1}
                   className="room-arrow right-0"
-                  aria-label="Nächstes Buch"
+                  aria-label={t("Nächstes Buch")}
                 >
                   <span aria-hidden>→</span>
                 </button>
@@ -406,7 +408,7 @@ export function Carousel({
                       key={s.key}
                       type="button"
                       onClick={() => go(i)}
-                      aria-label={`${s.book?.title ?? "Neues Buch"}, ${i + 1} von ${slides.length}`}
+                      aria-label={t("{title}, {i} von {n}", { title: s.book?.title ?? t("Neues Buch"), i: i + 1, n: slides.length })}
                       aria-current={i === near}
                       // Trefferfläche 44 hoch, die Reihe bleibt so flach wie die Punkte
                       className="group -my-2.5 grid h-11 w-7 place-items-center"

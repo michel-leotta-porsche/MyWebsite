@@ -590,7 +590,7 @@ function Recipe() {
             Classic Chrome
           </span>
           <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-8 gap-y-2 text-sm md:text-base">
-            <dt className="text-ink-2">{t("Dynamik")}</dt>
+            <dt className="text-ink-2">{t("Dynamik|Fuji")}</dt>
             <dd>DR200</dd>
             <dt className="text-ink-2">{t("Lichter · Schatten")}</dt>
             <dd>−1 · +1</dd>

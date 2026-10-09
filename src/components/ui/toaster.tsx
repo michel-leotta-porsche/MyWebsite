@@ -2,12 +2,15 @@
 
 import { Toaster as Sonner, toast } from "sonner";
 
+import { useT } from "@/lib/i18n";
+
 // Hinweise von unten als dunkle Pille, wischbar, mit Rückgängig als Aktion. Einmal im Layout eines Raums einsetzen.
 // Aufruf: notify("In die Ablage gelegt", { action: { label: "Rückgängig", onClick: undo } })
 
 export const notify = toast;
 
 export function Toaster() {
+  const t = useT();
   return (
     <Sonner
       position="bottom-center"
@@ -15,7 +18,7 @@ export function Toaster() {
       mobileOffset={{ bottom: "max(1rem, env(safe-area-inset-bottom))", left: "1rem", right: "1rem" }}
       gap={8}
       duration={6000}
-      containerAriaLabel="Hinweise"
+      containerAriaLabel={t("Hinweise")}
       toastOptions={{
         unstyled: true,
         classNames: {

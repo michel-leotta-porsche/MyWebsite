@@ -2,6 +2,8 @@
 
 import { useLayoutEffect, useRef } from "react";
 
+import { useT } from "@/lib/i18n";
+
 /**
  * Ladehinweis im Bücherzimmer: die Lampe wird hell, und wo gleich das Buch liegt, liegt ein Zettel aus dem Notizblock,
  * auf den sich mit Bleistift „Moment, ich hol deine Bücher.“ schreibt. Reines CSS, damit er schon im vorgerenderten
@@ -47,8 +49,14 @@ function Hand({ text, from = 0, own = false }: { text: string; from?: number; ow
   ));
 }
 
+/** Buchstaben ohne Leerzeichen: dort setzt die nächste Zeile die Schrift fort */
+const letters = (s: string) => s.replace(/ /g, "").length;
+
 export function RoomLoading() {
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT();
+  const l1 = t("Moment,");
+  const l2 = t("ich hol deine");
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -73,29 +81,29 @@ export function RoomLoading() {
   return (
     <div ref={ref} className="room-loading carousel" data-room-loading="">
       <span role="status" className="sr-only">
-        Bücherzimmer wird geladen
+        {t("Bücherzimmer wird geladen")}
       </span>
       <div aria-hidden className="rl-lamp" />
       <div aria-hidden className="rl-paper">
         <div className="rl-under" />
         <div className="rl-note">
           <span className="rl-ln">
-            <Hand text="Moment," />
+            <Hand text={l1} />
           </span>
           <span className="rl-ln">
-            <Hand text="ich hol deine" from={7} />
+            <Hand text={l2} from={letters(l1)} />
           </span>
           <span className="rl-ln">
-            <Hand text="Bücher." from={18} />
+            <Hand text={t("Bücher.")} from={letters(l1) + letters(l2)} />
           </span>
           <svg className="rl-line" viewBox="0 0 100 10" preserveAspectRatio="none">
             <path d="M2 6 C 25 3, 55 8, 97 4" />
           </svg>
           <span className="rl-ln rl-later rl-l1">
-            <Hand text="dauert heut" from={0} own />
+            <Hand text={t("dauert heut")} from={0} own />
           </span>
           <span className="rl-ln rl-later rl-l2">
-            <Hand text="kein Netz?" from={0} own />
+            <Hand text={t("kein Netz?")} from={0} own />
           </span>
         </div>
       </div>

@@ -15,7 +15,7 @@ import { Segmented } from "@/components/ui/segmented";
 import { Swatches } from "@/components/ui/swatches";
 import { bakePhoto } from "@/lib/develop/bake";
 import { estimateTilt } from "@/lib/develop/detail";
-import { cropFor, fitCrop, GEO0, geoIsNeutral, outMap, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
+import { cropFor, degrees, fitCrop, GEO0, geoIsNeutral, outMap, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
 import {
   applyLut,
   cleanEdit,
@@ -59,6 +59,9 @@ import { createPreviewer, type Previewer } from "@/lib/develop/preview";
 import { applySettings, asLook, fromEdit, fromRecipe, sameSettings, type BookLook, type CopiedSettings } from "@/lib/develop/settings";
 import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
 import { haptic } from "@/lib/haptics";
+// in Effekten i18n.t: liest die Sprache beim Aufruf, ohne den Effekt an t zu binden
+import * as i18n from "@/lib/i18n";
+import { de, locale, useLang, useT } from "@/lib/i18n";
 import { setShownPicks, useShownPicks } from "@/lib/pick-prefs";
 import { copySettings, forgetSettings, useRecentSettings } from "@/lib/settings-clipboard";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
@@ -70,20 +73,21 @@ import { useReducedMotion } from "@/lib/use-reduced-motion";
 type Tab = "s" | "l" | "f" | "r";
 type FineKey = (typeof FINE)[number][0];
 type Loaded = { thumb: ImageData; tile: ImageData; st: PhotoStats };
+type Tr = ReturnType<typeof useT>;
 export type DevelopPatch = Partial<StoredPhoto>;
 
 const TABS: [Tab, string][] = [
-  ["s", "Vorschläge"],
+  ["s", de("Vorschläge")],
   ["l", "Looks"],
-  ["f", "Feinschliff"],
-  ["r", "Rezept"],
+  ["f", de("Feinschliff")],
+  ["r", de("Rezept")],
 ];
 const FAST = 17;
 const FINE_N = 33;
 const LEVEL: [0 | 1 | 2, string][] = [
-  [0, "Aus"],
-  [1, "Schwach"],
-  [2, "Stark"],
+  [0, de("Aus")],
+  [1, de("Schwach")],
+  [2, de("Stark")],
 ];
 // Feld auf Papier für Auswahl und Namen: Pille mit feiner Kontur, wie die Chips
 const fieldClass =
@@ -191,11 +195,11 @@ const fullOf = (p: StoredPhoto, long: number): [number, number] => {
 
 type Group = "light" | "color" | "hsl" | "vignette" | "curve";
 const GROUPS: [Group, string, string, LucideIcon][] = [
-  ["light", "Licht genauer", "Lichter, Weiß, Schwarz, Klarheit", Sun],
-  ["color", "Farbe genauer", "Tönung, Dynamik", Droplet],
-  ["hsl", "Farben einzeln", "acht Farbtöne", Palette],
-  ["vignette", "Vignette", "Ränder abdunkeln", Aperture],
-  ["curve", "Gradationskurve", "Helligkeit Punkt für Punkt", Spline],
+  ["light", de("Licht genauer"), de("Lichter, Weiß, Schwarz, Klarheit"), Sun],
+  ["color", de("Farbe genauer"), de("Tönung, Dynamik"), Droplet],
+  ["hsl", de("Farben einzeln"), de("acht Farbtöne"), Palette],
+  ["vignette", de("Vignette"), de("Ränder abdunkeln"), Aperture],
+  ["curve", de("Gradationskurve"), de("Helligkeit Punkt für Punkt"), Spline],
 ];
 /** Die Kurve braucht Maus und Platz: im Menü nur am Rechner; eine schon gesetzte Kurve bleibt überall sichtbar */
 const DESK = "(min-width: 1024px) and (pointer: fine)";
@@ -206,9 +210,9 @@ const onDesk = (cb: () => void) => {
 };
 const useDesk = () => useSyncExternalStore(onDesk, () => window.matchMedia(DESK).matches, () => false);
 const CURVES: [string, [number, number][]][] = [
-  ["Gerade", []],
+  [de("Gerade"), []],
   [
-    "Mehr Kontrast",
+    de("Mehr Kontrast"),
     [
       [0, 0],
       [0.25, 0.19],
@@ -217,7 +221,7 @@ const CURVES: [string, [number, number][]][] = [
     ],
   ],
   [
-    "Weicher",
+    de("Weicher"),
     [
       [0, 0],
       [0.25, 0.3],
@@ -226,7 +230,7 @@ const CURVES: [string, [number, number][]][] = [
     ],
   ],
   [
-    "Matt",
+    de("Matt"),
     [
       [0, 0.08],
       [0.25, 0.27],
@@ -237,15 +241,15 @@ const CURVES: [string, [number, number][]][] = [
 ];
 const GROUPS_KEY = "calima-dev-groups";
 /** Was in einer Gruppe verstellt ist, kurz; leer, wenn nichts */
-function groupNote(m: More | undefined, g: Group): string {
+function groupNote(m: More | undefined, g: Group, t: Tr): string {
   if (!m) return "";
-  if (g === "curve") return curveIsNeutral(m.curve) ? "" : "angepasst";
+  if (g === "curve") return curveIsNeutral(m.curve) ? "" : t("angepasst");
   if (g === "hsl") {
-    const n = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([name]) => name);
+    const n = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([name]) => t(name));
     return n.length ? n.join(", ") : "";
   }
   const row = MORE_SLIDERS.find(([k, , grp]) => grp === g && Math.abs(m[k]) > 0.005);
-  return row ? `${row[1]} ${signed100(m[row[0]])}` : "";
+  return row ? `${t(row[1])} ${signed100(m[row[0]])}` : "";
 }
 
 /**
@@ -310,8 +314,9 @@ const LutThumb = memo(function LutThumb({ img, edit, className }: { img: ImageDa
 /* ---------- Bausteine der Werkzeuge ---------- */
 
 function Tile({ img, edit, name, txt, pressed, onClick, disabled, dashed }: { img?: ImageData; edit: PhotoEdit; name: string; txt: string; pressed: boolean; onClick: () => void; disabled?: boolean; dashed?: boolean }) {
+  const lang = useLang();
   return (
-    <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1 text-left disabled:opacity-40" lang="de">
+    <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1 text-left disabled:opacity-40" lang={lang}>
       <span className={`bg-paper-shade relative block aspect-[4/5] w-full outline-2 outline-offset-2 transition-[outline-color] duration-150 ${pressed ? "outline-ink" : dashed ? "outline-ink/40 outline-dashed" : "outline-transparent"}`}>
         {img && <LutThumb img={img} edit={edit} className="block size-full object-cover transition-transform duration-500 ease-out motion-safe:group-hover:-translate-y-[3px]" />}
         {pressed && (
@@ -352,6 +357,7 @@ function Slider({
   onFocus?: () => void;
   onChange: (v: number) => void;
 }) {
+  const t = useT();
   const changed = Math.abs(value - zero) > 0.001;
   const fill = `${((value - min) / (max - min)) * 100}%`;
   return (
@@ -364,11 +370,11 @@ function Slider({
         type="button"
         onClick={() => onChange(zero)}
         disabled={!changed}
-        title={`${label} zurücksetzen`}
+        title={t("{label} zurücksetzen", { label })}
         className={`text-ink-2 hover:text-ink hover:bg-ink/8 -my-2.5 -ml-1 grid size-11 place-items-center rounded-full transition-opacity duration-150 ${changed ? "" : "pointer-events-none opacity-0"}`}
       >
         <RotateCcw aria-hidden className="size-4" />
-        <span className="sr-only">{label} zurücksetzen</span>
+        <span className="sr-only">{t("{label} zurücksetzen", { label })}</span>
       </button>
       <output htmlFor={id} className="text-ink-2 text-xs tabular-nums">
         {format(value)}
@@ -391,13 +397,15 @@ function Slider({
 }
 
 function Chips<T extends string | number | null>({ label, opts, cur, onPick }: { label: string; opts: [T, string][]; cur: T; onPick: (v: T) => void }) {
+  // die Namen der Möglichkeiten kommen deutsch (de) und werden hier übersetzt
+  const t = useT();
   return (
     <div>
       <h3 className={groupTitle}>{label}</h3>
       <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
         {opts.map(([v, txt]) => (
           <button key={String(v)} type="button" aria-pressed={cur === v} onClick={() => onPick(v)} className={chip(cur === v)}>
-            {txt}
+            {t(txt)}
           </button>
         ))}
       </div>
@@ -410,6 +418,7 @@ function Chips<T extends string | number | null>({ label, opts, cur, onPick }: {
  * Das Feld ist für Finger und Maus; Tastatur und VoiceOver nehmen die zwei Regler darunter.
  */
 function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number, b: number) => void }) {
+  const t = useT();
   const pad = useRef<HTMLDivElement>(null);
   const drag = useRef(false);
   const at = (e: React.PointerEvent) => {
@@ -419,7 +428,7 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
   };
   return (
     <div>
-      <h3 className={groupTitle}>Weißabgleich-Verschiebung</h3>
+      <h3 className={groupTitle}>{t("Weißabgleich-Verschiebung")}</h3>
       <div className="flex flex-wrap items-center gap-3.5">
         <div
           ref={pad}
@@ -444,16 +453,16 @@ function WbPad({ r, b, onChange }: { r: number; b: number; onChange: (r: number,
           <b className="text-ink block text-[15px] font-semibold tabular-nums">
             R {signedStep(r)} · B {signedStep(b)}
           </b>
-          rechts mehr Rot
+          {t("rechts mehr Rot")}
           <br />
-          oben mehr Blau
+          {t("oben mehr Blau")}
           <br />
-          Doppeltipp: Mitte
+          {t("Doppeltipp: Mitte")}
         </div>
       </div>
       <div className="mt-2 grid gap-1">
-        <Slider id="dv-wb-r" label="Rot" value={r} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(v, b)} />
-        <Slider id="dv-wb-b" label="Blau" value={b} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(r, v)} />
+        <Slider id="dv-wb-r" label={t("Rot")} value={r} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(v, b)} />
+        <Slider id="dv-wb-b" label={t("Blau")} value={b} min={-9} max={9} step={1} zero={0} format={signedStep} onChange={(v) => onChange(r, v)} />
       </div>
     </div>
   );
@@ -489,7 +498,7 @@ export function DevelopDialog({
   bookId,
   onDone,
   onFinish,
-  title = "Bearbeiten",
+  title,
   long = 2560,
   note: opening,
   looks: inBook,
@@ -514,6 +523,8 @@ export function DevelopDialog({
   looks?: BookLook[];
   onClose: () => void;
 }) {
+  const t = useT();
+  const lang = useLang();
   const reduce = useReducedMotion();
   // fester Stand beim Öffnen: der Editor rendert weiter, die Fotos ändern sich erst mit „Fertig“
   const [photos] = useState(given);
@@ -567,7 +578,7 @@ export function DevelopDialog({
 
   const photo = photos.find((p) => p.key === sel) ?? photos[0];
   // Fotos ohne Titel heißen nach ihrer Stelle auf der Seite
-  const nameOf = (p: StoredPhoto) => p.title || `Foto ${photos.indexOf(p) + 1}`;
+  const nameOf = (p: StoredPhoto) => p.title || t("Foto {n}", { n: photos.indexOf(p) + 1 });
   const edit = edits[photo.key];
   const others = photos.filter((p) => p.key !== photo.key);
   const deferred = useDeferredValue(edits);
@@ -602,7 +613,7 @@ export function DevelopDialog({
         })
         .catch((e) => {
           console.warn("[bearbeiten] Abzug", reasonOf(e));
-          if (live) setError(`Die kleinen Vorschauen ließen sich nicht laden (${reasonOf(e)}).`);
+          if (live) setError(i18n.t("Die kleinen Vorschauen ließen sich nicht laden ({reason}).", { reason: reasonOf(e) }));
         })
         .finally(() => freeCanvas(scratch));
     }
@@ -625,7 +636,7 @@ export function DevelopDialog({
       previewer.current = p;
     } catch (e) {
       // in einem Rückruf, damit kein setState direkt im Effekt läuft
-      queueMicrotask(() => setError(`Die Vorschau ließ sich nicht starten (${reasonOf(e)}).`));
+      queueMicrotask(() => setError(i18n.t("Die Vorschau ließ sich nicht starten ({reason}).", { reason: reasonOf(e) })));
     }
     return () => {
       p?.dispose();
@@ -817,13 +828,13 @@ export function DevelopDialog({
     setAutoBusy(true);
     try {
       const px = pixelsOf(await b, 480);
-      const t = estimateTilt(px.data, px.width, px.height);
-      if (t == null) return setNote("Keine klare Kante gefunden. Dreh am Rad, bis es passt.");
-      const a = Math.max(-45, Math.min(45, geo.flip ? t : -t));
-      if (Math.abs(a - geo.angle) < 0.1) return setNote("Das Foto ist schon gerade.");
+      const tilt = estimateTilt(px.data, px.width, px.height);
+      if (tilt == null) return setNote(t("Keine klare Kante gefunden. Dreh am Rad, bis es passt."));
+      const a = Math.max(-45, Math.min(45, geo.flip ? tilt : -tilt));
+      if (Math.abs(a - geo.angle) < 0.1) return setNote(t("Das Foto ist schon gerade."));
       actGeo((g) => ({ ...g, angle: a, crop: fitCrop(g.crop, a, TW, TH) }));
       haptic("select");
-      setNote(`Um ${a > 0 ? "+" : "−"}${Math.abs(a).toFixed(1).replace(".", ",")}° gerade gerichtet. Das Rad stellt nach.`);
+      setNote(t("Um {angle} gerade gerichtet. Das Rad stellt nach.", { angle: degrees(a) }));
     } catch (e) {
       console.warn("[bearbeiten] Auto gerade", reasonOf(e));
     } finally {
@@ -900,8 +911,8 @@ export function DevelopDialog({
     remember();
     spreadTo(keys);
     haptic("success");
-    flash(`Auf alle ${photos.length}`, "jedes mit eigenem Auto");
-    setNote(`Auf ${photos.length} Fotos, jedes mit eigenem Auto. Zuschnitt bleibt je Foto. Rückgängig nimmt es zurück.`);
+    flash(t("Auf alle {n}", { n: photos.length }), t("jedes mit eigenem Auto"));
+    setNote(t("Auf {n} Fotos, jedes mit eigenem Auto. Zuschnitt bleibt je Foto. Rückgängig nimmt es zurück.", { n: photos.length }));
   };
   const alignAll = () => {
     const all = photos.map((p) => ({ k: p.key, st: loaded[p.key]?.st })).filter((x): x is { k: string; st: PhotoStats } => !!x.st);
@@ -913,8 +924,8 @@ export function DevelopDialog({
       ...Object.fromEntries(all.map(({ k, st }) => [k, { ...m[k], transfer: matchTransfer(st, all.filter((o) => o.k !== k).map((o) => o.st)), levels: null, origin: "match" as const, moodFrom: undefined }])),
     }));
     hop(all.map((x) => x.k));
-    flash("Angeglichen", `${all.length} Fotos rücken zusammen`);
-    setNote("Die Fotos sind in Licht und Farbe zueinander gerückt. Rückgängig nimmt es zurück.");
+    flash(t("Angeglichen"), t("{n} Fotos rücken zusammen", { n: all.length }));
+    setNote(t("Die Fotos sind in Licht und Farbe zueinander gerückt. Rückgängig nimmt es zurück."));
   };
   // Mias Wisch: vom eigenen Abzug über die anderen ziehen, jeder gestreifte bekommt die Bearbeitung
   const wipe = useRef<{ id: number; done: Set<string> } | null>(null);
@@ -932,8 +943,8 @@ export function DevelopDialog({
     const n = wipe.current?.done.size ?? 0;
     wipe.current = null;
     if (!n) return;
-    flash(`+${n}`, n === 1 ? "Foto übernimmt die Bearbeitung" : "Fotos übernehmen die Bearbeitung");
-    setNote(`Auf ${n} ${n === 1 ? "Foto" : "Fotos"} gewischt, jedes mit eigenem Auto.`);
+    flash(`+${n}`, n === 1 ? t("Foto übernimmt die Bearbeitung") : t("Fotos übernehmen die Bearbeitung"));
+    setNote(n === 1 ? t("Auf 1 Foto gewischt, jedes mit eigenem Auto.") : t("Auf {n} Fotos gewischt, jedes mit eigenem Auto.", { n }));
   };
 
   /* ----- Rezepte ----- */
@@ -941,7 +952,9 @@ export function DevelopDialog({
   const allRecipes = [...PRESETS, ...own];
   const recMatch = allRecipes.find((r) => sameRecipe(r.v, edit.rec));
   const recEmpty = recipeIsEmpty(edit.rec);
-  const recLabel = recMatch ? recMatch.name : recEmpty ? "" : edit.recName ? `${edit.recName} · geändert` : "Eigene Werte";
+  // voreingestellte Rezepte heißen deutsch (so stehen sie auch in recName); eigene Namen bleiben, wie sie sind
+  const shownName = (n: string) => (PRESETS.some((p) => p.name === n) ? t(n) : n);
+  const recLabel = recMatch ? shownName(recMatch.name) : recEmpty ? "" : edit.recName ? t("{name} · geändert", { name: shownName(edit.recName) }) : t("Eigene Werte");
 
   // eigener Look: nimmt Feinschliff und Look mit, die Auto-Werte des Fotos (Tonwerte, Farbübertragung) bleiben
   const applyOwn = (r: NamedRecipe) => act((e) => ({ ...e, ...r.f, rec: { ...r.v }, recName: r.name }), true);
@@ -956,19 +969,19 @@ export function DevelopDialog({
     // gleicher Name überschreibt den bestehenden Look, statt einen zweiten anzulegen
     const same = own.find((x) => x.name === name);
     const r: NamedRecipe = { id: same?.id ?? `own-${Date.now().toString(36)}`, name, txt: "eigener Look", v: { ...edit.rec }, f: lookFineOf(edit) };
-    setOwn((o) => [...o.filter((x) => x.name !== name), r].sort((a, b) => a.name.localeCompare(b.name, "de")));
+    setOwn((o) => [...o.filter((x) => x.name !== name), r].sort((a, b) => a.name.localeCompare(b.name, locale(lang))));
     setEdit((e) => ({ ...e, recName: name }));
     setNaming(false);
-    setNote(`„${name}“ steht jetzt oben bei „Deine Looks“, auch für andere Fotos und Bücher.`);
+    setNote(t("„{name}“ steht jetzt oben bei „Deine Looks“, auch für andere Fotos und Bücher.", { name }));
     // die Looks stehen oben, das Formular unten: zum neuen Look scrollen
     requestAnimationFrame(() => dialog.current?.querySelector(`[data-own="${r.id}"]`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }));
-    saveRecipe(uid, r).catch(() => setNote("Der Look ließ sich nicht speichern."));
+    saveRecipe(uid, r).catch(() => setNote(t("Der Look ließ sich nicht speichern.")));
   };
   const askDelete = (gone: NamedRecipe) =>
     setAsk({
-      text: `„${gone.name}“ löschen? Fotos, die ihn nutzen, bleiben, wie sie sind.`,
-      yes: "Löschen",
-      no: "Behalten",
+      text: t("„{name}“ löschen? Fotos, die ihn nutzen, bleiben, wie sie sind.", { name: gone.name }),
+      yes: t("Löschen"),
+      no: t("Behalten"),
       onYes: () => {
         setOwn((o) => o.filter((r) => r.id !== gone.id));
         deleteRecipe(uid, gone.id).catch(() => {});
@@ -976,26 +989,26 @@ export function DevelopDialog({
     });
   const renameOwn = (r: NamedRecipe, name: string) => {
     if (name === r.name) return setNaming(false);
-    if (own.some((x) => x.id !== r.id && x.name === name)) return setNote(`„${name}“ heißt schon ein anderer Look.`);
+    if (own.some((x) => x.id !== r.id && x.name === name)) return setNote(t("„{name}“ heißt schon ein anderer Look.", { name }));
     const next = { ...r, name };
-    setOwn((o) => o.map((x) => (x.id === r.id ? next : x)).sort((a, b) => a.name.localeCompare(b.name, "de")));
+    setOwn((o) => o.map((x) => (x.id === r.id ? next : x)).sort((a, b) => a.name.localeCompare(b.name, locale(lang))));
     if (edit.recName === r.name) setEdit((e) => ({ ...e, recName: name }));
     setNaming(false);
-    setNote(`Heißt jetzt „${name}“.`);
-    saveRecipe(uid, next).catch(() => setNote("Der Look ließ sich nicht speichern."));
+    setNote(t("Heißt jetzt „{name}“.", { name }));
+    saveRecipe(uid, next).catch(() => setNote(t("Der Look ließ sich nicht speichern.")));
   };
   const updateOwn = (r: NamedRecipe) => {
     const next: NamedRecipe = { ...r, v: { ...edit.rec }, f: lookFineOf(edit) };
     setOwn((o) => o.map((x) => (x.id === r.id ? next : x)));
     setEdit((e) => ({ ...e, recName: r.name }));
-    setNote(`„${r.name}“ hat jetzt die Einstellungen dieses Fotos.`);
-    saveRecipe(uid, next).catch(() => setNote("Der Look ließ sich nicht speichern."));
+    setNote(t("„{name}“ hat jetzt die Einstellungen dieses Fotos.", { name: r.name }));
+    saveRecipe(uid, next).catch(() => setNote(t("Der Look ließ sich nicht speichern.")));
   };
   const saveForm =
     naming === true ? (
       <SaveForm onCancel={() => setNaming(false)} onSave={saveOwn} />
     ) : naming ? (
-      <SaveForm key={naming.id} initial={naming.name} label={`Neuer Name für „${naming.name}“`} onCancel={() => setNaming(false)} onSave={(name) => renameOwn(naming, name)} />
+      <SaveForm key={naming.id} initial={naming.name} label={t("Neuer Name für „{name}“", { name: naming.name })} onCancel={() => setNaming(false)} onSave={(name) => renameOwn(naming, name)} />
     ) : null;
 
   /* ----- Vorschläge: welche dastehen, merkt sich das Gerät; austauschen per Rechtsklick oder langem Tippen ----- */
@@ -1006,7 +1019,8 @@ export function DevelopDialog({
   const swapPick = (from: PickId, to: PickId) => setShownPicks(shownPicks.map((id) => (id === from ? to : id)));
   const dropPick = (id: PickId) => {
     setShownPicks(shownPicks.filter((x) => x !== id));
-    setNote(`„${PICKS.find((p) => p.id === id)?.name}“ steht nicht mehr da. Unter „Weitere“ holst du ihn zurück.`);
+    const gone = PICKS.find((p) => p.id === id);
+    setNote(t("„{name}“ steht nicht mehr da. Unter „Weitere“ holst du ihn zurück.", { name: gone ? t(gone.name) : "" }));
   };
 
   /* ----- Einstellungen kopieren und einfügen: Farbe und Licht, nie der Zuschnitt ----- */
@@ -1015,37 +1029,38 @@ export function DevelopDialog({
   const copied = recentAll[0] ?? null;
   // das Rezept aus der Datei steckt in diesem Foto schon drin; kopiert wird es nur für andere Fotos
   const fileSettings = useMemo(() => (photo.recipe ? fromRecipe(photo.recipe) : null), [photo.recipe]);
-  const fileLabel = photo.recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
+  const fileFuji = photo.recipe?.kind === "fuji";
+  const fileLabel = fileFuji ? t("Fuji-Rezept") : t("Lightroom-Werte");
   const copyEdit = () => {
     const s = fromEdit(edit, undefined, nameOf(photo));
-    if (!s) return setNote("Noch nichts zu kopieren: Stell zuerst Farbe oder Licht ein.");
+    if (!s) return setNote(t("Noch nichts zu kopieren: Stell zuerst Farbe oder Licht ein."));
     copySettings(s);
     haptic("select");
-    setNote(`Mitgenommen. Liegt oben bei „Deine Looks“, bei jedem Foto mit einem Tipp (⇧⌘V).`);
+    setNote(t("Mitgenommen. Liegt oben bei „Deine Looks“, bei jedem Foto mit einem Tipp (⇧⌘V)."));
   };
   const copyFile = () => {
     if (!fileSettings) return;
     copySettings({ ...fileSettings, from: nameOf(photo) });
     haptic("select");
-    setNote(`${fileLabel} „${fileSettings.name}“ mitgenommen, in Calima nachempfunden. Liegt oben bei „Deine Looks“.`);
+    setNote(t("{label} „{name}“ mitgenommen, in Calima nachempfunden. Liegt oben bei „Deine Looks“.", { label: fileLabel, name: shownName(fileSettings.name) }));
   };
   const paste = () => {
-    if (!copied) return setNote("Erst bei einem Foto einen Look mitnehmen.");
+    if (!copied) return setNote(t("Erst bei einem Foto einen Look mitnehmen."));
     take(copied);
   };
   const take = (s: CopiedSettings) => {
     act((e) => applySettings(e, s), true);
-    setNote(`„${s.name}“ übernommen${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`);
+    setNote(s.approx ? t("„{name}“ übernommen, nachempfunden. Der Zuschnitt bleibt.", { name: shownName(s.name) }) : t("„{name}“ übernommen. Der Zuschnitt bleibt.", { name: shownName(s.name) }));
   };
   const wears = (s: CopiedSettings) => wearsLook(edit, asLook(s, ""));
   /** Mitgenommenes oder ein Look aus dem Buch wird ein eigener Look, für alle Fotos und Bücher */
   const keep = (s: CopiedSettings) => {
     const same = own.find((x) => x.name === s.name);
     const r = asLook(s, same?.id ?? `own-${Date.now().toString(36)}`);
-    setOwn((o) => [...o.filter((x) => x.name !== r.name), r].sort((a, b) => a.name.localeCompare(b.name, "de")));
+    setOwn((o) => [...o.filter((x) => x.name !== r.name), r].sort((a, b) => a.name.localeCompare(b.name, locale(lang))));
     if (recentAll.includes(s)) forgetSettings(s);
-    setNote(`„${r.name}“ steht jetzt bei „Deine Looks“. Umbenennen geht per Rechtsklick oder langem Drücken.`);
-    saveRecipe(uid, r).catch(() => setNote("Der Look ließ sich nicht speichern."));
+    setNote(t("„{name}“ steht jetzt bei „Deine Looks“. Umbenennen geht per Rechtsklick oder langem Drücken.", { name: r.name }));
+    saveRecipe(uid, r).catch(() => setNote(t("Der Look ließ sich nicht speichern.")));
   };
   // jeder Look nur einmal: eigene vor dem Buch, das Buch vor „Zuletzt“
   const looks = (inBook ?? []).filter((l) => !own.some((r) => sameRecipe(r.v, l.rec) && (!r.f || sameSettings({ rec: r.v, f: r.f }, l))));
@@ -1149,7 +1164,7 @@ export function DevelopDialog({
       if (gesture.current === g && !g.mode) {
         g.mode = "hold";
         setHolding(true);
-        setBig({ value: "Original", label: "loslassen zeigt wieder bearbeitet" });
+        setBig({ value: t("Original"), label: t("loslassen zeigt wieder bearbeitet") });
       }
     }, 380);
   };
@@ -1190,32 +1205,33 @@ export function DevelopDialog({
       }
       window.clearTimeout(g.t);
       g.mode = "swipe";
-      const t = tab;
-      if (t === "s") {
+      const cur = tab;
+      if (cur === "s") {
         g.mode = "none";
-        setNote("Wischen stellt unter Looks und Feinschliff ein. Hier genügt ein Tipp auf einen Vorschlag.");
-      } else if (t === "r") {
+        setNote(t("Wischen stellt unter Looks und Feinschliff ein. Hier genügt ein Tipp auf einen Vorschlag."));
+      } else if (cur === "r") {
         g.mode = "none";
-        setNote("Im Rezept stellst du die Werte unten ein, wie an der Kamera.");
-      } else if (t === "l" && !edit.look) {
+        setNote(t("Im Rezept stellst du die Werte unten ein, wie an der Kamera."));
+      } else if (cur === "l" && !edit.look) {
         g.mode = "none";
-        setNote("Erst einen Look wählen, dann wischen.");
+        setNote(t("Erst einen Look wählen, dann wischen."));
       }
-      g.v = t === "l" ? edit.amount : edit[active];
+      g.v = cur === "l" ? edit.amount : edit[active];
     }
     if (g.mode !== "swipe") return;
     const k = dx / g.w;
     if (tab === "l") {
       const v = Math.min(1, Math.max(0, g.v + k));
       live({ amount: v });
-      setBig({ value: `${Math.round(v * 100)} %`, label: lookOf(edit.look)?.name ?? "" });
+      const L = lookOf(edit.look);
+      setBig({ value: `${Math.round(v * 100)} %`, label: L ? t(L.name) : "" });
     } else {
       const [key, name, fmt, min, max] = fineOf(active);
       let v = Math.min(max, Math.max(min, g.v + k * (max - min) * 0.8));
       // nahe der Mitte rastet der Wert auf null ein
       if (min < 0 && Math.abs(v) < (max - min) * 0.015) v = 0;
       live({ [key]: v });
-      setBig({ value: fmt(v), label: name });
+      setBig({ value: fmt(v), label: t(name) });
     }
   };
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -1308,7 +1324,7 @@ export function DevelopDialog({
       return onClose();
     }
     if (!dirty) return onClose();
-    setAsk({ text: "Änderungen verwerfen?", yes: "Verwerfen", no: "Weiter bearbeiten", onYes: onClose });
+    setAsk({ text: t("Änderungen verwerfen?"), yes: t("Verwerfen"), no: t("Weiter bearbeiten"), onYes: onClose });
   };
 
   const finish = async () => {
@@ -1328,7 +1344,7 @@ export function DevelopDialog({
           if (p.orig) patches[p.key] = editedPatch(p, e);
           continue;
         }
-        setBusy(changed.length > 1 ? `Speichere Foto ${i + 1} von ${changed.length} …` : "Speichere das Foto …");
+        setBusy(changed.length > 1 ? t("Speichere Foto {i} von {n} …", { i: i + 1, n: changed.length }) : t("Speichere das Foto …"));
         const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo, vignette: e.more?.vignette, clarity: e.more?.clarity });
         if (cancelled.current) return;
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
@@ -1339,7 +1355,7 @@ export function DevelopDialog({
       if (cancelled.current) return;
       console.warn("[bearbeiten] Einrechnen", reasonOf(e));
       setBusy(null);
-      setError(`Speichern hat nicht geklappt. Prüf die Verbindung und tipp noch einmal auf Fertig. (${reasonOf(e)})`);
+      setError(t("Speichern hat nicht geklappt. Prüf die Verbindung und tipp noch einmal auf Fertig. ({reason})", { reason: reasonOf(e) }));
       return;
     }
     setBusy(null);
@@ -1351,20 +1367,22 @@ export function DevelopDialog({
   const hint =
     note ??
     (cropping
-      ? `Rahmen ziehen verschiebt ihn, Ecken ändern die Größe. Das Rad darunter richtet gerade.${bookId ? " Die Seite schneidet im Rahmen zusätzlich zu." : ""}`
+      ? bookId
+        ? t("Rahmen ziehen verschiebt ihn, Ecken ändern die Größe. Das Rad darunter richtet gerade. Die Seite schneidet im Rahmen zusätzlich zu.")
+        : t("Rahmen ziehen verschiebt ihn, Ecken ändern die Größe. Das Rad darunter richtet gerade.")
       : compare
-      ? "Den Strich auf dem Foto ziehen. Links ist das Original."
+      ? t("Den Strich auf dem Foto ziehen. Links ist das Original.")
       : tab === "s"
         ? series
-          ? "Ein Foto einstellen, dann „Auf alle“. Oder sein Bild im Streifen über die anderen ziehen."
-          : "Ein Tipp genügt. Lange drücken oder Rechtsklick tauscht einen Vorschlag aus."
+          ? t("Ein Foto einstellen, dann „Auf alle“. Oder sein Bild im Streifen über die anderen ziehen.")
+          : t("Ein Tipp genügt. Lange drücken oder Rechtsklick tauscht einen Vorschlag aus.")
         : tab === "l"
           ? edit.look
-            ? "Auf dem Foto wischen ändert die Stärke. Den Look noch einmal antippen oder „Ohne Look“ nimmt ihn weg."
-            : "Jede Kachel zeigt den Look auf deinem Foto."
+            ? t("Auf dem Foto wischen ändert die Stärke. Den Look noch einmal antippen oder „Ohne Look“ nimmt ihn weg.")
+            : t("Jede Kachel zeigt den Look auf deinem Foto.")
           : tab === "r"
-            ? "Die Einstellungen einer Fuji-Kamera, nachempfunden. Gilt auch für Fotos vom iPhone."
-            : `Auf dem Foto wischen stellt „${fineOf(active)[1]}“ ein. ↺ setzt einen Regler zurück.`);
+            ? t("Die Einstellungen einer Fuji-Kamera, nachempfunden. Gilt auch für Fotos vom iPhone.")
+            : t("Auf dem Foto wischen stellt „{name}“ ein. ↺ setzt einen Regler zurück.", { name: t(fineOf(active)[1]) }));
 
   const switchTab = (t: Tab) => {
     setTab(t);
@@ -1381,7 +1399,7 @@ export function DevelopDialog({
   // damit das Foto die ganze Höhe bekommt
   const strip = (className: string, thumb: string) =>
     photos.length > 1 && (
-      <div role="group" aria-label={series ? "Fotos dieses Stapels" : "Fotos dieser Doppelseite"} className={`flex gap-3 select-none ${className}`}>
+      <div role="group" aria-label={series ? t("Fotos dieses Stapels") : t("Fotos dieser Doppelseite")} className={`flex gap-3 select-none ${className}`}>
         {photos.map((p) => {
           const on = p.key === photo.key;
           const img = loaded[p.key]?.thumb;
@@ -1413,7 +1431,13 @@ export function DevelopDialog({
             >
               {img && <LutThumb img={img} edit={deferred[p.key]} className="block size-full object-cover" />}
               {!on && <span aria-hidden className="bg-paper/55 absolute inset-0 transition-opacity duration-150 group-hover:opacity-50" />}
-              <span className="sr-only">{on ? `${nameOf(p)}, in Bearbeitung${series ? ". Über die anderen ziehen überträgt die Bearbeitung" : ""}` : `${nameOf(p)} bearbeiten`}</span>
+              <span className="sr-only">
+                {on
+                  ? series
+                    ? t("{name}, in Bearbeitung. Über die anderen ziehen überträgt die Bearbeitung", { name: nameOf(p) })
+                    : t("{name}, in Bearbeitung", { name: nameOf(p) })
+                  : t("{name} bearbeiten", { name: nameOf(p) })}
+              </span>
             </button>
           );
         })}
@@ -1423,8 +1447,8 @@ export function DevelopDialog({
   return (
     <dialog
       ref={dialog}
-      aria-label="Foto bearbeiten"
-      lang="de"
+      aria-label={t("Foto bearbeiten")}
+      lang={lang}
       className="bg-table text-on-table fixed inset-0 z-[700] m-0 h-full max-h-none w-full max-w-none overflow-hidden overscroll-contain p-0"
       onCancel={(e) => {
         e.preventDefault();
@@ -1436,24 +1460,24 @@ export function DevelopDialog({
     >
       <div className="flex h-full flex-col flat:grid flat:grid-cols-[minmax(0,1fr)_minmax(300px,48%)] flat:grid-rows-[auto_minmax(0,1fr)] lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-5 lg:px-8 lg:pt-5 lg:pb-6">
         <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] flat:col-span-2 lg:col-span-2 lg:p-0">
-          <h2 className="text-xl font-bold tracking-[-0.02em]">{title}</h2>
+          <h2 className="text-xl font-bold tracking-[-0.02em]">{title ?? t("Bearbeiten")}</h2>
           <div className="flex items-center gap-2 lg:gap-3">
-            <ToolGroup label="Verlauf">
-              <IconButton label={withKeys("Rückgängig", "⌘Z")} onClick={undo} disabled={!past.length || !!busy}>
+            <ToolGroup label={t("Verlauf")}>
+              <IconButton label={withKeys(t("Rückgängig"), "⌘Z")} onClick={undo} disabled={!past.length || !!busy}>
                 <Undo2 aria-hidden />
               </IconButton>
-              <IconButton label={withKeys("Wiederholen", "⇧⌘Z")} onClick={redo} disabled={!future.length || !!busy}>
+              <IconButton label={withKeys(t("Wiederholen"), "⇧⌘Z")} onClick={redo} disabled={!future.length || !!busy}>
                 <Redo2 aria-hidden />
               </IconButton>
             </ToolGroup>
             {/* Telefon: nur das Zeichen, damit Verlauf, Abbrechen und Fertig in eine Zeile passen */}
-            <Button size="sm" onClick={close} className="pl-2.5 max-sm:min-w-11 max-sm:px-0" aria-label="Abbrechen">
+            <Button size="sm" onClick={close} className="pl-2.5 max-sm:min-w-11 max-sm:px-0" aria-label={t("Abbrechen")}>
               <X aria-hidden />
-              <span className="max-sm:sr-only">Abbrechen</span>
+              <span className="max-sm:sr-only">{t("Abbrechen")}</span>
             </Button>
             <Button variant="cloth" size="sm" onClick={finish} disabled={!!busy} className="pl-3 md:min-h-11 md:px-5">
               <Check aria-hidden />
-              {busy ? "Speichert …" : "Fertig"}
+              {busy ? t("Speichert …") : t("Fertig")}
             </Button>
           </div>
         </header>
@@ -1474,7 +1498,11 @@ export function DevelopDialog({
                 onPointerCancel={onUp}
                 onContextMenu={(e) => e.preventDefault()}
                 role="img"
-                aria-label={`${nameOf(photo)}${isNeutral(edit) ? "" : ", bearbeitet"}. Halten zeigt das Original, waagerecht wischen stellt ein, zwei Finger oder Doppeltipp zoomen.`}
+                aria-label={
+                  isNeutral(edit)
+                    ? t("{name}. Halten zeigt das Original, waagerecht wischen stellt ein, zwei Finger oder Doppeltipp zoomen.", { name: nameOf(photo) })
+                    : t("{name}, bearbeitet. Halten zeigt das Original, waagerecht wischen stellt ein, zwei Finger oder Doppeltipp zoomen.", { name: nameOf(photo) })
+                }
               >
                 {/* Zoom: nur transform; das Bild hat volle Auflösung, die Vergrößerung zeigt echte Details */}
                 <div
@@ -1514,7 +1542,7 @@ export function DevelopDialog({
                 )}
                 {failed && !shown && (
                   <div className="slip text-ink rounded-cut absolute inset-x-2 bottom-2 z-[6] grid justify-items-start gap-2 p-3 text-sm" onPointerDown={(e) => e.stopPropagation()}>
-                    <p className="font-semibold">Das Foto ließ sich nicht laden.</p>
+                    <p className="font-semibold">{t("Das Foto ließ sich nicht laden.")}</p>
                     <p className="text-ink-2 mt-0.5 text-xs">{failed}</p>
                     <Button
                       variant="paper"
@@ -1524,7 +1552,7 @@ export function DevelopDialog({
                         setAttempt((n) => n + 1);
                       }}
                     >
-                      Noch einmal laden
+                      {t("Noch einmal laden")}
                     </Button>
                   </div>
                 )}
@@ -1536,10 +1564,10 @@ export function DevelopDialog({
                       </span>
                     </div>
                     <span aria-hidden className="text-on-table pointer-events-none absolute top-2 left-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
-                      vorher
+                      {t("vorher")}
                     </span>
                     <span aria-hidden className="text-on-table pointer-events-none absolute top-2 right-2 z-[4] rounded-full bg-[rgb(12_10_8/0.6)] px-2.5 py-1 text-xs font-semibold">
-                      nachher
+                      {t("nachher")}
                     </span>
                   </>
                 )}
@@ -1551,7 +1579,7 @@ export function DevelopDialog({
                     className="text-on-table absolute right-2 bottom-2 z-[6] flex min-h-8 items-center gap-1.5 rounded-full bg-[rgb(12_10_8/0.6)] pr-3 pl-2 text-xs font-semibold tabular-nums pointer-coarse:min-h-10"
                   >
                     <ZoomOut aria-hidden className="size-4" />
-                    {zoomPct(view.z)} %<span className="sr-only">, ganzes Foto zeigen</span>
+                    {zoomPct(view.z)} %<span className="sr-only">{t(", ganzes Foto zeigen")}</span>
                   </button>
                 )}
                 <div aria-hidden className={`pointer-events-none absolute inset-0 z-[5] grid place-items-center transition-opacity duration-150 ${big ? "opacity-100" : "opacity-0"}`}>
@@ -1591,20 +1619,20 @@ export function DevelopDialog({
               <button
                 type="button"
                 disabled={!shown}
-                title="Auch: Taste C"
+                title={t("Auch: Taste C")}
                 onClick={openCrop}
                 className={buttonClass("quiet", "sm", `pl-2.5 ${photos.length > 1 ? "max-sm:min-w-11 max-sm:px-0" : ""}`)}
               >
                 <Crop aria-hidden />
-                <span className={photos.length > 1 ? "max-sm:sr-only" : ""}>Zuschneiden</span>
+                <span className={photos.length > 1 ? "max-sm:sr-only" : ""}>{t("Zuschneiden")}</span>
                 {!geoIsNeutral(edit.geo) && <span aria-hidden className="bg-mark size-1.5 rounded-full" />}
-                {!geoIsNeutral(edit.geo) && <span className="sr-only">, zugeschnitten</span>}
+                {!geoIsNeutral(edit.geo) && <span className="sr-only">{t(", zugeschnitten")}</span>}
               </button>
               <button
                 type="button"
                 aria-pressed={compare}
                 disabled={!shown}
-                title="Auch: M oder \ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter"
+                title={t("Auch: M oder \\ gedrückt halten zeigt das Original, 1–4 wechseln die Reiter")}
                 onClick={() => {
                   setCompare((c) => !c);
                   setSplit(toImage(0.5));
@@ -1613,7 +1641,7 @@ export function DevelopDialog({
                 className={buttonClass("quiet", "sm", `pl-2.5 max-sm:min-w-11 max-sm:px-0 flat:min-w-11 flat:px-0 ${compare ? "!bg-on-table !text-table" : ""}`)}
               >
                 <Columns2 aria-hidden />
-                <span className="max-sm:sr-only flat:sr-only">Vorher / nachher</span>
+                <span className="max-sm:sr-only flat:sr-only">{t("Vorher / nachher")}</span>
               </button>
               <button
                 type="button"
@@ -1622,14 +1650,14 @@ export function DevelopDialog({
                 className={buttonClass("quiet", "sm", "pl-2.5 max-sm:min-w-11 max-sm:px-0 flat:min-w-11 flat:px-0")}
               >
                 <RotateCcw aria-hidden />
-                <span className="max-sm:sr-only flat:sr-only">Foto zurücksetzen</span>
+                <span className="max-sm:sr-only flat:sr-only">{t("Foto zurücksetzen")}</span>
               </button>
               {/* am Telefon genügen zwei Finger, die Leiste bleibt einzeilig */}
               <button
                 type="button"
                 aria-pressed={view.z > 1.01}
                 disabled={!shown}
-                title={keys("Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto")}
+                title={keys(t("Auch: Doppelklick oder Mausrad aufs Foto, + und − auf der Tastatur, 0 zeigt das ganze Foto"))}
                 onClick={() => toggleZoom()}
                 className={buttonClass("quiet", "sm", `pl-2.5 max-sm:hidden flat:hidden ${view.z > 1.01 ? "!bg-on-table !text-table" : ""}`)}
               >
@@ -1649,7 +1677,7 @@ export function DevelopDialog({
         {/* Werkzeuge */}
         <section
           ref={slip}
-          aria-label="Werkzeuge"
+          aria-label={t("Werkzeuge")}
           inert={!shown || !!busy}
           onTouchStart={(e) => {
             const el = slip.current;
@@ -1699,7 +1727,7 @@ export function DevelopDialog({
         >
           {photos.length > 1 && (
             <p className="sr-only">
-              Du bearbeitest <b className="text-ink">{nameOf(photo)}</b>. Ein anderes Foto antippen wechselt.
+              {t("Du bearbeitest")} <b className="text-ink">{nameOf(photo)}</b>. {t("Ein anderes Foto antippen wechselt.")}
             </p>
           )}
           {cropping && (
@@ -1707,24 +1735,24 @@ export function DevelopDialog({
               <div className="flex items-center justify-between gap-2">
                 <Button variant="paper" size="sm" className="pl-2" onClick={() => setCropping(false)}>
                   <ChevronLeft aria-hidden />
-                  Werkzeuge
+                  {t("Werkzeuge")}
                 </Button>
-                <h3 className="text-[15px] font-bold tracking-[-0.01em]">Zuschnitt</h3>
+                <h3 className="text-[15px] font-bold tracking-[-0.01em]">{t("Zuschnitt")}</h3>
                 <Button variant="paper" size="sm" className="pl-2.5" disabled={geoIsNeutral(edit.geo)} onClick={() => actGeo(() => GEO0())}>
                   <RotateCcw aria-hidden />
-                  Zurücksetzen
+                  {t("Zurücksetzen")}
                 </Button>
               </div>
-              <Chips<Ratio> label="Format" opts={RATIOS} cur={geo.ratio} onPick={pickRatio} />
+              <Chips<Ratio> label={t("Format")} opts={RATIOS} cur={geo.ratio} onPick={pickRatio} />
               {geo.ratio !== "orig" && geo.ratio !== "free" && geo.ratio !== "1:1" && (
                 <div>
-                  <h3 className={groupTitle}>Ausrichtung</h3>
+                  <h3 className={groupTitle}>{t("Ausrichtung")}</h3>
                   <Segmented
                     tone="paper"
-                    label="Ausrichtung"
+                    label={t("Ausrichtung")}
                     options={[
-                      { value: "hoch", label: "Hoch" },
-                      { value: "quer", label: "Quer" },
+                      { value: "hoch", label: t("Hoch") },
+                      { value: "quer", label: t("Quer") },
                     ]}
                     value={geo.portrait ? "hoch" : "quer"}
                     onChange={(v) => pickPortrait(v === "hoch")}
@@ -1735,13 +1763,13 @@ export function DevelopDialog({
               <div className="max-lg:hidden">
                 <Slider
                   id="dv-angle"
-                  label="Geraderichten"
+                  label={t("Geraderichten")}
                   value={geo.angle}
                   min={-45}
                   max={45}
                   step={0.1}
                   zero={0}
-                  format={(v) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1).replace(".", ",")}°`}
+                  format={degrees}
                   onFocus={() => (dialBase.current = geo.crop)}
                   onChange={(v) => {
                     burst();
@@ -1762,19 +1790,19 @@ export function DevelopDialog({
               {tucked ? (
                 <>
                   <ChevronUp aria-hidden className="size-4" />
-                  Werkzeuge zeigen
+                  {t("Werkzeuge zeigen")}
                 </>
               ) : (
                 <>
                   <span aria-hidden className="bg-ink/25 h-1 w-10 rounded-full" />
-                  <span className="sr-only">Werkzeuge einklappen, Foto ganz zeigen</span>
+                  <span className="sr-only">{t("Werkzeuge einklappen, Foto ganz zeigen")}</span>
                 </>
               )}
             </button>
           <div
             hidden={tucked}
             role="tablist"
-            aria-label="Werkzeuge"
+            aria-label={t("Werkzeuge")}
             onKeyDown={(e) => {
               // Pfeiltasten wandern zwischen den Reitern (Muster der ARIA-Tabs)
               const i = TABS.findIndex(([t]) => t === tab);
@@ -1787,19 +1815,19 @@ export function DevelopDialog({
             }}
           >
             <div className="bg-ink/6 flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]">
-              {TABS.map(([t, name]) => (
+              {TABS.map(([id, name]) => (
                 <button
-                  key={t}
+                  key={id}
                   type="button"
                   role="tab"
-                  id={`dv-tab-${t}`}
-                  aria-selected={tab === t}
-                  aria-controls={tab === t ? `dv-pane-${t}` : undefined}
-                  tabIndex={tab === t ? 0 : -1}
-                  onClick={() => switchTab(t)}
-                  className={`relative min-h-9 min-w-0 flex-auto rounded-full px-2 text-[13px] font-semibold transition-colors duration-150 pointer-coarse:min-h-11 sm:text-sm ${tab === t ? "text-paper" : "text-ink-2 hover:text-ink"}`}
+                  id={`dv-tab-${id}`}
+                  aria-selected={tab === id}
+                  aria-controls={tab === id ? `dv-pane-${id}` : undefined}
+                  tabIndex={tab === id ? 0 : -1}
+                  onClick={() => switchTab(id)}
+                  className={`relative min-h-9 min-w-0 flex-auto rounded-full px-2 text-[13px] font-semibold transition-colors duration-150 pointer-coarse:min-h-11 sm:text-sm ${tab === id ? "text-paper" : "text-ink-2 hover:text-ink"}`}
                 >
-                  {tab === t && (
+                  {tab === id && (
                     <motion.span
                       layoutId="dv-tab"
                       aria-hidden
@@ -1807,7 +1835,7 @@ export function DevelopDialog({
                       transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 38 }}
                     />
                   )}
-                  <span className="relative">{name}</span>
+                  <span className="relative">{t(name)}</span>
                 </button>
               ))}
             </div>
@@ -1816,11 +1844,11 @@ export function DevelopDialog({
             <div hidden={tucked} className="mt-2 flex items-center gap-2">
               <Button variant="cloth" size="sm" onClick={spreadAll} disabled={!!busy} className="min-w-0 flex-1 pl-2.5">
                 <Copy aria-hidden />
-                Auf alle {photos.length}
+                {t("Auf alle {n}", { n: photos.length })}
               </Button>
               <Button variant="paper" size="sm" onClick={alignAll} disabled={!!busy || photos.some((p) => !loaded[p.key])} className="min-w-0 flex-1 pl-2.5">
                 <Layers aria-hidden />
-                Angleichen
+                {t("Angleichen")}
               </Button>
             </div>
           )}
@@ -1832,7 +1860,7 @@ export function DevelopDialog({
           <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`} hidden={cropping}>
             {tab === "s" && mine && (
               <div className="mb-7">
-                <h3 className={groupTitle}>Deine Looks</h3>
+                <h3 className={groupTitle}>{t("Deine Looks")}</h3>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                   {recent.map((c, i) => (
                     <ContextMenu
@@ -1841,12 +1869,12 @@ export function DevelopDialog({
                       className="grid min-w-0 select-none"
                       menu={
                         <>
-                          <MenuItem icon={<BookmarkPlus />} hint="für alle Fotos und Bücher" onClick={() => keep(c)}>
-                            Zu deinen Looks
+                          <MenuItem icon={<BookmarkPlus />} hint={t("für alle Fotos und Bücher")} onClick={() => keep(c)}>
+                            {t("Zu deinen Looks")}
                           </MenuItem>
                           <MenuSeparator />
                           <MenuItem icon={<X />} onClick={() => forgetSettings(c)}>
-                            Aus „Zuletzt“ entfernen
+                            {t("Aus „Zuletzt“ entfernen")}
                           </MenuItem>
                         </>
                       }
@@ -1854,8 +1882,8 @@ export function DevelopDialog({
                       <Tile
                         img={tileImg}
                         edit={applySettings(edit, c)}
-                        name={c.name}
-                        txt={["mitgenommen", c.source === "fuji" ? "Fuji" : c.source === "lightroom" ? "Lightroom" : c.from].filter(Boolean).join(" · ")}
+                        name={shownName(c.name)}
+                        txt={[t("mitgenommen"), c.source === "fuji" ? "Fuji" : c.source === "lightroom" ? "Lightroom" : c.from].filter(Boolean).join(" · ")}
                         pressed={wears(c)}
                         dashed
                         onClick={() => take(c)}
@@ -1871,24 +1899,24 @@ export function DevelopDialog({
                       menu={
                         <>
                           <MenuItem icon={<Pencil />} onClick={() => setNaming(r)}>
-                            Umbenennen
+                            {t("Umbenennen")}
                           </MenuItem>
-                          <MenuItem icon={<RefreshCw />} hint="nimmt Farbe und Licht von jetzt" onClick={() => updateOwn(r)} disabled={colorIsNeutral(edit) || wearsLook(edit, r)}>
-                            Mit diesem Foto überschreiben
+                          <MenuItem icon={<RefreshCw />} hint={t("nimmt Farbe und Licht von jetzt")} onClick={() => updateOwn(r)} disabled={colorIsNeutral(edit) || wearsLook(edit, r)}>
+                            {t("Mit diesem Foto überschreiben")}
                           </MenuItem>
                           <MenuSeparator />
                           <MenuItem icon={<Trash />} danger onClick={() => askDelete(r)}>
-                            Löschen
+                            {t("Löschen")}
                           </MenuItem>
                         </>
                       }
                     >
-                      <Tile img={tileImg} edit={{ ...edit, ...r.f, rec: r.v }} name={r.name} txt={r.f ? "eigener Look" : "eigenes Rezept"} pressed={wearsLook(edit, r)} onClick={() => applyOwn(r)} />
+                      <Tile img={tileImg} edit={{ ...edit, ...r.f, rec: r.v }} name={r.name} txt={r.f ? t("eigener Look") : t("eigenes Rezept")} pressed={wearsLook(edit, r)} onClick={() => applyOwn(r)} />
                       <button
                         type="button"
                         onClick={() => askDelete(r)}
-                        aria-label={`${r.name} löschen`}
-                        title={`${r.name} löschen`}
+                        aria-label={t("{name} löschen", { name: r.name })}
+                        title={t("{name} löschen", { name: r.name })}
                         className="bg-paper/90 text-ink hover:bg-paper absolute top-1.5 left-1.5 grid size-7 place-items-center rounded-full shadow-[0_1px_4px_rgb(12_10_8/0.3)]"
                       >
                         <X aria-hidden className="size-3.5" />
@@ -1901,7 +1929,7 @@ export function DevelopDialog({
             )}
             {tab === "s" && looks.length > 0 && (
               <div className="mb-7">
-                <h3 className={groupTitle}>In diesem Buch</h3>
+                <h3 className={groupTitle}>{t("In diesem Buch")}</h3>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                   {looks.map((l) => (
                     <ContextMenu
@@ -1909,25 +1937,25 @@ export function DevelopDialog({
                       container={dialog}
                       className="grid min-w-0 select-none"
                       menu={
-                        <MenuItem icon={<BookmarkPlus />} hint="für alle Fotos und Bücher" onClick={() => keep(l)}>
-                          Zu deinen Looks
+                        <MenuItem icon={<BookmarkPlus />} hint={t("für alle Fotos und Bücher")} onClick={() => keep(l)}>
+                          {t("Zu deinen Looks")}
                         </MenuItem>
                       }
                     >
-                      <Tile img={tileImg} edit={applySettings(edit, l)} name={l.name} txt={l.where || "aus diesem Buch"} pressed={wears(l)} onClick={() => take(l)} />
+                      <Tile img={tileImg} edit={applySettings(edit, l)} name={shownName(l.name)} txt={l.where || t("aus diesem Buch")} pressed={wears(l)} onClick={() => take(l)} />
                     </ContextMenu>
                   ))}
                 </div>
               </div>
             )}
-            {tab === "s" && (mine || looks.length > 0) && <h3 className={groupTitle}>Vorschläge</h3>}
+            {tab === "s" && (mine || looks.length > 0) && <h3 className={groupTitle}>{t("Vorschläge")}</h3>}
             {tab === "s" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile
                   img={tileImg}
                   edit={sugg.auto}
                   name="Auto"
-                  txt="Licht und Farbe automatisch"
+                  txt={t("Licht und Farbe automatisch")}
                   pressed={edit.origin === "auto"}
                   disabled={!me}
                   onClick={() =>
@@ -1948,19 +1976,19 @@ export function DevelopDialog({
                       className="grid min-w-0 select-none"
                       menu={
                         <>
-                          {spare.length > 0 && <MenuLabel>Austauschen gegen</MenuLabel>}
+                          {spare.length > 0 && <MenuLabel>{t("Austauschen gegen")}</MenuLabel>}
                           {spare.map((q) => (
-                            <MenuItem key={q.id} hint={q.txt} onClick={() => swapPick(id, q.id)}>
-                              {q.name}
+                            <MenuItem key={q.id} hint={t(q.txt)} onClick={() => swapPick(id, q.id)}>
+                              {t(q.name)}
                             </MenuItem>
                           ))}
                           {spare.length > 0 && <MenuSeparator />}
                           <MenuItem icon={<Trash />} onClick={() => dropPick(id)}>
-                            Entfernen
+                            {t("Entfernen")}
                           </MenuItem>
                           {picksChanged && (
                             <MenuItem icon={<RotateCcw />} onClick={() => setShownPicks(null)}>
-                              Vorschläge wie anfangs
+                              {t("Vorschläge wie anfangs")}
                             </MenuItem>
                           )}
                         </>
@@ -1969,8 +1997,8 @@ export function DevelopDialog({
                       <Tile
                         img={tileImg}
                         edit={sugg.picks[id]}
-                        name={p.name}
-                        txt={p.txt}
+                        name={t(p.name)}
+                        txt={t(p.txt)}
                         pressed={edit.origin === "pick" && edit.pick === id}
                         disabled={!me}
                         onClick={() => me && act((e) => pickEdit(me, id, e), true)}
@@ -1987,22 +2015,22 @@ export function DevelopDialog({
                         <span className="border-ink/25 text-ink-2 group-hover:border-ink/45 group-hover:text-ink grid aspect-[4/5] w-full place-items-center border border-dashed transition-colors duration-150">
                           <Plus aria-hidden className="size-6" strokeWidth={1.5} />
                         </span>
-                        <b className="text-sm font-semibold max-sm:text-xs">Weitere</b>
-                        <small className="text-ink-2 line-clamp-2 min-h-[2lh] text-xs leading-snug max-sm:hidden">Vorschläge dazuholen, lange drücken tauscht</small>
+                        <b className="text-sm font-semibold max-sm:text-xs">{t("Weitere")}</b>
+                        <small className="text-ink-2 line-clamp-2 min-h-[2lh] text-xs leading-snug max-sm:hidden">{t("Vorschläge dazuholen, lange drücken tauscht")}</small>
                       </button>
                     }
                   >
-                    <MenuLabel>Dazuholen</MenuLabel>
+                    <MenuLabel>{t("Dazuholen")}</MenuLabel>
                     {spare.map((q) => (
-                      <MenuItem key={q.id} hint={q.txt} onClick={() => setShownPicks([...shownPicks, q.id])}>
-                        {q.name}
+                      <MenuItem key={q.id} hint={t(q.txt)} onClick={() => setShownPicks([...shownPicks, q.id])}>
+                        {t(q.name)}
                       </MenuItem>
                     ))}
                     {picksChanged && (
                       <>
                         <MenuSeparator />
                         <MenuItem icon={<RotateCcw />} onClick={() => setShownPicks(null)}>
-                          Vorschläge wie anfangs
+                          {t("Vorschläge wie anfangs")}
                         </MenuItem>
                       </>
                     )}
@@ -2012,8 +2040,8 @@ export function DevelopDialog({
                 <Tile
                   img={tileImg}
                   edit={sugg.match}
-                  name="Angleichen"
-                  txt={others.length ? "an die Nachbarfotos" : "braucht ein zweites Foto auf der Seite"}
+                  name={t("Angleichen")}
+                  txt={others.length ? t("an die Nachbarfotos") : t("braucht ein zweites Foto auf der Seite")}
                   pressed={edit.origin === "match"}
                   disabled={!me || !otherStats.length}
                   onClick={() => me && act((e) => ({ ...e, transfer: matchTransfer(me, otherStats), levels: null, origin: "match", moodFrom: undefined }))}
@@ -2023,8 +2051,8 @@ export function DevelopDialog({
                 <Tile
                   img={tileImg}
                   edit={sugg.mood}
-                  name="Stimmung übernehmen"
-                  txt={moodSrc ? `vom ${nameOf(moodSrc)}` : "braucht ein zweites Foto auf der Seite"}
+                  name={t("Stimmung übernehmen")}
+                  txt={moodSrc ? t("vom {name}", { name: nameOf(moodSrc) }) : t("braucht ein zweites Foto auf der Seite")}
                   pressed={edit.origin === "mood"}
                   disabled={!me || !moodSt}
                   onClick={() => {
@@ -2047,8 +2075,8 @@ export function DevelopDialog({
               <div className="mt-7">
                 {!mine && (
                   <>
-                    <h3 className={groupTitle}>Deine Looks</h3>
-                    <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
+                    <h3 className={groupTitle}>{t("Deine Looks")}</h3>
+                    <p className="text-ink-2 text-sm">{t("Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.")}</p>
                   </>
                 )}
                 {naming === true ? (
@@ -2057,19 +2085,19 @@ export function DevelopDialog({
                   <div className={`flex flex-wrap gap-2 ${mine ? "" : "mt-3.5"}`}>
                     <Button variant="paper" size="sm" className="pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
                       <BookmarkPlus aria-hidden />
-                      Als eigenen Look speichern
+                      {t("Als eigenen Look speichern")}
                     </Button>
                     {/* im Buch liegen alle Looks schon unter „In diesem Buch“; mitnehmen braucht es nur ohne Buch */}
                     {!inBook && (
-                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyEdit} disabled={colorIsNeutral(edit)} title="Farbe und Licht ohne Zuschnitt, für die anderen Fotos, ⇧⌘C">
+                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyEdit} disabled={colorIsNeutral(edit)} title={t("Farbe und Licht ohne Zuschnitt, für die anderen Fotos, ⇧⌘C")}>
                         <ClipboardCopy aria-hidden />
-                        Für andere Fotos mitnehmen
+                        {t("Für andere Fotos mitnehmen")}
                       </Button>
                     )}
                     {fileSettings && (
-                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyFile} title="für andere Fotos und Bücher, in Calima nachempfunden">
+                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyFile} title={t("für andere Fotos und Bücher, in Calima nachempfunden")}>
                         <ClipboardCopy aria-hidden />
-                        {fileLabel} mitnehmen
+                        {fileFuji ? t("Fuji-Rezept mitnehmen") : t("Lightroom-Werte mitnehmen")}
                       </Button>
                     )}
                   </div>
@@ -2079,14 +2107,14 @@ export function DevelopDialog({
 
             {tab === "l" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
-                <Tile img={tileImg} edit={{ ...edit, look: null }} name="Ohne Look" txt="nimmt den Look weg" pressed={!edit.look} onClick={() => edit.look && act((e) => ({ ...e, look: null }))} />
+                <Tile img={tileImg} edit={{ ...edit, look: null }} name={t("Ohne Look")} txt={t("nimmt den Look weg")} pressed={!edit.look} onClick={() => edit.look && act((e) => ({ ...e, look: null }))} />
                 {LOOKS.map((L) => (
                   <Tile
                     key={L.id}
                     img={tileImg}
                     edit={{ ...edit, look: L.id, amount: 0.8 }}
-                    name={L.name}
-                    txt={L.txt}
+                    name={t(L.name)}
+                    txt={t(L.txt)}
                     pressed={edit.look === L.id}
                     onClick={() => act((e) => (e.look === L.id ? { ...e, look: null } : { ...e, look: L.id, amount: 0.8 }), true)}
                   />
@@ -2095,7 +2123,7 @@ export function DevelopDialog({
                   <div className="slip col-span-full sticky -bottom-4 z-[2] -mx-4 mt-1 border-t border-ink/10 px-4 pt-3 pb-2 lg:-bottom-5 lg:-mx-5 lg:px-5">
                     <Slider
                       id="dv-amount"
-                      label={`Stärke ${lookOf(edit.look)?.name ?? ""}`}
+                      label={t("Stärke {name}", { name: t(lookOf(edit.look)?.name ?? "") })}
                       value={edit.amount}
                       min={0}
                       max={1}
@@ -2115,7 +2143,7 @@ export function DevelopDialog({
                   <Slider
                     key={k}
                     id={`dv-${k}`}
-                    label={name}
+                    label={t(name)}
                     value={edit[k]}
                     min={min}
                     max={max}
@@ -2135,10 +2163,10 @@ export function DevelopDialog({
             {tab === "f" &&
               (() => {
                 const m = edit.more ?? MORE0();
-                const shownGroups = GROUPS.filter(([g]) => groups.includes(g) || groupNote(edit.more, g));
+                const shownGroups = GROUPS.filter(([g]) => groups.includes(g) || groupNote(edit.more, g, t));
                 const offered = GROUPS.filter(([g]) => g !== "curve" || desk || shownGroups.some(([x]) => x === g));
                 const pick = (g: Group) => {
-                  const changed = !!groupNote(edit.more, g);
+                  const changed = !!groupNote(edit.more, g, t);
                   if (groups.includes(g) && !changed) return keepGroups(groups.filter((x) => x !== g));
                   if (!groups.includes(g)) keepGroups([...groups, g]);
                   setFolded((f) => f.filter((x) => x !== g));
@@ -2146,15 +2174,15 @@ export function DevelopDialog({
                   requestAnimationFrame(() => document.getElementById(`dv-g-${g}`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }));
                 };
                 const slider = (k: (typeof MORE_SLIDERS)[number][0], name: string) => (
-                  <Slider key={k} id={`dv-m-${k}`} label={name} value={m[k]} min={-1} max={1} step={0.01} zero={0} format={signed100} onChange={(v) => liveMore(() => ({ [k]: v }))} />
+                  <Slider key={k} id={`dv-m-${k}`} label={t(name)} value={m[k]} min={-1} max={1} step={0.01} zero={0} format={signed100} onChange={(v) => liveMore(() => ({ [k]: v }))} />
                 );
                 return (
                   <div className="mt-5 grid gap-3 lg:mt-6">
                     {shownGroups.map(([g, name]) => {
-                      const note = groupNote(edit.more, g);
+                      const note = groupNote(edit.more, g, t);
                       const open = !folded.includes(g);
                       return (
-                        <section key={g} id={`dv-g-${g}`} aria-label={name} className="border-ink/12 border-t pt-2.5">
+                        <section key={g} id={`dv-g-${g}`} aria-label={t(name)} className="border-ink/12 border-t pt-2.5">
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
@@ -2165,11 +2193,11 @@ export function DevelopDialog({
                             >
                               <ChevronDown aria-hidden className={`size-4 flex-none transition-transform duration-150 ${open ? "" : "-rotate-90"}`} />
                               <span aria-hidden className={`size-2 flex-none rounded-full border-[1.5px] ${note ? "border-ink bg-mark" : "border-ink-2"}`} />
-                              <span className="truncate">{name}</span>
+                              <span className="truncate">{t(name)}</span>
                               {!open && note && <span className="text-ink-2 ml-auto truncate text-xs font-normal">{note}</span>}
                             </button>
                             {!note && (
-                              <IconButton label={`${name} schließen`} variant="paper" onClick={() => keepGroups(groups.filter((x) => x !== g))} className="!bg-transparent">
+                              <IconButton label={t("{name} schließen", { name: t(name) })} variant="paper" onClick={() => keepGroups(groups.filter((x) => x !== g))} className="!bg-transparent">
                                 <X aria-hidden />
                               </IconButton>
                             )}
@@ -2178,7 +2206,7 @@ export function DevelopDialog({
                             {g === "curve" ? (
                               <div className="grid gap-2.5 sm:col-span-2 lg:col-span-1">
                                 <CurvePad points={m.curve} hist={curveHist} onStart={burst} onChange={(c) => liveMore(() => ({ curve: c }))} />
-                                <div role="group" aria-label="Vorlagen" className="flex flex-wrap gap-1.5">
+                                <div role="group" aria-label={t("Vorlagen")} className="flex flex-wrap gap-1.5">
                                   {CURVES.map(([name, c]) => (
                                     <button
                                       key={name}
@@ -2194,25 +2222,25 @@ export function DevelopDialog({
                                       }}
                                       className={chip(JSON.stringify(c) === JSON.stringify(m.curve))}
                                     >
-                                      {name}
+                                      {t(name)}
                                     </button>
                                   ))}
                                 </div>
-                                <p className="text-ink-2 text-xs">Auf die Fläche klicken setzt einen Punkt. Aus der Fläche ziehen oder doppelklicken nimmt ihn weg.</p>
+                                <p className="text-ink-2 text-xs">{t("Auf die Fläche klicken setzt einen Punkt. Aus der Fläche ziehen oder doppelklicken nimmt ihn weg.")}</p>
                               </div>
                             ) : g === "hsl" ? (
                               <div className="grid gap-2.5 sm:col-span-2 lg:col-span-1">
                                 <Swatches
-                                  label={`${HUES[hue][0]}: ${HUES[hue][3]}`}
+                                  label={`${t(HUES[hue][0])}: ${t(HUES[hue][3])}`}
                                   items={HUES.map(([n, , color], i) => ({ id: String(i), label: n, color, ink: "var(--paper)" }))}
                                   value={String(hue)}
                                   onChange={(id) => setHue(Number(id))}
                                 />
-                                {(["Farbton", "Sättigung", "Helligkeit"] as const).map((label, j) => (
+                                {[de("Farbton"), de("Sättigung"), de("Helligkeit")].map((label, j) => (
                                   <Slider
                                     key={label}
                                     id={`dv-hsl-${j}`}
-                                    label={label}
+                                    label={t(label)}
                                     value={m.hsl[hue][j]}
                                     min={-1}
                                     max={1}
@@ -2236,18 +2264,18 @@ export function DevelopDialog({
                         container={dialog}
                         trigger={
                           <button type="button" className={buttonClass("paper", "sm", "pl-3")}>
-                            Mehr Werkzeuge
+                            {t("Mehr Werkzeuge")}
                             <ChevronDown aria-hidden />
                           </button>
                         }
                       >
                         {offered.map(([g, name, txt, Icon]) => (
-                          <MenuItem key={g} icon={<Icon />} hint={txt} checked={shownGroups.some(([x]) => x === g)} onClick={() => pick(g)}>
-                            {name}
+                          <MenuItem key={g} icon={<Icon />} hint={t(txt)} checked={shownGroups.some(([x]) => x === g)} onClick={() => pick(g)}>
+                            {t(name)}
                           </MenuItem>
                         ))}
                       </Menu>
-                      <span className="text-ink-2 text-xs">{shownGroups.length ? `${shownGroups.length} von ${offered.length} offen` : desk ? "Lichter, Klarheit, Farben, Vignette, Kurve" : "Lichter, Klarheit, Farben, Vignette"}</span>
+                      <span className="text-ink-2 text-xs">{shownGroups.length ? t("{n} von {m} offen", { n: shownGroups.length, m: offered.length }) : desk ? t("Lichter, Klarheit, Farben, Vignette, Kurve") : t("Lichter, Klarheit, Farben, Vignette")}</span>
                     </div>
                   </div>
                 );
@@ -2257,7 +2285,7 @@ export function DevelopDialog({
               <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-7">
                 <div className="sm:col-span-2 lg:col-span-1">
                   <h3 className={groupTitle}>
-                    <label htmlFor="dv-preset">Rezept</label>
+                    <label htmlFor="dv-preset">{t("Rezept")}</label>
                   </h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     <Menu
@@ -2265,16 +2293,16 @@ export function DevelopDialog({
                       container={dialog}
                       trigger={
                         <button type="button" id="dv-preset" className={`${fieldClass} flex min-w-0 flex-[1_1_200px] items-center justify-between gap-2 text-left`}>
-                          <span className="truncate">{recEmpty ? "Ohne Rezept" : recLabel}</span>
+                          <span className="truncate">{recEmpty ? t("Ohne Rezept") : recLabel}</span>
                           <ChevronDown aria-hidden className="size-4 flex-none" />
                         </button>
                       }
                     >
-                      {[{ id: "", name: "Ohne Rezept", txt: "" }, ...PRESETS].map((r) => (
+                      {[{ id: "", name: de("Ohne Rezept"), txt: "" }, ...PRESETS].map((r) => (
                         <MenuItem key={r.id} icon={<Check className={(r.id ? recMatch?.id === r.id : recEmpty) ? "" : "invisible"} />} onClick={() => pickRecipe(r.id)}>
                           <span>
-                            {r.name}
-                            {r.txt && <span className="text-ink-2"> · {r.txt}</span>}
+                            {t(r.name)}
+                            {r.txt && <span className="text-ink-2"> · {t(r.txt)}</span>}
                           </span>
                         </MenuItem>
                       ))}
@@ -2286,7 +2314,7 @@ export function DevelopDialog({
                       ))}
                       <MenuSeparator />
                       <MenuItem icon={<BookmarkPlus />} onClick={() => pickRecipe("save")}>
-                        Als eigenen Look speichern …
+                        {t("Als eigenen Look speichern …")}
                       </MenuItem>
                     </Menu>
                     {recMatch && own.some((r) => r.id === recMatch.id) && (
@@ -2296,7 +2324,7 @@ export function DevelopDialog({
                         onClick={() => askDelete(recMatch)}
                       >
                         <Trash aria-hidden className="size-4" />
-                        Löschen
+                        {t("Löschen")}
                       </button>
                     )}
                   </div>
@@ -2304,27 +2332,27 @@ export function DevelopDialog({
                 </div>
                 <div className="sm:col-span-2 lg:col-span-1">
                   <Chips<RecipeValues["film"]>
-                    label="Filmlook"
-                    opts={[[null, "Ohne"], ...LOOKS.map((L) => [L.id, L.name] as [RecipeValues["film"], string])]}
+                    label={t("Filmlook")}
+                    opts={[[null, de("Ohne")], ...LOOKS.map((L) => [L.id, L.name] as [RecipeValues["film"], string])]}
                     cur={edit.rec.film}
                     onPick={(v) => setRec(() => ({ film: v }), true)}
                   />
                 </div>
                 <WbPad r={edit.rec.wbR} b={edit.rec.wbB} onChange={(wbR, wbB) => liveRec({ wbR, wbB })} />
                 <div className="grid content-start gap-2.5 lg:gap-4">
-                  <h3 className={groupTitle}>Ton und Farbe</h3>
+                  <h3 className={groupTitle}>{t("Ton und Farbe")}</h3>
                   {(
                     [
-                      ["hl", "Lichter", -2, 4, 0.5],
-                      ["sh", "Schatten", -2, 4, 0.5],
-                      ["color", "Farbe", -4, 4, 1],
+                      ["hl", de("Lichter"), -2, 4, 0.5],
+                      ["sh", de("Schatten"), -2, 4, 0.5],
+                      ["color", de("Farbe"), -4, 4, 1],
                     ] as const
                   ).map(([k, name, min, max, step]) => (
-                    <Slider key={k} id={`dv-rc-${k}`} label={name} value={edit.rec[k]} min={min} max={max} step={step} zero={0} format={signedStep} onChange={(v) => liveRec({ [k]: v })} />
+                    <Slider key={k} id={`dv-rc-${k}`} label={t(name)} value={edit.rec[k]} min={min} max={max} step={step} zero={0} format={signedStep} onChange={(v) => liveRec({ [k]: v })} />
                   ))}
                 </div>
                 <Chips<RecipeValues["dr"]>
-                  label="Dynamikbereich"
+                  label={t("Dynamikbereich")}
                   opts={[
                     [100, "DR100"],
                     [200, "DR200"],
@@ -2334,14 +2362,14 @@ export function DevelopDialog({
                   onPick={(v) => setRec(() => ({ dr: v }))}
                 />
                 <Chips<RecipeValues["cc"]> label="Color Chrome" opts={LEVEL} cur={edit.rec.cc} onPick={(v) => setRec(() => ({ cc: v }))} />
-                <Chips<RecipeValues["fxb"]> label="Color Chrome FX Blau" opts={LEVEL} cur={edit.rec.fxb} onPick={(v) => setRec(() => ({ fxb: v }))} />
+                <Chips<RecipeValues["fxb"]> label={t("Color Chrome FX Blau")} opts={LEVEL} cur={edit.rec.fxb} onPick={(v) => setRec(() => ({ fxb: v }))} />
                 <div className="grid gap-1.5">
-                  <Chips<RecipeValues["grain"]> label="Körnung" opts={LEVEL} cur={edit.rec.grain} onPick={(v) => setRec(() => ({ grain: v }))} />
+                  <Chips<RecipeValues["grain"]> label={t("Körnung")} opts={LEVEL} cur={edit.rec.grain} onPick={(v) => setRec(() => ({ grain: v }))} />
                   <Chips<RecipeValues["gsize"]>
-                    label="Korngröße"
+                    label={t("Korngröße")}
                     opts={[
-                      ["klein", "Klein"],
-                      ["groß", "Groß"],
+                      ["klein", de("Klein")],
+                      ["groß", de("Groß")],
                     ]}
                     cur={edit.rec.gsize}
                     onPick={(v) => setRec(() => ({ gsize: v }))}
@@ -2368,7 +2396,8 @@ export function DevelopDialog({
   );
 }
 
-function SaveForm({ onSave, onCancel, initial = "", label = "Name für deinen Look" }: { onSave: (name: string) => void; onCancel: () => void; initial?: string; label?: string }): ReactNode {
+function SaveForm({ onSave, onCancel, initial = "", label }: { onSave: (name: string) => void; onCancel: () => void; initial?: string; label?: string }): ReactNode {
+  const t = useT();
   const [name, setName] = useState(initial);
   return (
     <form
@@ -2380,13 +2409,13 @@ function SaveForm({ onSave, onCancel, initial = "", label = "Name für deinen Lo
       }}
     >
       <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-        <Field label={label} autoFocus maxLength={40} required value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-[1_1_220px]" />
+        <Field label={label ?? t("Name für deinen Look")} autoFocus maxLength={40} required value={name} onChange={(e) => setName(e.target.value)} className="min-w-0 flex-[1_1_220px]" />
         <div className="flex gap-2">
           <button type="submit" className={buttonClass("ink", "sm")}>
-            Speichern
+            {t("Speichern")}
           </button>
           <button type="button" onClick={onCancel} className={buttonClass("paper", "sm")}>
-            Abbrechen
+            {t("Abbrechen")}
           </button>
         </div>
       </div>

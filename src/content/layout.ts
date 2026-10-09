@@ -1,5 +1,6 @@
 import { inkPaths, shapePaths, type PathEl } from "@/content/shapes";
 import { colWidth, pageNos, plateOf, typeArea, type BookData, type FontKey, type FreeEl, type Page, type TextLook, type TextRole } from "@/content/books";
+import { de, t } from "@/lib/i18n";
 
 // Eine Seite als Liste von Elementen in cqw (Seitenbreite = 100). Dieselbe Liste setzt das HTML
 // (page-view.tsx) und zeichnet die Textur fürs Umblättern (page-texture.ts), damit nichts springt.
@@ -81,17 +82,17 @@ export const TEXT_STYLE = { text: { size: 3.2, lh: 1.5 }, gross: { size: 4.4, lh
 
 /** Textrahmen auf freien Seiten: drei gesetzte Stile, keine Regler */
 export const TEXT_ROLE: Record<TextRole, { size: number; weight: 400 | 700; lh: number; tone: Tone; display?: boolean; label: string }> = {
-  heading: { size: 6, weight: 700, lh: 1.02, tone: "ink", display: true, label: "Überschrift" },
-  body: { size: 3.2, weight: 400, lh: 1.5, tone: "ink", label: "Absatz" },
-  note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: "Notiz" },
+  heading: { size: 6, weight: 700, lh: 1.02, tone: "ink", display: true, label: de("Überschrift") },
+  body: { size: 3.2, weight: 400, lh: 1.5, tone: "ink", label: de("Absatz") },
+  note: { size: CAPTION, weight: 400, lh: LEADING, tone: "ink2", label: de("Notiz") },
 };
 
 /** Schriften der Textrahmen als CSS-Variablen (layout.tsx) */
 export const FONTS: Record<FontKey, { label: string; css: string; lh: number }> = {
-  grotesk: { label: "Grotesk", css: "var(--font-bricolage)", lh: 1 },
-  serif: { label: "Serif", css: "var(--font-serif)", lh: 1.05 },
-  mono: { label: "Schreibmaschine", css: "var(--font-mono)", lh: 1.05 },
-  hand: { label: "Handschrift", css: "var(--font-hand)", lh: 1 },
+  grotesk: { label: de("Grotesk"), css: "var(--font-bricolage)", lh: 1 },
+  serif: { label: de("Serif"), css: "var(--font-serif)", lh: 1.05 },
+  mono: { label: de("Schreibmaschine"), css: "var(--font-mono)", lh: 1.05 },
+  hand: { label: de("Handschrift"), css: "var(--font-hand)", lh: 1 },
 };
 /** Schriftgröße, Stärke und Zeilenabstand eines Textrahmens: Stil plus freie Werte */
 export function textMetrics(role: TextRole, look?: TextLook) {
@@ -274,7 +275,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
           // Zeile darunter, dann der Name: ein Block, damit eine lange Zeile umbricht und den Namen mitschiebt
           {
             t: "text",
-            text: [book.subtitle, book.author ?? "Michel Leotta"].filter(Boolean).join("\n"),
+            text: [book.subtitle && t(book.subtitle), book.author ?? "Michel Leotta"].filter(Boolean).join("\n"),
             x,
             y: H - book.bottom + 2.4,
             w: 100 - x - 10,
@@ -297,7 +298,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
     case "title": {
       const els: El[] = [
         { t: "text", text: book.title, x: ta.x, y: ta.y, size: 7, weight: 700, tone: "ink", lh: 0.95, display: true },
-        { t: "text", text: book.subtitle, x: ta.x, y: ta.y + 9.5, size: 3, weight: 400, tone: "ink", lh: LEADING },
+        { t: "text", text: book.subtitle && t(book.subtitle), x: ta.x, y: ta.y + 9.5, size: 3, weight: 400, tone: "ink", lh: LEADING },
       ];
       if (book.places)
         els.push({ t: "text", text: book.places, x: ta.x, y: ta.y + 14, size: 3, weight: 400, tone: "ink2", lh: LEADING });
@@ -390,7 +391,7 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
     case "index": {
       const { cols, cw, ch, top } = indexGrid(book, ta);
       const els: El[] = [
-        { t: "text", text: "Tafeln", x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
+        { t: "text", text: t("Tafeln"), x: ta.x, y: ta.y, size: CAPTION, weight: 600, tone: "ink", lh: LEADING },
       ];
       book.plates.forEach((p, i) => {
         const x = ta.x + (i % cols) * (cw + INDEX_GAP);

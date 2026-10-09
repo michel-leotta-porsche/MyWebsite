@@ -63,7 +63,7 @@ export const START: Record<string, string> = {
     "Film simulation, grain, white balance: what the Fuji writes into the file sits as a note beneath the photo. Lightroom presets come along as .xmp.",
   "Schild über der Bucht": "Sign above the bay",
   "Rezept · Beispielwerte": "Recipe · sample values",
-  Dynamik: "Dynamic range",
+  "Dynamik|Fuji": "Dynamic range",
   "Lichter · Schatten": "Highlights · shadows",
   Farbe: "Color",
   Körnung: "Grain",

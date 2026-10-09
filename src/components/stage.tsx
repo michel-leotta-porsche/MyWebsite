@@ -44,6 +44,7 @@ import {
 import type { StoredPhoto } from "@/lib/store";
 import { haptic, warmHaptics } from "@/lib/haptics";
 import { IS_APP, keys, withKeys } from "@/lib/app-mode";
+import { de, useT } from "@/lib/i18n";
 
 // Die Bühne: eine Doppelseite groß, Fotos und Texte direkt auf der Seite bewegen, vergrößern, zuschneiden.
 // Kanten rasten am Raster (6 Spalten, 9 Zeilen), an Seitenkanten, Bund und Nachbarn ein.
@@ -93,7 +94,7 @@ function remember(it: SpreadItem) {
 
 const TOOL_KEYS: Record<string, Tool> = { v: "select", p: "pen", e: "eraser", l: "line", a: "arrow", r: "rect", o: "ellipse", k: "tape" };
 
-const DEFAULT_TEXT: Record<TextRole, string> = { heading: "Überschrift", body: "Ein paar Sätze zu diesem Tag.", note: "Notiz" };
+const DEFAULT_TEXT: Record<TextRole, string> = { heading: de("Überschrift"), body: de("Ein paar Sätze zu diesem Tag."), note: de("Notiz") };
 
 /**
  * Die Bühne ist ein Modal über der Werkbank: der Rest der Seite wird inert (weder Tab noch Klick erreichen ihn),
@@ -163,6 +164,7 @@ export function Stage({
   /** Bildbearbeitung (Looks, Vorschläge, Feinschliff) für ein Foto öffnen */
   onDevelop?: (key: string) => void;
 }) {
+  const t = useT();
   const grid = useMemo(() => spreadGrid(geom), [geom]);
   const [sel, setSel] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ id: string; box: Box; original: boolean; from?: Corner } | null>(null);
@@ -345,16 +347,18 @@ export function Stage({
     const p = b.x + b.w / 2 < 100 ? 0 : 1;
     const col = grid.cols[p].filter((_, i) => i % 2 === 0).findIndex((c) => Math.abs(c - b.x) < 0.6);
     const row = grid.rows.filter((_, i) => i % 2 === 0).findIndex((r) => Math.abs(r - b.y) < 0.6);
-    return `${p === 0 ? "linke" : "rechte"} Seite${col >= 0 ? `, Spalte ${col + 1}` : ""}${row >= 0 ? `, Zeile ${row + 1}` : ""}`;
+    return `${p === 0 ? t("linke Seite") : t("rechte Seite")}${col >= 0 ? t(", Spalte {n}", { n: col + 1 }) : ""}${row >= 0 ? t(", Zeile {n}", { n: row + 1 }) : ""}`;
   };
   const nameOf = (it: SpreadItem) =>
     it.t === "photo"
-      ? `Foto ${noOf(it.key) ?? ""} ${photos.get(it.key)?.title || ""}`.trim()
+      ? `${t("Foto {no}", { no: noOf(it.key) ?? "" })} ${photos.get(it.key)?.title || ""}`.trim()
       : it.t === "text"
-        ? `${TEXT_ROLE[it.role].label}: ${it.text.slice(0, 30)}`
+        ? `${t(TEXT_ROLE[it.role].label)}: ${it.text.slice(0, 30)}`
         : it.t === "shape"
-          ? SHAPES[it.kind].label
-          : `Zeichnung, ${it.strokes.length} ${it.strokes.length === 1 ? "Strich" : "Striche"}`;
+          ? t(SHAPES[it.kind].label)
+          : it.strokes.length === 1
+            ? t("Zeichnung, 1 Strich")
+            : t("Zeichnung, {n} Striche", { n: it.strokes.length });
 
   // ---- Einrasten ----
   // 8 px auf dem Bildschirm, auch vergrößert; mit dem Finger 4 px, damit das Foto nicht kleben bleibt und dann springt
@@ -599,12 +603,12 @@ export function Stage({
   const addText = (role: TextRole, p: 0 | 1, at?: { x: number; y: number }, given?: string) => {
     const cols = role === "heading" ? 6 : role === "body" ? 4 : 3;
     const w = cols * grid.cw + (cols - 1) * 2;
-    const text = given?.slice(0, 1200) ?? DEFAULT_TEXT[role];
+    const text = given?.slice(0, 1200) ?? t(DEFAULT_TEXT[role]);
     const h = boxOf({ t: "text", id: "x", text, role, box: { x: 0, y: 0, w, h: 0 } }, geom).h;
     // an der Stelle des Zeigers, auch auf einem Foto (Ebenen); ohne Zeiger die erste freie Stelle
     const box = (at ? snapAt(p, at, w, h) : null) ?? placeNew(items, geom, p, w, h) ?? snapAt(p, { x: grid.ta[p].x, y: grid.rows[0] }, w, h);
     const id = itemId();
-    commit([...items, { t: "text", id, text, role, box: { ...box, h } }], undefined, `${TEXT_ROLE[role].label} hinzugefügt: ${where(box)}. Jetzt tippen.`);
+    commit([...items, { t: "text", id, text, role, box: { ...box, h } }], undefined, t("{what} hinzugefügt: {where}. Jetzt tippen.", { what: t(TEXT_ROLE[role].label), where: where(box) }));
     setSel(id);
     if (!given) setEditing(id);
   };
@@ -620,7 +624,7 @@ export function Stage({
   const addPhoto = (key: string, p: 0 | 1, at?: { x: number; y: number }) => {
     const photo = photos.get(key);
     if (!photo) return;
-    if (items.some((i) => i.t === "photo" && i.key === key)) return setSay("Das Foto liegt schon auf dieser Doppelseite.");
+    if (items.some((i) => i.t === "photo" && i.key === key)) return setSay(t("Das Foto liegt schon auf dieser Doppelseite."));
     const order: (0 | 1)[] = [p, (1 - p) as 0 | 1];
     for (const pg of order) {
       if (photosOnPage(items, pg) >= MAX_PHOTOS_PER_PAGE) continue;
@@ -640,12 +644,12 @@ export function Stage({
       const c = at && pg === p ? at : { x: pg * 100 + 50, y: 50 };
       return put(snapAt(pg, { x: c.x - w / 2, y: c.y - h / 2 }, w, h));
     }
-    const msg = `Kein Platz mehr: höchstens ${MAX_PHOTOS_PER_PAGE} Fotos pro Seite. Erst ein Foto beiseitelegen.`;
+    const msg = t("Kein Platz mehr: höchstens {n} Fotos pro Seite. Erst ein Foto beiseitelegen.", { n: MAX_PHOTOS_PER_PAGE });
     setSay(msg);
     setNotice(msg);
     function put(box: Box) {
       const id = itemId();
-      commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, `Foto hinzugefügt: ${where(box)}`, [key]);
+      commit([...items, { t: "photo", id, key, box, caption: "auto" }], undefined, t("Foto hinzugefügt: {where}", { where: where(box) }), [key]);
       setSel(id);
       setNotice("");
     }
@@ -668,15 +672,21 @@ export function Stage({
   const penSeen = useRef(false);
   const inkTarget = useRef<string | null>(null);
   const sketchFrame = useRef(0);
-  const setTool = (t: Tool) => {
+  const setTool = (next: Tool) => {
     inkTarget.current = null;
     sketchRef.current = null;
     setSketch(null);
-    setToolState(t);
-    if (t !== "select") {
+    setToolState(next);
+    if (next !== "select") {
       setSel(null);
       setEditing(null);
-      setSay(t === "pen" ? "Stift: auf der Seite zeichnen. Esc beendet." : t === "eraser" ? "Radierer: über Striche wischen." : `${SHAPES[t].label}: auf der Seite aufziehen.`);
+      setSay(
+        next === "pen"
+          ? t("Stift: auf der Seite zeichnen. Esc beendet.")
+          : next === "eraser"
+            ? t("Radierer: über Striche wischen.")
+            : t("{shape}: auf der Seite aufziehen.", { shape: t(SHAPES[next].label) }),
+      );
     }
   };
   /** Punkt in cqw der Doppelseite (x 0..200, y in cqw) */
@@ -725,7 +735,7 @@ export function Stage({
       const { box, strokes } = absToStrokes(keep, grid.H);
       return [{ ...it, box, strokes }];
     });
-    if (changed) commit(next, tag, "Strich radiert");
+    if (changed) commit(next, tag, t("Strich radiert"));
   };
 
   const onDrawDown = (e: React.PointerEvent) => {
@@ -790,7 +800,7 @@ export function Stage({
       else shape = { box: { x: Math.min(sk.a.x, 200 - w), y: Math.min(sk.a.y, 100 - (w / grid.H) * 100), w, h: (w / grid.H) * 100 } };
     } else shape = shapeBox(sk, !!last.current?.shiftKey);
     const id = itemId();
-    commit([...items, { t: "shape", id, kind: sk.shape, box: shape.box, look: lookFor(sk.shape), ...(shape.from && shape.from !== "tl" ? { from: shape.from } : {}) }], undefined, `${SHAPES[sk.shape].label} hinzugefügt: ${where(shape.box)}`);
+    commit([...items, { t: "shape", id, kind: sk.shape, box: shape.box, look: lookFor(sk.shape), ...(shape.from && shape.from !== "tl" ? { from: shape.from } : {}) }], undefined, t("{what} hinzugefügt: {where}", { what: t(SHAPES[sk.shape].label), where: where(shape.box) }));
     // wie in Keynote und PowerPoint: nach dem Aufziehen zurück zur Auswahl, die neue Form ist gewählt
     setToolState("select");
     setSel(id);
@@ -804,12 +814,12 @@ export function Stage({
     const target = items.find((i) => i.id === inkTarget.current && i.t === "ink");
     if (target && target.t === "ink") {
       const { box, strokes } = absToStrokes([...strokesToAbs(target.strokes, target.box, grid.H), stroke], grid.H);
-      commit(items.map((i) => (i.id === target.id ? { ...target, box, strokes } : i)), undefined, `Strich ${strokes.length}`);
+      commit(items.map((i) => (i.id === target.id ? { ...target, box, strokes } : i)), undefined, t("Strich {n}", { n: strokes.length }));
     } else {
       const id = itemId();
       inkTarget.current = id;
       const { box, strokes } = absToStrokes([stroke], grid.H);
-      commit([...items, { t: "ink", id, box, strokes }], undefined, "Zeichnung begonnen");
+      commit([...items, { t: "ink", id, box, strokes }], undefined, t("Zeichnung begonnen"));
     }
   };
   const pathsOf = (it: SpreadItem): PathEl[] =>
@@ -836,7 +846,7 @@ export function Stage({
       commit(
         items.map((i) => (i.id === it.id ? { ...i, box } : i)),
         `key-${it.id}`,
-        e.shiftKey ? `Größe ${Math.round(box.w)} × ${Math.round(box.h)}` : where(box),
+        e.shiftKey ? t("Größe {w} × {h}", { w: Math.round(box.w), h: Math.round(box.h) }) : where(box),
       );
     } else if ((e.metaKey || e.ctrlKey) && (e.key === "]" || e.key === "[")) {
       e.preventDefault();
@@ -860,7 +870,7 @@ export function Stage({
       ? { ...snapAt(pageAt(at.x), at, Math.min(b.w, 100), b.h), w: b.w, h: b.h }
       : { ...b, x: Math.max(0, b.x + dx), y: Math.max(0, b.y + dy) };
     const copy = { ...src, id, box, pairId: undefined } as SpreadItem;
-    commit([...items, copy], undefined, `${src.t === "photo" ? "Foto" : src.t === "text" ? "Text" : nameOf(src)} eingefügt: ${where(box)}`);
+    commit([...items, copy], undefined, t("{what} eingefügt: {where}", { what: src.t === "photo" ? t("Foto") : src.t === "text" ? t("Text") : nameOf(src), where: where(box) }));
     setSel(id);
   };
   const duplicate = (it: SpreadItem) => paste(it);
@@ -874,7 +884,7 @@ export function Stage({
     const marker = remember(it);
     // in der App gehen nur Texte ins System; Fotos und Formen bleiben in Calimas eigener Ablage (Workshop Paket 6)
     if (!IS_APP || it.t === "text") navigator.clipboard?.writeText(marker).catch(() => {});
-    setSay("Kopiert");
+    setSay(t("Kopiert"));
   };
   const pasteFromMenu = async (at?: { x: number; y: number }) => {
     if (clipboard) return paste(clipboard.item, at);
@@ -888,50 +898,50 @@ export function Stage({
     const common: MenuEntry[] = it
       ? [
           "sep",
-          { label: "Kopieren", hint: keys("⌘C"), run: () => copyItem(it) },
-          { label: "Ausschneiden", hint: keys("⌘X"), run: () => (copyItem(it), remove(it)) },
-          { label: "Duplizieren", hint: keys("⌘D"), run: () => paste(it) },
-          { label: "Einfügen", hint: keys("⌘V"), run: () => pasteFromMenu() },
+          { label: t("Kopieren"), hint: keys("⌘C"), run: () => copyItem(it) },
+          { label: t("Ausschneiden"), hint: keys("⌘X"), run: () => (copyItem(it), remove(it)) },
+          { label: t("Duplizieren"), hint: keys("⌘D"), run: () => paste(it) },
+          { label: t("Einfügen"), hint: keys("⌘V"), run: () => pasteFromMenu() },
           "sep",
-          { label: "Ganz nach vorn", hint: keys("⇧⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "front") },
-          { label: "Nach vorn", hint: keys("⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "up") },
-          { label: "Nach hinten", hint: keys("⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "down") },
-          { label: "Ganz nach hinten", hint: keys("⇧⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "back") },
+          { label: t("Ganz nach vorn"), hint: keys("⇧⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "front") },
+          { label: t("Nach vorn"), hint: keys("⌘]"), disabled: !canLayer(it.id, "up"), run: () => layer(it.id, "up") },
+          { label: t("Nach hinten"), hint: keys("⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "down") },
+          { label: t("Ganz nach hinten"), hint: keys("⇧⌘["), disabled: !canLayer(it.id, "down"), run: () => layer(it.id, "back") },
           "sep",
         ]
       : [];
     if (it?.t === "photo")
       return [
-        { label: "Zuschneiden", hint: IS_APP ? "Doppeltippen" : "Doppelklick", run: () => setCropping(it.id) },
-        { label: "Ausschnitt-Dialog …", run: () => setCrop(it.id) },
+        { label: t("Zuschneiden"), hint: IS_APP ? t("Doppeltippen") : t("Doppelklick"), run: () => setCropping(it.id) },
+        { label: t("Ausschnitt-Dialog …"), run: () => setCrop(it.id) },
         {
-          label: "Unterschrift auf der Seite",
+          label: t("Unterschrift auf der Seite"),
           checked: it.caption === "auto",
           run: () => commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, caption: i.caption === "auto" ? "off" : "auto" } : i))),
         },
         ...common,
-        { label: "Aus dem Buch nehmen", hint: "Entf", run: () => remove(it) },
+        { label: t("Aus dem Buch nehmen"), hint: t("Entf"), run: () => remove(it) },
       ];
     if (it?.t === "text")
       return [
-        { label: "Text schreiben", hint: "Enter", run: () => setEditing(it.id) },
+        { label: t("Text schreiben"), hint: "Enter", run: () => setEditing(it.id) },
         ...(Object.keys(TEXT_ROLE) as TextRole[]).map(
-          (r): MenuEntry => ({ label: TEXT_ROLE[r].label, checked: it.role === r, run: () => commit(items.map((i) => (i.id === it.id ? { ...i, role: r } : i))) }),
+          (r): MenuEntry => ({ label: t(TEXT_ROLE[r].label), checked: it.role === r, run: () => commit(items.map((i) => (i.id === it.id ? { ...i, role: r } : i))) }),
         ),
         {
-          label: "Helle Schrift",
+          label: t("Helle Schrift"),
           checked: !!it.light,
           run: () => commit(items.map((i) => (i.id === it.id && i.t === "text" ? { ...i, light: i.light ? undefined : true } : i))),
         },
         ...common,
-        { label: "Löschen", hint: "Entf", run: () => remove(it) },
+        { label: t("Löschen"), hint: t("Entf"), run: () => remove(it) },
       ];
-    if (it?.t === "shape" || it?.t === "ink") return [...common.slice(1), { label: "Löschen", hint: "Entf", run: () => remove(it) }];
+    if (it?.t === "shape" || it?.t === "ink") return [...common.slice(1), { label: t("Löschen"), hint: t("Entf"), run: () => remove(it) }];
     const at = menu.at;
     return [
-      { label: "Hier einfügen", hint: keys("⌘V"), run: () => pasteFromMenu(at) },
+      { label: t("Hier einfügen"), hint: keys("⌘V"), run: () => pasteFromMenu(at) },
       "sep",
-      ...(Object.keys(TEXT_ROLE) as TextRole[]).map((r): MenuEntry => ({ label: `${TEXT_ROLE[r].label} hier`, run: () => addText(r, pageAt(at.x), at) })),
+      ...(Object.keys(TEXT_ROLE) as TextRole[]).map((r): MenuEntry => ({ label: t("{what} hier", { what: t(TEXT_ROLE[r].label) }), run: () => addText(r, pageAt(at.x), at) })),
     ];
   };
 
@@ -961,16 +971,16 @@ export function Stage({
     else if (to === "back") j = 0;
     else if (to === "up") j = items.findIndex((o, n) => n > i && hits(o));
     else j = items.findLastIndex((o, n) => n < i && hits(o));
-    if (j < 0 || j === i) return setSay(to === "up" || to === "front" ? "Liegt schon ganz vorn." : "Liegt schon ganz hinten.");
+    if (j < 0 || j === i) return setSay(to === "up" || to === "front" ? t("Liegt schon ganz vorn.") : t("Liegt schon ganz hinten."));
     const next = [...items];
     const [it] = next.splice(i, 1);
     next.splice(j, 0, it);
-    commit(next, undefined, to === "up" || to === "front" ? "Nach vorn gelegt" : "Nach hinten gelegt");
+    commit(next, undefined, to === "up" || to === "front" ? t("Nach vorn gelegt") : t("Nach hinten gelegt"));
   };
   const remove = (it: SpreadItem) => {
     setSel(null);
     if (it.t === "photo") onShelve(it.key);
-    else commit(items.filter((i) => i.id !== it.id), undefined, `${it.t === "text" ? "Text" : nameOf(it)} entfernt`);
+    else commit(items.filter((i) => i.id !== it.id), undefined, t("{what} entfernt", { what: it.t === "text" ? t("Text") : nameOf(it) }));
   };
 
   // ⌘C / ⌘X / ⌘V; Text aus anderen Apps wird ein neuer Textrahmen
@@ -1001,7 +1011,7 @@ export function Stage({
       if (typing(e) || !it) return;
       e.clipboardData?.setData("text/plain", remember(it));
       e.preventDefault();
-      setSay(e.type === "cut" ? "Ausgeschnitten" : "Kopiert");
+      setSay(e.type === "cut" ? de("Ausgeschnitten") : de("Kopiert"));
       if (e.type === "cut") latest.current.remove(it);
     };
     const onPaste = (e: ClipboardEvent) => {
@@ -1338,12 +1348,12 @@ export function Stage({
               className={`${phone ? "min-h-11" : "min-h-10"} relative min-w-0 flex-1 truncate pl-4 text-left text-[14px] ${it.id === sel ? "font-semibold" : ""}`}
             >
               {it.id === sel && <span aria-hidden className="bg-mark absolute inset-y-2 left-0 w-[3px] rounded-r-full" />}
-              {nameOf(it) || "Foto"}
+              {nameOf(it) || t("Foto")}
             </button>
-            <button type="button" aria-label="nach vorn" title="nach vorn" disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
+            <button type="button" aria-label={t("nach vorn")} title={t("nach vorn")} disabled={!canLayer(it.id, "up")} onClick={() => layer(it.id, "up")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
               <ChevronUp aria-hidden className="size-4" />
             </button>
-            <button type="button" aria-label="nach hinten" title="nach hinten" disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
+            <button type="button" aria-label={t("nach hinten")} title={t("nach hinten")} disabled={!canLayer(it.id, "down")} onClick={() => layer(it.id, "down")} className={`${phone ? "size-11" : "size-8"} text-ink-2 hover:bg-ink/8 grid place-items-center rounded-full disabled:opacity-30`}>
               <ChevronDown aria-hidden className="size-4" />
             </button>
           </li>
@@ -1382,7 +1392,7 @@ export function Stage({
   /** Fotos des Buchs zum Hineinholen: am Desktop unter der Doppelseite, am Handy im Fach „Fotos“ */
   const photoStrip = (
     <>
-      <ul tabIndex={0} aria-label="Fotos des Buchs" className={`flex gap-2 overflow-x-auto ${phone ? "pb-1" : "mt-2 pb-2"}`}>
+      <ul tabIndex={0} aria-label={t("Fotos des Buchs")} className={`flex gap-2 overflow-x-auto ${phone ? "pb-1" : "mt-2 pb-2"}`}>
         {[...shelf.map((photo) => ({ photo, spread: -1 })), ...elsewhere].map(({ photo: ph, spread }) => (
           <li key={ph.key} className="shrink-0">
             <button
@@ -1429,13 +1439,13 @@ export function Stage({
                 setPullGhost(null);
               }}
               style={{ touchAction: "pan-x" }}
-              aria-label={`Foto auf diese Doppelseite holen: ${ph.title || "ohne Titel"}, ${spread < 0 ? "beiseitegelegt" : `von Doppelseite ${spread + 1}`}`}
+              aria-label={t("Foto auf diese Doppelseite holen: {title}, {from}", { title: ph.title || t("ohne Titel"), from: spread < 0 ? t("beiseitegelegt") : t("von Doppelseite {n}", { n: spread + 1 }) })}
               className="group block text-left select-none [-webkit-touch-callout:none]"
             >
               <span className="relative block h-16 w-16">
                 <Image src={ph.thumb} alt="" fill sizes="64px" className="object-cover transition-opacity duration-150 group-hover:opacity-80" draggable={false} />
               </span>
-              <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? "Beiseite" : `Doppelseite ${spread + 1}`}</span>
+              <span className="text-on-table-2 mt-1 block text-[11px] tabular-nums">{spread < 0 ? t("Beiseite") : t("Doppelseite {n}", { n: spread + 1 })}</span>
             </button>
           </li>
         ))}
@@ -1457,23 +1467,23 @@ export function Stage({
         onDragStart={(e) => e.dataTransfer.setData("text/x-role", r)}
         onClick={() => addText(r, curPage)}
         className={buttonClass("quiet", "sm", `cursor-grab pl-2.5 ${phone ? "min-h-11" : "min-h-10"}`)}
-        title={IS_APP ? "Antippen legt den Text auf die Seite, Ziehen an eine bestimmte Stelle" : "Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle"}
+        title={IS_APP ? t("Antippen legt den Text auf die Seite, Ziehen an eine bestimmte Stelle") : t("Klicken legt den Text auf die Seite, Ziehen an eine bestimmte Stelle")}
       >
         <Plus aria-hidden />
-        {TEXT_ROLE[r].label}
+        {t(TEXT_ROLE[r].label)}
       </button>
     ));
 
   const penColors = () => <Swatches value={pen.c} cloth={data.cloth.base} onPick={(c) => c && setPen((p) => ({ ...p, c }))} />;
   const penWidths = () => (
-      <span className="flex gap-1" role="group" aria-label="Breite">
+      <span className="flex gap-1" role="group" aria-label={t("Breite")}>
         {PEN_SIZES.map((ps) => (
           <button
             key={ps.label}
             type="button"
             aria-pressed={pen.s === ps.s}
-            aria-label={`Breite ${ps.label}`}
-            title={ps.label}
+            aria-label={t("Breite {w}", { w: t(ps.label) })}
+            title={t(ps.label)}
             onClick={() => setPen((p) => ({ ...p, s: ps.s }))}
             className={`flex size-9 items-center justify-center rounded-full transition-colors duration-150 pointer-coarse:size-11 ${pen.s === ps.s ? "bg-on-table/16 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.4)]" : "hover:bg-on-table/8"}`}
           >
@@ -1491,39 +1501,39 @@ export function Stage({
   const selTray = phone && !draft && (selected?.t === "photo" || selected?.t === "text") ? selected : null;
 
   return (
-    <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={`Doppelseite ${index + 1} gestalten`}>
+    <div ref={dialog} className="linen table-surface fixed inset-0 z-[600] overflow-x-hidden overflow-y-auto bg-table" role="dialog" aria-modal="true" aria-label={t("Doppelseite {n} gestalten", { n: index + 1 })}>
       {phone ? (
         // Handy: eine schlanke Zeile; Raster, Ebenen und Zurücksetzen stehen hinter „…“
         <header className="sticky top-0 z-30 flex items-center gap-1.5 bg-table/95 px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]">
-          <ToolIcon label="Zur Übersicht" data-stage-first onClick={onClose} className="!bg-transparent !shadow-none">
+          <ToolIcon label={t("Zur Übersicht")} data-stage-first onClick={onClose} className="!bg-transparent !shadow-none">
             <ChevronLeft aria-hidden />
           </ToolIcon>
-          <span className="text-on-table min-w-0 flex-1 truncate font-semibold">Doppelseite {index + 1}</span>
+          <span className="text-on-table min-w-0 flex-1 truncate font-semibold">{t("Doppelseite {n}", { n: index + 1 })}</span>
           {onDevelop && firstKey && (
-            <ToolIcon label="Fotos bearbeiten" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>
+            <ToolIcon label={t("Fotos bearbeiten")} onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>
               <SlidersHorizontal aria-hidden />
             </ToolIcon>
           )}
-          <ToolGroup label="Verlauf">
-            <ToolIcon label="Rückgängig" disabled={!canUndo} onClick={onUndo}>
+          <ToolGroup label={t("Verlauf")}>
+            <ToolIcon label={t("Rückgängig")} disabled={!canUndo} onClick={onUndo}>
               <Undo2 aria-hidden />
             </ToolIcon>
-            <ToolIcon label="Wiederholen" disabled={!canRedo} onClick={onRedo}>
+            <ToolIcon label={t("Wiederholen")} disabled={!canRedo} onClick={onRedo}>
               <Redo2 aria-hidden />
             </ToolIcon>
           </ToolGroup>
-          <Menu trigger={<ToolIcon label="Mehr"><Ellipsis aria-hidden /></ToolIcon>}>
+          <Menu trigger={<ToolIcon label={t("Mehr")}><Ellipsis aria-hidden /></ToolIcon>}>
             <MenuItem icon={<Grid3x3 aria-hidden />} onClick={toggleGrid}>
-              {gridOn ? "Raster ausblenden" : "Raster zeigen"}
+              {gridOn ? t("Raster ausblenden") : t("Raster zeigen")}
             </MenuItem>
             {shown.length > 1 && (
               <MenuItem icon={<Layers aria-hidden />} onClick={() => setLayersOpen(true)}>
-                Ebenen
+                {t("Ebenen")}
               </MenuItem>
             )}
             {free && (
               <MenuItem icon={<RotateCcw aria-hidden />} onClick={onReset}>
-                Auf Vorschlag zurücksetzen
+                {t("Auf Vorschlag zurücksetzen")}
               </MenuItem>
             )}
           </Menu>
@@ -1533,31 +1543,31 @@ export function Stage({
           <span className="flex min-w-0 items-center gap-4">
             <button type="button" data-stage-first onClick={onClose} className={buttonClass("quiet", "sm", "pl-2.5")}>
               <ChevronLeft aria-hidden />
-              Übersicht
+              {t("Übersicht")}
             </button>
-            <span className="text-on-table font-semibold whitespace-nowrap">Doppelseite {index + 1}</span>
-            <span className="text-on-table-2 hidden truncate text-sm lg:inline">{free ? "frei gestaltet, fixiert" : "automatisch, wird beim ersten Handgriff frei"}</span>
+            <span className="text-on-table font-semibold whitespace-nowrap">{t("Doppelseite {n}", { n: index + 1 })}</span>
+            <span className="text-on-table-2 hidden truncate text-sm lg:inline">{free ? t("frei gestaltet, fixiert") : t("automatisch, wird beim ersten Handgriff frei")}</span>
           </span>
           <span className="flex flex-wrap items-center gap-2">
             {/* steht immer da (unsichtbar, solange nichts frei ist), damit der Kopf nach dem ersten Handgriff nicht wächst und die Seite rutscht */}
             <Button size="sm" onClick={onReset} disabled={!free} className={free ? "" : "invisible"}>
               <RotateCcw aria-hidden />
-              Auf Vorschlag zurücksetzen
+              {t("Auf Vorschlag zurücksetzen")}
             </Button>
             {onDevelop && firstKey && (
               <Button size="sm" onClick={() => onDevelop(selected?.t === "photo" ? selected.key : firstKey)}>
                 <SlidersHorizontal aria-hidden />
-                Fotos bearbeiten
+                {t("Fotos bearbeiten")}
               </Button>
             )}
-            <ToolGroup label="Verlauf und Raster">
-              <ToolIcon label={withKeys("Rückgängig", "⌘Z")} disabled={!canUndo} onClick={onUndo}>
+            <ToolGroup label={t("Verlauf und Raster")}>
+              <ToolIcon label={withKeys(t("Rückgängig"), "⌘Z")} disabled={!canUndo} onClick={onUndo}>
                 <Undo2 aria-hidden />
               </ToolIcon>
-              <ToolIcon label={withKeys("Wiederholen", "⇧⌘Z")} disabled={!canRedo} onClick={onRedo}>
+              <ToolIcon label={withKeys(t("Wiederholen"), "⇧⌘Z")} disabled={!canRedo} onClick={onRedo}>
                 <Redo2 aria-hidden />
               </ToolIcon>
-              <ToolIcon label="Raster zeigen (G)" aria-pressed={gridOn} onClick={toggleGrid} className="aria-pressed:!bg-on-table aria-pressed:text-table">
+              <ToolIcon label={t("Raster zeigen (G)")} aria-pressed={gridOn} onClick={toggleGrid} className="aria-pressed:!bg-on-table aria-pressed:text-table">
                 <Grid3x3 aria-hidden />
               </ToolIcon>
             </ToolGroup>
@@ -1566,7 +1576,7 @@ export function Stage({
       )}
 
       <p className="sr-only" aria-live="polite">
-        {say}
+        {t(say)}
       </p>
 
       <div className={`grid gap-8 px-4 md:px-8 ${phone ? "pb-8" : "pb-24 md:grid-cols-[minmax(0,1fr)_300px]"}`}>
@@ -1574,34 +1584,34 @@ export function Stage({
           {narrow && (
             <div className={`mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 ${phone ? "mt-1" : ""}`}>
               <Segmented
-                label="Ansicht"
+                label={t("Ansicht")}
                 value={String(view) as "all" | "0" | "1"}
                 onChange={(v) => camTo(v === "all" ? "all" : (Number(v) as 0 | 1))}
                 options={[
-                  { value: "all", label: "Ganze Doppelseite" },
-                  { value: "0", label: "Links" },
-                  { value: "1", label: "Rechts" },
+                  { value: "all", label: t("Ganze Doppelseite") },
+                  { value: "0", label: t("Links") },
+                  { value: "1", label: t("Rechts") },
                 ]}
               />
               <span className="text-on-table-2 text-[13px] tabular-nums">{zoom > 1.05 ? `${Math.round(zoom * 100)} %` : ""}</span>
             </div>
           )}
           {phone && shown.length > 1 && (
-            <Sheet open={layersOpen} onOpenChange={setLayersOpen} title="Ebenen" description="Oben liegt vorn. Antippen wählt, auch was verdeckt ist.">
+            <Sheet open={layersOpen} onOpenChange={setLayersOpen} title={t("Ebenen")} description={t("Oben liegt vorn. Antippen wählt, auch was verdeckt ist.")}>
               {layerList()}
             </Sheet>
           )}
           {cropping ? (
-            <div className="mb-4 flex min-h-9 items-center gap-x-2 overflow-hidden" role="toolbar" aria-label="Zuschneiden">
-              <span className="text-on-table mr-2 shrink-0 text-sm font-semibold">Zuschneiden</span>
+            <div className="mb-4 flex min-h-9 items-center gap-x-2 overflow-hidden" role="toolbar" aria-label={t("Zuschneiden")}>
+              <span className="text-on-table mr-2 shrink-0 text-sm font-semibold">{t("Zuschneiden")}</span>
               <Button variant="cloth" size="sm" className="shrink-0 px-5" haptic="success" onClick={() => setCropMsg("done")}>
-                Fertig
+                {t("Fertig")}
               </Button>
               <Button size="sm" className="shrink-0" onClick={() => setCropMsg("cancel")}>
-                Abbrechen
+                {t("Abbrechen")}
               </Button>
               <ToolIcon
-                label="Ausschnitt genauer einstellen"
+                label={t("Ausschnitt genauer einstellen")}
                 onClick={() => {
                   const id = cropping;
                   setCropMsg("cancel");
@@ -1610,11 +1620,11 @@ export function Stage({
               >
                 <Ellipsis aria-hidden />
               </ToolIcon>
-              <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden</span>
+              <span className="text-on-table-2 hidden min-w-0 truncate text-[13px] lg:inline">{t("Bild ziehen verschiebt · Ecken am Bild vergrößern · Griffe am Rahmen schneiden")}</span>
             </div>
           ) : phone ? null : (
           <div className="mb-4 space-y-2">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2" role="toolbar" aria-label="Werkzeuge">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2" role="toolbar" aria-label={t("Werkzeuge")}>
               <span className={toolPill}>
                 {(["select", "pen", "eraser"] as const).map((t) => (
                   <ToolButton key={t} tool={t} active={tool === t} onClick={() => setTool(tool === t && t !== "select" ? "select" : t)} />
@@ -1628,17 +1638,17 @@ export function Stage({
               {textButtons()}
             </div>
             {tool === "pen" && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label="Stift">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label={t("Stift")}>
                 {penColors()}
                 {penWidths()}
-                <span className="text-on-table-2 text-[13px]">{coarse ? "Mit dem Stift zeichnen; der Finger zeichnet nicht, sobald ein Stift da war." : "Zeichnen mit Maus oder Stift. Esc oder V beendet."}</span>
+                <span className="text-on-table-2 text-[13px]">{coarse ? t("Mit dem Stift zeichnen; der Finger zeichnet nicht, sobald ein Stift da war.") : t("Zeichnen mit Maus oder Stift. Esc oder V beendet.")}</span>
               </div>
             )}
             {tool !== "select" && tool !== "pen" && (
               <p className="text-on-table-2 text-[13px]">
                 {tool === "eraser"
-                  ? "Über Striche wischen löscht sie. Formen und Fotos bleiben."
-                  : `${SHAPES[tool].label} aufziehen; ein Klick legt sie in Standardgröße hin. ${isLinear(tool) ? "Shift: 45°-Schritte." : "Shift: Quadrat bzw. Kreis."} Alt: ohne Einrasten.`}
+                  ? t("Über Striche wischen löscht sie. Formen und Fotos bleiben.")
+                  : `${t("{shape} aufziehen; ein Klick legt sie in Standardgröße hin.", { shape: t(SHAPES[tool].label) })} ${isLinear(tool) ? t("Shift: 45°-Schritte.") : t("Shift: Quadrat bzw. Kreis.")} ${t("Alt: ohne Einrasten.")}`}
               </p>
             )}
           </div>
@@ -1867,7 +1877,7 @@ export function Stage({
                   {selected && selected.id !== editing && selected.id !== cropping && !(selected.t === "shape" && isLinear(selected.kind)) && (
                     <div className={`pointer-events-none absolute ${selected.t === "shape" || selected.t === "ink" ? "outline-1 outline-dashed outline-mark" : ""}`} style={pct(boxOf(selected, geom))}>
                       {draft?.id === selected.id && draft.original && (
-                        <span className="bg-ink text-paper absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">Originalformat</span>
+                        <span className="bg-ink text-paper absolute top-1 left-1 px-1.5 py-0.5 text-[11px]">{t("Originalformat")}</span>
                       )}
                       {!draft &&
                         HANDLES.filter((h) => selected.t !== "text" || (!h.e.t && !h.e.b)).map((h) => (
@@ -1900,7 +1910,7 @@ export function Stage({
                         onDone={(box, c) => {
                           setCropMsg(null);
                           setCropping(null);
-                          if (box) commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, box, crop: c } : i)), undefined, "Zugeschnitten");
+                          if (box) commit(items.map((i) => (i.id === it.id && i.t === "photo" ? { ...i, box, crop: c } : i)), undefined, t("Zugeschnitten"));
                         }}
                       />
                     );
@@ -1908,7 +1918,7 @@ export function Stage({
                   {editItem && editItem.t === "text" && (
                     <textarea
                       autoFocus
-                      aria-label={`${TEXT_ROLE[editItem.role].label} schreiben`}
+                      aria-label={t("{what} schreiben", { what: t(TEXT_ROLE[editItem.role].label) })}
                       value={editItem.text}
                       onChange={(e) => setTextOf(editItem.id, e.target.value)}
                       onFocus={(e) => e.currentTarget.select()}
@@ -1930,64 +1940,64 @@ export function Stage({
           )}
           {dockShown && (
             // Handy: vier Fächer direkt unter der Doppelseite; hoch bleibt die Leiste bei langer Seite unten am Rand stehen, quer würde sie die Seite verdecken
-            <nav aria-label="Werkzeuge" className={`bg-table-deep border-on-table/15 ${landscape ? "relative" : "sticky bottom-0"} z-[75] -mx-4 mt-4 border-t pb-[env(safe-area-inset-bottom)] md:-mx-8`}>
+            <nav aria-label={t("Werkzeuge")} className={`bg-table-deep border-on-table/15 ${landscape ? "relative" : "sticky bottom-0"} z-[75] -mx-4 mt-4 border-t pb-[env(safe-area-inset-bottom)] md:-mx-8`}>
               {selTray?.t === "photo" && (
-                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label="Foto">
+                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={t("Foto")}>
                   <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1">
                     {onDevelop && (
                       <Button size="sm" onClick={() => onDevelop(selTray.key)} className="shrink-0">
                         <SlidersHorizontal aria-hidden />
-                        Bearbeiten
+                        {t("Bearbeiten")}
                       </Button>
                     )}
-                    <ToolGroup label="Foto">
-                      <ToolIcon label="Ausschnitt" onClick={() => setCropping(selTray.id)}>
+                    <ToolGroup label={t("Foto")}>
+                      <ToolIcon label={t("Ausschnitt")} onClick={() => setCropping(selTray.id)}>
                         <Crop aria-hidden />
                       </ToolIcon>
                       <ToolIcon
-                        label={selTray.caption === "auto" ? "Unterschrift aus" : "Unterschrift an"}
+                        label={selTray.caption === "auto" ? t("Unterschrift aus") : t("Unterschrift an")}
                         aria-pressed={selTray.caption === "auto"}
                         onClick={() => commit(items.map((i) => (i.id === selTray.id ? { ...i, caption: selTray.caption === "auto" ? "off" : "auto" } : i)))}
                       >
                         {selTray.caption === "auto" ? <Captions aria-hidden /> : <CaptionsOff aria-hidden />}
                       </ToolIcon>
-                      <ToolIcon label="Aus dem Buch nehmen" onClick={() => remove(selTray)}>
+                      <ToolIcon label={t("Aus dem Buch nehmen")} onClick={() => remove(selTray)}>
                         <Trash aria-hidden />
                       </ToolIcon>
                     </ToolGroup>
                     {/* seltener gebraucht: Ebene und Duplizieren hinter „Mehr“ */}
-                    <Menu align="end" trigger={<ToolIcon label="Mehr zum Foto"><Ellipsis aria-hidden /></ToolIcon>}>
+                    <Menu align="end" trigger={<ToolIcon label={t("Mehr zum Foto")}><Ellipsis aria-hidden /></ToolIcon>}>
                       <MenuItem icon={<BringToFront aria-hidden />} disabled={!canLayer(selTray.id, "up")} onClick={() => layer(selTray.id, "up")}>
-                        Nach vorn
+                        {t("Nach vorn")}
                       </MenuItem>
                       <MenuItem icon={<SendToBack aria-hidden />} disabled={!canLayer(selTray.id, "down")} onClick={() => layer(selTray.id, "down")}>
-                        Nach hinten
+                        {t("Nach hinten")}
                       </MenuItem>
                       <MenuItem icon={<Copy aria-hidden />} onClick={() => duplicate(selTray)}>
-                        Duplizieren
+                        {t("Duplizieren")}
                       </MenuItem>
                     </Menu>
                   </div>
-                  <p className="text-on-table-2 mt-2 text-[13px]">Ziehen verschiebt, zwei Finger ändern die Größe.</p>
+                  <p className="text-on-table-2 mt-2 text-[13px]">{t("Ziehen verschiebt, zwei Finger ändern die Größe.")}</p>
                 </div>
               )}
               {selTray?.t === "text" && (
-                <div className="border-on-table/15 min-h-[108px] border-b px-2 pt-3 pb-3" role="group" aria-label="Text">
+                <div className="border-on-table/15 min-h-[108px] border-b px-2 pt-3 pb-3" role="group" aria-label={t("Text")}>
                   <TextToolbar key={selTray.id} docked item={selTray} box={boxOf(selTray, geom)} cloth={data.cloth.base} onLook={(patch, tag) => setLook(selTray.id, patch, tag)} />
                 </div>
               )}
               {!selTray && activeDock && (
-                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={DOCKS[activeDock].label}>
+                <div className="border-on-table/15 min-h-[108px] border-b px-4 pt-3 pb-3" role="group" aria-label={t(DOCKS[activeDock].label)}>
                   {activeDock === "photos" &&
                     (shelf.length > 0 || elsewhere.length > 0 ? (
                       photoStrip
                     ) : (
-                      <p className="text-on-table-2 text-[13px]">Alle Fotos des Buchs liegen schon auf dieser Doppelseite.</p>
+                      <p className="text-on-table-2 text-[13px]">{t("Alle Fotos des Buchs liegen schon auf dieser Doppelseite.")}</p>
                     ))}
                   {activeDock === "text" && (
                     <>
                       <div className="flex flex-wrap gap-2">{textButtons()}</div>
-                      <p className="text-on-table-2 mt-2 text-[13px]">Doppeltippen auf einen Text schreibt.</p>
+                      <p className="text-on-table-2 mt-2 text-[13px]">{t("Doppeltippen auf einen Text schreibt.")}</p>
                     </>
                   )}
                   {activeDock === "draw" && (
@@ -2002,7 +2012,7 @@ export function Stage({
                       {tool === "pen" ? (
                         penColors()
                       ) : (
-                        <p className="text-on-table-2 text-[13px]">Über Striche wischen löscht sie. Formen und Fotos bleiben.</p>
+                        <p className="text-on-table-2 text-[13px]">{t("Über Striche wischen löscht sie. Formen und Fotos bleiben.")}</p>
                       )}
                     </div>
                   )}
@@ -2014,7 +2024,7 @@ export function Stage({
                         ))}
                       </div>
                       <p className="text-on-table-2 mt-2 text-[13px]">
-                        {tool === "select" ? "Form wählen, dann auf der Seite aufziehen." : `${SHAPES[tool as ShapeKind].label} aufziehen, ein Tipp legt sie hin.`}
+                        {tool === "select" ? t("Form wählen, dann auf der Seite aufziehen.") : t("{shape} aufziehen, ein Tipp legt sie hin.", { shape: t(SHAPES[tool as ShapeKind].label) })}
                       </p>
                     </>
                   )}
@@ -2035,7 +2045,7 @@ export function Stage({
                       <span aria-hidden className={`grid h-7 w-14 place-items-center rounded-full transition-colors duration-150 ${on ? "bg-on-table/14" : ""}`}>
                         <Icon className="size-[20px]" strokeWidth={1.75} />
                       </span>
-                      {DOCKS[d].label}
+                      {t(DOCKS[d].label)}
                     </button>
                   );
                 })}
@@ -2056,11 +2066,12 @@ export function Stage({
             </div>
           )}
           {!phone && (shelf.length > 0 || elsewhere.length > 0) && (
-            <section aria-label="Alle Fotos" className="mt-5">
+            <section aria-label={t("Alle Fotos")} className="mt-5">
               <p className="text-on-table text-sm font-semibold">
-                Alle Fotos{" "}
+                {t("Alle Fotos")}{" "}
                 <span className="text-on-table-2 font-normal">
-                  · {coarse ? "antippen oder nach oben auf die Seite ziehen" : "ziehen oder antippen legt sie auf die Seite"}, von anderen Doppelseiten wandern sie herüber
+                  · {coarse ? t("antippen oder nach oben auf die Seite ziehen") : t("ziehen oder antippen legt sie auf die Seite")}
+                  {t(", von anderen Doppelseiten wandern sie herüber")}
                 </span>
               </p>
               {photoStrip}
@@ -2078,24 +2089,24 @@ export function Stage({
           )}
           {phone ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken zeigt alles, was mit dem Element geht.
+              {t("Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken zeigt alles, was mit dem Element geht.")}
             </p>
           ) : narrow && coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              Zwei Finger zoomen und verschieben die Ansicht, Doppeltippen aufs freie Papier holt eine Seite groß und wieder zurück. Zwei Finger auf dem gewählten Foto ändern seine Größe.
+              {t("Zwei Finger zoomen und verschieben die Ansicht, Doppeltippen aufs freie Papier holt eine Seite groß und wieder zurück. Zwei Finger auf dem gewählten Foto ändern seine Größe.")}
             </p>
           ) : null}
           {phone ? null : coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.
-              Lange drücken zeigt alles, was mit dem Element geht.
+              {t("Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.")}{" "}
+              {t("Lange drücken zeigt alles, was mit dem Element geht.")}
             </p>
           ) : (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              Ziehen verschiebt, die Griffe ändern die Größe. Doppelklick auf ein Foto schneidet zu, auf einen Text schreibt, aufs Papier legt neuen Text an.
-              Kanten rasten am Raster ein, <kbd>Alt</kbd> beim Ziehen setzt frei.
-              Tastatur: <kbd>Tab</kbd> wählt, Pfeile verschieben um eine Spalte oder Zeile, <kbd>Shift</kbd> + Pfeile ändern die Größe, <kbd>Enter</kbd>{" "}
-              schneidet zu, <kbd>Entf</kbd> nimmt heraus, <kbd>⌘C</kbd> / <kbd>⌘V</kbd> kopiert, <kbd>⌘D</kbd> dupliziert, <kbd>G</kbd> zeigt das Raster.
+              {t("Ziehen verschiebt, die Griffe ändern die Größe. Doppelklick auf ein Foto schneidet zu, auf einen Text schreibt, aufs Papier legt neuen Text an.")}{" "}
+              {t("Kanten rasten am Raster ein,")} <kbd>Alt</kbd> {t("beim Ziehen setzt frei.")}{" "}
+              {t("Tastatur:")} <kbd>Tab</kbd> {t("wählt, Pfeile verschieben um eine Spalte oder Zeile,")} <kbd>Shift</kbd> {t("+ Pfeile ändern die Größe,")} <kbd>Enter</kbd>{" "}
+              {t("schneidet zu,")} <kbd>{t("Entf")}</kbd> {t("nimmt heraus,")} <kbd>⌘C</kbd> / <kbd>⌘V</kbd> {t("kopiert,")} <kbd>⌘D</kbd> {t("dupliziert,")} <kbd>G</kbd> {t("zeigt das Raster.")}
             </p>
           )}
         </div>
@@ -2118,9 +2129,9 @@ export function Stage({
           )}
           {selected?.t === "text" && (
             <div className={panelClass}>
-              <p className={panelTitle}>Textrahmen</p>
+              <p className={panelTitle}>{t("Textrahmen")}</p>
               <fieldset className="flex flex-wrap gap-2 text-sm">
-                <legend className="text-ink-2 mb-1 text-[13px]">Stil</legend>
+                <legend className="text-ink-2 mb-1 text-[13px]">{t("Stil")}</legend>
                 {(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => (
                   <button
                     key={r}
@@ -2129,12 +2140,12 @@ export function Stage({
                     onClick={() => commit(items.map((i) => (i.id === selected.id ? { ...i, role: r } : i)))}
                     className={chip(selected.role === r)}
                   >
-                    {TEXT_ROLE[r].label}
+                    {t(TEXT_ROLE[r].label)}
                   </button>
                 ))}
               </fieldset>
               <label className="block text-[13px]">
-                <span className="text-ink-2">Text</span>
+                <span className="text-ink-2">{t("Text")}</span>
                 <textarea
                   ref={textArea}
                   className={noteClass}
@@ -2147,7 +2158,7 @@ export function Stage({
                 />
               </label>
               <Switch on={!!selected.light} onChange={(on) => commit(items.map((i) => (i.id === selected.id && i.t === "text" ? { ...i, light: on || undefined } : i)))}>
-                Helle Schrift <span className="text-ink-2">(für Text auf dunklen Fotos)</span>
+                {t("Helle Schrift")} <span className="text-ink-2">{t("(für Text auf dunklen Fotos)")}</span>
               </Switch>
               <LayerButtons
                 onLayer={(to) => layer(selected.id, to)}
@@ -2156,27 +2167,27 @@ export function Stage({
                 down={canLayer(selected.id, "down")}
               />
               {boxOf(selected, geom).y + boxOf(selected, geom).h > grid.ys[grid.ys.length - 2] + 0.5 && (
-                <p className="text-ink text-[12px] font-semibold">Der Text läuft unten aus dem Satzspiegel. Kürzen oder den Rahmen breiter ziehen.</p>
+                <p className="text-ink text-[12px] font-semibold">{t("Der Text läuft unten aus dem Satzspiegel. Kürzen oder den Rahmen breiter ziehen.")}</p>
               )}
-              <RemoveButton onClick={() => remove(selected)}>Textrahmen entfernen</RemoveButton>
+              <RemoveButton onClick={() => remove(selected)}>{t("Textrahmen entfernen")}</RemoveButton>
             </div>
           )}
 
           {selected?.t === "shape" && (
             <div className={panelClass}>
-              <p className={panelTitle}>{SHAPES[selected.kind].label}</p>
+              <p className={panelTitle}>{t(SHAPES[selected.kind].label)}</p>
               <div className="space-y-1">
-                <p className="text-ink-2 text-[13px]">{selected.kind === "tape" ? "Farbe" : "Kontur"}</p>
+                <p className="text-ink-2 text-[13px]">{selected.kind === "tape" ? t("Farbe") : t("Kontur")}</p>
                 <Swatches value={selected.kind === "tape" ? (selected.look.fill ?? selected.look.color) : selected.look.color} cloth={data.cloth.base} onPick={(c) => setShapeOf(selected.id, { color: c ?? selected.look.color, fill: selected.kind === "tape" ? undefined : selected.look.fill })} dark />
               </div>
               {(selected.kind === "rect" || selected.kind === "ellipse") && (
                 <div className="space-y-1">
-                  <p className="text-ink-2 text-[13px]">Fläche</p>
+                  <p className="text-ink-2 text-[13px]">{t("Fläche")}</p>
                   <Swatches value={selected.look.fill ?? null} cloth={data.cloth.base} none onPick={(c) => setShapeOf(selected.id, { fill: c ?? undefined })} dark />
                 </div>
               )}
               <fieldset className="flex flex-wrap items-center gap-2 text-sm">
-                <legend className="text-ink-2 mb-1 text-[13px]">{selected.kind === "tape" ? "Breite" : "Strich"}</legend>
+                <legend className="text-ink-2 mb-1 text-[13px]">{selected.kind === "tape" ? t("Breite") : t("Strich")}</legend>
                 {([1, 2, 3] as const).map((w) => (
                   <button
                     key={w}
@@ -2185,27 +2196,28 @@ export function Stage({
                     onClick={() => setShapeOf(selected.id, { weight: w })}
                     className={chip(selected.look.weight === w)}
                   >
-                    {w === 1 ? "fein" : w === 2 ? "mittel" : "kräftig"}
+                    {w === 1 ? t("fein") : w === 2 ? t("mittel") : t("kräftig")}
                   </button>
                 ))}
                 {selected.kind !== "tape" && (
                   <Switch className="ml-2" on={!!selected.look.dashed} onChange={(on) => setShapeOf(selected.id, { dashed: on || undefined })}>
-                    gestrichelt
+                    {t("gestrichelt")}
                   </Switch>
                 )}
               </fieldset>
               <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
-              <RemoveButton onClick={() => remove(selected)}>{SHAPES[selected.kind].label} entfernen</RemoveButton>
+              <RemoveButton onClick={() => remove(selected)}>{t("{what} entfernen", { what: t(SHAPES[selected.kind].label) })}</RemoveButton>
             </div>
           )}
           {selected?.t === "ink" && (
             <div className={panelClass}>
-              <p className={panelTitle}>Zeichnung</p>
+              <p className={panelTitle}>{t("Zeichnung")}</p>
               <p className="text-ink-2 text-[13px]">
-                {selected.strokes.length} {selected.strokes.length === 1 ? "Strich" : "Striche"}. Ziehen verschiebt, die Griffe skalieren. Einzelne Striche löscht der Radierer (E).
+                {selected.strokes.length === 1 ? t("1 Strich.") : t("{n} Striche.", { n: selected.strokes.length })}{" "}
+                {t("Ziehen verschiebt, die Griffe skalieren. Einzelne Striche löscht der Radierer (E).")}
               </p>
               <div className="space-y-1">
-                <p className="text-ink-2 text-[13px]">Alle Striche umfärben</p>
+                <p className="text-ink-2 text-[13px]">{t("Alle Striche umfärben")}</p>
                 <Swatches
                   value={selected.strokes.every((st) => st.c === selected.strokes[0].c) ? selected.strokes[0].c : null}
                   cloth={data.cloth.base}
@@ -2214,13 +2226,13 @@ export function Stage({
                 />
               </div>
               <LayerButtons onLayer={(to) => layer(selected.id, to)} onDuplicate={() => duplicate(selected)} up={canLayer(selected.id, "up")} down={canLayer(selected.id, "down")} />
-              <RemoveButton onClick={() => remove(selected)}>Zeichnung entfernen</RemoveButton>
+              <RemoveButton onClick={() => remove(selected)}>{t("Zeichnung entfernen")}</RemoveButton>
             </div>
           )}
           {!phone && shown.length > 1 && (
             <div className={panelClass}>
-              <p className={panelTitle}>Was oben liegt</p>
-              <p className="text-ink-2 text-[12px] leading-snug">Oben liegt vorn. Antippen wählt, auch was verdeckt ist.</p>
+              <p className={panelTitle}>{t("Was oben liegt")}</p>
+              <p className="text-ink-2 text-[12px] leading-snug">{t("Oben liegt vorn. Antippen wählt, auch was verdeckt ist.")}</p>
               {layerList()}
             </div>
           )}
@@ -2267,27 +2279,28 @@ function PhotoPanel({
   up: boolean;
   down: boolean;
 }) {
+  const t = useT();
   return (
     <div className={panelClass}>
-      <p className={panelTitle}>Foto</p>
-      <Field label="Titel" value={photo?.title ?? ""} onChange={(e) => onTitle(e.target.value.slice(0, 50))} />
+      <p className={panelTitle}>{t("Foto")}</p>
+      <Field label={t("Titel")} value={photo?.title ?? ""} onChange={(e) => onTitle(e.target.value.slice(0, 50))} />
       <Switch on={item.caption === "auto"} onChange={(on) => onCaption(on ? "auto" : "off")}>
-        Unterschrift auf der Seite <span className="text-ink-2">(sonst im Kopf)</span>
+        {t("Unterschrift auf der Seite")} <span className="text-ink-2">{t("(sonst im Kopf)")}</span>
       </Switch>
       <div className="flex flex-wrap gap-2">
         <Button variant="paper" size="sm" className="pl-2.5" onClick={onCrop}>
           <Crop aria-hidden />
-          Ausschnitt
+          {t("Ausschnitt")}
         </Button>
         {onDevelop && (
           <Button variant="paper" size="sm" className="pl-2.5" onClick={onDevelop}>
             <SlidersHorizontal aria-hidden />
-            Bearbeiten
+            {t("Bearbeiten")}
           </Button>
         )}
       </div>
       <LayerButtons onLayer={onLayer} onDuplicate={onDuplicate} up={up} down={down} />
-      <RemoveButton onClick={onRemove}>Aus dem Buch nehmen</RemoveButton>
+      <RemoveButton onClick={onRemove}>{t("Aus dem Buch nehmen")}</RemoveButton>
     </div>
   );
 }
@@ -2339,21 +2352,22 @@ function LayerButtons({
   up?: boolean;
   down?: boolean;
 }) {
+  const t = useT();
   const icon = "text-ink hover:bg-ink/10 grid size-9 place-items-center rounded-full disabled:opacity-35 pointer-coarse:size-11 [&_svg]:size-[18px]";
   return (
     <div className="flex items-center gap-3">
-      <div className="bg-ink/6 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]" role="group" aria-label="Ebene und Kopie">
-        <button type="button" className={icon} onClick={onDuplicate} aria-label="Duplizieren" title={withKeys("Duplizieren", "⌘D")}>
+      <div className="bg-ink/6 inline-flex rounded-full p-[3px] shadow-[inset_0_0_0_1px_rgb(27_28_26/0.12)]" role="group" aria-label={t("Ebene und Kopie")}>
+        <button type="button" className={icon} onClick={onDuplicate} aria-label={t("Duplizieren")} title={withKeys(t("Duplizieren"), "⌘D")}>
           <Copy aria-hidden />
         </button>
-        <button type="button" className={icon} onClick={() => onLayer("front")} disabled={!up} aria-label="Ganz nach vorn" title={withKeys("Ganz nach vorn", "⇧⌘]")}>
+        <button type="button" className={icon} onClick={() => onLayer("front")} disabled={!up} aria-label={t("Ganz nach vorn")} title={withKeys(t("Ganz nach vorn"), "⇧⌘]")}>
           <BringToFront aria-hidden />
         </button>
-        <button type="button" className={icon} onClick={() => onLayer("back")} disabled={!down} aria-label="Ganz nach hinten" title={withKeys("Ganz nach hinten", "⇧⌘[")}>
+        <button type="button" className={icon} onClick={() => onLayer("back")} disabled={!down} aria-label={t("Ganz nach hinten")} title={withKeys(t("Ganz nach hinten"), "⇧⌘[")}>
           <SendToBack aria-hidden />
         </button>
       </div>
-      <span className="text-ink-2 text-[13px]">Kopie und Ebene</span>
+      <span className="text-ink-2 text-[13px]">{t("Kopie und Ebene")}</span>
     </div>
   );
 }
@@ -2365,6 +2379,7 @@ type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; disa
  * Mit dem Finger (sheet) ein Blatt von unten mit 48px-Zeilen und ohne Tastenkürzel, weg vom Daumen.
  */
 function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; sheet: boolean; entries: MenuEntry[]; onClose: () => void }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   useEffect(() => {
@@ -2407,7 +2422,7 @@ function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; 
       <div
         ref={ref}
         role="menu"
-        aria-label="Aktionen"
+        aria-label={t("Aktionen")}
         onKeyDown={move}
         className={`slip text-ink fixed overflow-hidden ${
           sheet
@@ -2716,11 +2731,11 @@ function CropMode({
 }
 
 const SWATCHES: { label: string; value: string | null }[] = [
-  { label: "Tinte", value: null },
-  { label: "Grau", value: "#5a5c56" },
-  { label: "Papier", value: "#eee9df" },
-  { label: "Schwarz", value: "#000000" },
-  { label: "Weiß", value: "#ffffff" },
+  { label: de("Tinte"), value: null },
+  { label: de("Grau"), value: "#5a5c56" },
+  { label: de("Papier"), value: "#eee9df" },
+  { label: de("Schwarz"), value: "#000000" },
+  { label: de("Weiß"), value: "#ffffff" },
 ];
 /** cqw → Punkt bei einer gedruckten Seitenbreite von 15 cm */
 const PT = 4.25;
@@ -2740,6 +2755,7 @@ function TextToolbar({
   docked?: boolean;
   onLook: (patch: Partial<Record<keyof TextLook, TextLook[keyof TextLook] | null>>, tag?: string) => void;
 }) {
+  const t = useT();
   const m = textMetrics(item.role, item.look);
   const look = item.look ?? {};
   const pt = Math.round(m.size * PT);
@@ -2747,7 +2763,7 @@ function TextToolbar({
   const above = box.y > 9;
   const btn = "flex h-8 min-w-8 items-center justify-center rounded-full px-1.5 text-sm pointer-coarse:h-11 pointer-coarse:min-w-11 transition-colors duration-150 hover:bg-ink/8";
   const on = "bg-ink text-paper hover:bg-ink";
-  const colors = [...SWATCHES, { label: "Einband", value: cloth }];
+  const colors = [...SWATCHES, { label: de("Einband"), value: cloth }];
   // im Bildschirm halten: am Handy ragte die Leiste über die Seitenkante, „Fett“ und Farben waren nicht erreichbar (iPhone-Workshop, Befund 6)
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -2774,7 +2790,7 @@ function TextToolbar({
     <div
       ref={ref}
       role="toolbar"
-      aria-label="Text gestalten"
+      aria-label={t("Text gestalten")}
       onPointerDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       className={`slip text-ink flex select-text flex-wrap items-center gap-1 rounded-tool p-1.5 shadow-[0_12px_28px_-12px_rgb(12_10_8/0.8)] ${docked ? "mx-auto w-fit max-w-full" : "absolute z-[65] max-w-[min(560px,calc(100vw-32px))]"}`}
@@ -2783,24 +2799,24 @@ function TextToolbar({
       <Menu
         align="start"
         trigger={
-          <button type="button" aria-label={`Schriftart: ${FONTS[m.font].label}`} className="bg-ink/6 flex h-8 items-center gap-1.5 rounded-full pr-2.5 pl-3 text-sm shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] pointer-coarse:h-11" style={{ fontFamily: FONTS[m.font].css }}>
-            {FONTS[m.font].label}
+          <button type="button" aria-label={t("Schriftart: {font}", { font: t(FONTS[m.font].label) })} className="bg-ink/6 flex h-8 items-center gap-1.5 rounded-full pr-2.5 pl-3 text-sm shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)] pointer-coarse:h-11" style={{ fontFamily: FONTS[m.font].css }}>
+            {t(FONTS[m.font].label)}
             <ChevronDown aria-hidden className="size-3.5" />
           </button>
         }
       >
         {(Object.keys(FONTS) as FontKey[]).map((f) => (
           <MenuItem key={f} icon={<Check className={f === m.font ? "" : "invisible"} />} onClick={() => onLook({ font: f === "grotesk" ? null : f })}>
-            <span style={{ fontFamily: FONTS[f].css }}>{FONTS[f].label}</span>
+            <span style={{ fontFamily: FONTS[f].css }}>{t(FONTS[f].label)}</span>
           </MenuItem>
         ))}
       </Menu>
-      <span className="mx-1 flex items-center" role="group" aria-label="Größe">
-        <button type="button" className={btn} aria-label="kleiner" onClick={() => setPt(pt - (pt > 24 ? 4 : 1))}>
+      <span className="mx-1 flex items-center" role="group" aria-label={t("Größe")}>
+        <button type="button" className={btn} aria-label={t("kleiner")} onClick={() => setPt(pt - (pt > 24 ? 4 : 1))}>
           −
         </button>
         <label className="sr-only" htmlFor={`size-${item.id}`}>
-          Größe in Punkt
+          {t("Größe in Punkt")}
         </label>
         <input
           id={`size-${item.id}`}
@@ -2811,26 +2827,26 @@ function TextToolbar({
           onChange={(e) => e.target.value && setPt(Number(e.target.value))}
           className="bg-ink/6 h-8 w-12 rounded-full border-0 pointer-coarse:h-11 text-center text-sm tabular-nums shadow-[inset_0_0_0_1px_rgb(27_28_26/0.14)]"
         />
-        <button type="button" className={btn} aria-label="größer" onClick={() => setPt(pt + (pt >= 24 ? 4 : 1))}>
+        <button type="button" className={btn} aria-label={t("größer")} onClick={() => setPt(pt + (pt >= 24 ? 4 : 1))}>
           +
         </button>
         <span aria-hidden className="text-ink-2 ml-1 text-[11px]">
           pt
         </span>
       </span>
-      <button type="button" aria-pressed={m.weight >= 700} aria-label="Fett" className={`${btn} font-bold ${m.weight >= 700 ? on : ""}`} onClick={() => onLook({ bold: m.weight < 700 })}>
-        F
+      <button type="button" aria-pressed={m.weight >= 700} aria-label={t("Fett")} className={`${btn} font-bold ${m.weight >= 700 ? on : ""}`} onClick={() => onLook({ bold: m.weight < 700 })}>
+        {t("F")}
       </button>
-      <button type="button" aria-pressed={!!look.italic} aria-label="Kursiv" className={`${btn} italic ${look.italic ? on : ""}`} onClick={() => onLook({ italic: look.italic ? null : true })}>
-        K
+      <button type="button" aria-pressed={!!look.italic} aria-label={t("Kursiv")} className={`${btn} italic ${look.italic ? on : ""}`} onClick={() => onLook({ italic: look.italic ? null : true })}>
+        {t("K")}
       </button>
-      <span className="mx-1 flex" role="group" aria-label="Ausrichtung">
+      <span className="mx-1 flex" role="group" aria-label={t("Ausrichtung|Text")}>
         {(["left", "center", "right"] as const).map((a) => (
           <button
             key={a}
             type="button"
             aria-pressed={(look.align ?? "left") === a}
-            aria-label={a === "left" ? "linksbündig" : a === "center" ? "mittig" : "rechtsbündig"}
+            aria-label={a === "left" ? t("linksbündig") : a === "center" ? t("mittig") : t("rechtsbündig")}
             className={`${btn} ${(look.align ?? "left") === a ? on : ""}`}
             onClick={() => onLook({ align: a === "left" ? null : a })}
           >
@@ -2844,15 +2860,15 @@ function TextToolbar({
           </button>
         ))}
       </span>
-      <span className="flex items-center gap-1" role="group" aria-label="Farbe">
+      <span className="flex items-center gap-1" role="group" aria-label={t("Farbe")}>
         {colors.map((c) => {
           const active = (look.color ?? null) === c.value && (c.value !== null || !item.light);
           return (
             <button
               key={c.label}
               type="button"
-              title={c.label}
-              aria-label={`Farbe ${c.label}`}
+              title={t(c.label)}
+              aria-label={t("Farbe {color}", { color: t(c.label) })}
               aria-pressed={active}
               onClick={() => onLook({ color: c.value })}
               className={`size-6 rounded-full border pointer-coarse:size-11 ${active ? "outline-2 outline-offset-1 outline-ink" : ""} border-ink/30`}
@@ -2860,8 +2876,8 @@ function TextToolbar({
             />
           );
         })}
-        <label className="relative size-6 cursor-pointer overflow-hidden rounded-full pointer-coarse:size-11 border border-ink/30" title="Eigene Farbe">
-          <span className="sr-only">Eigene Farbe</span>
+        <label className="relative size-6 cursor-pointer overflow-hidden rounded-full pointer-coarse:size-11 border border-ink/30" title={t("Eigene Farbe")}>
+          <span className="sr-only">{t("Eigene Farbe")}</span>
           <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
           <input
             type="color"
@@ -2935,27 +2951,28 @@ function Paths({ paths }: { paths: PathEl[] }) {
 
 /** Farben für Formen und Stift: Tinte, Papier und die Farben der Einbände; dazu der Einband dieses Buchs und eine eigene */
 const PALETTE: { label: string; value: string }[] = [
-  { label: "Tinte", value: "#1b1c1a" },
-  { label: "Grau", value: "#5a5c56" },
-  { label: "Papier", value: "#eee9df" },
-  { label: "Weiß", value: "#ffffff" },
-  { label: "Ringelblume", value: "#e8a72c" },
-  { label: "Ziegel", value: "#cc7048" },
-  { label: "Meer", value: "#5b979c" },
-  { label: "Salbei", value: "#a3ad92" },
+  { label: de("Tinte"), value: "#1b1c1a" },
+  { label: de("Grau"), value: "#5a5c56" },
+  { label: de("Papier"), value: "#eee9df" },
+  { label: de("Weiß"), value: "#ffffff" },
+  { label: de("Ringelblume"), value: "#e8a72c" },
+  { label: de("Ziegel"), value: "#cc7048" },
+  { label: de("Meer"), value: "#5b979c" },
+  { label: de("Salbei"), value: "#a3ad92" },
 ];
 
 function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; cloth: string; onPick: (c: string | null) => void; none?: boolean; dark?: boolean }) {
-  const colors = PALETTE.some((p) => p.value.toLowerCase() === cloth.toLowerCase()) ? PALETTE : [...PALETTE, { label: "Einband", value: cloth }];
+  const colors = PALETTE.some((p) => p.value.toLowerCase() === cloth.toLowerCase()) ? PALETTE : [...PALETTE, { label: de("Einband"), value: cloth }];
+  const t = useT();
   const ring = dark ? "outline-ink" : "outline-on-table";
   return (
-    <span className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Farbe">
+    <span className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("Farbe")}>
       {none && (
         <button
           type="button"
           aria-pressed={value === null}
-          aria-label="keine Fläche"
-          title="keine"
+          aria-label={t("keine Fläche")}
+          title={t("keine")}
           onClick={() => onPick(null)}
           className={`relative size-7 overflow-hidden rounded-full pointer-coarse:size-11 border border-ink/30 bg-paper ${value === null ? `outline-2 outline-offset-1 ${ring}` : ""}`}
         >
@@ -2968,16 +2985,16 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
         <button
           key={c.label}
           type="button"
-          title={c.label}
-          aria-label={`Farbe ${c.label}`}
+          title={t(c.label)}
+          aria-label={t("Farbe {color}", { color: t(c.label) })}
           aria-pressed={value?.toLowerCase() === c.value.toLowerCase()}
           onClick={() => onPick(c.value)}
           className={`size-7 rounded-full border border-ink/30 pointer-coarse:size-11 ${value?.toLowerCase() === c.value.toLowerCase() ? `outline-2 outline-offset-1 ${ring}` : ""}`}
           style={{ background: c.value }}
         />
       ))}
-      <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-ink/30 pointer-coarse:size-11" title="Eigene Farbe">
-        <span className="sr-only">Eigene Farbe</span>
+      <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-ink/30 pointer-coarse:size-11" title={t("Eigene Farbe")}>
+        <span className="sr-only">{t("Eigene Farbe")}</span>
         <span aria-hidden className="absolute inset-0" style={{ background: "conic-gradient(#e8a72c, #d2553b, #6a8fa3, #6f8d5e, #e8a72c)" }} />
         <input type="color" value={value ?? "#1b1c1a"} onChange={(e) => onPick(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
       </label>
@@ -2986,21 +3003,22 @@ function Swatches({ value, cloth, onPick, none, dark }: { value: string | null; 
 }
 
 const DOCKS: Record<Dock, { label: string; icon: typeof Images }> = {
-  photos: { label: "Fotos", icon: Images },
-  text: { label: "Text", icon: Type },
-  draw: { label: "Zeichnen", icon: PenLine },
-  shapes: { label: "Formen", icon: Shapes },
+  photos: { label: de("Fotos"), icon: Images },
+  text: { label: de("Text"), icon: Type },
+  draw: { label: de("Zeichnen"), icon: PenLine },
+  shapes: { label: de("Formen"), icon: Shapes },
 };
 
 const TOOL_INFO: Record<Tool, { label: string; key: string }> = {
-  select: { label: "Auswahl", key: "V" },
-  pen: { label: "Stift", key: "P" },
-  eraser: { label: "Radierer", key: "E" },
+  select: { label: de("Auswahl"), key: "V" },
+  pen: { label: de("Stift"), key: "P" },
+  eraser: { label: de("Radierer"), key: "E" },
   ...SHAPES,
 };
 
 /** Werkzeugknopf mit kleinem Zeichen; Name und Kürzel im Tooltip und für Screenreader */
 function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; onClick: () => void }) {
+  const t = useT();
   const info = TOOL_INFO[tool];
   const icon: Record<Tool, React.ReactNode> = {
     select: <path d="M5 3l12 8-5.5 1.2L9 18z" fill="currentColor" />,
@@ -3016,8 +3034,8 @@ function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; on
     <button
       type="button"
       aria-pressed={active}
-      aria-label={`${info.label} (${info.key})`}
-      title={`${info.label} (${info.key})`}
+      aria-label={`${t(info.label)} (${info.key})`}
+      title={`${t(info.label)} (${info.key})`}
       onClick={onClick}
       className={`flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${active ? "bg-on-table text-table" : "text-on-table hover:bg-on-table/10"}`}
     >

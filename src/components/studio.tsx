@@ -26,6 +26,7 @@ import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { aspectFor, autoPhotos, editedPatch, loadBook, newId, numberWord, saveBook, SCHEMA, uploadEdited, uploadPhoto, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_PRINTS, MAX_STACK, piles, putPrints, removePrint, trimPiles, type Print } from "@/lib/studio-store";
+import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
 // bearbeiten, dann sichern oder in ein Buch legen. Bis dahin bleibt alles auf dem Gerät. Die letzten Fotos liegen als Abzüge
@@ -41,15 +42,15 @@ const ACCEPT = "image/*,.heic,.heif,.dng";
 const N = 33;
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const abzuege = (n: number) => (n === 1 ? "Ein Abzug" : `${numberWord(n)} Abzüge`);
-const stem = (name: string) => name.replace(/\.[^.]+$/, "").slice(0, 60) || "Foto";
+const abzuege = (n: number) => (n === 1 ? t("Ein Abzug") : t("{n} Abzüge", { n: numberWord(n) }));
+const stem = (name: string) => name.replace(/\.[^.]+$/, "").slice(0, 60) || t("Foto");
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 const when = (at: number) => {
   const d = new Date(at);
   const now = new Date();
-  if (sameDay(d, now)) return "heute";
-  if (sameDay(d, new Date(now.getTime() - 864e5))) return "gestern";
-  return d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+  if (sameDay(d, now)) return t("heute");
+  if (sameDay(d, new Date(now.getTime() - 864e5))) return t("gestern");
+  return d.toLocaleDateString(locale(getLang()), { day: "numeric", month: "short" });
 };
 // Drehung der Abzüge auf dem Pult: aus der Hand gelegt, aber ruhig
 const TILT = [-4, 2.5, -1.5, 3.5, -2.5, 1.5, -3, 2];
@@ -70,6 +71,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const [done, setDone] = useState<Print[] | null>(null);
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   useEffect(() => {
     listPrints(user.uid)
@@ -90,24 +92,24 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     const images = given.filter((x) => !x.type.startsWith("video/"));
     const files = images.filter((f) => f.size <= MAX_FILE).slice(0, MAX_STACK);
     const notes: string[] = [];
-    if (images.length > MAX_STACK) notes.push(`Höchstens ${MAX_STACK} Fotos auf einmal, die ersten ${MAX_STACK} sind offen.`);
-    if (images.some((f) => f.size > MAX_FILE)) notes.push("Fotos über 60 MB bleiben draußen.");
-    if (!files.length) return setError(notes.join(" ") || "Dieses Foto lässt sich nicht öffnen.");
+    if (images.length > MAX_STACK) notes.push(t("Höchstens {max} Fotos auf einmal, die ersten {max} sind offen.", { max: MAX_STACK }));
+    if (images.some((f) => f.size > MAX_FILE)) notes.push(t("Fotos über 60 MB bleiben draußen."));
+    if (!files.length) return setError(notes.join(" ") || t("Dieses Foto lässt sich nicht öffnen."));
     const stack = files.length > 1 ? newId() : undefined;
     const at = Date.now();
     const made: Print[] = [];
     let broken = 0;
     let reason = "";
-    setPreparing(files.length > 1 ? `Öffne 1 von ${files.length} …` : "Wird geöffnet …");
+    setPreparing(files.length > 1 ? t("Öffne {i} von {n} …", { i: 1, n: files.length }) : t("Wird geöffnet …"));
     try {
       const { studioSource } = await import("@/lib/ingest");
       // nacheinander, nie alle zugleich: jedes Foto wird in voller Größe entpackt
       for (const [i, file] of files.entries()) {
-        if (files.length > 1) setPreparing(`Öffne ${i + 1} von ${files.length} …`);
+        if (files.length > 1) setPreparing(t("Öffne {i} von {n} …", { i: i + 1, n: files.length }));
         // Safari verschluckt sich bei vielen großen Fotos hintereinander am Speicher: ein zweiter Versuch nach kurzer Pause
         const s = await studioSource(file).catch(() => pause(400).then(() => studioSource(file))).catch((e) => {
           broken++;
-          if (e instanceof Error && /format|DNG/i.test(e.message)) reason = `: ${e.message}`;
+          if (e instanceof Error && /format|DNG/i.test(e.message)) reason = e.message;
           return null;
         });
         if (s) made.push({ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: made.length });
@@ -115,13 +117,28 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     } finally {
       setPreparing(null);
     }
-    if (broken) notes.push(files.length === 1 ? `Dieses Foto lässt sich nicht öffnen${reason}.` : `${broken === 1 ? "Ein Foto ließ" : `${numberWord(broken)} Fotos ließen`} sich nicht öffnen.`);
+    if (broken)
+      notes.push(
+        files.length === 1
+          ? reason
+            ? t("Dieses Foto lässt sich nicht öffnen: {reason}.", { reason })
+            : t("Dieses Foto lässt sich nicht öffnen.")
+          : broken === 1
+            ? t("Ein Foto ließ sich nicht öffnen.")
+            : t("{n} Fotos ließen sich nicht öffnen.", { n: numberWord(broken) }),
+      );
     if (!made.length) return setError(notes.join(" "));
     // bleibt nur eins übrig, ist es ein einzelner Abzug
     const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
     keep(ps);
     // der Hinweis gehört in den Editor, der das Studio sonst verdeckt
-    setOpenNote(!notes.length ? null : !broken ? notes.join(" ") : `${notes.join(" ")} ${made.length === 1 ? "Ein Foto ist" : `${numberWord(made.length)} Fotos sind`} offen.`);
+    setOpenNote(
+      !notes.length
+        ? null
+        : !broken
+          ? notes.join(" ")
+          : `${notes.join(" ")} ${made.length === 1 ? t("Ein Foto ist offen.") : t("{n} Fotos sind offen.", { n: numberWord(made.length) })}`,
+    );
     setEditing(ps);
   };
 
@@ -132,8 +149,14 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   };
 
   const sub = prints.length
-    ? `${stacks.length < prints.length ? `${abzuege(prints.length)} in ${stacks.length === 1 ? "einem Stapel" : `${numberWord(stacks.length)} Stapeln`}` : abzuege(prints.length)} · zuletzt ${when(prints[0].at)}`
-    : "Fotos bearbeiten, sichern oder in ein Buch legen. Gern mehrere auf einmal.";
+    ? `${
+        stacks.length < prints.length
+          ? stacks.length === 1
+            ? t("{prints} in einem Stapel", { prints: abzuege(prints.length) })
+            : t("{prints} in {n} Stapeln", { prints: abzuege(prints.length), n: numberWord(stacks.length).toLowerCase() })
+          : abzuege(prints.length)
+      } · ${t("zuletzt {when}", { when: when(prints[0].at) })}`
+    : t("Fotos bearbeiten, sichern oder in ein Buch legen. Gern mehrere auf einmal.");
 
   return (
     <section
@@ -149,12 +172,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     >
       <div className="grid gap-1">
         <h2 id="studio-h" className="text-on-table text-[28px] leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          Fotostudio
+          {t("Fotostudio")}
         </h2>
         <p className="text-on-table-2 text-sm">{sub}</p>
       </div>
 
-      <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label="Abzüge">
+      <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label={t("Abzüge")}>
         {stacks.map((pile, i) => (pile.length > 1 ? <StackTile key={pile[0].stack} pile={pile} i={i} onOpen={() => setEditing(pile)} /> : <PrintTile key={pile[0].id} print={pile[0]} i={i} onOpen={() => setEditing(pile)} />))}
         <OnTable i={stacks.length} tilt={2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
@@ -168,7 +191,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
               +
             </span>
             <span className="text-[15px] leading-tight font-bold" aria-live="polite">
-              {preparing ?? (prints.length ? "Neue Fotos" : "Fotos wählen")}
+              {preparing ?? (prints.length ? t("Neue Fotos") : t("Fotos wählen"))}
             </span>
           </button>
         </OnTable>
@@ -188,7 +211,11 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           if (fs.length) open(fs).finally(() => (el.value = ""));
         }}
       />
-      {prints.length > 0 && <p className="text-on-table-2 mt-2 text-[13px]">Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.</p>}
+      {prints.length > 0 && (
+        <p className="text-on-table-2 mt-2 text-[13px]">
+          {t("Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.")}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-on-table text-sm">
           {error}
@@ -242,9 +269,10 @@ function PrintTile({ print, i, onOpen }: { print: Print; i: number; onOpen: () =
   const { img } = useBlobUrls(blobs);
   const [pw, ph] = outSize(print.edit?.geo, print.w, print.h);
   const land = pw >= ph;
+  const t = useT();
   return (
     <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
-      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={`${print.name}, ${when(print.at)} bearbeitet. Öffnen`}>
+      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("{name}, {when} bearbeitet. Öffnen", { name: print.name, when: when(print.at) })}>
         <span className="studio-paper">
           {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
           {img && <img src={img} alt="" draggable={false} className={`block object-cover ${land ? "h-[96px] w-[132px] md:h-[112px] md:w-[156px]" : "h-[132px] w-[96px] md:h-[156px] md:w-[112px]"}`} />}
@@ -272,9 +300,10 @@ function Paper({ print, className = "", children }: { print: Print; className?: 
 
 /** Ein Stapel auf dem Pult: oben der erste Abzug, darunter zwei weitere, die sich beim Anheben auffächern */
 function StackTile({ pile, i, onOpen }: { pile: Print[]; i: number; onOpen: () => void }) {
+  const t = useT();
   return (
     <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
-      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={`Stapel mit ${numberWord(pile.length)} Fotos, ${when(pile[0].at)} bearbeitet. Öffnen`}>
+      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("Stapel mit {n} Fotos, {when} bearbeitet. Öffnen", { n: numberWord(pile.length).toLowerCase(), when: when(pile[0].at) })}>
         {pile.slice(1, 3).map((p, j) => (
           <span key={p.id} aria-hidden className="studio-fan absolute inset-0 grid place-items-end" style={{ ["--f" as string]: j ? -1 : 1 } as CSSProperties}>
             <Paper print={p} className="shadow-[1px_2px_4px_rgb(12_10_8/0.35)]" />
@@ -353,6 +382,7 @@ function StudioEditor({ prints, uid, note, onClose, onFinish }: { prints: Print[
   // Seitengröße und Abzug genügen der Vorschau; die Arbeitsfassung (4096 px) bleibt als Blob, bis gerechnet wird
   const blobs = useMemo(() => Object.fromEntries(prints.flatMap((p) => [[`${p.id}:page`, p.page], [`${p.id}:thumb`, p.thumb]])), [prints]);
   const urls = useBlobUrls(blobs);
+  const t = useT();
   const [photos] = useState<StoredPhoto[]>(() =>
     prints.map((p) => ({
       key: p.id,
@@ -370,16 +400,19 @@ function StudioEditor({ prints, uid, note, onClose, onFinish }: { prints: Print[
       camera: p.meta?.camera,
     })),
   );
-  return <DevelopDialog photos={photos} start={prints[0].id} uid={uid} title={prints.length > 1 ? `${prints.length} Fotos` : "Fotostudio"} long={STUDIO_LONG} note={note} onFinish={onFinish} onClose={onClose} />;
+  return <DevelopDialog photos={photos} start={prints[0].id} uid={uid} title={prints.length > 1 ? t("{n} Fotos", { n: prints.length }) : t("Fotostudio")} long={STUDIO_LONG} note={note} onFinish={onFinish} onClose={onClose} />;
 }
 
 /** „Kalkwand · Licht +0,3“: was am Foto gemacht ist, kurz */
 function summary(e: PhotoEdit | undefined) {
-  if (!e || isNeutral(e)) return "Unbearbeitet";
+  if (!e || isNeutral(e)) return t("Unbearbeitet");
+  // describeEdit liefert die Bezeichnungen schon übersetzt, verglichen wird deshalb mit t()
   const rows = describeEdit(e);
-  const head = rows.filter((r) => r.label === "Vorschlag" || r.label === "Rezept" || r.label === "Look").map((r) => r.value);
-  const fine = rows.filter((r) => !["Vorschlag", "Rezept", "Look", "Filmlook", "Weißabgleich", "Dynamikbereich", "Lichter / Schatten", "Farbe", "Color Chrome / FX Blau", "Körnung"].includes(r.label));
-  return [...head, ...fine.map((r) => (r.label === "Zuschnitt" ? r.value : `${r.label} ${r.value}`))].slice(0, 3).join(" · ");
+  const lead = [t("Vorschlag"), t("Rezept"), "Look"];
+  const head = rows.filter((r) => lead.includes(r.label)).map((r) => r.value);
+  const skip = [...lead, t("Filmlook"), t("Weißabgleich"), t("Dynamikbereich"), t("Lichter / Schatten"), t("Farbe"), t("Color Chrome / FX Blau"), t("Körnung")];
+  const fine = rows.filter((r) => !skip.includes(r.label));
+  return [...head, ...fine.map((r) => (r.label === t("Zuschnitt") ? r.value : `${r.label} ${r.value}`))].slice(0, 3).join(" · ");
 }
 
 const coarse = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
@@ -387,9 +420,9 @@ const coarse = () => typeof window !== "undefined" && window.matchMedia("(pointe
 /** „Für die Datei schärfen“ gilt fürs Gerät, nicht pro Foto: es hängt an der Größe der Datei, nicht am Bild */
 const SHARPEN_KEY = "calima-studio-sharpen";
 const SHARPEN_OPTS: { value: `${SharpenLevel}`; label: string }[] = [
-  { value: "0", label: "Aus" },
-  { value: "1", label: "Leicht" },
-  { value: "2", label: "Stark" },
+  { value: "0", label: de("Aus") },
+  { value: "1", label: de("Leicht") },
+  { value: "2", label: de("Stark") },
 ];
 const savedSharpen = (): SharpenLevel => {
   try {
@@ -422,6 +455,7 @@ function DoneSheet({
   onRemove: () => void;
 }) {
   const router = useRouter();
+  const t = useT();
   const many = prints.length > 1;
   const [files, setFiles] = useState<File[]>([]);
   const [zip, setZip] = useState<Blob | null>(null);
@@ -515,7 +549,7 @@ function DoneSheet({
     window.setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
   };
   const downloadAll = () => {
-    if (zip) download(zip, `Calima ${prints.length} Fotos.zip`);
+    if (zip) download(zip, `Calima ${t("{n} Fotos", { n: prints.length })}.zip`);
     else for (const f of files) download(f, f.name);
   };
   const canSave = ready && (!many || IS_APP || touch || !!zip);
@@ -525,7 +559,7 @@ function DoneSheet({
     if (IS_APP) {
       const done = (r: ShareResult) => {
         if (r === "shared") haptic("success");
-        else if (r === "failed") notify(many ? "Die Dateien ließen sich nicht sichern. Versuch es bitte noch einmal." : "Die Datei ließ sich nicht sichern. Versuch es bitte noch einmal.");
+        else if (r === "failed") notify(many ? t("Die Dateien ließen sich nicht sichern. Versuch es bitte noch einmal.") : t("Die Datei ließ sich nicht sichern. Versuch es bitte noch einmal."));
       };
       if (many) saveFilesInApp(files).then(done);
       else saveFile(safeFileName(files[0].name.replace(/\.jpe?g$/i, ""), ".jpg"), files[0], files[0].type).then(done);
@@ -538,20 +572,20 @@ function DoneSheet({
     else {
       downloadAll();
       haptic("success");
-      notify(touch ? "Gesichert." : "Liegt in deinen Downloads.");
+      notify(touch ? t("Gesichert.") : t("Liegt in deinen Downloads."));
     }
   };
 
   const shelve = async (target: StoredBook | null) => {
     setBookError(null);
-    const into = target ? `„${target.title || "Ohne Titel"}“` : "ein neues Buch";
-    setBusy(many ? `Lege Foto 1 von ${prints.length} in ${into} …` : target ? `Lege das Foto in ${into} …` : "Lege ein neues Buch an …");
+    const into = target ? `„${target.title || t("Ohne Titel")}“` : t("ein neues Buch");
+    setBusy(many ? t("Lege Foto {i} von {n} in {into} …", { i: 1, n: prints.length, into }) : target ? t("Lege das Foto in {into} …", { into }) : t("Lege ein neues Buch an …"));
     try {
       const { ingest } = await import("@/lib/ingest");
       const bookId = target?.id ?? newId();
       const photos: StoredPhoto[] = [];
       for (const [i, p] of prints.entries()) {
-        if (many) setBusy(`Lege Foto ${i + 1} von ${prints.length} in ${into} …`);
+        if (many) setBusy(t("Lege Foto {i} von {n} in {into} …", { i: i + 1, n: prints.length, into }));
         const key = newId().slice(0, 10);
         const edit = p.edit;
         // das unbearbeitete Foto wird zum Original im Buch, die Bearbeitung liegt darüber: auf der Werkbank bleibt sie änderbar
@@ -606,14 +640,24 @@ function DoneSheet({
         });
       }
       haptic("success");
-      const n = many ? `Die ${numberWord(prints.length)} Fotos liegen` : "Liegt";
-      notify(target ? `${n} in der Ablage von „${target.title || "Ohne Titel"}“.` : many ? `Neues Buch mit ${numberWord(prints.length)} Fotos angelegt.` : "Neues Buch mit diesem Foto angelegt.", {
-        duration: 8000,
-        action: { label: "Öffnen", onClick: () => router.push(`/neu?id=${bookId}`) },
-      });
+      const name = target?.title || t("Ohne Titel");
+      const words = numberWord(prints.length).toLowerCase();
+      notify(
+        target
+          ? many
+            ? t("Die {n} Fotos liegen in der Ablage von „{name}“.", { n: words, name })
+            : t("Liegt in der Ablage von „{name}“.", { name })
+          : many
+            ? t("Neues Buch mit {n} Fotos angelegt.", { n: words })
+            : t("Neues Buch mit diesem Foto angelegt."),
+        {
+          duration: 8000,
+          action: { label: t("Öffnen"), onClick: () => router.push(`/neu?id=${bookId}`) },
+        },
+      );
       onClose();
     } catch (e) {
-      setBookError(`Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. (${friendlyError(e)})`);
+      setBookError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
     } finally {
       setBusy(null);
     }
@@ -621,11 +665,22 @@ function DoneSheet({
 
   const own = (books ?? []).filter((b) => !b.trashed);
   const coverOf = (b: StoredBook) => (b.photos.find((p) => p.key === b.coverKey) ?? b.photos.find((p) => !p.shelved))?.thumb;
-  const title = many ? `${numberWord(prints.length)} Fotos fertig` : "Fertig bearbeitet";
-  const label = !canSave && !failed ? (many ? `Rechne ${Math.min(files.length + 1, prints.length)} von ${prints.length} …` : "Wird vorbereitet …") : IS_APP || share || touch ? (many ? `Alle ${prints.length} in Fotos sichern …` : "In Fotos sichern …") : many ? "Alle herunterladen" : "Herunterladen";
+  const title = many ? t("{n} Fotos fertig", { n: numberWord(prints.length) }) : t("Fertig bearbeitet");
+  const label =
+    !canSave && !failed
+      ? many
+        ? t("Rechne {i} von {n} …", { i: Math.min(files.length + 1, prints.length), n: prints.length })
+        : t("Wird vorbereitet …")
+      : IS_APP || share || touch
+        ? many
+          ? t("Alle {n} in Fotos sichern …", { n: prints.length })
+          : t("In Fotos sichern …")
+        : many
+          ? t("Alle herunterladen")
+          : t("Herunterladen");
 
   return (
-    <MountedSheet title={view === "main" ? title : "In welches Buch?"} hideTitle={view === "main"} onClose={onClose} locked={!!busy}>
+    <MountedSheet title={view === "main" ? title : t("In welches Buch?")} hideTitle={view === "main"} onClose={onClose} locked={!!busy}>
       {(close) =>
         view === "main" ? (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
@@ -654,15 +709,15 @@ function DoneSheet({
               <p className="text-ink-2 text-center text-[13px]" aria-live="polite">
                 {failed
                   ? many
-                    ? "Die Dateien ließen sich nicht rechnen."
-                    : "Die Datei ließ sich nicht rechnen."
+                    ? t("Die Dateien ließen sich nicht rechnen.")
+                    : t("Die Datei ließ sich nicht rechnen.")
                   : IS_APP || share
                     ? many
-                      ? `Im nächsten Fenster „${prints.length} Bilder sichern“ wählen. Ohne Ortsangabe.`
-                      : "Im nächsten Fenster „Bild sichern“ wählen. Ohne Ortsangabe."
+                      ? t("Im nächsten Fenster „{n} Bilder sichern“ wählen. Ohne Ortsangabe.", { n: prints.length })
+                      : t("Im nächsten Fenster „Bild sichern“ wählen. Ohne Ortsangabe.")
                     : many && !touch
-                      ? `Eine ZIP-Datei mit ${prints.length} JPEGs, ${STUDIO_LONG} px, ohne Ortsangabe.`
-                      : `JPEG, ${STUDIO_LONG} px, ohne Ortsangabe.`}
+                      ? t("Eine ZIP-Datei mit {n} JPEGs, {px} px, ohne Ortsangabe.", { n: prints.length, px: STUDIO_LONG })
+                      : t("JPEG, {px} px, ohne Ortsangabe.", { px: STUDIO_LONG })}
               </p>
               {failed && (
                 <Button
@@ -674,51 +729,56 @@ function DoneSheet({
                     setAttempt((n) => n + 1);
                   }}
                 >
-                  Noch einmal versuchen
+                  {t("Noch einmal versuchen")}
                 </Button>
               )}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <span aria-hidden className="text-[15px] font-semibold">
-                Für die Datei schärfen
+                {t("Für die Datei schärfen")}
               </span>
-              <Segmented label="Für die Datei schärfen" tone="paper" options={SHARPEN_OPTS} value={`${sharpen}`} onChange={(v) => pickSharpen(Number(v) as SharpenLevel)} />
+              <Segmented
+                label={t("Für die Datei schärfen")}
+                tone="paper"
+                options={SHARPEN_OPTS.map((o) => ({ ...o, label: t(o.label) }))} value={`${sharpen}`} onChange={(v) => pickSharpen(Number(v) as SharpenLevel)} />
             </div>
             <ListGroup paper>
-              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? "Alle in ein Buch legen …" : "In ein Buch legen …"} onClick={() => setView("books")} />
-              <ListRow paper lead={<Pencil aria-hidden />} title="Weiter bearbeiten" onClick={() => close(onEdit)} />
-              <ListRow paper danger lead={<Trash2 aria-hidden />} title={many ? "Stapel vom Pult nehmen" : "Vom Pult nehmen"} onClick={() => close(onRemove)} />
+              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? t("Alle in ein Buch legen …") : t("In ein Buch legen …")} onClick={() => setView("books")} />
+              <ListRow paper lead={<Pencil aria-hidden />} title={t("Weiter bearbeiten")} onClick={() => close(onEdit)} />
+              <ListRow paper danger lead={<Trash2 aria-hidden />} title={many ? t("Stapel vom Pult nehmen") : t("Vom Pult nehmen")} onClick={() => close(onRemove)} />
             </ListGroup>
           </div>
         ) : (
           <div className="grid gap-3">
             <Button size="sm" variant="paper" className="justify-self-start pl-2" onClick={() => setView("main")} disabled={!!busy}>
               <ChevronLeft aria-hidden />
-              Zurück
+              {t("Zurück")}
             </Button>
-            <p className="text-ink-2 text-sm">{many ? `Die ${numberWord(prints.length)} Fotos kommen in die Ablage.` : "Das Foto kommt in die Ablage."} Deine Seiten bleiben, wie sie sind.</p>
-            <ListGroup paper label="Deine Bücher">
+            <p className="text-ink-2 text-sm">
+              {many ? t("Die {n} Fotos kommen in die Ablage.", { n: numberWord(prints.length).toLowerCase() }) : t("Das Foto kommt in die Ablage.")} {t("Deine Seiten bleiben, wie sie sind.")}
+            </p>
+            <ListGroup paper label={t("Deine Bücher")}>
               {own.map((b) => {
-                const t = coverOf(b);
+                const thumb = coverOf(b);
                 return (
                   <ListRow
                     key={b.id}
                     paper
                     lead={
-                      t ? (
+                      thumb ? (
                         // eslint-disable-next-line @next/next/no-img-element -- Einband-Miniatur aus dem eigenen Speicher
-                        <img src={t} alt="" className="h-10 w-[30px] object-cover" />
+                        <img src={thumb} alt="" className="h-10 w-[30px] object-cover" />
                       ) : (
                         <span className="bg-paper-shade block h-10 w-[30px]" />
                       )
                     }
-                    title={b.title || "Ohne Titel"}
-                    detail={`${b.photos.length} ${b.photos.length === 1 ? "Foto" : "Fotos"}`}
+                    title={b.title || t("Ohne Titel")}
+                    detail={b.photos.length === 1 ? t("1 Foto") : t("{n} Fotos", { n: b.photos.length })}
                     onClick={busy ? undefined : () => shelve(b)}
                   />
                 );
               })}
-              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? "Neues Buch mit diesen Fotos" : "Neues Buch mit diesem Foto"} onClick={busy ? undefined : () => shelve(null)} />
+              <ListRow paper lead={<BookPlus aria-hidden />} title={many ? t("Neues Buch mit diesen Fotos") : t("Neues Buch mit diesem Foto")} onClick={busy ? undefined : () => shelve(null)} />
             </ListGroup>
             <p className="text-ink-2 min-h-5 text-[13px]" aria-live="polite">
               {busy ?? bookError}

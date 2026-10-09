@@ -5,6 +5,7 @@ import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { useRef, type ReactNode } from "react";
 
 import { haptic } from "@/lib/haptics";
+import { useT } from "@/lib/i18n";
 
 // Menü auf Zettelpapier, z. B. hinter „Mehr“. Tastatur, Fokus und Position kommen aus Base UI.
 // Es wächst aus dem Knopf (transform-origin) und schrumpft beim Schließen kurz zurück.
@@ -90,6 +91,7 @@ export function MenuItem({
   danger?: boolean;
   disabled?: boolean;
 }) {
+  const t = useT();
   return (
     <BaseMenu.Item
       disabled={disabled}
@@ -113,7 +115,7 @@ export function MenuItem({
           <path d="M20 6 9 17l-5-5" />
         </svg>
       )}
-      {checked && <span className="sr-only">, offen</span>}
+      {checked && <span className="sr-only">{t(", offen")}</span>}
     </BaseMenu.Item>
   );
 }

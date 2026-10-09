@@ -16,6 +16,7 @@ import { useFeedback } from "@/components/leave-feedback";
 import { Shelf, Table } from "@/components/table";
 import { signInError } from "@/lib/errors";
 import { signIn, type SignInProvider } from "@/lib/firebase";
+import { useLang, useT } from "@/lib/i18n";
 import { SignInButtons } from "@/components/sign-in-buttons";
 import { ReportDialog } from "@/components/report-dialog";
 import { blockSender, keepInInbox, loadShare, toBookData, watchBlocked, type Blocked, type Share } from "@/lib/store";
@@ -34,6 +35,8 @@ export function GuestBook() {
   const [reporting, setReporting] = useState(false);
   const [blocked, setBlocked] = useState<Blocked[] | null>(null);
   const feedback = useFeedback((s) => user?.displayName ?? s.to);
+  const t = useT();
+  const lang = useLang();
 
   useEffect(() => {
     if (!user) return;
@@ -80,19 +83,19 @@ export function GuestBook() {
   const book = useMemo<BookData | null>(() => {
     if (!share) return null;
     try {
-      return toBookData(share.book);
+      return toBookData(share.book, lang);
     } catch {
       return null;
     }
-  }, [share]);
+  }, [share, lang]);
 
   if (token === null && share === undefined)
-    return <Empty text="Dieser Link ist unvollständig." />;
-  if (share === undefined && offline) return <Empty text="Keine Verbindung. Das Buch lädt, sobald du wieder online bist." />;
+    return <Empty text={t("Dieser Link ist unvollständig.")} />;
+  if (share === undefined && offline) return <Empty text={t("Keine Verbindung. Das Buch lädt, sobald du wieder online bist.")} />;
   if (share === undefined) return <main className="linen table-surface min-h-svh bg-table" />;
-  if (!share || !book) return <Empty text="Dieses Buch liegt hier nicht mehr. Vielleicht wurde der Link zurückgezogen." />;
+  if (!share || !book) return <Empty text={t("Dieses Buch liegt hier nicht mehr. Vielleicht wurde der Link zurückgezogen.")} />;
 
-  if (hidden && !reporting) return <Empty text={`Bücher von ${share.fromName} hast du ausgeblendet. Im Profil kannst du das zurücknehmen.`} />;
+  if (hidden && !reporting) return <Empty text={t("Bücher von {name} hast du ausgeblendet. Im Profil kannst du das zurücknehmen.", { name: share.fromName })} />;
 
   const mine = !!user && user.uid === share.owner;
 
@@ -107,14 +110,14 @@ export function GuestBook() {
         bookExtra={(_, plates) => feedback.extra(share, plates, !mine && <MoreMenu onReport={() => setReporting(true)} />)}
       >
         <Table
-          label={`Ein Buch für ${share.to}`}
+          label={t("Ein Buch für {name}", { name: share.to })}
           headerRight={
             <div className="flex items-center gap-2">
               {user ? (
                 kept ? (
                   <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
                     <Check aria-hidden />
-                    Liegt in deinem Bücherzimmer
+                    {t("Liegt in deinem Bücherzimmer")}
                   </Link>
                 ) : (
                   <span aria-hidden className="inline-block min-h-9 w-24" />
@@ -122,22 +125,22 @@ export function GuestBook() {
               ) : (
                 <Button size="sm" onClick={() => setKeeping(true)}>
                   <BookmarkPlus aria-hidden />
-                  <span className="max-sm:hidden">In mein Bücherzimmer legen</span>
-                  <span className="sm:hidden">Behalten</span>
+                  <span className="max-sm:hidden">{t("In mein Bücherzimmer legen")}</span>
+                  <span className="sm:hidden">{t("Behalten")}</span>
                 </Button>
               )}
               {!mine && <MoreMenu onReport={() => setReporting(true)} />}
             </div>
           }
         >
-          <Shelf feature books={[book]} note={() => `Für ${share.to}, von ${share.fromName}`} />
+          <Shelf feature books={[book]} note={() => t("Für {to}, von {from}", { to: share.to, from: share.fromName })} />
         </Table>
       </Library>
       <Sheet
         open={keeping && !user}
         onOpenChange={setKeeping}
-        title="In dein Bücherzimmer legen"
-        description={`Mit einem Konto liegt „${share.book?.title || "dieses Buch"}“ in deinem Bücherzimmer unter „Für dich“, und du kannst eigene Bücher machen.`}
+        title={t("In dein Bücherzimmer legen")}
+        description={t("Mit einem Konto liegt „{title}“ in deinem Bücherzimmer unter „Für dich“, und du kannst eigene Bücher machen.", { title: share.book?.title || t("dieses Buch") })}
       >
         <SignInButtons
           tone="cloth"
@@ -157,9 +160,9 @@ export function GuestBook() {
           </p>
         )}
         <p className="text-ink-2 mt-4 text-[13px]">
-          Es gelten die{" "}
+          {t("Es gelten die")}{" "}
           <Link href="/nutzungsbedingungen" className="underline decoration-ink/40 underline-offset-4 hover:decoration-ink">
-            Nutzungsbedingungen
+            {t("Nutzungsbedingungen")}
           </Link>
           .
         </p>
@@ -179,10 +182,11 @@ export function GuestBook() {
 
 /** Seltene Handgriffe hinter „Mehr“, damit Melden nicht neben Zettel und Eselsohr steht */
 function MoreMenu({ onReport }: { onReport: () => void }) {
+  const t = useT();
   return (
-    <Menu trigger={<IconButton label="Mehr"><MoreHorizontal aria-hidden /></IconButton>}>
+    <Menu trigger={<IconButton label={t("Mehr")}><MoreHorizontal aria-hidden /></IconButton>}>
       <MenuItem icon={<Flag />} onClick={onReport}>
-        Buch melden
+        {t("Buch melden")}
       </MenuItem>
     </Menu>
   );
@@ -191,12 +195,13 @@ function MoreMenu({ onReport }: { onReport: () => void }) {
 /** Leerer Tisch mit Weg zurück: in der App gibt es keine Zurück-Taste des Browsers */
 function Empty({ text }: { text: string }) {
   const user = useUser();
+  const t = useT();
   return (
     <main className="linen table-surface flex min-h-svh flex-col items-center justify-center gap-6 bg-table px-6">
       <p className="text-on-table-2 max-w-sm text-center">{text}</p>
       {user !== undefined && (
         <Link href={user ? "/zimmer" : "/"} className={buttonClass("quiet")}>
-          {user ? "Zum Bücherzimmer" : IS_APP ? "Zu Calima" : "Zur Startseite"}
+          {user ? t("Zum Bücherzimmer") : IS_APP ? t("Zu Calima") : t("Zur Startseite")}
         </Link>
       )}
     </main>

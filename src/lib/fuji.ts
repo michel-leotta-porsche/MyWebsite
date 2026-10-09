@@ -4,6 +4,7 @@
 // unbekannte Werte erscheinen als Rohwert statt falsch übersetzt.
 
 import type { FujiRecipe } from "@/content/recipes";
+import { de } from "@/lib/i18n";
 
 type Entry = { tag: number; type: number; count: number; at: number };
 
@@ -53,15 +54,15 @@ const SATURATION: Record<number, number | string> = {
   0x400: -2,
   0x4c0: -3,
   0x4e0: -4,
-  0x300: "Monochrom",
-  0x301: "Monochrom + Rotfilter",
-  0x302: "Monochrom + Gelbfilter",
-  0x303: "Monochrom + Grünfilter",
+  0x300: de("Monochrom"),
+  0x301: de("Monochrom + Rotfilter"),
+  0x302: de("Monochrom + Gelbfilter"),
+  0x303: de("Monochrom + Grünfilter"),
   0x310: "Sepia",
   0x500: "Acros",
-  0x501: "Acros + Rotfilter",
-  0x502: "Acros + Gelbfilter",
-  0x503: "Acros + Grünfilter",
+  0x501: de("Acros + Rotfilter"),
+  0x502: de("Acros + Gelbfilter"),
+  0x503: de("Acros + Grünfilter"),
 };
 const SHARPNESS: Record<number, number> = { 0x0: -4, 0x1: -3, 0x2: -2, 0x82: -1, 0x3: 0, 0x84: 1, 0x4: 2, 0x5: 3, 0x6: 4 };
 const NR: Record<number, number> = {
@@ -77,18 +78,18 @@ const NR: Record<number, number> = {
 };
 const WB: Record<number, string> = {
   0x0: "Auto",
-  0x1: "Auto, Weiß",
-  0x2: "Auto, Ambiente",
-  0x100: "Tageslicht",
-  0x200: "Bewölkt",
-  0x300: "Leuchtstoff Tageslicht",
-  0x301: "Leuchtstoff Tagesweiß",
-  0x302: "Leuchtstoff Kaltweiß",
-  0x303: "Leuchtstoff Warmweiß",
-  0x400: "Kunstlicht",
-  0x500: "Blitz",
-  0x600: "Unterwasser",
-  0xf00: "Eigener",
+  0x1: de("Auto, Weiß"),
+  0x2: de("Auto, Ambiente"),
+  0x100: de("Tageslicht"),
+  0x200: de("Bewölkt"),
+  0x300: de("Leuchtstoff Tageslicht"),
+  0x301: de("Leuchtstoff Tagesweiß"),
+  0x302: de("Leuchtstoff Kaltweiß"),
+  0x303: de("Leuchtstoff Warmweiß"),
+  0x400: de("Kunstlicht"),
+  0x500: de("Blitz"),
+  0x600: de("Unterwasser"),
+  0xf00: de("Eigener"),
   0xff0: "Kelvin",
 };
 const level = (v: number | undefined): 0 | 1 | 2 => (v === 64 ? 2 : v === 32 ? 1 : 0);

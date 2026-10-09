@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { LegalLinks } from "@/components/legal-links";
 import { hitClass } from "@/components/ui-classes";
+import { TranslationNote } from "@/components/translation-note";
 import { Wordmark } from "@/components/ui-base";
 
 // Impressum und Datenschutz: ein ruhiger Tisch mit einer Textspalte, gleicher Kopf wie die Räume.
@@ -18,7 +19,8 @@ export const OPERATOR = {
   email: "michel.leotta@hotmail.com",
 };
 
-export function LegalPage({ title, children }: { title: string; children: ReactNode }) {
+/** binding: Rechtstext, auf Englisch mit dem Hinweis, dass die deutsche Fassung gilt */
+export function LegalPage({ title, binding = false, children }: { title: ReactNode; binding?: boolean; children: ReactNode }) {
   return (
     <main className="linen table-surface relative flex min-h-svh flex-col bg-table">
       <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
@@ -29,13 +31,14 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
         <h1 className="text-on-table text-4xl leading-[0.95] font-bold tracking-[-0.03em] md:text-6xl" style={{ fontVariationSettings: '"wdth" 78, "opsz" 72' }}>
           {title}
         </h1>
+        {binding && <TranslationNote />}
         <div className="mt-10 flex flex-col gap-10">{children}</div>
       </article>
     </main>
   );
 }
 
-export function LegalSection({ title, children }: { title: string; children: ReactNode }) {
+export function LegalSection({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <section className="border-on-table-2/25 border-t pt-5">
       <h2 className="text-on-table text-xl font-semibold tracking-[-0.01em]">{title}</h2>

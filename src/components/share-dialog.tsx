@@ -10,6 +10,7 @@ import { ListGroup, ListRow } from "@/components/ui/list";
 import { MountedSheet } from "@/components/ui/sheet";
 import { notify } from "@/components/ui/toaster";
 import { haptic } from "@/lib/haptics";
+import { useT } from "@/lib/i18n";
 import { copyText, shareLink } from "@/lib/native";
 import { IS_APP } from "@/lib/app-mode";
 import { SITE_URL } from "@/lib/share-meta";
@@ -41,6 +42,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   const [notes, setNotes] = useState<Record<string, Note[]>>({});
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const t = useT();
   // Teilen-Knopf im Browser nur, wo es ein Teilen-Menü gibt (Telefon, Safari); erst nach dem Laden bekannt
   const canShare = useSyncExternalStore(noSubscribe, hasShare, () => false);
   // Vor dem ersten Teilen einmal den Nutzungsbedingungen zustimmen (App Store 1.2); null solange unbekannt
@@ -92,7 +94,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
       // auf dem Telefon gleich das Teilen-Menü (WhatsApp, Nachrichten …); in der App zuverlässig auch nach dem Speichern
       if (canShare || IS_APP) send(token, to.trim(), named.title);
     } catch {
-      notify("Der Link ließ sich nicht anlegen. Prüf die Verbindung und tipp noch einmal.");
+      notify(t("Der Link ließ sich nicht anlegen. Prüf die Verbindung und tipp noch einmal."));
       haptic("warning");
     } finally {
       setBusy(false);
@@ -101,9 +103,9 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
 
   // Teilen-Blatt mit einem Satz, wie man ihn selbst schreiben würde; Rückmeldung nur, wenn es wirklich geklappt hat
   const send = async (token: string, name: string, title: string) => {
-    const r = await shareLink({ title, text: `Ich hab dir ein Fotobuch hingelegt: „${title}“. Zum Blättern, ohne Konto.`, url: linkFor(token) });
+    const r = await shareLink({ title, text: t("Ich hab dir ein Fotobuch hingelegt: „{title}“. Zum Blättern, ohne Konto.", { title }), url: linkFor(token) });
     if (r === "shared") {
-      notify(`Link für ${name} ist unterwegs.`);
+      notify(t("Link für {name} ist unterwegs.", { name }));
       haptic("success");
     } else if (r === "failed") copy(token, name);
   };
@@ -114,7 +116,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
       timers.current.delete(token);
       unshare(token).catch(() => {});
       setShares((all) => all?.filter((x) => x.token !== token) ?? null);
-      setWithdrawing((w) => w.filter((t) => t !== token));
+      setWithdrawing((w) => w.filter((x) => x !== token));
     }, WITHDRAW_MS);
     timers.current.set(token, id);
     setWithdrawing((w) => [...w, token]);
@@ -122,7 +124,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
   const keep = (token: string) => {
     window.clearTimeout(timers.current.get(token));
     timers.current.delete(token);
-    setWithdrawing((w) => w.filter((t) => t !== token));
+    setWithdrawing((w) => w.filter((x) => x !== token));
   };
   // Dialog zu, solange etwas aussteht: das Zurückziehen gilt trotzdem
   useEffect(() => {
@@ -137,10 +139,10 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
 
   const copy = async (token: string, name: string) => {
     if (!(await copyText(linkFor(token)))) {
-      notify("Kopieren hat nicht geklappt. Tipp auf Teilen und wähl dort Kopieren.");
+      notify(t("Kopieren hat nicht geklappt. Tipp auf Teilen und wähl dort Kopieren."));
       return;
     }
-    notify(`Link für ${name} kopiert.`);
+    notify(t("Link für {name} kopiert.", { name }));
     haptic("success");
     setCopied(token);
     window.setTimeout(() => setCopied(null), 1600);
@@ -150,8 +152,8 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
 
   return (
     <MountedSheet
-      title={needsTitle ? "Buch hinlegen" : `„${book.title}“ hinlegen`}
-      description="Jede Person bekommt einen eigenen Link, ohne Konto. Wer den Link hat, kann das Buch ansehen, und sonst nichts. Du kannst ihn jederzeit zurückziehen."
+      title={needsTitle ? t("Buch hinlegen") : t("„{title}“ hinlegen", { title: book.title })}
+      description={t("Jede Person bekommt einen eigenen Link, ohne Konto. Wer den Link hat, kann das Buch ansehen, und sonst nichts. Du kannst ihn jederzeit zurückziehen.")}
       onClose={onClose}
     >
       <form
@@ -161,9 +163,9 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
           create();
         }}
       >
-        {needsTitle && <Field label="Titel des Buchs" hint="Steht auf dem Einband" value={title} onChange={(e) => setTitle(e.target.value.slice(0, 40))} />}
+        {needsTitle && <Field label={t("Titel des Buchs")} hint={t("Steht auf dem Einband")} value={title} onChange={(e) => setTitle(e.target.value.slice(0, 40))} />}
         <div className="flex items-end gap-3">
-          <Field label="Für wen?" className="min-w-0 flex-1" value={to} onChange={(e) => setTo(e.target.value)} maxLength={40} />
+          <Field label={t("Für wen?")} className="min-w-0 flex-1" value={to} onChange={(e) => setTo(e.target.value)} maxLength={40} />
           <Button
             type="submit"
             variant="ink"
@@ -172,7 +174,7 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
             disabled={busy || !to.trim() || (needsTitle && !title.trim()) || mustAgree || agreed === null}
           >
             <Link2 aria-hidden />
-            Link erstellen
+            {t("Link erstellen")}
           </Button>
         </div>
       </form>
@@ -180,9 +182,9 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
         <label className="mt-3 flex min-h-11 items-center gap-3 text-[13px]">
           <input type="checkbox" checked={agreeNow} onChange={(e) => setAgreeNow(e.target.checked)} className="accent-ink size-[18px] shrink-0" />
           <span>
-            Ich teile nur, woran ich die Rechte habe, und halte mich an die{" "}
+            {t("Ich teile nur, woran ich die Rechte habe, und halte mich an die")}{" "}
             <Link href="/nutzungsbedingungen" className="underline underline-offset-4">
-              Nutzungsbedingungen
+              {t("Nutzungsbedingungen")}
             </Link>
             .
           </span>
@@ -190,9 +192,9 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
       )}
 
       <div className="mt-6">
-        {shares === null && <p className="text-ink-2 text-sm">Lade …</p>}
+        {shares === null && <p className="text-ink-2 text-sm">{t("Lade …")}</p>}
         {shares && shares.length > 0 && (
-          <ListGroup paper label="Links">
+          <ListGroup paper label={t("Geteilte Links")}>
             {shares.map((s) => {
               const going = withdrawing.includes(s.token);
               const count = (notes[s.token] ?? []).length;
@@ -201,25 +203,25 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
                   key={s.token}
                   paper
                   lead={<Gift aria-hidden />}
-                  title={`Für ${s.to}`}
-                  detail={going ? "Wird zurückgezogen" : count ? `${count} ${count === 1 ? "Rückmeldung" : "Rückmeldungen"}` : "Liegt bereit"}
+                  title={t("Für {name}", { name: s.to })}
+                  detail={going ? t("Wird zurückgezogen") : count === 1 ? t("1 Rückmeldung") : count ? t("{n} Rückmeldungen", { n: count }) : t("Liegt bereit")}
                   trail={
                     <span className="flex gap-1">
                       {going ? (
-                        <IconButton variant="paper" label={`Link für ${s.to} behalten`} onClick={() => keep(s.token)}>
+                        <IconButton variant="paper" label={t("Link für {name} behalten", { name: s.to })} onClick={() => keep(s.token)}>
                           <Undo2 aria-hidden />
                         </IconButton>
                       ) : (
                         <>
                           {(IS_APP || canShare) && (
-                            <IconButton variant="paper" label={`Link für ${s.to} teilen`} onClick={() => send(s.token, s.to, book.title)}>
+                            <IconButton variant="paper" label={t("Link für {name} teilen", { name: s.to })} onClick={() => send(s.token, s.to, book.title)}>
                               <Share aria-hidden />
                             </IconButton>
                           )}
-                          <IconButton variant="paper" label={copied === s.token ? "Kopiert" : `Link für ${s.to} kopieren`} onClick={() => copy(s.token, s.to)}>
+                          <IconButton variant="paper" label={copied === s.token ? t("Kopiert") : t("Link für {name} kopieren", { name: s.to })} onClick={() => copy(s.token, s.to)}>
                             {copied === s.token ? <Check aria-hidden /> : <Copy aria-hidden />}
                           </IconButton>
-                          <IconButton variant="paper" label={`Link für ${s.to} zurückziehen`} onClick={() => withdraw(s.token)}>
+                          <IconButton variant="paper" label={t("Link für {name} zurückziehen", { name: s.to })} onClick={() => withdraw(s.token)}>
                             <Link2Off aria-hidden />
                           </IconButton>
                         </>
@@ -235,19 +237,19 @@ export function ShareDialog({ book, onClose, onTitle }: { book: StoredBook; onCl
 
       {allNotes.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-ink-2 mb-2 text-[13px] font-semibold">Zettel und Eselsohren</h3>
-          <ListGroup paper label="Zettel und Eselsohren">
+          <h3 className="text-ink-2 mb-2 text-[13px] font-semibold">{t("Zettel und Eselsohren")}</h3>
+          <ListGroup paper label={t("Zettel und Eselsohren")}>
             {allNotes.map(({ n, s }) => (
               <ListRow
                 key={n.id}
                 paper
                 lead={n.kind === "ear" ? <BookmarkCheck aria-hidden /> : <StickyNote aria-hidden />}
-                title={<span className="block font-normal">{n.kind === "ear" ? `Eselsohr bei Tafel ${n.no}` : `„${n.text}“`}</span>}
-                detail={`${n.from || "Gast"} · Link für ${s.to}`}
+                title={<span className="block font-normal">{n.kind === "ear" ? t("Eselsohr bei Tafel {no}", { no: n.no ?? "" }) : `„${n.text}“`}</span>}
+                detail={t("{from} · Link für {name}", { from: n.from || t("Gast"), name: s.to })}
                 trail={
                   <IconButton
                     variant="paper"
-                    label={n.kind === "ear" ? `Eselsohr bei Tafel ${n.no} entfernen` : `Zettel von ${n.from || "Gast"} entfernen`}
+                    label={n.kind === "ear" ? t("Eselsohr bei Tafel {no} entfernen", { no: n.no ?? "" }) : t("Zettel von {name} entfernen", { name: n.from || t("Gast") })}
                     onClick={() => {
                       setNotes((all) => ({ ...all, [s.token]: (all[s.token] ?? []).filter((x) => x.id !== n.id) }));
                       deleteNote(s.token, n.id).catch(() => {});

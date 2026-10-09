@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { LegalPage, LegalSection, Mail, OPERATOR } from "@/components/legal";
 import { linkClass } from "@/components/ui-classes";
+import { T } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Nutzungsbedingungen · Calima",
@@ -13,63 +14,96 @@ const inline = `${linkClass} underline`;
 
 export default function Page() {
   return (
-    <LegalPage title="Nutzungsbedingungen">
-      <LegalSection title="Worum es geht">
+    <LegalPage title={<T>Nutzungsbedingungen</T>} binding>
+      <LegalSection title={<T>Worum es geht</T>}>
         <p>
-          Calima ist ein kostenloses, privates Projekt von {OPERATOR.name}. Du machst aus deinen Fotos Bücher zum Blättern und legst sie einzelnen
-          Menschen per Link hin. Mit dem Anmelden stimmst du diesen Bedingungen zu.
+          <T>Calima ist ein kostenloses, privates Projekt von</T> {OPERATOR.name}.{" "}
+          <T>
+            Du machst aus deinen Fotos Bücher zum Blättern und legst sie einzelnen Menschen per Link hin. Mit dem Anmelden stimmst du diesen
+            Bedingungen zu.
+          </T>
         </p>
       </LegalSection>
 
-      <LegalSection title="Deine Inhalte">
+      <LegalSection title={<T>Deine Inhalte</T>}>
         <p>
-          Deine Fotos und Texte bleiben deine. Du erlaubst mir nur, sie zu speichern und denen zu zeigen, denen du einen Link gibst, solange du
-          sie nicht löschst. Lade nur hoch, woran du die Rechte hast, und zeig Menschen auf Fotos nur, wenn sie damit einverstanden sind.
+          <T>
+            Deine Fotos und Texte bleiben deine. Du erlaubst mir nur, sie zu speichern und denen zu zeigen, denen du einen Link gibst, solange du
+            sie nicht löschst. Lade nur hoch, woran du die Rechte hast, und zeig Menschen auf Fotos nur, wenn sie damit einverstanden sind.
+          </T>
         </p>
       </LegalSection>
 
-      <LegalSection title="Was nicht erlaubt ist">
-        <p>Für anstößige oder missbräuchliche Inhalte gibt es keine Toleranz. Nicht erlaubt sind insbesondere:</p>
+      <LegalSection title={<T>Was nicht erlaubt ist</T>}>
+        <p>
+          <T>Für anstößige oder missbräuchliche Inhalte gibt es keine Toleranz. Nicht erlaubt sind insbesondere:</T>
+        </p>
         <ul className="flex flex-col gap-1">
-          <li>· Darstellungen sexuellen Missbrauchs und sexualisierte Darstellungen Minderjähriger</li>
-          <li>· Pornografie und Gewaltdarstellungen</li>
-          <li>· Hass, Hetze, Bedrohung und Belästigung, auch in Zetteln an andere</li>
-          <li>· Inhalte, die Rechte anderer verletzen, etwa fremde Fotos oder Bilder von Menschen gegen ihren Willen</li>
-          <li>· alles andere, was gegen geltendes Recht verstößt</li>
+          <li>
+            · <T>Darstellungen sexuellen Missbrauchs und sexualisierte Darstellungen Minderjähriger</T>
+          </li>
+          <li>
+            · <T>Pornografie und Gewaltdarstellungen</T>
+          </li>
+          <li>
+            · <T>Hass, Hetze, Bedrohung und Belästigung, auch in Zetteln an andere</T>
+          </li>
+          <li>
+            · <T>Inhalte, die Rechte anderer verletzen, etwa fremde Fotos oder Bilder von Menschen gegen ihren Willen</T>
+          </li>
+          <li>
+            · <T>alles andere, was gegen geltendes Recht verstößt</T>
+          </li>
         </ul>
       </LegalSection>
 
-      <LegalSection title="Melden und Folgen">
+      <LegalSection title={<T>Melden und Folgen</T>}>
         <p>
-          Wer etwas Unzulässiges sieht, meldet es mit „Melden“ im Buch oder an <Mail /> (siehe <Link href="/hilfe" className={inline}>Hilfe</Link>). Ich prüfe Meldungen
-          innerhalb von 24 Stunden. Verstößt ein Inhalt gegen diese Bedingungen, entferne ich ihn und sperre das Konto, von dem er kommt.
-          Strafbare Inhalte melde ich den Behörden.
+          <T>Wer etwas Unzulässiges sieht, meldet es mit „Melden“ im Buch oder an</T> <Mail /> (<T>siehe</T>{" "}
+          <Link href="/hilfe" className={inline}>
+            <T>Hilfe</T>
+          </Link>
+          ).{" "}
+          <T>
+            Ich prüfe Meldungen innerhalb von 24 Stunden. Verstößt ein Inhalt gegen diese Bedingungen, entferne ich ihn und sperre das Konto, von dem
+            er kommt. Strafbare Inhalte melde ich den Behörden.
+          </T>
         </p>
       </LegalSection>
 
-      <LegalSection title="Verfügbarkeit und Haftung">
+      <LegalSection title={<T>Verfügbarkeit und Haftung</T>}>
         <p>
-          Calima ist kostenlos und ohne Gewähr. Ich gebe mir Mühe, dass alles läuft und nichts verloren geht, kann es aber nicht versprechen; sichere
-          bei wichtigen Büchern deshalb den Aufbau als Datei und behalte deine Originalfotos. Ich hafte unbeschränkt für Vorsatz und grobe Fahrlässigkeit sowie für Schäden an Leben, Körper
-          und Gesundheit, sonst nur nach den gesetzlichen Regeln für unentgeltliche Leistungen.
+          <T>
+            Calima ist kostenlos und ohne Gewähr. Ich gebe mir Mühe, dass alles läuft und nichts verloren geht, kann es aber nicht versprechen; sichere
+            bei wichtigen Büchern deshalb den Aufbau als Datei und behalte deine Originalfotos. Ich hafte unbeschränkt für Vorsatz und grobe Fahrlässigkeit sowie für Schäden an Leben, Körper
+            und Gesundheit, sonst nur nach den gesetzlichen Regeln für unentgeltliche Leistungen.
+          </T>
         </p>
       </LegalSection>
 
-      <LegalSection title="Ende">
+      <LegalSection title={<T>Ende</T>}>
         <p>
-          Du kannst dein Konto jederzeit im <Link href="/profil" className={inline}>Profil</Link> löschen. Ich kann Calima einstellen; dann sage ich
-          es mindestens vier Wochen vorher, damit du deine Bücher sichern kannst.
+          <T>Du kannst dein Konto jederzeit im</T>{" "}
+          <Link href="/profil" className={inline}>
+            <T>Profil</T>
+          </Link>{" "}
+          <T>löschen.</T>{" "}
+          <T>Ich kann Calima einstellen; dann sage ich es mindestens vier Wochen vorher, damit du deine Bücher sichern kannst.</T>
         </p>
       </LegalSection>
 
-      <LegalSection title="Änderungen und Recht">
+      <LegalSection title={<T>Änderungen und Recht</T>}>
         <p>
-          Ändern sich diese Bedingungen, steht das hier mit neuem Datum. Es gilt deutsches Recht; zwingende Verbraucherschutzvorschriften deines
-          Landes bleiben unberührt.
+          <T>
+            Ändern sich diese Bedingungen, steht das hier mit neuem Datum. Es gilt deutsches Recht; zwingende Verbraucherschutzvorschriften deines
+            Landes bleiben unberührt.
+          </T>
         </p>
       </LegalSection>
 
-      <p className="text-on-table-2 text-sm">Stand: Oktober 2026</p>
+      <p className="text-on-table-2 text-sm">
+        <T>Stand: Oktober 2026</T>
+      </p>
     </LegalPage>
   );
 }

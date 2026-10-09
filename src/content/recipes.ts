@@ -1,6 +1,7 @@
 import type { Plate } from "@/content/books";
 import camera from "@/content/camera.json";
 import { isNeutral } from "@/lib/develop/model";
+import { de } from "@/lib/i18n";
 
 // Rezepte und Kameradaten zu den Tafeln.
 // Fuji: Die Fuerteventura-Fotos sind mit einem Fuji-Rezept entstanden, die Werte stecken in den
@@ -54,7 +55,7 @@ export type Recipe = FujiRecipe | LightroomRecipe;
 
 const sommerlicht: FujiRecipe = {
   kind: "fuji",
-  name: "Sommerlicht",
+  name: de("Sommerlicht"),
   film: "Classic Chrome",
   dr: "DR400",
   wb: { mode: "Auto", r: 2, b: -4 },
@@ -67,13 +68,13 @@ const sommerlicht: FujiRecipe = {
   grain: { strength: 1, size: "klein" },
   colorChrome: 2,
   fxBlue: 1,
-  iso: "Auto bis 3200",
+  iso: de("Auto bis 3200"),
   ev: "+1/3",
   placeholder: true,
 };
 const nachmittag: FujiRecipe = {
   kind: "fuji",
-  name: "Nachmittag",
+  name: de("Nachmittag"),
   film: "Classic Negative",
   dr: "DR200",
   wb: { mode: "5500K", r: 1, b: -2 },
@@ -86,16 +87,16 @@ const nachmittag: FujiRecipe = {
   grain: { strength: 2, size: "klein" },
   colorChrome: 1,
   fxBlue: 0,
-  iso: "Auto bis 6400",
+  iso: de("Auto bis 6400"),
   ev: "±0",
   placeholder: true,
 };
 const kalkwand: FujiRecipe = {
   kind: "fuji",
-  name: "Kalkwand",
+  name: de("Kalkwand"),
   film: "Nostalgic Neg.",
   dr: "DR Auto",
-  wb: { mode: "Tageslicht", r: 3, b: -5 },
+  wb: { mode: de("Tageslicht"), r: 3, b: -5 },
   highlight: -2,
   shadow: 0,
   color: 1,
@@ -105,7 +106,7 @@ const kalkwand: FujiRecipe = {
   grain: { strength: 1, size: "groß" },
   colorChrome: 2,
   fxBlue: 2,
-  iso: "Auto bis 1600",
+  iso: de("Auto bis 1600"),
   ev: "+2/3",
   placeholder: true,
 };

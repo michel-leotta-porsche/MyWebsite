@@ -2,6 +2,7 @@ import type { StaticImageData } from "next/image";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
 import type { PhotoEdit } from "@/lib/develop/model";
+import { de, t } from "@/lib/i18n";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import rettungsturm from "../../public/photos/09-rettungsturm.jpg";
@@ -325,7 +326,7 @@ export function build(spec: BookSpec): BookData {
 const fuerteventura = build({
   id: "fuerteventura",
   title: "Fuerteventura",
-  subtitle: "Sechsundzwanzig Fotografien",
+  subtitle: de("Sechsundzwanzig Fotografien"),
   colophon: [
     "Fuerteventura",
     "Sechsundzwanzig Fotografien, aufgenommen auf Fuerteventura mit einer Fuji.",
@@ -525,7 +526,7 @@ const fuerteventura = build({
 const japan = build({
   id: "japan",
   title: "Japan",
-  subtitle: "Vierzehn Fotografien",
+  subtitle: de("Vierzehn Fotografien"),
   places: "Kyoto Tokio Osaka Miyajima",
   colophon: [
     "Japan",
@@ -650,7 +651,7 @@ export const bookById = (id: string) => books.find((b) => b.id === id);
 export const plateOf = (book: BookData, no: number) => book.plates[no - 1];
 
 /** Name einer Tafel für Screenreader: „Tafel 3: Palme“, ohne Titel nur „Tafel 3“ (kein leerer Rest nach dem Doppelpunkt) */
-export const plateName = (no: number, title?: string) => (title?.trim() ? `Tafel ${no}: ${title.trim()}` : `Tafel ${no}`);
+export const plateName = (no: number, title?: string) => (title?.trim() ? t("Tafel {no}: {title}", { no, title: title.trim() }) : t("Tafel {no}", { no }));
 
 /** Satzspiegel in cqw: Bund, oben, außen, unten; Breite 82 */
 export function typeArea(book: Pick<BookData, "aspect" | "bottom">, side: "left" | "right") {

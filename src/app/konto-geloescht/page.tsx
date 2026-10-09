@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Wordmark } from "@/components/ui-base";
 import { buttonClass } from "@/components/ui/button-class";
+import { T } from "@/lib/i18n";
 
 export const metadata: Metadata = { title: "Konto gelöscht · Calima", robots: { index: false } };
 
@@ -15,14 +16,14 @@ export default function Page() {
       </header>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 pb-24">
         <h1 className="text-on-table text-3xl font-bold tracking-[-0.03em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          Dein Konto ist gelöscht.
+          <T>Dein Konto ist gelöscht.</T>
         </h1>
         <p className="text-on-table-2 mt-3 text-base leading-relaxed">
-          Deine Bücher, Fotos und geteilten Links sind weg. Danke, dass du Calima ausprobiert hast.
+          <T>Deine Bücher, Fotos und geteilten Links sind weg. Danke, dass du Calima ausprobiert hast.</T>
         </p>
         <p className="mt-8">
           <Link href="/" className={buttonClass("quiet")}>
-            Zur Startseite
+            <T>Zur Startseite</T>
           </Link>
         </p>
       </div>

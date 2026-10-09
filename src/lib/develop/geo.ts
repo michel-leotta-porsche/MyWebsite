@@ -4,6 +4,8 @@
 // Reihenfolge: Viertel drehen (im Uhrzeigersinn) → waagerecht spiegeln → um angle Grad drehen (Mitte) → Rahmen.
 // Der Rahmen liegt in der „Fläche“: dem Bild nach Vierteln und Spiegeln, vor dem Geraderichten (Breite W', Höhe H').
 
+import { de, getLang, t } from "@/lib/i18n";
+
 export type Ratio = "orig" | "free" | "1:1" | "4:5" | "3:2" | "16:9";
 
 export type Geo = {
@@ -21,8 +23,8 @@ export type Geo = {
 };
 
 export const RATIOS: [Ratio, string][] = [
-  ["orig", "Original"],
-  ["free", "Frei"],
+  ["orig", de("Original")],
+  ["free", de("Frei")],
   ["1:1", "1:1"],
   ["4:5", "4:5"],
   ["3:2", "3:2"],
@@ -68,7 +70,7 @@ export function ratioOf(r: Ratio, portrait: boolean, W: number, H: number): numb
 
 /** „4:5“ hochkant, „5:4“ quer */
 export function ratioLabel(r: Ratio, portrait: boolean): string {
-  if (r === "free" || r === "orig") return RATIOS.find(([x]) => x === r)![1];
+  if (r === "free" || r === "orig") return t(RATIOS.find(([x]) => x === r)![1]);
   const [a, b] = r.split(":").map(Number);
   const [lo, hi] = [Math.min(a, b), Math.max(a, b)];
   return portrait ? `${lo}:${hi}` : `${hi}:${lo}`;
@@ -205,14 +207,19 @@ export function mapPoint(g: Geo, w: number, h: number, [u, v]: [number, number])
   return ox < 0 || ox > 1 || oy < 0 || oy > 1 ? null : [ox, oy];
 }
 
+/** Dezimalzahl mit Komma im Deutschen, Punkt im Englischen */
+export const decimal = (s: string) => (getLang() === "en" ? s : s.replace(".", ","));
+/** Winkel mit Vorzeichen, eine Nachkommastelle: „−2,5°“ */
+export const degrees = (a: number) => `${a > 0 ? "+" : a < 0 ? "−" : ""}${decimal(Math.abs(a).toFixed(1))}°`;
+
 /** „Zugeschnitten 4:5, gerade −2,5°, gedreht“: für den Zettel */
 export function describeGeo(g: Geo): string {
   const parts: string[] = [];
   const cropped = g.crop[2] < 0.999 || g.crop[3] < 0.999;
-  if (cropped) parts.push(g.ratio === "free" || g.ratio === "orig" ? "zugeschnitten" : `zugeschnitten ${ratioLabel(g.ratio, g.portrait)}`);
-  if (Math.abs(g.angle) >= 0.05) parts.push(`gerade ${g.angle > 0 ? "+" : "−"}${Math.abs(g.angle).toFixed(1).replace(".", ",")}°`);
-  if (g.quarter) parts.push(`${g.quarter * 90}° gedreht`);
-  if (g.flip) parts.push("gespiegelt");
+  if (cropped) parts.push(g.ratio === "free" || g.ratio === "orig" ? t("zugeschnitten") : t("zugeschnitten {ratio}", { ratio: ratioLabel(g.ratio, g.portrait) }));
+  if (Math.abs(g.angle) >= 0.05) parts.push(t("gerade {angle}", { angle: degrees(g.angle) }));
+  if (g.quarter) parts.push(t("{deg}° gedreht", { deg: g.quarter * 90 }));
+  if (g.flip) parts.push(t("gespiegelt"));
   const s = parts.join(", ");
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

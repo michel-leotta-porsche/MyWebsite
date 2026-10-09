@@ -28,6 +28,7 @@ import type { User } from "@/lib/firebase";
 import { IS_APP } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
 import { handOver } from "@/lib/handoff";
+import { getLang, locale, t, useLang, useT } from "@/lib/i18n";
 import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
 import { markSeen, seenSnapshot } from "@/lib/seen";
@@ -42,8 +43,8 @@ const isOwner = (u: User) => !!u.email && OWNER_EMAILS.includes(u.email.toLowerC
 /** Das eine Beispielbuch für alle, die noch kein eigenes haben */
 const SAMPLE_ID = "fuerteventura";
 
-const books = (n: number) => (n === 0 ? "Keine Bücher" : n === 1 ? "Ein Buch" : `${numberWord(n)} Bücher`);
-const some = (n: number) => (n === 1 ? "eines" : numberWord(n).toLowerCase());
+const books = (n: number) => (n === 0 ? t("Keine Bücher") : n === 1 ? t("Ein Buch") : t("{n} Bücher", { n: numberWord(n) }));
+const some = (n: number) => (n === 1 ? t("eines") : numberWord(n).toLowerCase());
 
 /**
  * Bücherzimmer: der eine Raum hinter der Anmeldung. Oben „Von dir“ (eigene Bücher und ein leeres zum Anlegen),
@@ -53,15 +54,16 @@ const some = (n: number) => (n === 1 ? "eines" : numberWord(n).toLowerCase());
  * Gestaltet wird ein einzelnes Buch auf der Werkbank (/neu).
  */
 export function BookRoom() {
+  const t = useT();
   return (
     <RequireUser
-      title="Dein Bücherzimmer"
-      text="Hier liegen deine eigenen Fotobücher und die, die Freunde für dich hingelegt haben."
+      title={t("Dein Bücherzimmer")}
+      text={t("Hier liegen deine eigenen Fotobücher und die, die Freunde für dich hingelegt haben.")}
       loading={
         // derselbe Tisch wie im Zimmer, damit der Zettel schon dort liegt, wo gleich das Buch hinkommt
-        <Table label="Bücherzimmer" title={<Wordmark />} headerRight={<RoomNav />}>
+        <Table label={t("Bücherzimmer")} title={<Wordmark />} headerRight={<RoomNav />}>
           <RoomHeading count={"\u00a0"} />
-          <section aria-label="Von dir" className="grid gap-2">
+          <section aria-label={t("Von dir")} className="grid gap-2">
             <RoomLoading />
           </section>
         </Table>
@@ -73,13 +75,14 @@ export function BookRoom() {
 }
 
 function RoomHeading({ count }: { count: string }) {
+  const t = useT();
   return (
     <div className="grid gap-3">
       <h1
         className="text-on-table text-[clamp(44px,6.4vw,92px)] leading-[0.88] font-bold tracking-[-0.035em]"
         style={{ fontVariationSettings: '"wdth" 75, "opsz" 96' }}
       >
-        Bücherzimmer
+        {t("Bücherzimmer")}
       </h1>
       <p className="text-on-table-2 text-base" aria-live="polite">
         {count}
@@ -100,6 +103,9 @@ function Room({ user }: { user: User }) {
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [emptying, setEmptying] = useState(false);
   const router = useRouter();
+  const t = useT();
+  // Untertitel und Kolophon der Bücher entstehen in der gewählten Sprache
+  const lang = useLang();
   const importInput = useRef<HTMLInputElement>(null);
   const pickInput = useRef<HTMLInputElement>(null);
 
@@ -120,20 +126,20 @@ function Room({ user }: { user: User }) {
     for (const b of bundled) if (!shelf.hidden.includes(b.id)) list.push({ book: b, bundled: true });
     for (const b of own ?? []) {
       try {
-        list.push({ book: toBookData(b), stored: b });
+        list.push({ book: toBookData(b, lang), stored: b });
       } catch {}
     }
     return list;
-  }, [own, bundled, shelf.hidden]);
+  }, [own, bundled, shelf.hidden, lang]);
   const given = useMemo(() => {
     const list: Item[] = [];
     for (const g of gifts ?? []) {
       try {
-        list.push({ book: { ...toBookData(g.book), id: `geschenk-${g.token.slice(0, 10)}` }, gift: g });
+        list.push({ book: { ...toBookData(g.book, lang), id: `geschenk-${g.token.slice(0, 10)}` }, gift: g });
       } catch {}
     }
     return list;
-  }, [gifts]);
+  }, [gifts, lang]);
 
   const all = [...mine, ...given];
   // in Büchern von Freunden: Eselsohren knicken und Zettel einlegen, wie auf ihrem Link
@@ -190,11 +196,11 @@ function Room({ user }: { user: User }) {
     text && (
       <div role="alert" className="text-on-table flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <span>
-          Konnte {zone === "own" ? "deine Bücher" : "die Bücher von Freunden"} nicht laden: {text}
+          {zone === "own" ? t("Konnte deine Bücher nicht laden: {error}", { error: text }) : t("Konnte die Bücher von Freunden nicht laden: {error}", { error: text })}
         </span>
         <Button size="sm" onClick={() => room.retry(zone)}>
           <RotateCw aria-hidden />
-          Nochmal versuchen
+          {t("Nochmal versuchen")}
         </Button>
       </div>
     );
@@ -208,7 +214,7 @@ function Room({ user }: { user: User }) {
       href="/neu"
       className="group relative block"
       style={{ width: "var(--tw)", aspectRatio: "2 / 3" }}
-      aria-label="Neues Buch anlegen"
+      aria-label={t("Neues Buch anlegen")}
     >
       <span aria-hidden className="book-shadow-closed absolute inset-0" />
       <span aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full" style={{ width: 4 }} />
@@ -217,9 +223,9 @@ function Room({ user }: { user: User }) {
           className="text-cloth-ink/60 text-[clamp(22px,7vw,30px)] leading-[0.9] font-bold tracking-[-0.03em]"
           style={{ fontVariationSettings: '"wdth" 78, "opsz" 96', textShadow: "0 1px 0 rgb(255 255 255 / 0.35)" }}
         >
-          Neues
+          {t("Neues")}
           <br />
-          Buch
+          {t("Buch")}
         </span>
         <span aria-hidden className="text-cloth-ink/50 absolute top-[9%] left-[11%] text-3xl font-light transition-transform duration-500 ease-out group-hover:rotate-90">
           +
@@ -259,7 +265,7 @@ function Room({ user }: { user: User }) {
     <Carousel
       key="von-dir"
       id="von-dir"
-      heading="Von dir"
+      heading={t("Von dir")}
       showHeading={giftsFirst}
       slides={ownReady ? ownSlides : []}
       start={Math.max(0, startAt)}
@@ -267,23 +273,23 @@ function Room({ user }: { user: User }) {
         if (!slide.book)
           return (
             <Panel
-              title="Neues Buch"
-              meta={IS_APP ? "Fotos wählen, fertig." : "Fotos reinziehen, fertig."}
+              title={t("Neues Buch")}
+              meta={IS_APP ? t("Fotos wählen, fertig.") : t("Fotos reinziehen, fertig.")}
               primary={
                 IS_APP ? (
                   // in der App öffnet die Apple-Auswahl sofort; wer abbricht, bleibt im Zimmer und hat kein leeres Buch
                   <button type="button" className={primaryClass} onClick={() => pickInput.current?.click()}>
-                    Fotos wählen
+                    {t("Fotos wählen")}
                   </button>
                 ) : (
                   <Link href="/neu" className={primaryClass}>
-                    Fotos wählen
+                    {t("Fotos wählen")}
                   </Link>
                 )
               }
             >
               <Button size="sm" onClick={() => importInput.current?.click()}>
-                Aus Datei öffnen
+                {t("Aus Datei öffnen")}
               </Button>
             </Panel>
           );
@@ -293,14 +299,14 @@ function Room({ user }: { user: User }) {
           return (
             <Panel
               title={b.title}
-              meta={owner ? `${b.plates.length} Tafeln · mitgeliefert` : `Beispiel · ${b.plates.length} Tafeln von Michel Leotta`}
+              meta={owner ? t("{n} Tafeln · mitgeliefert", { n: b.plates.length }) : t("Beispiel · {n} Tafeln von Michel Leotta", { n: b.plates.length })}
               book={b}
               after={
                 !owner && (
                   <div className="mt-6">
                     <div className="note-paper deal w-[86%] -rotate-1 px-4 pt-3 pb-3.5">
                       <p className="text-ink-2 text-[21px] leading-[1.05]" style={{ fontFamily: "var(--font-hand), cursive" }}>
-                        So sieht ein fertiges Buch aus. Blätter rein, dann mach dein eigenes.
+                        {t("So sieht ein fertiges Buch aus. Blätter rein, dann mach dein eigenes.")}
                       </p>
                     </div>
                   </div>
@@ -309,7 +315,7 @@ function Room({ user }: { user: User }) {
             >
               <Menu
                 trigger={
-                <IconButton label="Mehr">
+                <IconButton label={t("Mehr")}>
                   <Ellipsis aria-hidden />
                 </IconButton>
               }
@@ -318,10 +324,10 @@ function Room({ user }: { user: User }) {
                   icon={<Archive aria-hidden />}
                   onClick={() => {
                     shelf.putAway(b.id);
-                    undoable(`„${b.title}“ liegt nicht mehr in deinem Zimmer.`, () => shelf.putBack(b.id));
+                    undoable(t("„{title}“ liegt nicht mehr in deinem Zimmer.", { title: b.title }), () => shelf.putBack(b.id));
                   }}
                 >
-                  Aus dem Zimmer nehmen
+                  {t("Aus dem Zimmer nehmen")}
                 </MenuItem>
               </Menu>
             </Panel>
@@ -329,7 +335,7 @@ function Room({ user }: { user: User }) {
         }
         const s = d?.stored;
         const sp = s ? room.spread[s.id] : undefined;
-        const base = !s ? `${slide.book.plates.length} Tafeln` : s.title.trim() ? `${slide.book.plates.length} Tafeln` : `${s.photos.filter((p) => !p.shelved).length} Fotos · ohne Titel`;
+        const base = !s || s.title.trim() ? t("{n} Tafeln", { n: slide.book.plates.length }) : t("{n} Fotos · ohne Titel", { n: s.photos.filter((p) => !p.shelved).length });
         return (
           <Panel
             title={slide.book.title}
@@ -354,26 +360,26 @@ function Room({ user }: { user: User }) {
             {s && (
               <Link href={`/neu?id=${s.id}`} className={buttonClass("quiet", "sm")}>
                 <Pencil aria-hidden />
-                Bearbeiten
+                {t("Bearbeiten")}
               </Link>
             )}
             {s && !sp?.to.length && <Button size="sm" onClick={() => setSharing(s)}>
-                Hinlegen für …
+                {t("Hinlegen für …")}
               </Button>}
             {s && (
               <Menu
                 trigger={
-                <IconButton label="Mehr">
+                <IconButton label={t("Mehr")}>
                   <Ellipsis aria-hidden />
                 </IconButton>
               }
               >
                 <MenuItem icon={<Gift aria-hidden />} onClick={() => setSharing(s)}>
-                  Hinlegen für …
+                  {t("Hinlegen für …")}
                 </MenuItem>
                 <MenuSeparator />
-                <MenuItem danger icon={<Trash2 aria-hidden />} onClick={() => undoable(`„${s.title || "Ohne Titel"}“ liegt im Papierkorb.`, room.toTrash(s))}>
-                  In den Papierkorb
+                <MenuItem danger icon={<Trash2 aria-hidden />} onClick={() => undoable(t("„{title}“ liegt im Papierkorb.", { title: s.title || t("Ohne Titel") }), room.toTrash(s))}>
+                  {t("In den Papierkorb")}
                 </MenuItem>
               </Menu>
             )}
@@ -421,29 +427,29 @@ function Room({ user }: { user: User }) {
     <Carousel
       key="fuer-dich"
       id="fuer-dich"
-      heading="Für dich"
-      slides={given.map((d) => ({ key: d.book.id, book: d.book, note: d.gift ? `von ${d.gift.fromName}` : undefined }))}
+      heading={t("Für dich")}
+      slides={given.map((d) => ({ key: d.book.id, book: d.book, note: d.gift ? t("von {name}", { name: d.gift.fromName }) : undefined }))}
       panel={(slide) => {
         const g = slide.book && byId(slide.book.id)?.gift;
         if (!slide.book || !g) return null;
         return (
-          <Panel title={slide.book.title} meta={`von ${g.fromName} · ${slide.book.plates.length} Tafeln`} book={slide.book}>
+          <Panel title={slide.book.title} meta={t("von {name} · {n} Tafeln", { name: g.fromName, n: slide.book.plates.length })} book={slide.book}>
             <Menu
               trigger={
-              <IconButton label="Mehr">
+              <IconButton label={t("Mehr")}>
                 <Ellipsis aria-hidden />
               </IconButton>
             }
             >
-              <MenuItem icon={<Archive aria-hidden />} onClick={() => undoable(`„${g.book.title || "Ohne Titel"}“ liegt nicht mehr in deinem Zimmer.`, room.dropGift(g))}>
-                Aus dem Zimmer nehmen
+              <MenuItem icon={<Archive aria-hidden />} onClick={() => undoable(t("„{title}“ liegt nicht mehr in deinem Zimmer.", { title: g.book.title || t("Ohne Titel") }), room.dropGift(g))}>
+                {t("Aus dem Zimmer nehmen")}
               </MenuItem>
               <MenuItem icon={<Flag aria-hidden />} onClick={() => setReporting(g)}>
-                Melden …
+                {t("Melden …")}
               </MenuItem>
               <MenuSeparator />
               <MenuItem danger icon={<EyeOff aria-hidden />} onClick={() => room.block(g)}>
-                Bücher von {g.fromName} ausblenden
+                {t("Bücher von {name} ausblenden", { name: g.fromName })}
               </MenuItem>
             </Menu>
           </Panel>
@@ -452,7 +458,7 @@ function Room({ user }: { user: User }) {
     >
       {!giftsLoaded && placeholder}
       {giftsLoaded && given.length === 0 && !room.errors.gifts && (
-        <p className="text-on-table-2 max-w-md text-sm leading-relaxed">Bücher, die dir jemand hinlegt, landen von selbst hier, sobald du ihren Link öffnest.</p>
+        <p className="text-on-table-2 max-w-md text-sm leading-relaxed">{t("Bücher, die dir jemand hinlegt, landen von selbst hier, sobald du ihren Link öffnest.")}</p>
       )}
       {zoneError(room.errors.gifts, "gifts")}
     </Carousel>
@@ -479,14 +485,14 @@ function Room({ user }: { user: User }) {
           return (step) => router.push(`/neu?id=${s.id}${step >= 2 && step - 2 < s.spreads.length ? `&doppelseite=${step - 1}` : ""}`);
         }}
       >
-        <Table label="Bücherzimmer" title={<Wordmark />} headerRight={<RoomNav />}>
+        <Table label={t("Bücherzimmer")} title={<Wordmark />} headerRight={<RoomNav />}>
           <RoomHeading count={count} />
           {giftsFirst ? [forYou, fromYou] : [fromYou, forYou]}
           <Studio user={user} books={own} />
           {putAway.length > 0 && (
             <section aria-labelledby="weggelegt-h" className="grid max-w-xl gap-2">
               <h2 id="weggelegt-h" className="text-on-table-2 text-sm">
-                Weggelegt
+                {t("Weggelegt")}
               </h2>
               <ListGroup>
                 {putAway.map((b) => (
@@ -494,9 +500,9 @@ function Room({ user }: { user: User }) {
                     key={b.id}
                     lead={<Archive aria-hidden />}
                     title={b.title}
-                    detail={owner ? "Mitgeliefert" : "Beispiel"}
+                    detail={owner ? t("Mitgeliefert") : t("Beispiel")}
                     trail={
-                      <IconButton label={`${b.title} zurücklegen`} onClick={() => shelf.putBack(b.id)}>
+                      <IconButton label={t("{title} zurücklegen", { title: b.title })} onClick={() => shelf.putBack(b.id)}>
                         <ArchiveRestore aria-hidden />
                       </IconButton>
                     }
@@ -506,22 +512,22 @@ function Room({ user }: { user: User }) {
             </section>
           )}
           {trash.length > 0 && (
-            <section aria-label="Papierkorb" className="grid max-w-xl justify-items-start gap-3">
+            <section aria-label={t("Papierkorb")} className="grid max-w-xl justify-items-start gap-3">
               <Button size="sm" aria-expanded={showTrash} onClick={() => setShowTrash((v) => !v)}>
                 <Trash2 aria-hidden />
-                Papierkorb ({trash.length})
+                {t("Papierkorb ({n})", { n: trash.length })}
               </Button>
               {showTrash && (
                 <>
-                  <p className="text-on-table-2 text-[13px]">Bücher im Papierkorb liegen nirgends aus, ihre geteilten Links zeigen nichts mehr.</p>
+                  <p className="text-on-table-2 text-[13px]">{t("Bücher im Papierkorb liegen nirgends aus, ihre geteilten Links zeigen nichts mehr.")}</p>
                   <ListGroup className="w-full">
                     {trash.map((b) => (
                       <ListRow
                         key={b.id}
-                        title={<span className="block truncate">{b.title || "Ohne Titel"}</span>}
+                        title={<span className="block truncate">{b.title || t("Ohne Titel")}</span>}
                         detail={fotos(b.photos.filter((p) => !p.shelved).length)}
                         trail={
-                          <IconButton label={`${b.title || "Ohne Titel"} zurücklegen`} onClick={() => room.restore(b)}>
+                          <IconButton label={t("{title} zurücklegen", { title: b.title || t("Ohne Titel") })} onClick={() => room.restore(b)}>
                             <ArchiveRestore aria-hidden />
                           </IconButton>
                         }
@@ -530,7 +536,7 @@ function Room({ user }: { user: User }) {
                     <ListRow
                       danger
                       lead={<Trash2 aria-hidden />}
-                      title="Papierkorb leeren …"
+                      title={t("Papierkorb leeren …")}
                       onClick={() => {
                         // kein Hinweis von vorhin soll über „Endgültig löschen“ liegen
                         notify.dismiss();
@@ -575,14 +581,15 @@ function Room({ user }: { user: User }) {
         />
       )}
       {confirmEmpty && (
-        <RoomSheet title="Papierkorb leeren" onClose={() => !emptying && setConfirmEmpty(false)}>
+        <RoomSheet title={t("Papierkorb leeren")} onClose={() => !emptying && setConfirmEmpty(false)}>
           <p className="text-sm leading-relaxed">
-            {trash.length === 1 ? "Ein Buch wird" : `${trash.length} Bücher werden`} endgültig gelöscht: mit allen Fotos, Zwischenständen und geteilten Links samt
-            Zetteln der Gäste. Das lässt sich nicht rückgängig machen.
+            {trash.length === 1
+              ? t("Ein Buch wird endgültig gelöscht: mit allen Fotos, Zwischenständen und geteilten Links samt Zetteln der Gäste. Das lässt sich nicht rückgängig machen.")
+              : t("{n} Bücher werden endgültig gelöscht: mit allen Fotos, Zwischenständen und geteilten Links samt Zetteln der Gäste. Das lässt sich nicht rückgängig machen.", { n: trash.length })}
           </p>
           <ul className="text-ink-2 mt-3 text-[13px]">
             {trash.map((b) => (
-              <li key={b.id}>· {b.title || "Ohne Titel"}</li>
+              <li key={b.id}>· {b.title || t("Ohne Titel")}</li>
             ))}
           </ul>
           <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -596,10 +603,10 @@ function Room({ user }: { user: User }) {
                 setConfirmEmpty(false);
               }}
             >
-              {emptying ? "Löscht …" : "Endgültig löschen"}
+              {emptying ? t("Löscht …") : t("Endgültig löschen")}
             </Button>
             <Button variant="paper" disabled={emptying} onClick={() => setConfirmEmpty(false)}>
-              Abbrechen
+              {t("Abbrechen")}
             </Button>
           </div>
         </RoomSheet>
@@ -611,7 +618,7 @@ function Room({ user }: { user: User }) {
 
 /** Hinweis unten mit Rückgängig, z. B. nach dem Wegräumen eines Buchs */
 function undoable(text: string, undo: () => void) {
-  notify(text, { action: { label: "Rückgängig", onClick: undo } });
+  notify(text, { action: { label: t("Rückgängig"), onClick: undo } });
 }
 
 /**
@@ -641,12 +648,13 @@ function RoomSheet({ title, onClose, children }: { title: string; onClose: () =>
 
 /** Bei wem ein eigenes Buch liegt: „bei Anna und Tom“, ab drei „bei Anna, Tom +1“ */
 function whereOf(s: Spread | undefined): string {
-  if (!s || s.to.length === 0) return "liegt noch bei niemandem";
-  return `bei ${s.to.length <= 2 ? s.to.join(" und ") : `${s.to.slice(0, 2).join(", ")} +${s.to.length - 2}`}`;
+  if (!s || s.to.length === 0) return t("liegt noch bei niemandem");
+  return t("bei {names}", { names: s.to.length <= 2 ? s.to.join(` ${t("und")} `) : `${s.to.slice(0, 2).join(", ")} +${s.to.length - 2}` });
 }
 
-const fotos = (n: number) => (n === 1 ? "Ein Foto" : `${n} Fotos`);
-const earWord = (n: number) => (n === 1 ? "Eselsohr" : "Eselsohren");
+const fotos = (n: number) => (n === 1 ? t("Ein Foto") : t("{n} Fotos", { n }));
+const noteCount = (n: number) => (n === 1 ? t("1 Zettel") : t("{n} Zettel", { n }));
+const earCount = (n: number) => (n === 1 ? t("1 Eselsohr") : t("{n} Eselsohren", { n }));
 const plateOf = (book: BookData, no?: number) => (no ? book.plates.find((p) => p.no === no) : undefined);
 
 /** Kleines Foto einer Tafel mit umgeknickter Ecke, wie das Eselsohr im Buch */
@@ -682,6 +690,7 @@ function Panel({
   children?: ReactNode;
 }) {
   const { open } = useContext(OpenBook);
+  const t = useT();
   return (
     <div className="mx-auto grid w-full max-w-lg gap-1">
       <h3 className="text-on-table text-[28px] leading-tight font-bold tracking-[-0.02em]" style={{ fontVariationSettings: '"wdth" 80' }}>
@@ -692,7 +701,7 @@ function Panel({
         {primary ??
           (book && (
             <Button variant="cloth" onClick={() => open(book.id)}>
-              Aufschlagen
+              {t("Aufschlagen")}
             </Button>
           ))}
         {children}
@@ -702,7 +711,7 @@ function Panel({
   );
 }
 
-const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null);
+const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString(locale(getLang()), { day: "numeric", month: "short" }) : null);
 
 /**
  * Was Freunde im Buch zurückgelassen haben, ohne Kästchenreihe: höchstens zwei Zettel als kleiner Stapel,
@@ -714,6 +723,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
   const notes = spread.items.filter((n) => n.kind === "note");
   const ears = spread.items.filter((n) => n.kind === "ear");
   const fresh = spread.items.filter(isNew).length;
+  const t = useT();
   useEffect(() => {
     const id = window.setTimeout(() => markSeen(book.id), 1500);
     return () => window.clearTimeout(id);
@@ -724,19 +734,19 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
       <div className="mt-6">
         <div className="note-paper w-[86%] -rotate-1 px-4 pt-3 pb-3.5">
           <p className="text-ink-2 text-[21px] leading-[1.05]" style={{ fontFamily: "var(--font-hand), cursive" }}>
-            Noch nichts zurück. Zettel und Eselsohren landen hier.
+            {t("Noch nichts zurück. Zettel und Eselsohren landen hier.")}
           </p>
         </div>
       </div>
     );
 
-  const head = [notes.length && `${notes.length} Zettel`, ears.length && `${ears.length} ${earWord(ears.length)}`, fresh && `${fresh} neu`].filter(Boolean).join(" · ");
+  const head = [notes.length && noteCount(notes.length), ears.length && earCount(ears.length), fresh && t("{n} neu", { n: fresh })].filter(Boolean).join(" · ");
   return (
     <div className="mt-6 grid gap-4">
       <div className="text-on-table-2 flex items-center justify-between gap-3 text-[13px]">
         <span>{head}</span>
         <Button size="sm" onClick={onAll}>
-          Alle
+          {t("Alle")}
           <ChevronRight aria-hidden />
         </Button>
       </div>
@@ -745,7 +755,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
           type="button"
           onClick={onAll}
           className="press relative grid text-left"
-          aria-label={`Zettel von ${notes[0].who}: ${notes[0].text}. Alle Rückmeldungen ansehen`}
+          aria-label={t("Zettel von {who}: {text}. Alle Rückmeldungen ansehen", { who: notes[0].who, text: notes[0].text ?? "" })}
         >
           {notes.slice(0, 2).map((n, i) => (
             <span
@@ -761,7 +771,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
               <span className="line-clamp-2 text-[23px] leading-[1.02]" style={{ fontFamily: "var(--font-hand), cursive" }}>
                 „{n.text}“
               </span>
-              <span className="text-ink-2 mt-1.5 block text-xs">{[n.who, n.no && `Tafel ${n.no}`, shortDate(n)].filter(Boolean).join(" · ")}</span>
+              <span className="text-ink-2 mt-1.5 block text-xs">{[n.who, n.no && t("Tafel {no}", { no: n.no }), shortDate(n)].filter(Boolean).join(" · ")}</span>
             </span>
           ))}
         </button>
@@ -774,7 +784,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
               className={`deal ${i > 0 ? "-ml-6" : ""}`}
               style={{ rotate: `${[-3, 2, -1.5][i]}deg`, zIndex: 3 - i, ["--d" as string]: 2 + i } as CSSProperties}
             >
-              <button type="button" onClick={() => open(book.id, e.no)} className="press ear-print" aria-label={`${e.who} hat Tafel ${e.no} geknickt. Dort aufschlagen`}>
+              <button type="button" onClick={() => open(book.id, e.no)} className="press ear-print" aria-label={t("{who} hat Tafel {no} geknickt. Dort aufschlagen", { who: e.who, no: e.no ?? "" })}>
                 <EarPhoto book={book} no={e.no} />
               </button>
             </li>
@@ -796,8 +806,9 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
 /** „Flo hat Tafel 3 geknickt“, bei mehreren „Flo und Anna haben Ecken geknickt“ */
 function earLine(ears: Feedback[]) {
   const who = [...new Set(ears.map((e) => e.who))];
-  if (ears.length === 1) return `${who[0]} hat Tafel ${ears[0].no} geknickt`;
-  return `${who.length <= 2 ? who.join(" und ") : `${who.slice(0, 2).join(", ")} +${who.length - 2}`} ${who.length === 1 ? "hat" : "haben"} Ecken geknickt`;
+  if (ears.length === 1) return t("{who} hat Tafel {no} geknickt", { who: who[0], no: ears[0].no ?? "" });
+  const names = who.length <= 2 ? who.join(` ${t("und")} `) : `${who.slice(0, 2).join(", ")} +${who.length - 2}`;
+  return who.length === 1 ? t("{who} hat Ecken geknickt", { who: names }) : t("{who} haben Ecken geknickt", { who: names });
 }
 
 function EarPhoto({ book, no }: { book: BookData; no?: number }) {
@@ -815,12 +826,13 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
   const items = spread?.items ?? [];
   const notes = items.filter((n) => n.kind === "note").length;
   const ears = items.length - notes;
+  const t = useT();
   return (
-    <RoomSheet title={`Zurück von Freunden: ${book.title}`} onClose={onClose}>
+    <RoomSheet title={t("Zurück von Freunden: {title}", { title: book.title })} onClose={onClose}>
       <p className="text-ink-2 text-sm">
-        {[notes && `${notes} Zettel`, ears && `${ears} ${earWord(ears)}`].filter(Boolean).join(" · ")} · {whereOf(spread)}
+        {[notes && noteCount(notes), ears && earCount(ears)].filter(Boolean).join(" · ")} · {whereOf(spread)}
       </p>
-      <ListGroup paper className="mt-3" label="Zettel und Eselsohren">
+      <ListGroup paper className="mt-3" label={t("Zettel und Eselsohren")}>
         {items.map((n) => (
           <FeedbackRow
             key={`${n.token}-${n.id}`}
@@ -841,10 +853,10 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
             open(book.id);
           }}
         >
-          Buch aufschlagen
+          {t("Buch aufschlagen")}
         </Button>
         <Button variant="paper" onClick={onManage}>
-          Links und Zettel verwalten …
+          {t("Links und Zettel verwalten …")}
         </Button>
       </div>
     </RoomSheet>
@@ -852,8 +864,10 @@ function ReturnsDialog({ book, spread, onClose, onManage }: { book: BookData; sp
 }
 
 function FeedbackRow({ book, n, onPlate }: { book: BookData; n: Feedback; onPlate: (no: number) => void }) {
-  const when = n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString("de-DE", { day: "numeric", month: "short" }) : null;
-  const place = n.no ? `Tafel ${n.no}` : null;
+  const t = useT();
+  const lang = useLang();
+  const when = n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString(locale(lang), { day: "numeric", month: "short" }) : null;
+  const place = n.no ? t("Tafel {no}", { no: n.no }) : null;
   const sub = [n.who, place, when].filter(Boolean).join(" · ");
   // Eselsohren führen ins Buch (Pfeil), Zettel bleiben Zettel in Handschrift
   return n.kind === "ear" ? (
@@ -862,10 +876,10 @@ function FeedbackRow({ book, n, onPlate }: { book: BookData; n: Feedback; onPlat
       lead={<EarThumb book={book} no={n.no} className="h-12 w-9" cut="bg-[var(--slip)]" />}
       title={
         <span className="font-normal">
-          <span className="font-semibold">{n.who}</span> hat {place ?? "eine Tafel"} geknickt
+          <span className="font-semibold">{n.who}</span> {t("hat {plate} geknickt", { plate: place ?? t("eine Tafel") })}
         </span>
       }
-      detail={when ? `${when} · dort aufschlagen` : "Dort aufschlagen"}
+      detail={when ? t("{when} · dort aufschlagen", { when }) : t("Dort aufschlagen")}
       onClick={n.no ? () => onPlate(n.no!) : undefined}
     />
   ) : (
@@ -886,25 +900,26 @@ function news(fresh: { n: Feedback; title: string }[]) {
   const notes = fresh.filter((f) => f.n.kind === "note").length;
   const ears = fresh.length - notes;
   const titles = [...new Set(fresh.map((f) => f.title))];
-  const what = [notes && `${notes} ${notes === 1 ? "neuer Zettel" : "neue Zettel"}`, ears && `${ears} ${ears === 1 ? "neues Eselsohr" : "neue Eselsohren"}`]
+  const what = [notes && (notes === 1 ? t("1 neuer Zettel") : t("{n} neue Zettel", { n: notes })), ears && (ears === 1 ? t("1 neues Eselsohr") : t("{n} neue Eselsohren", { n: ears }))]
     .filter(Boolean)
-    .join(" und ");
-  return titles.length === 1 ? `${what} bei ${titles[0]}` : `${what} in ${titles.length} Büchern`;
+    .join(` ${t("und")} `);
+  return titles.length === 1 ? t("{what} bei {title}", { what, title: titles[0] }) : t("{what} in {n} Büchern", { what, n: titles.length });
 }
 
 /** Bestand in einer Zeile: „Fünf Bücher: drei von dir, zwei für dich.“ */
 function stock(mine: number, given: number) {
-  if (mine + given === 0) return "Noch liegt hier nichts. Leg dein erstes Buch an.";
-  if (given === 0) return `${books(mine)} von dir.`;
-  if (mine === 0) return `${books(given)} für dich.`;
-  return `${books(mine + given)}: ${some(mine)} von dir, ${some(given)} für dich.`;
+  if (mine + given === 0) return t("Noch liegt hier nichts. Leg dein erstes Buch an.");
+  if (given === 0) return t("{books} von dir.", { books: books(mine) });
+  if (mine === 0) return t("{books} für dich.", { books: books(given) });
+  return t("{books}: {mine} von dir, {given} für dich.", { books: books(mine + given), mine: some(mine), given: some(given) });
 }
 
 /** Aufkleber auf dem Beispielbuch, damit niemand es für ein eigenes hält */
 function SampleBand() {
+  const t = useT();
   return (
     <span aria-hidden className="sample-band">
-      Beispiel
+      {t("Beispiel")}
     </span>
   );
 }

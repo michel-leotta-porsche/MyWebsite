@@ -10,6 +10,7 @@ import { SignInButtons } from "@/components/sign-in-buttons";
 import { linkClass } from "@/components/ui-base";
 import { signInError } from "@/lib/errors";
 import { signIn, type SignInProvider } from "@/lib/firebase";
+import { useT } from "@/lib/i18n";
 import { useUser } from "@/lib/use-user";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
@@ -23,6 +24,7 @@ export function AppStart() {
   const router = useRouter();
   const [busy, setBusy] = useState<SignInProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
   useEffect(() => {
     if (user) router.replace("/zimmer");
   }, [user, router]);
@@ -41,9 +43,9 @@ export function AppStart() {
       </div>
       <div className="mx-auto w-full max-w-md">
         <h1 className="text-on-table text-[44px] leading-[0.9] font-bold tracking-[-0.04em]" style={{ fontVariationSettings: '"wdth" 75, "opsz" 96' }}>
-          Deine Fotos, gebunden.
+          {t("Deine Fotos, gebunden.")}
         </h1>
-        <p className="text-on-table mt-4 text-lg leading-relaxed opacity-80">Ein paar Fotos werden ein Buch, das man wirklich umblättert. Freunde lesen per Link, ohne Konto.</p>
+        <p className="text-on-table mt-4 text-lg leading-relaxed opacity-80">{t("Ein paar Fotos werden ein Buch, das man wirklich umblättert. Freunde lesen per Link, ohne Konto.")}</p>
         <div className="mt-7">
           <SignInButtons
             busy={busy}
@@ -65,9 +67,9 @@ export function AppStart() {
           )}
         </div>
         <p className="text-on-table-2 mt-5 text-sm">
-          Kostenlos. Mit dem Anmelden gelten die{" "}
+          {t("Kostenlos. Mit dem Anmelden gelten die")}{" "}
           <Link href="/nutzungsbedingungen" className={`${linkClass} underline`}>
-            Nutzungsbedingungen
+            {t("Nutzungsbedingungen")}
           </Link>
           .
         </p>

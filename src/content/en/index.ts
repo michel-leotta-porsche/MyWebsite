@@ -8,8 +8,13 @@
 // hinlegen (ein Buch für jemanden) = hand over · Rezept (Fuji) = recipe · Look = look · Feinschliff = fine-tuning
 // Anrede: du → you, locker und knapp wie im Deutschen. Keine Gedankenstriche, wo das Deutsche keine hat.
 
+import { DEVELOP } from "./develop";
+import { LEGAL } from "./legal";
+import { LIBRARY } from "./library";
+import { STAGE } from "./stage";
 import { START } from "./start";
+import { WORKBENCH } from "./workbench";
 
-export const PARTS: Record<string, Record<string, string>> = { START };
+export const PARTS: Record<string, Record<string, string>> = { START, LEGAL, STAGE, WORKBENCH, LIBRARY, DEVELOP };
 
 export const EN: Record<string, string> = Object.assign({}, ...Object.values(PARTS));

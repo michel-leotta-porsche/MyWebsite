@@ -3,7 +3,8 @@
 // Einrechnen (Worker) gleich anwenden. Nur die Körnung ist ein Muster obendrauf.
 // Reine Rechnung ohne DOM, damit sie auch im Worker läuft. Der Zuschnitt (geo) ist keine Farbe; er liegt in geo.ts.
 
-import { cleanGeo, describeGeo, geoIsNeutral, type Geo } from "@/lib/develop/geo";
+import { cleanGeo, decimal, describeGeo, geoIsNeutral, type Geo } from "@/lib/develop/geo";
+import { de, t } from "@/lib/i18n";
 
 export type Transfer = {
   /** Lab-Mittel und -Streuung des Fotos selbst */
@@ -63,14 +64,14 @@ export type PhotoEdit = {
 
 /** acht Farbtöne für „Farben einzeln“: Name, Mitte in Grad, Probe, wofür er gut ist */
 export const HUES: [string, number, string, string][] = [
-  ["Rot", 0, "#c8423a", "Lippen, Mohn, Rücklichter"],
-  ["Orange", 30, "#d9822f", "Haut, Sand, Abendlicht"],
-  ["Gelb", 58, "#d8b836", "Laub im Herbst, Raps, Kerzenlicht"],
-  ["Grün", 115, "#5f9a45", "Wiesen, Blätter"],
-  ["Türkis", 175, "#3f9c98", "Lagunen, Glas"],
-  ["Blau", 220, "#3f6fb5", "Himmel, Meer, Schatten"],
-  ["Lila", 270, "#7a55b0", "Lavendel, Dämmerung"],
-  ["Magenta", 320, "#b84a8c", "Blüten, Neon"],
+  [de("Rot"), 0, "#c8423a", de("Lippen, Mohn, Rücklichter")],
+  [de("Orange"), 30, "#d9822f", de("Haut, Sand, Abendlicht")],
+  [de("Gelb"), 58, "#d8b836", de("Laub im Herbst, Raps, Kerzenlicht")],
+  [de("Grün"), 115, "#5f9a45", de("Wiesen, Blätter")],
+  [de("Türkis"), 175, "#3f9c98", de("Lagunen, Glas")],
+  [de("Blau"), 220, "#3f6fb5", de("Himmel, Meer, Schatten")],
+  [de("Lila"), 270, "#7a55b0", de("Lavendel, Dämmerung")],
+  [de("Magenta"), 320, "#b84a8c", de("Blüten, Neon")],
 ];
 
 export type More = {
@@ -299,15 +300,15 @@ function fromLab(L: number, a: number, bb: number): RGB {
 export const LOOKS: { id: LookId; name: string; txt: string; f: (c: RGB) => RGB }[] = [
   {
     id: "sommer",
-    name: "Sommer",
-    txt: "warm, Schwarz leicht offen",
+    name: de("Sommer"),
+    txt: de("warm, Schwarz leicht offen"),
     f: ([r, g, b]) => satur([r * 1.06, g, b * 0.86].map((x) => scurve(0.05 + cl(x) * 0.93, 0.25)) as RGB, 0.92),
   },
-  { id: "kreide", name: "Kreide", txt: "matt und blass", f: ([r, g, b]) => satur([r * 1.02, g, b * 0.98], 0.68).map((x) => 0.12 + cl(x) * 0.8) as RGB },
+  { id: "kreide", name: de("Kreide"), txt: de("matt und blass"), f: ([r, g, b]) => satur([r * 1.02, g, b * 0.98], 0.68).map((x) => 0.12 + cl(x) * 0.8) as RGB },
   {
     id: "daemmerung",
-    name: "Dämmerung",
-    txt: "kühle Tiefen, warme Lichter",
+    name: de("Dämmerung"),
+    txt: de("kühle Tiefen, warme Lichter"),
     f: ([r, g, b]) => {
       const l = luma(r, g, b);
       const s = (1 - l) ** 2;
@@ -317,14 +318,14 @@ export const LOOKS: { id: LookId; name: string; txt: string; f: (c: RGB) => RGB 
   },
   {
     id: "salz",
-    name: "Salz",
-    txt: "kühl und klar",
+    name: de("Salz"),
+    txt: de("kühl und klar"),
     f: ([r, g, b]) => satur([r * 0.95, g, b * 1.07].map((x) => scurve(0.03 + cl(x) * 0.97, 0.18)) as RGB, 0.85),
   },
   {
     id: "kohle",
-    name: "Kohle",
-    txt: "Schwarzweiß mit Rotfilter",
+    name: de("Kohle"),
+    txt: de("Schwarzweiß mit Rotfilter"),
     f: ([r, g, b]) => {
       const v = 0.02 + scurve(cl(0.5 * r + 0.38 * g + 0.12 * b), 0.45) * 0.96;
       return [v, v, v * 0.985];
@@ -332,8 +333,8 @@ export const LOOKS: { id: LookId; name: string; txt: string; f: (c: RGB) => RGB 
   },
   {
     id: "messing",
-    name: "Messing",
-    txt: "kräftig wie Diafilm, gedämpftes Grün",
+    name: de("Messing"),
+    txt: de("kräftig wie Diafilm, gedämpftes Grün"),
     f: ([r, g, b]) => {
       const gr = Math.max(0, g - Math.max(r, b));
       return satur([r * 1.07 + gr * 0.3, g - gr * 0.35, b * 0.8].map((x) => 0.035 + scurve(cl(x), 0.22) * 0.93) as RGB, 0.85);
@@ -353,11 +354,11 @@ export const fineOf = (e: PhotoEdit): LookFine => ({ exposure: e.exposure, contr
 export const wearsLook = (e: PhotoEdit, r: NamedRecipe) => sameRecipe(r.v, e.rec) && (!r.f || JSON.stringify(r.f) === JSON.stringify(fineOf(e)));
 
 export const PRESETS: NamedRecipe[] = [
-  { id: "sommerlicht", name: "Sommerlicht", txt: "warm, weiche Lichter", v: { film: "sommer", wbR: 2, wbB: -4, hl: -1, sh: 1, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },
-  { id: "nachmittag", name: "Nachmittag", txt: "satt, kühle Tiefen", v: { film: "daemmerung", wbR: 1, wbB: -2, hl: 0, sh: -1, color: 3, dr: 200, cc: 1, fxb: 0, grain: 2, gsize: "klein" } },
-  { id: "kalkwand", name: "Kalkwand", txt: "golden, harte Sonne", v: { film: "messing", wbR: 3, wbB: -5, hl: -2, sh: 0, color: 1, dr: 100, cc: 2, fxb: 2, grain: 1, gsize: "groß" } },
-  { id: "hafen", name: "Hafen", txt: "kühl, tiefes Blau", v: { film: "salz", wbR: -2, wbB: 3, hl: 0, sh: 1, color: -1, dr: 200, cc: 1, fxb: 2, grain: 0, gsize: "klein" } },
-  { id: "kohle", name: "Kohle", txt: "Schwarzweiß, kräftig", v: { film: "kohle", wbR: 0, wbB: 0, hl: 1, sh: 2, color: 0, dr: 100, cc: 0, fxb: 0, grain: 2, gsize: "groß" } },
+  { id: "sommerlicht", name: de("Sommerlicht"), txt: de("warm, weiche Lichter"), v: { film: "sommer", wbR: 2, wbB: -4, hl: -1, sh: 1, color: 2, dr: 400, cc: 2, fxb: 1, grain: 1, gsize: "klein" } },
+  { id: "nachmittag", name: de("Nachmittag"), txt: de("satt, kühle Tiefen"), v: { film: "daemmerung", wbR: 1, wbB: -2, hl: 0, sh: -1, color: 3, dr: 200, cc: 1, fxb: 0, grain: 2, gsize: "klein" } },
+  { id: "kalkwand", name: de("Kalkwand"), txt: de("golden, harte Sonne"), v: { film: "messing", wbR: 3, wbB: -5, hl: -2, sh: 0, color: 1, dr: 100, cc: 2, fxb: 2, grain: 1, gsize: "groß" } },
+  { id: "hafen", name: de("Hafen"), txt: de("kühl, tiefes Blau"), v: { film: "salz", wbR: -2, wbB: 3, hl: 0, sh: 1, color: -1, dr: 200, cc: 1, fxb: 2, grain: 0, gsize: "klein" } },
+  { id: "kohle", name: de("Kohle"), txt: de("Schwarzweiß, kräftig"), v: { film: "kohle", wbR: 0, wbB: 0, hl: 1, sh: 2, color: 0, dr: 100, cc: 0, fxb: 0, grain: 2, gsize: "groß" } },
 ];
 
 /* ---------- Pipeline für eine Farbe (0..1) ---------- */
@@ -678,15 +679,15 @@ export type PickId = "klar" | "film" | "sw" | "matt" | "abend" | "kuehl" | "dia"
 export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdit>; more: Partial<More> }[] = [
   {
     id: "klar",
-    name: "Klar",
-    txt: "frisch, kräftig, knackig",
+    name: de("Klar"),
+    txt: de("frisch, kräftig, knackig"),
     e: { contrast: 0.18, exposure: 0.04 },
     more: { highlights: -0.3, whites: 0.12, blacks: -0.12, vibrance: 0.32, clarity: 0.3 },
   },
   {
     id: "film",
-    name: "Warmer Film",
-    txt: "weich und warm, wie analog",
+    name: de("Warmer Film"),
+    txt: de("weich und warm, wie analog"),
     e: { look: "sommer", amount: 0.65, shadows: 0.15, warmth: 0.12 },
     more: {
       vignette: -0.3,
@@ -699,16 +700,16 @@ export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdi
   },
   {
     id: "sw",
-    name: "Schwarzweiß",
-    txt: "kräftiger Kontrast, dunkle Ränder",
+    name: de("Schwarzweiß"),
+    txt: de("kräftiger Kontrast, dunkle Ränder"),
     e: { look: "kohle", amount: 1, contrast: 0.28 },
     more: { blacks: -0.15, clarity: 0.35, vignette: -0.35 },
   },
   // zum Austauschen: stehen erst unter Vorschläge, wenn jemand sie dorthin holt
   {
     id: "matt",
-    name: "Matt",
-    txt: "blass, Schwarz offen",
+    name: de("Matt"),
+    txt: de("blass, Schwarz offen"),
     e: { look: "kreide", amount: 0.7, contrast: -0.08 },
     more: {
       vibrance: -0.15,
@@ -721,29 +722,29 @@ export const PICKS: { id: PickId; name: string; txt: string; e: Partial<PhotoEdi
   },
   {
     id: "abend",
-    name: "Abendlicht",
-    txt: "golden, weiche Schatten",
+    name: de("Abendlicht"),
+    txt: de("golden, weiche Schatten"),
     e: { warmth: 0.3, shadows: 0.2, exposure: 0.03 },
     more: { highlights: -0.2, tint: 0.06, vibrance: 0.2, vignette: -0.2 },
   },
   {
     id: "kuehl",
-    name: "Kühl",
-    txt: "klar und frisch, wie Meerluft",
+    name: de("Kühl"),
+    txt: de("klar und frisch, wie Meerluft"),
     e: { look: "salz", amount: 0.7, warmth: -0.08, contrast: 0.1 },
     more: { highlights: -0.15, clarity: 0.15 },
   },
   {
     id: "dia",
-    name: "Diafilm",
-    txt: "satt und kräftig",
+    name: de("Diafilm"),
+    txt: de("satt und kräftig"),
     e: { look: "messing", amount: 0.75, contrast: 0.15 },
     more: { blacks: -0.1, vibrance: 0.15, vignette: -0.2 },
   },
   {
     id: "weich",
-    name: "Weich",
-    txt: "hell und sanft, für Gesichter",
+    name: de("Weich"),
+    txt: de("hell und sanft, für Gesichter"),
     e: { exposure: 0.06, contrast: -0.12, shadows: 0.25 },
     more: { highlights: -0.25, clarity: -0.2, vibrance: 0.1 },
   },
@@ -799,60 +800,64 @@ export function moodTransfer(me: PhotoStats, from: PhotoStats): Transfer {
 /* ---------- Zettel ---------- */
 
 const signed = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "±") + Math.abs(v);
-const LEVEL = ["Aus", "Schwach", "Stark"];
+const LEVEL = [de("Aus"), de("Schwach"), de("Stark")];
 
 /** Was nachbearbeitet wurde, in Zeilen für den Rezept-Zettel */
 export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [];
-  if (e.origin === "auto") rows.push({ label: "Vorschlag", value: "Auto" });
-  if (e.origin === "match") rows.push({ label: "Vorschlag", value: "an die anderen Fotos angeglichen" });
-  if (e.origin === "mood") rows.push({ label: "Vorschlag", value: e.moodFrom ? `Stimmung von ${e.moodFrom}` : "Stimmung übernommen" });
-  if (e.origin === "pick") rows.push({ label: "Vorschlag", value: PICKS.find((p) => p.id === e.pick)?.name ?? "fertiger Vorschlag" });
+  if (e.origin === "auto") rows.push({ label: t("Vorschlag"), value: "Auto" });
+  if (e.origin === "match") rows.push({ label: t("Vorschlag"), value: t("an die anderen Fotos angeglichen") });
+  if (e.origin === "mood") rows.push({ label: t("Vorschlag"), value: e.moodFrom ? t("Stimmung von {name}", { name: e.moodFrom }) : t("Stimmung übernommen") });
+  if (e.origin === "pick") {
+    const p = PICKS.find((x) => x.id === e.pick);
+    rows.push({ label: t("Vorschlag"), value: p ? t(p.name) : t("fertiger Vorschlag") });
+  }
   const R = e.rec;
   if (!recipeIsEmpty(R)) {
     const preset = [...PRESETS].find((p) => sameRecipe(p.v, R));
-    rows.push({ label: "Rezept", value: preset ? preset.name : e.recName ? `${e.recName}, angepasst` : "eigene Werte" });
-    rows.push({ label: "Filmlook", value: lookOf(R.film)?.name ?? "Ohne" });
-    rows.push({ label: "Weißabgleich", value: `R${signed(R.wbR)} B${signed(R.wbB)}` });
-    rows.push({ label: "Dynamikbereich", value: `DR${R.dr}` });
-    rows.push({ label: "Lichter / Schatten", value: `${signed(R.hl)} / ${signed(R.sh)}` });
-    rows.push({ label: "Farbe", value: signed(R.color) });
-    if (R.cc || R.fxb) rows.push({ label: "Color Chrome / FX Blau", value: `${LEVEL[R.cc]} / ${LEVEL[R.fxb]}` });
-    if (R.grain) rows.push({ label: "Körnung", value: `${LEVEL[R.grain]}, ${R.gsize}` });
+    rows.push({ label: t("Rezept"), value: preset ? t(preset.name) : e.recName ? t("{name}, angepasst", { name: e.recName }) : t("eigene Werte") });
+    const film = lookOf(R.film);
+    rows.push({ label: t("Filmlook"), value: film ? t(film.name) : t("Ohne") });
+    rows.push({ label: t("Weißabgleich"), value: `R${signed(R.wbR)} B${signed(R.wbB)}` });
+    rows.push({ label: t("Dynamikbereich"), value: `DR${R.dr}` });
+    rows.push({ label: t("Lichter / Schatten"), value: `${signed(R.hl)} / ${signed(R.sh)}` });
+    rows.push({ label: t("Farbe"), value: signed(R.color) });
+    if (R.cc || R.fxb) rows.push({ label: t("Color Chrome / FX Blau"), value: `${t(LEVEL[R.cc])} / ${t(LEVEL[R.fxb])}` });
+    if (R.grain) rows.push({ label: t("Körnung"), value: `${t(LEVEL[R.grain])}, ${R.gsize === "groß" ? t("groß") : t("klein")}` });
   }
   const look = lookOf(e.look);
-  if (look) rows.push({ label: "Look", value: `${look.name} ${Math.round(e.amount * 100)} %` });
-  for (const [k, label, f] of FINE) if (Math.abs(e[k]) > 0.005) rows.push({ label, value: f(e[k]) });
+  if (look) rows.push({ label: "Look", value: `${t(look.name)} ${Math.round(e.amount * 100)} %` });
+  for (const [k, label, f] of FINE) if (Math.abs(e[k]) > 0.005) rows.push({ label: t(label), value: f(e[k]) });
   const m = e.more;
   if (m && !moreIsNeutral(m)) {
-    for (const [k, label] of MORE_SLIDERS) if (Math.abs(m[k]) > 0.005) rows.push({ label, value: signed100(m[k]) });
-    const hues = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([n]) => n);
-    if (hues.length) rows.push({ label: "Farben einzeln", value: hues.join(", ") });
-    if (!curveIsNeutral(m.curve)) rows.push({ label: "Gradationskurve", value: "angepasst" });
+    for (const [k, label] of MORE_SLIDERS) if (Math.abs(m[k]) > 0.005) rows.push({ label: t(label), value: signed100(m[k]) });
+    const hues = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([n]) => t(n));
+    if (hues.length) rows.push({ label: t("Farben einzeln"), value: hues.join(", ") });
+    if (!curveIsNeutral(m.curve)) rows.push({ label: t("Gradationskurve"), value: t("angepasst") });
   }
-  if (e.geo && !geoIsNeutral(e.geo)) rows.push({ label: "Zuschnitt", value: describeGeo(e.geo) });
+  if (e.geo && !geoIsNeutral(e.geo)) rows.push({ label: t("Zuschnitt"), value: describeGeo(e.geo) });
   return rows;
 }
 
 /** Feinschliff-Regler: Schlüssel, Name, Anzeige, Bereich */
 export const FINE: [keyof Pick<PhotoEdit, "exposure" | "contrast" | "shadows" | "warmth" | "sat">, string, (v: number) => string, number, number][] = [
-  ["exposure", "Licht", (v) => `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2).replace(".", ",")} EV`, -1, 1],
-  ["contrast", "Kontrast", (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
-  ["shadows", "Schatten aufhellen", (v) => `${Math.round(v * 100)}`, 0, 1],
-  ["warmth", "Wärme", (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
-  ["sat", "Farbe", (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
+  ["exposure", de("Licht"), (v) => `${v >= 0 ? "+" : "−"}${decimal(Math.abs(v).toFixed(2))} EV`, -1, 1],
+  ["contrast", de("Kontrast"), (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
+  ["shadows", de("Schatten aufhellen"), (v) => `${Math.round(v * 100)}`, 0, 1],
+  ["warmth", de("Wärme"), (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
+  ["sat", de("Farbe"), (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
 ];
 export { signed as signedStep };
 
 const signed100 = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`;
 /** Regler in „Mehr Werkzeuge“ außer den Farben einzeln: Schlüssel, Name, Gruppe */
 export const MORE_SLIDERS: [Exclude<keyof More, "hsl" | "curve">, string, "light" | "color" | "vignette"][] = [
-  ["highlights", "Lichter", "light"],
-  ["whites", "Weiß", "light"],
-  ["blacks", "Schwarz", "light"],
-  ["tint", "Tönung", "color"],
-  ["vibrance", "Dynamik", "color"],
-  ["clarity", "Klarheit", "light"],
-  ["vignette", "Vignette", "vignette"],
+  ["highlights", de("Lichter"), "light"],
+  ["whites", de("Weiß"), "light"],
+  ["blacks", de("Schwarz"), "light"],
+  ["tint", de("Tönung"), "color"],
+  ["vibrance", de("Dynamik"), "color"],
+  ["clarity", de("Klarheit"), "light"],
+  ["vignette", de("Vignette"), "vignette"],
 ];
 export { signed100 };

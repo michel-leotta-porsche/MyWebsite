@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Wordmark } from "@/components/ui-base";
 import { buttonClass } from "@/components/ui/button-class";
+import { T } from "@/lib/i18n";
 
 export const metadata: Metadata = { title: "Nicht gefunden · Calima" };
 
@@ -15,15 +16,17 @@ export default function NotFound() {
       </header>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 pb-24">
         <h1 className="text-on-table text-3xl font-bold tracking-[-0.03em]" style={{ fontVariationSettings: '"wdth" 80' }}>
-          Diese Seite gibt es nicht.
+          <T>Diese Seite gibt es nicht.</T>
         </h1>
-        <p className="text-on-table-2 mt-3 text-base leading-relaxed">Vielleicht ist der Link alt oder unvollständig.</p>
+        <p className="text-on-table-2 mt-3 text-base leading-relaxed">
+          <T>Vielleicht ist der Link alt oder unvollständig.</T>
+        </p>
         <p className="mt-8 flex flex-wrap gap-2">
           <Link href="/zimmer" className={buttonClass("cloth")}>
-            Zum Bücherzimmer
+            <T>Zum Bücherzimmer</T>
           </Link>
           <Link href="/" className={buttonClass("quiet")}>
-            Zur Startseite
+            <T>Zur Startseite</T>
           </Link>
         </p>
       </div>

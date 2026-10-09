@@ -6,6 +6,7 @@ import { Check, PenLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { notify } from "@/components/ui/toaster";
+import { useT } from "@/lib/i18n";
 import { isAbusive } from "@/lib/note-filter";
 import type { Pinned, Spot } from "@/components/book";
 import { PinNote } from "@/components/pin-note";
@@ -37,10 +38,11 @@ export function useFeedback(from: (share: Share) => string) {
   const [saved, setSaved] = useState<Record<string, Saved>>({});
   const [draftPin, setDraftPin] = useState<(Spot & { token: string }) | null>(null);
   const [openPins, setOpenPins] = useState<string[]>([]);
+  const t = useT();
 
   useEffect(() => {
     const timers = earTimers.current;
-    return () => timers.forEach((t) => window.clearTimeout(t));
+    return () => timers.forEach((id) => window.clearTimeout(id));
   }, []);
 
   const add = (set: typeof setEars, token: string, no: number) => set((m) => ({ ...m, [token]: [...(m[token] ?? []), no] }));
@@ -70,7 +72,7 @@ export function useFeedback(from: (share: Share) => string) {
       return;
     }
     add(setEars, token, no);
-    notify(`Eselsohr bei Tafel ${no}`, { duration: EAR_DELAY_MS, action: { label: "Rückgängig", onClick: () => toggleEar(share, no) } });
+    notify(t("Eselsohr bei Tafel {no}", { no }), { duration: EAR_DELAY_MS, action: { label: t("Rückgängig"), onClick: () => toggleEar(share, no) } });
     earTimers.current.set(
       key,
       window.setTimeout(() => {
@@ -79,7 +81,7 @@ export function useFeedback(from: (share: Share) => string) {
           .then(() => save(token, (s) => ({ ...s, ears: [...s.ears.filter((x) => x !== no), no] })))
           .catch(() => {
             remove(setEars, token, no);
-            notify("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal.");
+            notify(t("Das Eselsohr ist nicht angekommen. Versuch es bitte nochmal."));
           });
       }, EAR_DELAY_MS),
     );
@@ -126,15 +128,15 @@ export function useFeedback(from: (share: Share) => string) {
             open
             onOpenChange={() => {}}
             onDiscard={() => setDraftPin(null)}
-            onSend={async (t) => {
-              if (isAbusive(t)) throw new Error("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders.");
-              await leaveNote(share.token, { kind: "note", text: t, from: from(share), no: d.no, x: d.x, y: d.y }).catch(() => {
-                throw new Error("Der Zettel ist nicht angekommen. Versuch es bitte nochmal.");
+            onSend={async (text) => {
+              if (isAbusive(text)) throw new Error(t("So etwas gehört nicht auf einen Zettel. Formulier es bitte anders."));
+              await leaveNote(share.token, { kind: "note", text, from: from(share), no: d.no, x: d.x, y: d.y }).catch(() => {
+                throw new Error(t("Der Zettel ist nicht angekommen. Versuch es bitte nochmal."));
               });
               const id = `z${Date.now().toString(36)}`;
-              save(share.token, (s) => ({ ...s, pins: [...s.pins, { id, no: d.no, x: d.x, y: d.y, text: t }] }));
+              save(share.token, (s) => ({ ...s, pins: [...s.pins, { id, no: d.no, x: d.x, y: d.y, text }] }));
               setDraftPin(null);
-              notify(`Dein Zettel hängt bei ${share.fromName} an dieser Stelle.`);
+              notify(t("Dein Zettel hängt bei {name} an dieser Stelle.", { name: share.fromName }));
             }}
             flipX={d.x > 0.5}
             flipY={d.y > 0.6}
@@ -155,13 +157,13 @@ export function useFeedback(from: (share: Share) => string) {
         {no !== undefined && sentOf(share).includes(no) && (
           <span className="text-on-table-2 inline-flex min-h-9 items-center gap-1.5">
             <Check aria-hidden className="size-4" />
-            Eselsohr bei {share.fromName}
+            {t("Eselsohr bei {name}", { name: share.fromName })}
           </span>
         )}
         {no !== undefined && (
           <Button size="sm" onClick={() => pin(share, { no, x: 0.5, y: 0.4 })}>
             <PenLine aria-hidden />
-            Zettel
+            {t("Zettel")}
           </Button>
         )}
         {more}
