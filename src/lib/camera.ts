@@ -3,7 +3,7 @@
 import { registerPlugin } from "@capacitor/core";
 
 import { IS_APP } from "@/lib/app-mode";
-import { buildLut, type PhotoEdit } from "@/lib/develop/model";
+import { buildLut, GRAIN, type PhotoEdit } from "@/lib/develop/model";
 
 // Brücke zu Calimas Kamera in der iPhone-App (ios/App/App/CalimaCamera.swift). Der Sucher liegt hinter der Webansicht,
 // die Seite malt die Bedienung darüber. Der Look geht als derselbe 3D-LUT hinüber, den die Vorschau beim Bearbeiten nutzt.
@@ -23,11 +23,23 @@ type Plugin = {
   flip(): Promise<{ front: boolean }>;
   capture(): Promise<{ path: string }>;
   discard(o: { path: string }): Promise<void>;
-  /** Ereignisse der Erkenner im Sucher (noch keine; vorgesehen für Vorschläge wie Ticket oder Bordkarte, Reisebuch-Workshop) */
+  /** Körnung live im Sucher: amount wie GRAIN.amount, cell wie GRAIN.cell (Anteil der Bildbreite); 0 schaltet sie ab */
+  setGrain(o: { amount: number; cell: number }): Promise<void>;
+  /**
+   * Ereignisse aus der App: „shutter“ (Kamera-Knopf oder Lautstärketaste gedrückt), „zoom“ (am Kamera-Knopf gewischt,
+   * data.factor relativ zur Hauptkamera). Vorgesehen auch für Erkenner (Vorschläge wie Ticket oder Bordkarte, Reisebuch-Workshop).
+   */
   addListener(event: "event", fn: (e: CameraEvent) => void): Promise<{ remove: () => Promise<void> }>;
 };
 
-export type CameraEvent = { name: string; data: Record<string, unknown> };
+export type CameraEvent = { name: "shutter" | "zoom" | (string & {}); data: Record<string, unknown> };
+
+/** Ein Film: ein Look, so viele Bilder, dann ein Stapel. 24 wie ein kurzer Kleinbildfilm; mehr sprengt den Platz im Fotostudio (MAX_KEPT) */
+export const FILM_FRAMES = 24;
+
+/** Körnung des Looks für den Sucher; ohne Körnung 0 */
+export const grainOf = (e: PhotoEdit | null): { amount: number; cell: number } =>
+  e && e.rec.grain ? { amount: GRAIN.amount[e.rec.grain], cell: GRAIN.cell[e.rec.gsize] } : { amount: 0, cell: 0 };
 
 export const LUT_N = 33;
 export const CalimaCamera = registerPlugin<Plugin>("CalimaCamera");

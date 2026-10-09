@@ -1,11 +1,11 @@
 "use client";
 
-import { SwitchCamera, X } from "lucide-react";
+import { Film as FilmIcon, SwitchCamera, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { IconButton } from "@/components/ui/button";
-import { CalimaCamera, isDenied, LUT_N, lutOf, takeShot, type Frame } from "@/lib/camera";
+import { CalimaCamera, FILM_FRAMES, grainOf, isDenied, LUT_N, lutOf, takeShot, type Frame } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
@@ -20,12 +20,31 @@ import type { Print } from "@/lib/studio-store";
 // Der Sucher ist der native Teil (ios/App/App/CalimaCamera.swift) hinter der durchsichtigen Seite; hier liegen nur
 // Look-Pillen, Auslöser und Gesten. Gedrückt halten zeigt das Original (wie beim Bearbeiten), Wischen nach oben oder
 // unten macht heller oder dunkler, zwei Finger zoomen, ein Tipp stellt scharf. Jedes Foto wird ein Abzug im Fotostudio,
-// mit dem Look als Bearbeitung; eingerechnet wird erst beim Sichern, dann auch Körnung und Klarheit.
+// mit dem Look als Bearbeitung; eingerechnet wird erst beim Sichern, dann auch die Klarheit. Die Körnung läuft schon im
+// Sucher mit. „Film einlegen“ (Stufe 2) hält einen Look fest: FILM_FRAMES Bilder, die als ein Stapel im Fotostudio
+// landen, auch über mehrere Kamera-Sitzungen hinweg; der Kamera-Knopf und die Lautstärketasten lösen aus.
 
 type Look = { id: string; name: string; approx: boolean; edit: PhotoEdit | null };
+/** ein eingelegter Film: bleibt im Gerät, bis er voll ist oder entnommen wird */
+type Film = { name: string; approx: boolean; edit: PhotoEdit | null; stack: string; count: number };
 
 const ORIGINAL = "original";
 const LAST_KEY = "calima:kamera-look";
+const FILM_KEY = "calima:film";
+const readFilm = (): Film | null => {
+  try {
+    const f = JSON.parse(localStorage.getItem(FILM_KEY) ?? "null");
+    return f && typeof f.stack === "string" && typeof f.count === "number" ? (f as Film) : null;
+  } catch {
+    return null;
+  }
+};
+const writeFilm = (f: Film | null) => {
+  try {
+    if (f) localStorage.setItem(FILM_KEY, JSON.stringify(f));
+    else localStorage.removeItem(FILM_KEY);
+  } catch {}
+};
 const HOLD_MS = 220;
 const MOVE_PX = 10;
 const EV_MAX = 2;
@@ -40,7 +59,7 @@ const stamp = () => {
 };
 const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
 
-export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Print) => void; onClose: () => void }) {
+export function Camera({ uid, onShot, onFilmDone, onClose }: { uid: string; onShot: (p: Print, stack?: string) => void; onFilmDone: (stack: string) => void; onClose: () => void }) {
   const t = useT();
   const recent = useRecentSettings();
   const [own, setOwn] = useState<NamedRecipe[]>([]);
@@ -63,6 +82,7 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
   const [count, setCount] = useState(0);
   const [last, setLast] = useState<string | null>(null);
   const [reticle, setReticle] = useState<{ x: number; y: number; k: number } | null>(null);
+  const [film, setFilm] = useState<Film | null>(readFilm);
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -86,8 +106,9 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
     PRESETS.forEach((r) => add(lookOfRecipe(r)));
     return out;
   }, [recent, own, t]);
-  // zuletzt gewählter Look, sonst der zuletzt mitgenommene („So fotografieren“), sonst Sommerlicht
-  const active = looks.find((l) => l.id === lookId) ?? (recent.length ? looks[1] : (looks.find((l) => l.id === PRESETS[0].id) ?? looks[0]));
+  // ein eingelegter Film legt den Look fest; sonst der zuletzt gewählte, sonst der zuletzt mitgenommene („So fotografieren“), sonst Sommerlicht
+  const chosen = looks.find((l) => l.id === lookId) ?? (recent.length ? looks[1] : (looks.find((l) => l.id === PRESETS[0].id) ?? looks[0]));
+  const active: Look = film ? { id: "film", name: film.name, approx: film.approx, edit: film.edit } : chosen;
 
   const frameOf = useCallback((): Frame | null => {
     const r = box.current?.getBoundingClientRect();
@@ -138,6 +159,7 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
     if (l) CalimaCamera.setLut(l).catch(() => {});
     else CalimaCamera.setOriginal({ on: true }).catch(() => {});
     if (l && !holding) CalimaCamera.setOriginal({ on: false }).catch(() => {});
+    CalimaCamera.setGrain(grainOf(active.edit)).catch(() => {});
     try {
       localStorage.setItem(LAST_KEY, active.id);
     } catch {}
@@ -149,6 +171,23 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
     if (l.id === active.id) return;
     haptic("select");
     setLookId(l.id);
+  };
+
+  /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel; bleibt eingelegt, bis er voll ist oder entnommen wird ----- */
+
+  const loadFilm = () => {
+    if (!ready || film) return;
+    haptic("press");
+    const f: Film = { name: active.name, approx: active.approx, edit: active.edit, stack: newId(), count: 0 };
+    writeFilm(f);
+    setFilm(f);
+  };
+  const ejectFilm = () => {
+    if (!film) return;
+    haptic("select");
+    writeFilm(null);
+    setFilm(null);
+    if (film.count) onFilmDone(film.stack);
   };
 
   /* ----- Gesten im Sucher: halten (Original), wischen (Licht), zwei Finger (Zoom), tippen (Schärfe) ----- */
@@ -268,9 +307,23 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = active.edit ?? undefined;
-      const print: Print = { id: newId(), name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit };
-      onShot(print);
+      const onFilm = film;
+      const print: Print = { id: newId(), name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit, pos: onFilm?.count };
+      onShot(print, onFilm?.stack);
       setCount((n) => n + 1);
+      if (onFilm) {
+        const next = { ...onFilm, count: onFilm.count + 1 };
+        if (next.count >= FILM_FRAMES) {
+          // voll: der Film kommt als Stapel ins Fotostudio, die Kamera bleibt offen
+          writeFilm(null);
+          setFilm(null);
+          haptic("success");
+          onFilmDone(onFilm.stack);
+        } else {
+          writeFilm(next);
+          setFilm(next);
+        }
+      }
       setLast((old) => {
         if (old) URL.revokeObjectURL(old);
         return URL.createObjectURL(s.thumb);
@@ -280,7 +333,7 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
         const url = URL.createObjectURL(s.page);
         bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: SIZES.thumb, thumb: SIZES.thumb } })
           .then((r) => {
-            onShot({ ...print, shot: r.blobs.thumb });
+            onShot({ ...print, shot: r.blobs.thumb }, onFilm?.stack);
             setLast((old) => {
               if (old) URL.revokeObjectURL(old);
               return URL.createObjectURL(r.blobs.thumb);
@@ -300,6 +353,21 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
 
   useEffect(() => () => void (last && URL.revokeObjectURL(last)), [last]);
 
+  // Kamera-Knopf und Lautstärketasten lösen aus, Wischen am Knopf zoomt; der Auslöser hier ist immer der aktuelle
+  const shootRef = useRef(shoot);
+  useEffect(() => {
+    shootRef.current = shoot;
+  });
+  useEffect(() => {
+    const sub = CalimaCamera.addListener("event", (e) => {
+      if (e.name === "shutter") shootRef.current();
+      else if (e.name === "zoom" && typeof e.data.factor === "number") setZoom(e.data.factor);
+    });
+    return () => {
+      sub.then((h) => h.remove()).catch(() => {});
+    };
+  }, []);
+
   const flip = () => {
     if (!ready || busy) return;
     haptic("select");
@@ -312,7 +380,15 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
   };
 
   const title = holding ? t("Original") : active.name;
-  const sub = holding ? t("Loslassen bringt den Look zurück") : active.approx ? t("nachempfunden") : active.edit ? "" : t("Ohne Look");
+  const sub = holding
+    ? t("Loslassen bringt den Look zurück")
+    : film
+      ? t("Film, {i} von {n}", { i: film.count, n: FILM_FRAMES })
+      : active.approx
+        ? t("nachempfunden")
+        : active.edit
+          ? ""
+          : t("Ohne Look");
 
   return createPortal(
     <div id="calima-kamera" className="text-on-table fixed inset-0 z-[600] flex flex-col bg-transparent select-none" role="dialog" aria-label={t("Kamera")}>
@@ -329,8 +405,8 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
         </span>
       </header>
 
-      {/* Sucher: 3:4 wie das Foto, durchsichtig; dahinter zeichnet die App */}
-      <div className="bg-table-deep relative flex min-h-0 flex-1 flex-col">
+      {/* Sucher: 3:4 wie das Foto, durchsichtig; dahinter zeichnet die App. Hier darf nichts einen Hintergrund malen. */}
+      <div className="relative flex min-h-0 flex-1 flex-col bg-transparent">
         <div
           ref={box}
           className="relative mx-auto w-full max-w-full touch-none"
@@ -363,7 +439,32 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
       </div>
 
       <footer className="bg-table-deep grid gap-3 pt-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}>
+        {film ? (
+          <div className="flex items-center gap-3 px-4 pb-1">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2 text-[13px]">
+                <span className="truncate font-semibold">{film.name}</span>
+                <span className="text-on-table-2 flex-none tabular-nums">{t("{i} von {n}", { i: film.count, n: FILM_FRAMES })}</span>
+              </div>
+              {/* der Zählstreifen: ein Strich je Bild, so viele voll wie belichtet */}
+              <div className="mt-1.5 flex gap-[3px]" aria-hidden>
+                {Array.from({ length: FILM_FRAMES }, (_, i) => (
+                  <span key={i} className={`h-1.5 flex-1 rounded-full ${i < film.count ? "bg-cloth" : "bg-on-table-2/30"}`} />
+                ))}
+              </div>
+            </div>
+            <button type="button" onClick={ejectFilm} className="border-on-table-2/50 text-on-table flex-none rounded-full border px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap">
+              {film.count ? t("Film entnehmen") : t("Film raus")}
+            </button>
+          </div>
+        ) : (
         <ul className="flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t("Looks")}>
+          <li className="flex-none">
+            <button type="button" onClick={loadFilm} disabled={!ready} className="border-on-table-2/50 text-on-table flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50">
+              <FilmIcon aria-hidden className="h-4 w-4" />
+              {t("Film einlegen")}
+            </button>
+          </li>
           {looks.map((l) => {
             const on = l.id === active.id;
             return (
@@ -380,6 +481,7 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
             );
           })}
         </ul>
+        )}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center px-7">
           <span className="justify-self-start">
             <span className="relative block h-12 w-12 overflow-hidden rounded-[10px] border-2 border-on-table-2/60">
@@ -405,7 +507,13 @@ export function Camera({ uid, onShot, onClose }: { uid: string; onShot: (p: Prin
             </IconButton>
           </span>
         </div>
-        <p className="text-on-table-2 px-6 text-center text-[12px]">{count ? t("{n} im Stapel. Schließen bringt dich zu Fertig.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) }) : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}</p>
+        <p className="text-on-table-2 px-6 text-center text-[12px]">
+          {film
+            ? t("Der Film bleibt drin, bis {n} Bilder drauf sind oder du ihn entnimmst. Dann liegt er als Stapel im Fotostudio.", { n: FILM_FRAMES })
+            : count
+              ? t("{n} im Stapel. Schließen bringt dich zu Fertig.", { n: count === 1 ? t("Ein Foto") : t("{n} Fotos", { n: count }) })
+              : t("Halten zeigt das Original, Wischen macht heller oder dunkler.")}
+        </p>
       </footer>
     </div>,
     document.body,

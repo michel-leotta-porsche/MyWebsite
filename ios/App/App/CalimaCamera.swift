@@ -26,6 +26,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "flip", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "capture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discard", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setGrain", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -67,6 +68,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 webView.isOpaque = false
                 webView.backgroundColor = .clear
                 webView.scrollView.backgroundColor = .clear
+                webView.underPageBackgroundColor = .clear
                 self.camera.attach(to: host, frame: frame)
                 if let lut { self.camera.setLut(base64: lut, n: n) }
                 self.camera.start { error in
@@ -79,6 +81,12 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+    }
+
+    /// Körnung live: amount wie GRAIN.amount, cell als Anteil der Bildbreite (GRAIN.cell in model.ts)
+    @objc func setGrain(_ call: CAPPluginCall) {
+        camera.setGrain(amount: Float(call.getDouble("amount") ?? 0), cell: Float(call.getDouble("cell") ?? 0))
+        call.resolve()
     }
 
     @objc func layout(_ call: CAPPluginCall) {
@@ -105,6 +113,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             webView.isOpaque = wasOpaque
             webView.backgroundColor = wasBackground
             webView.scrollView.backgroundColor = wasBackground
+            webView.underPageBackgroundColor = wasBackground ?? .clear
         }
     }
 
@@ -163,7 +172,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
 }
 
 /// Kamera-Sitzung, Farbwürfel und Sucher
-final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate, MTKViewDelegate {
+final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, AVCapturePhotoCaptureDelegate, MTKViewDelegate, AVCaptureSessionControlsDelegate {
     static let folder = FileManager.default.temporaryDirectory.appendingPathComponent("calima-kamera", isDirectory: true)
 
     private let session = AVCaptureSession()
@@ -181,6 +190,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private let srgb = CGColorSpace(name: CGColorSpace.sRGB)!
 
     private var cube: CIFilter?
+    /// Körnung wie in der Vorschau (preview.ts): Rauschen in Zellen, weiches Licht, in den Mitten am stärksten
+    private var grainAmount: Float = 0
+    private var grainCell: Float = 0
+    private let noise = CIFilter(name: "CIRandomGenerator")?.outputImage
+    private var grainTick: UInt32 = 0
+    /// Kamera-Knopf und Lautstärketasten (iOS 17.2) lösen aus; der Web-Teil hört auf das Ereignis „shutter“
+    private var shutterInteraction: UIInteraction?
     private var latest: CIImage?
     private let lock = NSLock()
     private var drawPending = false
@@ -213,6 +229,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         view.delegate = self
         if view.superview == nil { host.insertSubview(view, at: 0) }
         preview = view
+        if #available(iOS 17.2, *), shutterInteraction == nil {
+            let interaction = AVCaptureEventInteraction { [weak self] event in
+                if event.phase == .ended { self?.onEvent?("shutter", [:]) }
+            }
+            host.addInteraction(interaction)
+            shutterInteraction = interaction
+        }
     }
 
     func layout(frame: CGRect) {
@@ -236,6 +259,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func stop() {
         let view = preview
         preview = nil
+        if let shutterInteraction { view?.superview?.removeInteraction(shutterInteraction) }
+        shutterInteraction = nil
         view?.removeFromSuperview()
         queue.async {
             if self.running {
@@ -290,6 +315,18 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
         // Hauptkamera (24 mm) als Ausgangslage, nicht das Ultraweitwinkel
         baseZoom = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { CGFloat(truncating: $0) } ?? 1
+        // Kamera-Knopf (iOS 18): Wischen darauf zoomt wie zwei Finger; der Web-Teil hört „zoom“ und zeigt die Zahl
+        if #available(iOS 18.0, *), session.supportsControls {
+            for c in session.controls { session.removeControl(c) }
+            let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
+                guard let self else { return }
+                self.onEvent?("zoom", ["factor": Double(CGFloat(factor) / self.baseZoom)])
+            }
+            if session.canAddControl(slider) {
+                session.addControl(slider)
+                session.setControlsDelegate(self, queue: queue)
+            }
+        }
         try? device.lockForConfiguration()
         device.videoZoomFactor = baseZoom
         if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
@@ -334,6 +371,42 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         cube = f
         lock.unlock()
     }
+
+    func setGrain(amount: Float, cell: Float) {
+        lock.lock()
+        grainAmount = amount
+        grainCell = cell
+        lock.unlock()
+    }
+
+    /// Körnung wie preview.ts: Rauschen je Zelle, als weiches Licht gemischt (Mitten am stärksten, Lichter und Tiefen kaum).
+    /// Das Rauschen wandert je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
+    private func grained(_ image: CIImage) -> CIImage {
+        guard let noise else { return image }
+        let cellPx = max(1, CGFloat(grainCell) * image.extent.width)
+        grainTick &+= 1
+        let shift = CGFloat(grainTick % 977) * 13
+        let k = CGFloat(grainAmount) * 4
+        let grain = noise
+            .samplingNearest()
+            .transformed(by: CGAffineTransform(translationX: shift, y: shift * 0.37).scaledBy(x: cellPx, y: cellPx))
+            .cropped(to: image.extent)
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputBVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+                "inputBiasVector": CIVector(x: 0.5 - k / 2, y: 0.5 - k / 2, z: 0.5 - k / 2, w: 1),
+            ])
+        return grain.applyingFilter("CISoftLightBlendMode", parameters: [kCIInputBackgroundImageKey: image])
+    }
+
+    // MARK: Kamera-Knopf (AVCaptureSessionControlsDelegate): nichts zu tun, der Web-Teil zeigt die Werte selbst
+
+    func sessionControlsDidBecomeActive(_ session: AVCaptureSession) {}
+    func sessionControlsWillEnterFullscreenAppearance(_ session: AVCaptureSession) {}
+    func sessionControlsWillExitFullscreenAppearance(_ session: AVCaptureSession) {}
+    func sessionControlsDidBecomeInactive(_ session: AVCaptureSession) {}
 
     func setExposure(ev: Float) {
         guard let device = input?.device else { return }
@@ -386,6 +459,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         if !original, let cube {
             cube.setValue(image, forKey: kCIInputImageKey)
             image = cube.outputImage ?? image
+            if grainAmount > 0 { image = grained(image) }
         }
         latest = image
         let pending = drawPending
