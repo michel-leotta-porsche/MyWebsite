@@ -12,6 +12,7 @@ import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
 import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CalimaRecipe, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
+import { dayStack } from "@/lib/day-stack";
 import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
@@ -484,33 +485,26 @@ async function currentUid(): Promise<string | null> {
 }
 
 /**
- * Calimas Kamera über dem Buch. Die Aufnahmen landen wie aus dem Fotostudio als Abzüge auf dem Gerät (mehrere als ein
- * Stapel); statt „Fertig“ im Studio sagt ein Hinweis, wo sie liegen, und das Buch bleibt, wie es war.
+ * Calimas Kamera über dem Buch. Die Aufnahmen landen wie aus dem Zimmer auf dem Gerät (Abendstapel): ohne Film auf dem
+ * Stapel ihres Tages, auf einem Film im Film. Ein Hinweis sagt, wo sie liegen, und das Buch bleibt, wie es war.
  */
 function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
   const t = useT();
-  const session = useRef<{ stack: string; prints: Print[]; films: Set<string> } | null>(null);
-  const now = () => (session.current ??= { stack: `cam-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`, prints: [], films: new Set() });
+  const made = useRef({ shots: new Set<string>(), films: new Set<string>() });
   const onShot = (p: Print, filmStack?: string) => {
-    const cur = now();
     // auf einem Film zählt die Kamera selbst, der Stapel ist der Film
     if (filmStack) {
-      cur.films.add(filmStack);
+      made.current.films.add(filmStack);
       putPrints(uid, [{ ...p, stack: filmStack }]).catch(() => {});
       return;
     }
-    const i = cur.prints.findIndex((x) => x.id === p.id);
-    const print = { ...p, stack: cur.stack, pos: i < 0 ? cur.prints.length : cur.prints[i].pos };
-    if (i < 0) cur.prints.push(print);
-    else cur.prints[i] = print;
-    putPrints(uid, [print]).catch(() => {});
+    made.current.shots.add(p.id);
+    putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]).catch(() => {});
   };
   const close = () => {
-    const { prints: made, films } = now();
+    const { shots, films } = made.current;
     onClose();
-    // ein einzelnes Foto ist ein Abzug, kein Stapel
-    if (made.length === 1) putPrints(uid, [{ ...made[0], stack: undefined, pos: undefined }]).catch(() => {});
-    if (made.length) notify(made.length === 1 ? t("Das Foto liegt im Fotostudio.") : t("Die {n} Fotos liegen als Stapel im Fotostudio.", { n: made.length }));
+    if (shots.size) notify(shots.size === 1 ? t("Das Foto liegt auf dem Stapel von heute.") : t("Die {n} Fotos liegen auf dem Stapel von heute.", { n: shots.size }));
     else if (films.size) notify(t("Der Film liegt im Fotostudio."));
   };
   return <CameraView uid={uid} onShot={onShot} onFilmDone={() => {}} onClose={close} />;
