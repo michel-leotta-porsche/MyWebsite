@@ -25,7 +25,9 @@ import type { Print } from "@/lib/studio-store";
 // ein Foto nach dem anderen, groß. Nach rechts ins Buch, nach links weg, antippen für einen Satz. Jede Entscheidung liegt
 // sofort auf dem Gerät (Print.pick), wer schließt, macht später dort weiter; nichts erinnert, nichts zählt rot.
 // Sind alle entschieden, legt „Fertig für heute“ den Tag als eigene Seiten ins Buch: ins zuletzt benutzte Tagebuch,
-// beim ersten Mal schlägt Calima die Buchart vor. Weggelegt heißt nur: nicht ins Buch. Aus der Mediathek löscht Calima nie.
+// beim ersten Mal schlägt Calima die Buchart vor. Weggelegt heißt: nicht ins Buch. Es verlässt den Pult sofort und liegt
+// noch eine Woche darunter zum Zurückholen (studio-store KEEP_AWAY), ein Archiv gibt es nicht. Aus der Mediathek löscht
+// Calima nie.
 
 /** Bucharten fürs erste Tagebuch; bis die Bucharten mit Tagen kommen, sind sie Titel und Leinen des neuen Buchs */
 const KINDS: { title: string; cloth: ClothId }[] = [
@@ -81,7 +83,7 @@ export function DaySort({
   onChange: (ps: Print[]) => void;
   onAdd: (files: File[]) => void;
   onEditAll: () => void;
-  /** der Tag liegt im Buch oder ist weggeräumt: der Stapel verlässt den Pult */
+  /** der Tag liegt im Buch: was darin liegt, verlässt den Pult */
   onLaid: () => void;
   onClose: () => void;
 }) {
@@ -265,10 +267,7 @@ export function DaySort({
             setLaid(l);
             onLaid();
           }}
-          onClear={() => {
-            onLaid();
-            onClose();
-          }}
+          onDone={onClose}
         />
       ) : null}
 
@@ -544,7 +543,7 @@ function Finish({
   dayLong,
   onBusy,
   onLaid,
-  onClear,
+  onDone,
 }: {
   prints: Print[];
   user: User;
@@ -552,7 +551,7 @@ function Finish({
   dayLong: string;
   onBusy: (on: boolean) => void;
   onLaid: (l: Laid) => void;
-  onClear: () => void;
+  onDone: () => void;
 }) {
   const t = useT();
   const ins = prints.filter((p) => p.pick === "in");
@@ -571,10 +570,10 @@ function Finish({
       <Scroll>
         <p className="text-on-table text-[22px] leading-snug font-bold tracking-[-0.02em]">{t("Heute kommt nichts ins Buch.")}</p>
         <p className="text-on-table-2 text-[15px]">
-          {t("Die weggelegten Fotos verschwinden vom Pult. Was nur Calima fotografiert hat, ist dann weg. Rückgängig oben holt das letzte zurück.")}
+          {t("Was du weggelegt hast, liegt noch eine Woche unter dem Pult. Dort holst du es zurück, danach räumt Calima es weg.")}
         </p>
-        <Button variant="paper" className="mt-2 w-full" onClick={onClear}>
-          {outs === 1 ? t("Das Foto wegräumen") : t("Die {n} Fotos wegräumen", { n: outs })}
+        <Button variant="quiet" className="mt-2 w-full" onClick={onDone}>
+          {t("Fertig")}
         </Button>
       </Scroll>
     );
@@ -604,7 +603,7 @@ function Finish({
       <Spread prints={ins} dayLong={dayLong} />
       <p className="text-on-table-2 text-[15px]">
         <span className="text-on-table font-semibold">{ins.length === 1 ? t("Ein Foto kommt ins Buch.") : t("{n} Fotos kommen ins Buch.", { n: ins.length })}</span>{" "}
-        {outs > 0 && (outs === 1 ? t("Eins legst du weg, es verschwindet danach vom Pult.") : t("{n} legst du weg, sie verschwinden danach vom Pult.", { n: outs }))}
+        {outs > 0 && (outs === 1 ? t("Eins hast du weggelegt, es liegt noch eine Woche unter dem Pult.") : t("{n} hast du weggelegt, sie liegen noch eine Woche unter dem Pult.", { n: outs }))}
       </p>
 
       {choosing ? (

@@ -1,9 +1,10 @@
-// Abendstapel: ein Tag ist ein Stapel, der Tag wechselt um 4 Uhr früh, und Tagesstapel räumt das Fotostudio nie selbst weg.
+// Abendstapel: ein Tag ist ein Stapel, der Tag wechselt um 4 Uhr früh, und Tagesstapel räumt das Fotostudio nicht selbst
+// weg, nur was dort seit einer Woche weggelegt ist.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { dayOf, daysAgo, dayStack, isDayStack } from "@/lib/day-stack";
-import { piles, trimPiles, type Print } from "@/lib/studio-store";
+import { KEEP_AWAY, piles, trimPiles, type Print } from "@/lib/studio-store";
 
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
 
@@ -39,4 +40,16 @@ test("ein Tag liegt in der Reihenfolge der Aufnahme", () => {
   const s = "tag-2026-10-09";
   const [pile] = piles([print("spät", at(2026, 10, 9, 18), s), print("früh", at(2026, 10, 9, 8), s)]);
   assert.deepEqual(pile.map((p) => p.id), ["früh", "spät"]);
+});
+
+test("Weggelegtes bleibt eine Woche zum Zurückholen, dann geht es", () => {
+  const s = "tag-2026-10-01";
+  const now = at(2026, 10, 9, 20);
+  const out = (id: string, ago: number): Print => ({ ...print(id, at(2026, 10, 1), s), pick: "out", pickAt: now - ago });
+  const ps = [print("offen", at(2026, 10, 1), s), out("gestern", 864e5), out("alt", KEEP_AWAY + 1)];
+  const { keep, drop } = trimPiles(piles(ps), now);
+  assert.deepEqual(keep.flat().map((p) => p.id).sort(), ["gestern", "offen"]);
+  assert.deepEqual(drop.map((p) => p.id), ["alt"]);
+  // nur noch Abgelaufenes: der Tag verschwindet ganz
+  assert.equal(trimPiles(piles([out("alt", KEEP_AWAY + 1)]), now).keep.length, 0);
 });

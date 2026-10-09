@@ -33,7 +33,7 @@ export type Print = {
   /** Stapel: zusammen gewählte Fotos tragen dieselbe Kennung und ihre Stelle darin */
   stack?: string;
   pos?: number;
-  /** Abendstapel: eingeordnet ins Buch oder weggelegt, und wann (für Rückgängig); bleibt beim Schließen erhalten */
+  /** Abendstapel: eingeordnet ins Buch oder weggelegt, und wann (für Rückgängig und KEEP_AWAY); bleibt beim Schließen erhalten */
   pick?: "in" | "out";
   pickAt?: number;
   /** der Satz zum Foto, wird im Buch sein Titel */
@@ -56,18 +56,22 @@ export function piles(prints: Print[]): Print[][] {
   return [...by.values()].map((pile) => pile.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))).sort((a, b) => at(b) - at(a));
 }
 
+/** so lange liegt ein weggelegtes Foto vom Abendstapel noch unter dem Pult, zum Zurückholen */
+export const KEEP_AWAY = 7 * 864e5;
+
 /**
  * was liegen bleibt: höchstens MAX_PRINTS Stapel und MAX_KEPT Fotos, der neueste Stapel immer ganz.
- * Tagesstapel (Abendstapel) räumt das Studio nie selbst weg und zählt sie nicht mit: Fotos aus Calimas Kamera
- * gibt es nur hier, bis sie im Buch liegen.
+ * Tagesstapel (Abendstapel) räumt das Studio nicht selbst weg und zählt sie nicht mit: Fotos aus Calimas Kamera
+ * gibt es nur hier, bis sie im Buch liegen. Nur was dort seit KEEP_AWAY weggelegt ist, geht.
  */
-export function trimPiles(all: Print[][]): { keep: Print[][]; drop: Print[] } {
+export function trimPiles(all: Print[][], now = Date.now()): { keep: Print[][]; drop: Print[] } {
   const keep: Print[][] = [];
   let kept = 0;
   let n = 0;
   for (const pile of all) {
     if (isDayStack(pile[0].stack)) {
-      keep.push(pile);
+      const left = pile.filter((p) => p.pick !== "out" || (p.pickAt ?? now) > now - KEEP_AWAY);
+      if (left.length) keep.push(left);
       continue;
     }
     if (kept && (kept >= MAX_PRINTS || n + pile.length > MAX_KEPT)) continue;
@@ -75,7 +79,8 @@ export function trimPiles(all: Print[][]): { keep: Print[][]; drop: Print[] } {
     kept++;
     n += pile.length;
   }
-  return { keep, drop: all.filter((p) => !keep.includes(p)).flat() };
+  const stays = new Set(keep.flat());
+  return { keep, drop: all.flat().filter((p) => !stays.has(p)) };
 }
 
 /** so viele Stapel (oder einzelne Abzüge) bleiben je Konto liegen; ältere räumt das Studio selbst weg */
