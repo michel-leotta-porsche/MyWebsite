@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 
 import { BookPlus, Camera as CameraIcon, ChevronLeft, Pencil, Trash2 } from "lucide-react";
 
+import { usePultSort } from "@/components/pult-sort";
 import { Button } from "@/components/ui/button";
 import { ListGroup, ListRow } from "@/components/ui/list";
 import { hitClass } from "@/components/ui-classes";
@@ -118,7 +119,19 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const shown = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);
   const stacks = piles(shown);
   // auf dem Pult liegt, was noch einsortiert wird oder ins Buch soll; Weggelegtes liegt eine Woche darunter
-  const desk = stacks.map((pile) => (isDayStack(pile[0].stack) ? pile.filter((p) => p.pick !== "out") : pile)).filter((pile) => pile.length);
+  const shown = stacks.map((pile) => (isDayStack(pile[0].stack) ? pile.filter((p) => p.pick !== "out") : pile)).filter((pile) => pile.length);
+  // von Hand umsortieren: die neue Reihenfolge gilt für alle Fotos eines Stapels und bleibt auf dem Gerät
+  const resort = (keys: string[]) => {
+    const ranked = stacks.map((pile) => {
+      const at = keys.indexOf(pileKey(pile));
+      return pile.map((p) => ({ ...p, rank: at < 0 ? keys.length : at }));
+    });
+    const all = ranked.flat();
+    setPrints((list) => list.map((x) => all.find((p) => p.id === x.id) ?? x));
+    putPrints(user.uid, all.map((p) => ({ ...p, work: undefined }))).catch(() => {});
+  };
+  const sort = usePultSort({ keys: shown.map(pileKey), onDrop: resort });
+  const desk = sort.order ? sort.order.map((k) => shown.find((pile) => pileKey(pile) === k)!).filter(Boolean) : shown;
   const onDesk = desk.flat();
   const away = prints.filter((p) => isDayStack(p.stack) && p.pick === "out");
 
@@ -285,7 +298,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         <p className="text-on-table-2 text-sm">{sub}</p>
       </div>
 
-      <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label={t("Abzüge")}>
+      <ul {...sort.bind} className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 select-none md:pl-8 [-webkit-touch-callout:none]" aria-label={t("Abzüge")}>
         {desk.map((pile, i) =>
           isDayStack(pile[0].stack) ? (
             <DayTile key={pile[0].stack} pile={pile} i={i} n={desk.length} onOpen={() => setSorting(pile[0].stack!)} />
@@ -410,6 +423,10 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   );
 }
 
+const pileKey = (pile: Print[]) => pile[0].stack ?? pile[0].id;
+/** jeder Stapel liegt immer gleich schief, auch wenn er auf dem Pult den Platz wechselt */
+const tiltOf = (key: string) => TILT[[...key].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TILT.length];
+
 function PrintTile({ print, i, n, onOpen }: { print: Print; i: number; n: number; onOpen: () => void }) {
   const blobs = useMemo(() => ({ img: print.shot ?? print.thumb }), [print.shot, print.thumb]);
   const { img } = useBlobUrls(blobs);
@@ -417,7 +434,7 @@ function PrintTile({ print, i, n, onOpen }: { print: Print; i: number; n: number
   const land = pw >= ph;
   const t = useT();
   return (
-    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+    <OnTable i={i} n={n} tilt={tiltOf(print.id)} pile={print.id} className="-ml-5 md:-ml-6">
       <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("{name}, {when} bearbeitet. Öffnen", { name: print.name, when: when(print.at) })}>
         <span className="studio-paper">
           {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
@@ -448,7 +465,7 @@ function Paper({ print, className = "", children }: { print: Print; className?: 
 function StackTile({ pile, i, n, onOpen }: { pile: Print[]; i: number; n: number; onOpen: () => void }) {
   const t = useT();
   return (
-    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+    <OnTable i={i} n={n} tilt={tiltOf(pile[0].stack!)} pile={pile[0].stack} className="-ml-5 md:-ml-6">
       <button type="button" onClick={onOpen} className="studio-sheet" aria-label={t("Stapel mit {n} Fotos, {when} bearbeitet. Öffnen", { n: numberWord(pile.length).toLowerCase(), when: when(pile[0].at) })}>
         {pile.slice(1, 3).map((p, j) => (
           <span key={p.id} aria-hidden className="studio-fan absolute inset-0 grid place-items-end" style={{ ["--f" as string]: j ? -1 : 1 } as CSSProperties}>
@@ -472,7 +489,7 @@ function DayTile({ pile, i, n, onOpen }: { pile: Print[]; i: number; n: number; 
   const day = dayName(pile[0].stack!);
   const open = pile.filter((p) => !p.pick).length;
   return (
-    <OnTable i={i} n={n} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+    <OnTable i={i} n={n} tilt={tiltOf(pile[0].stack!)} pile={pile[0].stack} className="-ml-5 md:-ml-6">
       <button
         type="button"
         onClick={onOpen}
@@ -544,7 +561,22 @@ const still = () => typeof window !== "undefined" && window.matchMedia("(prefers
  * Etwas, das auf dem Tisch liegt: Schatten bleibt liegen, das Blatt darüber hebt sich beim Zeigen (Maus) oder Drücken (Finger)
  * und kippt zur Hand hin. Die Neigung läuft über CSS-Variablen am Element, nicht über React, damit nichts neu rendert.
  */
-function OnTable({ i, n, tilt, className = "", children }: { i: number; /** wie viele Stapel liegen: die vorderen liegen oben */ n: number; tilt: number; className?: string; children: ReactNode }) {
+function OnTable({
+  i,
+  n,
+  tilt,
+  pile,
+  className = "",
+  children,
+}: {
+  i: number;
+  /** wie viele Stapel liegen: die vorderen liegen oben */ n: number;
+  tilt: number;
+  /** Kennung des Stapels: so lässt er sich auf dem Pult umsortieren (pult-sort.ts) */
+  pile?: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLLIElement>(null);
   const set = (rx: number, ry: number) => {
     const el = ref.current;
@@ -577,6 +609,7 @@ function OnTable({ i, n, tilt, className = "", children }: { i: number; /** wie 
   return (
     <li
       ref={ref}
+      data-pile={pile}
       className={`studio-slot deal ${className}`}
       style={{ rotate: `${tilt}deg`, zIndex: n + 1 - i, ["--d" as string]: i } as CSSProperties}
       onPointerEnter={(e) => e.pointerType === "mouse" && lift(true)}

@@ -38,6 +38,8 @@ export type Print = {
   pickAt?: number;
   /** der Satz zum Foto, wird im Buch sein Titel */
   line?: string;
+  /** Platz des Stapels auf dem Pult, wenn er von Hand umsortiert wurde; neue Stapel ohne Platz liegen vorn */
+  rank?: number;
 };
 
 /** so viele Fotos lassen sich auf einmal wählen; mehr sprengt auf älteren iPhones den Speicher */
@@ -45,7 +47,7 @@ export const MAX_STACK = 20;
 /** so viele Fotos bleiben je Konto höchstens liegen, über alle Stapel (je etwa 5 MB) */
 const MAX_KEPT = 40;
 
-/** Abzüge in Stapel gruppiert, neuester Stapel zuerst; ein einzelnes Foto ist ein Stapel aus einem */
+/** Abzüge in Stapel gruppiert, neuester Stapel zuerst, außer der Pult wurde umsortiert; ein einzelnes Foto ist ein Stapel aus einem */
 export function piles(prints: Print[]): Print[][] {
   const by = new Map<string, Print[]>();
   for (const p of prints) {
@@ -53,7 +55,14 @@ export function piles(prints: Print[]): Print[][] {
     by.set(k, [...(by.get(k) ?? []), p]);
   }
   const at = (pile: Print[]) => Math.max(...pile.map((p) => p.at));
-  return [...by.values()].map((pile) => pile.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0))).sort((a, b) => at(b) - at(a));
+  const rank = (pile: Print[]) => Math.min(...pile.map((p) => p.rank ?? Infinity));
+  return [...by.values()]
+    .map((pile) => pile.sort((a, b) => (a.pos ?? 0) - (b.pos ?? 0)))
+    .sort((a, b) => {
+      const [ra, rb] = [rank(a), rank(b)];
+      // von Hand gelegte Stapel behalten ihren Platz; was neu dazukommt, liegt vorn, neuestes zuerst
+      return ra === rb ? at(b) - at(a) : ra === Infinity ? -1 : rb === Infinity ? 1 : ra - rb;
+    });
 }
 
 /** so lange liegt ein weggelegtes Foto vom Abendstapel noch unter dem Pult, zum Zurückholen */
