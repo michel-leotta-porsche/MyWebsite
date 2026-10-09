@@ -5,7 +5,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, isNeutral } from "@/lib/develop/model";
 import type { User } from "@/lib/firebase";
 import { aspectFor, autoPhotos, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
-import type { Print } from "@/lib/studio-store";
+import { workOf, type Print } from "@/lib/studio-store";
 
 // Abzüge vom Pult in ein Buch legen: hochladen, Bearbeitung einrechnen, ins Buch schreiben. Das Fotostudio legt sie
 // in die Ablage eines Buchs (Seiten bleiben, wie sie sind), der Abendstapel legt einen ganzen Tag als neue Seiten an.
@@ -24,7 +24,7 @@ export async function uploadPrints(uid: string, bookId: string, prints: Print[],
     step?.(i);
     const key = newId().slice(0, 10);
     const edit = p.edit;
-    const ph = await ingest(new File([p.work], `${p.name}.jpg`, { type: "image/jpeg" }), key, p.meta);
+    const ph = await ingest(new File([await workOf(p)], `${p.name}.jpg`, { type: "image/jpeg" }), key, p.meta);
     const urls = await uploadPhoto(uid, bookId, ph);
     let photo: StoredPhoto = {
       key,

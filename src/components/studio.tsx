@@ -32,7 +32,7 @@ import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { listPrints, MAX_STACK, piles, putPrints, removePrint, trimPiles, type Print } from "@/lib/studio-store";
+import { listPrints, MAX_STACK, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -94,10 +94,13 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       .catch(() => {});
   }, [user.uid]);
 
-  // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist
+  // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist. Liegt ein Abzug
+  // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher
   const keep = (ps: Print[]) => {
     setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
-    putPrints(user.uid, ps).catch(() => {});
+    putPrints(user.uid, ps)
+      .then(() => setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x))))
+      .catch(() => {});
   };
   const stacks = piles(prints);
 
@@ -661,7 +664,7 @@ function DoneSheet({
       const out: File[] = [];
       // nacheinander: jedes Foto braucht in voller Größe viel Speicher
       for (const p of prints) {
-        const url = URL.createObjectURL(p.work);
+        const url = URL.createObjectURL(await workOf(p));
         const e = p.edit ?? neutralEdit();
         try {
           const baked = await bakePhoto({

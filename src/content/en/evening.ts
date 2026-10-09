@@ -45,4 +45,5 @@ export const EVENING: Record<string, string> = {
   Heute: "Today",
   Gestern: "Yesterday",
   Fotografieren: "Take photos",
+  "Das Foto liegt nicht mehr auf diesem Gerät.": "This photo is no longer on this device.",
 };
