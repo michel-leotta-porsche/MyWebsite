@@ -601,19 +601,104 @@ html.ohne-struktur .printed::after {
     translate: 0 -4px;
   }
 }
-/* Abzug im Fotostudio: Foto mit weißem Rand, liegt auf dem Tisch wie die Eselsohr-Abzüge */
-.studio-print {
+/* Fotostudio: Abzüge liegen schräg auf dem Tisch, wie das Buch. Der Schatten bleibt auf dem Tisch, das Papier hebt sich
+   beim Zeigen oder Drücken ab und kippt zum Finger. Bewegt werden nur transform und opacity. */
+.studio-slot {
+  --rx: 0deg;
+  --ry: 0deg;
+  --lz: 0px;
+  position: relative;
   display: block;
-  padding: 5px 5px 14px;
-  background: var(--paper);
-  box-shadow:
-    0 1px 1px rgb(12 10 8 / 0.5),
-    0 12px 18px -8px rgb(12 10 8 / 0.75);
-  transition: translate 160ms var(--ease-out);
 }
-@media (hover: hover) and (pointer: fine) {
-  .studio-print:hover {
-    translate: 0 -4px;
+.studio-sheet {
+  position: relative;
+  display: block;
+  transform: perspective(1000px) rotateX(calc(12deg + var(--rx))) rotateY(var(--ry)) translateZ(var(--lz));
+  transform-origin: 50% 85%;
+  transition: transform 500ms var(--ease-out);
+  will-change: transform;
+}
+.studio-slot[data-move] .studio-sheet {
+  transition-duration: 160ms;
+}
+.studio-slot[data-lift] {
+  --lz: 48px;
+}
+/* zwei Schatten aus dem Vokabular des Buchs: liegend scharf, angehoben weit und weich; nur die Deckkraft wechselt */
+.studio-shadow,
+.studio-shadow-lift {
+  position: absolute;
+  inset: 4% 3% 0;
+  pointer-events: none;
+  transform: perspective(1000px) rotateX(12deg);
+  transform-origin: 50% 85%;
+  transition: opacity 500ms var(--ease-out);
+}
+.studio-shadow {
+  box-shadow: var(--book-shadow-closed);
+}
+.studio-shadow-lift {
+  box-shadow: var(--book-shadow-lift);
+  opacity: 0;
+}
+.studio-slot[data-lift] .studio-shadow {
+  opacity: 0.35;
+}
+.studio-slot[data-lift] .studio-shadow-lift {
+  opacity: 1;
+}
+/* angehoben fällt der Schatten weiter weg: nur verschoben, damit es beim Wechsel nicht flackert */
+.studio-shadow-lift {
+  translate: 0 0;
+  transition:
+    opacity 500ms var(--ease-out),
+    translate 500ms var(--ease-out);
+}
+.studio-slot[data-lift] .studio-shadow-lift {
+  translate: -4px 10px;
+}
+/* Fotopapier: weißer Rand, Faser im Papier, zur Unterkante leicht gewölbt */
+.studio-paper {
+  position: relative;
+  display: block;
+  padding: 5px 5px 15px;
+  background: var(--paper);
+  overflow: hidden;
+}
+.studio-paper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgb(12 10 8 / 0.12), transparent 22%),
+    linear-gradient(to right, rgb(12 10 8 / 0.06), transparent 12%, transparent 88%, rgb(12 10 8 / 0.08)),
+    url("/textures/paper.webp");
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+/* Glanz der Fotoschicht: wandert mit der Neigung, nur angehoben sichtbar */
+.studio-sheen {
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(255 236 210 / 0.22), transparent);
+  opacity: 0;
+  transform: translate(var(--gx, 0px), var(--gy, 0px));
+  transition:
+    opacity 500ms var(--ease-out),
+    transform 500ms var(--ease-out);
+  mix-blend-mode: soft-light;
+}
+.studio-slot[data-lift] .studio-sheen {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-sheet,
+  .studio-shadow,
+  .studio-shadow-lift,
+  .studio-sheen {
+    transition: none;
   }
 }
 .press:active {

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { BookPlus, ChevronLeft, Pencil, Trash2 } from "lucide-react";
 
@@ -119,16 +119,16 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         <p className="text-on-table-2 text-sm">{sub}</p>
       </div>
 
-      <ul className="flex flex-wrap items-end gap-y-5 pl-2" aria-label="Abzüge">
+      <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label="Abzüge">
         {prints.map((p, i) => (
           <PrintTile key={p.id} print={p} i={i} onOpen={() => setEditing(p)} />
         ))}
-        <li className="deal ml-3" style={{ rotate: "2deg", ["--d" as string]: prints.length } as CSSProperties}>
+        <OnTable i={prints.length} tilt={2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
             type="button"
             onClick={() => input.current?.click()}
             disabled={preparing}
-            className="press linen bg-paper-shade text-cloth-ink/70 grid h-[132px] w-[104px] content-between p-3 text-left disabled:opacity-70 md:h-[156px] md:w-[124px]"
+            className="studio-sheet linen bg-paper-shade text-cloth-ink/70 grid h-[132px] w-[104px] content-between p-3 text-left disabled:opacity-70 md:h-[156px] md:w-[124px]"
             aria-describedby="studio-h"
           >
             <span aria-hidden className="text-3xl leading-none font-light">
@@ -138,7 +138,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
               {preparing ? "Wird geöffnet …" : prints.length ? "Neues Foto" : "Foto wählen"}
             </span>
           </button>
-        </li>
+        </OnTable>
       </ul>
       <input
         ref={input}
@@ -153,7 +153,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           if (f) open(f);
         }}
       />
-      {prints.length > 0 && <p className="text-on-table-2 -mt-1 text-[13px]">Ein Abzug öffnet das Foto wieder, so wie du es bearbeitet hast. Nichts davon wird hochgeladen.</p>}
+      {prints.length > 0 && <p className="text-on-table-2 mt-2 text-[13px]">Ein Abzug öffnet das Foto wieder, so wie du es bearbeitet hast. Nichts davon wird hochgeladen.</p>}
       {error && (
         <p role="alert" className="text-on-table text-sm">
           {error}
@@ -201,11 +201,71 @@ function PrintTile({ print, i, onOpen }: { print: Print; i: number; onOpen: () =
   const { img } = useBlobUrls(blobs);
   const land = print.w >= print.h;
   return (
-    <li className={`deal ${i > 0 ? "-ml-5 md:-ml-6" : ""}`} style={{ rotate: `${TILT[i % TILT.length]}deg`, zIndex: MAX_PRINTS - i, ["--d" as string]: i } as CSSProperties}>
-      <button type="button" onClick={onOpen} className="press studio-print" aria-label={`${print.name}, ${when(print.at)} bearbeitet. Öffnen`}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
-        {img && <img src={img} alt="" className={`block object-cover ${land ? "h-[96px] w-[132px] md:h-[112px] md:w-[156px]" : "h-[132px] w-[96px] md:h-[156px] md:w-[112px]"}`} />}
+    <OnTable i={i} tilt={TILT[i % TILT.length]} className="-ml-5 md:-ml-6">
+      <button type="button" onClick={onOpen} className="studio-sheet" aria-label={`${print.name}, ${when(print.at)} bearbeitet. Öffnen`}>
+        <span className="studio-paper">
+          {/* eslint-disable-next-line @next/next/no-img-element -- Blob vom Gerät, kein Bild für next/image */}
+          {img && <img src={img} alt="" draggable={false} className={`block object-cover ${land ? "h-[96px] w-[132px] md:h-[112px] md:w-[156px]" : "h-[132px] w-[96px] md:h-[156px] md:w-[112px]"}`} />}
+          <span aria-hidden className="studio-sheen" />
+        </span>
       </button>
+    </OnTable>
+  );
+}
+
+const still = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Etwas, das auf dem Tisch liegt: Schatten bleibt liegen, das Blatt darüber hebt sich beim Zeigen (Maus) oder Drücken (Finger)
+ * und kippt zur Hand hin. Die Neigung läuft über CSS-Variablen am Element, nicht über React, damit nichts neu rendert.
+ */
+function OnTable({ i, tilt, className = "", children }: { i: number; tilt: number; className?: string; children: ReactNode }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const set = (rx: number, ry: number) => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.setProperty("--rx", `${rx}deg`);
+    el.style.setProperty("--ry", `${ry}deg`);
+    el.style.setProperty("--gx", `${-ry * 2.4}px`);
+    el.style.setProperty("--gy", `${rx * 2.4}px`);
+  };
+  const lift = (on: boolean) => {
+    const el = ref.current;
+    if (!el || still()) return;
+    if (on) el.dataset.lift = "";
+    else {
+      delete el.dataset.lift;
+      delete el.dataset.move;
+      set(0, 0);
+    }
+  };
+  const lean = (e: ReactPointerEvent) => {
+    const el = ref.current;
+    if (!el || still() || !("lift" in el.dataset)) return;
+    const r = el.getBoundingClientRect();
+    const nx = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    const ny = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    el.dataset.move = "";
+    // die Seite unter der Hand sinkt ein wenig, wie ein Blatt, das man antippt
+    set(ny * 9, nx * -9);
+  };
+  return (
+    <li
+      ref={ref}
+      className={`studio-slot deal ${className}`}
+      style={{ rotate: `${tilt}deg`, zIndex: MAX_PRINTS + 1 - i, ["--d" as string]: i } as CSSProperties}
+      onPointerEnter={(e) => e.pointerType === "mouse" && lift(true)}
+      onPointerDown={(e) => e.pointerType !== "mouse" && lift(true)}
+      onPointerMove={lean}
+      onPointerLeave={() => lift(false)}
+      onPointerUp={(e) => e.pointerType !== "mouse" && lift(false)}
+      onPointerCancel={() => lift(false)}
+      onFocus={() => lift(true)}
+      onBlur={() => lift(false)}
+    >
+      <span aria-hidden className="studio-shadow" />
+      <span aria-hidden className="studio-shadow-lift" />
+      {children}
     </li>
   );
 }
