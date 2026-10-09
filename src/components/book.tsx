@@ -87,12 +87,25 @@ function labelAt(book: BookData, mode: Mode, k: number): string {
   return ps.length > 1 ? `Tafel ${ps[0]}–${ps[ps.length - 1]}` : `Tafel ${ps[0]}`;
 }
 
-/** Titel der randlosen Tafeln: sie tragen keine Unterschrift auf der Seite */
-function headCaption(book: BookData, mode: Mode, k: number) {
+type SideCaption = { side: "left" | "right"; plates: { no: number; title: string; name: string; slip: string | null }[] };
+
+/**
+ * Je aufgeschlagener Seite: Titel der randlosen Tafeln (sie tragen keine Unterschrift auf der Seite) und
+ * welcher Zettel zu einem Foto gehört (Rezept aus Fuji-Daten oder Lightroom-Preset, Kamera, Bearbeitung).
+ */
+function sideCaptions(book: BookData, mode: Mode, k: number): SideCaption[] {
   const pages = pagesAt(book, mode, k);
-  const sides = pages.length === 2 ? (["left", "right"] as const) : (["right"] as const);
-  const ps = [...new Set(pages.flatMap((p, i) => headPlates(book, p, sides[i] ?? "right")))];
-  return ps.map((no) => `${no} ${plateOf(book, no).title}`).join(" · ");
+  const names = pages.length === 2 ? (["left", "right"] as const) : (["right"] as const);
+  return pages.map((page, i) => {
+    const side = names[i] ?? "right";
+    const heads = new Set(headPlates(book, page, side));
+    const plates = pageNos(page).map((no) => {
+      const p = plateOf(book, no);
+      const slip = !hasSlip(p) ? null : recipeOf(p) ? "Rezept" : cameraOf(p) ? "Kamera" : "Bearbeitung";
+      return { no, title: heads.has(no) ? p.title : "", name: p.title, slip };
+    });
+    return { side, plates: plates.filter((pl) => pl.title || pl.slip) };
+  });
 }
 
 const noopSubscribe = () => () => {};
@@ -827,11 +840,15 @@ export function Book({
     return onRight && !onLeft ? "left" : "right";
   })();
   const label = labelAt(book, mode, k);
-  const caption = headCaption(book, mode, kt);
   const pw = pageWidth(book, mode);
-  const slipNos = current
-    .filter((no) => hasSlip(plateOf(book, no)))
-    .map((no) => ({ no, label: recipeOf(plateOf(book, no)) ? "Rezept" : cameraOf(plateOf(book, no)) ? "Kamera" : "Bearbeitung", title: plateOf(book, no).title }));
+  const sides = sideCaptions(book, mode, kt);
+  const slipProps = { k, slip: slipPlate?.no ?? null, onOpen: setSlip, onPoint: setPointed };
+  const actions = (extra || onEdit) && (
+    <>
+      {extra?.(book, current)}
+      {onEdit && <EditButton onEdit={() => onEdit(k)} />}
+    </>
+  );
 
   return (
     <section
@@ -876,14 +893,10 @@ export function Book({
             <ChevronLeft aria-hidden className="text-on-table-2 size-5" />
             Calima
           </button>
-          {/* Titel der randlosen Tafel: auf der Seite selbst steht nichts */}
-          <div className="text-on-table-2 hidden items-baseline gap-4 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col flat:items-start flat:gap-1">
-            <span aria-live="polite">
-              <RollingLabel text={caption} reduce={reduce} />
-            </span>
-            <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
-            {extra?.(book, current)}
-            {onEdit && <EditButton onEdit={() => onEdit(k)} />}
+          {/* Bildtitel der randlosen Tafeln (auf der Seite selbst steht nichts) und ihr Rezept: je Seite eine Gruppe */}
+          <div className="hidden items-start gap-x-8 gap-y-2 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col">
+            <SideCaptions sides={sides} kt={kt} reduce={reduce} slipProps={slipProps} layout="row" />
+            {actions && <span className="flex shrink-0 items-center gap-2">{actions}</span>}
           </div>
           <p className="text-on-table-2 ml-auto justify-self-end text-right text-sm flat:col-start-3" aria-live="polite">
             <span className="text-on-table">{book.title}</span>
@@ -898,16 +911,32 @@ export function Book({
             </span>
             {nPlates}
           </p>
-          {/* Telefon: Titel der randlosen Tafel unter dem Kopf; quer links und rechts neben dem Buch */}
-          <div className="text-on-table-2 flex min-h-6 basis-full flex-wrap items-baseline justify-between gap-x-3 pt-1 text-sm md:hidden flat:max-md:contents">
-            <span aria-hidden className="min-w-0 truncate flat:col-start-1 flat:row-start-2">
-              <RollingLabel text={caption} reduce={reduce} />
-            </span>
-            <span className="flex shrink-0 flex-wrap justify-end gap-x-3 flat:col-start-3 flat:row-start-2 flat:justify-self-end">
-              <SlipButtons nos={slipNos} k={k} slip={slipPlate?.no ?? null} onOpen={setSlip} onPoint={setPointed} />
-              {extra?.(book, current)}
-              {onEdit && <EditButton onEdit={() => onEdit(k)} />}
-            </span>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={() => onEdit(k)}
+              aria-label="Bearbeiten"
+              title="Bearbeiten (oder lange aufs Buch drücken)"
+              className={buttonClass("quiet", "sm", "-mr-1 -mt-1.5 size-11 shrink-0 justify-center p-0 md:hidden flat:hidden")}
+            >
+              <Pencil aria-hidden />
+            </button>
+          )}
+          {/* Telefon: über jeder Seite ihr Bildtitel und Rezept, links über links, rechts über rechts;
+              quer stehen sie links und rechts neben dem Buch */}
+          <div className="grid basis-full gap-y-2 pt-1 text-sm md:hidden flat:max-md:contents">
+            <SideCaptions sides={sides} kt={kt} reduce={reduce} slipProps={slipProps} layout="columns" />
+            {/* hochkant steht „Bearbeiten“ als Stift oben in der Kopfzeile, das spart der Bühne eine Zeile */}
+            {(extra || onEdit) && (
+              <span className={`flex flex-wrap justify-end gap-2 flat:col-start-3 flat:row-start-3 flat:justify-self-end ${extra ? "" : "hidden flat:flex"}`}>
+                {extra?.(book, current)}
+                {onEdit && (
+                  <span className="hidden flat:contents">
+                    <EditButton onEdit={() => onEdit(k)} />
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         </header>
 
@@ -1205,51 +1234,89 @@ function EditButton({ onEdit }: { onEdit: () => void }) {
   );
 }
 
-/**
- * Knöpfe „Rezept“ (Pillen) für die Tafeln der aufgeschlagenen Doppelseite. Bei mehreren Fotos trägt der Knopf den
- * Fototitel, und Zeigen oder Fokus hebt das Foto auf der Seite hervor; die Nummer allein sagt nicht, welches es ist.
- */
-function SlipButtons({
-  nos,
-  k,
-  slip,
-  onOpen,
-  onPoint,
-}: {
-  nos: { no: number; label: string; title: string }[];
+type SlipProps = {
   k: number;
   slip: number | null;
   onOpen: (s: { no: number; k: number } | null) => void;
   onPoint: (no: number | null) => void;
+};
+
+/**
+ * Bildtitel und Zettel-Knopf je Seite. Telefon (columns): zwei Spalten wie die Doppelseite darunter, links
+ * linksbündig, rechts rechtsbündig; quer neben dem Buch. Ab Tablet (row): die Gruppen nebeneinander in der Kopfmitte.
+ * Lange Titel brechen auf zwei Zeilen um statt abzuschneiden; der Knopf steht bei seinem Titel und braucht keine Nummer.
+ */
+function SideCaptions({
+  sides,
+  kt,
+  reduce,
+  slipProps,
+  layout,
+}: {
+  sides: SideCaption[];
+  kt: number;
+  reduce: boolean;
+  slipProps: SlipProps;
+  layout: "row" | "columns";
 }) {
-  if (!nos.length) return null;
-  const many = nos.length > 1;
+  const columns = layout === "columns";
+  const single = sides.length === 1;
   return (
-    <span className="flex min-w-0 shrink-0 gap-2 md:flex-wrap">
-      {nos.map(({ no, label, title }) => (
-        <button
-          key={no}
-          type="button"
-          aria-expanded={slip === no}
-          aria-label={`${label} zu ${plateName(no, title)}`}
-          title={title || undefined}
-          onClick={() => onOpen(slip === no ? null : { no, k })}
-          onPointerEnter={(e) => e.pointerType === "mouse" && onPoint(no)}
-          onPointerLeave={() => onPoint(null)}
-          onFocus={() => onPoint(no)}
-          onBlur={() => onPoint(null)}
-          className={buttonClass("quiet", "sm", `max-w-[13rem] ${slip === no ? "bg-on-table/16" : ""}`)}
-        >
-          <ScrollText aria-hidden />
-          <span className="truncate">
-            {label}
-            {/* Telefon: nur die Nummer, sonst passt die Zeile nicht; der offene Zettel hebt sein Foto hervor */}
-            {many && <span className="md:hidden"> {no}</span>}
-            {many && <span className="max-md:hidden">{title ? ` · ${title}` : ` ${no}`}</span>}
-          </span>
-        </button>
-      ))}
-    </span>
+    <div
+      aria-live="polite"
+      className={
+        columns
+          ? "grid min-h-6 grid-cols-2 items-start gap-x-4 flat:max-md:contents"
+          : "flex min-w-0 items-start gap-x-8 flat:flex-col flat:gap-y-3"
+      }
+    >
+      {sides.map(({ side, plates }) => {
+        const right = columns && side === "right" && !single;
+        return (
+          <motion.div
+            key={`${kt}-${side}`}
+            initial={reduce ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className={`grid min-w-0 content-start gap-y-2 ${right ? "col-start-2 justify-items-end text-right" : "justify-items-start"} ${
+              columns && single ? "col-span-2" : ""
+            } ${columns ? (right ? "flat:col-start-3 flat:row-start-2 flat:justify-self-end" : "flat:col-start-1 flat:row-start-2") : "max-w-[20rem]"}`}
+          >
+            {plates.map(({ no, title, name, slip }) => (
+              <div key={no} className={`grid min-w-0 gap-y-1.5 ${right ? "justify-items-end" : "justify-items-start"}`}>
+                {title && (
+                  <p className="line-clamp-2 leading-snug [overflow-wrap:anywhere]">
+                    <span className="text-on-table-2 mr-[0.45em] tabular-nums">{no}</span>
+                    <span className="text-on-table">{title}</span>
+                  </p>
+                )}
+                {slip && <SlipButton no={no} label={slip} title={name} {...slipProps} />}
+              </div>
+            ))}
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Knopf „Rezept“ (Pille) zu einer Tafel; Zeigen oder Fokus hebt das Foto auf der Seite hervor */
+function SlipButton({ no, label, title, k, slip, onOpen, onPoint }: SlipProps & { no: number; label: string; title: string }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={slip === no}
+      aria-label={`${label} zu ${plateName(no, title)}`}
+      onClick={() => onOpen(slip === no ? null : { no, k })}
+      onPointerEnter={(e) => e.pointerType === "mouse" && onPoint(no)}
+      onPointerLeave={() => onPoint(null)}
+      onFocus={() => onPoint(no)}
+      onBlur={() => onPoint(null)}
+      className={buttonClass("quiet", "sm", slip === no ? "bg-on-table/16" : "")}
+    >
+      <ScrollText aria-hidden />
+      {label}
+    </button>
   );
 }
 
