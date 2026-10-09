@@ -178,6 +178,7 @@ type Ctx2D = { translate(x: number, y: number): void; rotate(a: number): void; s
 export function placeOn(ctx: Ctx2D, g: Geo, w: number, h: number, k: number) {
   const [W, H] = turned(w, h, g.quarter);
   ctx.scale(k, k);
+  // gleiche Schritte wie in outMap
   ctx.translate(-g.crop[0] * W, -g.crop[1] * H);
   ctx.translate(W / 2, H / 2);
   ctx.rotate(rad(g.angle));
@@ -214,4 +215,47 @@ export function describeGeo(g: Geo): string {
   if (g.flip) parts.push("gespiegelt");
   const s = parts.join(", ");
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Stelle im Bild (0..1) → Stelle im Ergebnis (0..1), als affine Abbildung [a, b, c, d, e, f]:
+ * x' = a·u + c·v + e, y' = b·u + d·v + f. Für die Vignette in der Vorschau, die auf dem ganzen Bild rechnet.
+ */
+export function outMap(g: Geo | undefined, w: number, h: number): [number, number, number, number, number, number] {
+  if (!g) return [1, 0, 0, 1, 0, 0];
+  // dieselben Schritte wie placeOn, als Matrix gesammelt
+  const m = [1, 0, 0, 1, 0, 0];
+  const ctx = {
+    translate(x: number, y: number) {
+      m[4] += m[0] * x + m[2] * y;
+      m[5] += m[1] * x + m[3] * y;
+    },
+    rotate(r: number) {
+      const c = Math.cos(r);
+      const s = Math.sin(r);
+      const [A, B, C, D] = m;
+      m[0] = A * c + C * s;
+      m[1] = B * c + D * s;
+      m[2] = -A * s + C * c;
+      m[3] = -B * s + D * c;
+    },
+    scale(x: number, y: number) {
+      m[0] *= x;
+      m[1] *= x;
+      m[2] *= y;
+      m[3] *= y;
+    },
+  };
+  const [ow, oh] = outSize(g, w, h);
+  ctx.scale(1 / ow, 1 / oh);
+  // placeOn mit Maßstab 1, dann von Bildpixeln (Mitte als Ursprung) auf 0..1
+  const [W, H] = turned(w, h, g.quarter);
+  ctx.translate(-g.crop[0] * W, -g.crop[1] * H);
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate((g.angle * Math.PI) / 180);
+  if (g.flip) ctx.scale(-1, 1);
+  ctx.rotate((g.quarter * Math.PI) / 2);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.scale(w, h);
+  return m as [number, number, number, number, number, number];
 }

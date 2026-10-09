@@ -8,6 +8,9 @@ import { applyGrain, applyLut, GRAIN, type RecipeValues } from "@/lib/develop/mo
 export type PreviewState = { lut: Uint8Array; n: number; rec: RecipeValues; /** 0..1: links davon Original; null = kein Vergleich */ split: number | null; original: boolean;
   /** Richtung der Trennlinie im Bild, wenn es gedreht oder gespiegelt gezeigt wird; ohne: links nach rechts */
   sdir?: [number, number];
+  /** Vignette −1..1 und die Abbildung Bild → Ergebnis (outMap), damit sie am Rand des Zuschnitts sitzt */
+  vignette?: number;
+  vmap?: [number, number, number, number, number, number];
 };
 
 const VS = `#version 300 es
@@ -24,6 +27,8 @@ uniform sampler3D lut;
 uniform float n;
 uniform float split;
 uniform vec2 sdir;
+uniform float vig;
+uniform mat3 vmap;
 uniform float amount;
 uniform float cell;
 uniform vec2 full;
@@ -38,6 +43,12 @@ void main() {
   vec3 c = texture(img, uv).rgb;
   if (dot(uv - 0.5, sdir) + 0.5 < split) { o = vec4(c, 1.0); return; }
   c = texture(lut, c * ((n - 1.0) / n) + 0.5 / n).rgb;
+  if (vig != 0.0) {
+    vec2 q = (vmap * vec3(uv, 1.0)).xy;
+    float t = clamp((length((q - 0.5) * 2.0) - 0.45) / 0.7, 0.0, 1.0);
+    float f = t * t * (3.0 - 2.0 * t);
+    c = vig < 0.0 ? c * (1.0 + vig * 0.7 * f) : c + (1.0 - c) * vig * 0.6 * f;
+  }
   if (amount > 0.0) {
     vec2 px = floor(uv * full / cell);
     float h = hash2(uint(px.x), uint(px.y));
@@ -129,6 +140,10 @@ function glPreviewer(canvas: HTMLCanvasElement): Previewer | null {
       gl.uniform1f(u("n"), s.n);
       gl.uniform1f(u("split"), s.original ? 2 : (s.split ?? -1));
       gl.uniform2f(u("sdir"), ...(s.sdir ?? [1, 0]));
+      gl.uniform1f(u("vig"), s.vignette ?? 0);
+      const [a, b, c, d, e, f] = s.vmap ?? [1, 0, 0, 1, 0, 0];
+      // spaltenweise: erste Spalte (a, b, 0), zweite (c, d, 0), dritte (e, f, 1)
+      gl.uniformMatrix3fv(u("vmap"), false, [a, b, 0, c, d, 0, e, f, 1]);
       gl.uniform1f(u("amount"), GRAIN.amount[s.rec.grain]);
       gl.uniform1f(u("cell"), Math.max(1, full[0] * GRAIN.cell[s.rec.gsize]));
       gl.uniform2f(u("full"), full[0], full[1]);

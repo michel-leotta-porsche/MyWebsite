@@ -2,7 +2,7 @@
 // Läuft im Worker (OffscreenCanvas) und, wo der fehlt, genauso im Hauptthread.
 
 import { outSize, placeOn, type Geo } from "@/lib/develop/geo";
-import { applyGrain, applyLut, toLab, type RecipeValues } from "@/lib/develop/model";
+import { applyGrain, applyLut, applyVignette, toLab, type RecipeValues } from "@/lib/develop/model";
 
 export type BakeJob = {
   url: string;
@@ -16,6 +16,8 @@ export type BakeJob = {
   maxBytes?: number;
   /** Zuschnitt; vor LUT und Körnung, damit die Körnung am Ergebnis gleich groß ist */
   geo?: Geo;
+  /** Vignette −1..1, nach dem LUT und vor der Körnung */
+  vignette?: number;
 };
 export type BakeResult = { w: number; h: number; blobs: { large: Blob; page: Blob; thumb: Blob }; color: [number, number, number] };
 
@@ -77,6 +79,7 @@ export async function bake(
     const sh = Math.min(STRIP, h - y);
     const img = ctx.getImageData(0, y, w, sh);
     applyLut(img.data, img.data, job.lut, job.n);
+    if (job.vignette) applyVignette(img.data, w, h, job.vignette, y);
     applyGrain(img.data, w, job.rec, y);
     ctx.putImageData(img, 0, y);
   }
