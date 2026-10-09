@@ -148,7 +148,7 @@ export function aspectFor(photos: Pick<StoredPhoto, "w" | "h" | "shelved">[]) {
   return Math.abs(avg - 4 / 3) < Math.abs(avg - 1.5) ? 4 / 3 : 1.5;
 }
 /** Bücher aus dem Fotostudio bekamen bis Oktober 2026 Breite durch Höhe (0.75): umdrehen statt das Buch zu stauchen */
-const pageAspect = (a: number) => (a > 0 && a < 1 ? 1 / a : a);
+export const pageAspect = (a: number) => (a > 0 && a < 1 ? 1 / a : a);
 
 /** Ältere Stände auf das aktuelle Schema heben: Doppelseiten bekommen feste Kennungen */
 export function migrate(b: StoredBook): StoredBook {

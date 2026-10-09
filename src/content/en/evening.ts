@@ -16,6 +16,10 @@ export const EVENING: Record<string, string> = {
   "Foto: {line}": "Photo: {line}",
   "Ein Satz zu diesem Foto": "A line about this photo",
   "Ramen mit Ei. Wieder hin.": "Ramen with egg. Going back.",
+  "Wie war der Tag?": "How was the day?",
+  "Früh los, Nebel am See. Abends Ramen.": "Early start, mist on the lake. Ramen at night.",
+  "Steht auf der Tagesseite. Leer lassen geht auch.": "Goes on the day's page. Leaving it empty is fine.",
+  "Seite gestalten": "Design the page",
   "Heute kommt nichts ins Buch.": "Nothing goes into the book today.",
   "Was du weggelegt hast, liegt noch eine Woche unter dem Pult. Dort holst du es zurück, danach räumt Calima es weg.":
     "What you put aside stays under the desk for a week. You can bring it back there; after that Calima clears it away.",

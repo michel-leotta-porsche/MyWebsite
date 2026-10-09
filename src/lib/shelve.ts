@@ -1,10 +1,12 @@
 "use client";
 
-import { autoSequence, pickCover, spreadId, type SpreadDraft } from "@/lib/auto-sequence";
+import { autoSequence, pickCover, type SpreadDraft } from "@/lib/auto-sequence";
+import { dayPage, pickForPage } from "@/lib/day-page";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, isNeutral } from "@/lib/develop/model";
 import type { User } from "@/lib/firebase";
-import { aspectFor, autoPhotos, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
+import type { Geom } from "@/lib/free-layout";
+import { aspectFor, autoPhotos, bottomFor, CLOTHS, pageAspect, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { workOf, type Print } from "@/lib/studio-store";
 
 // Abzüge vom Pult in ein Buch legen: hochladen, Bearbeitung einrechnen, ins Buch schreiben. Das Fotostudio legt sie
@@ -74,30 +76,42 @@ export function newBook(user: User, id: string, photos: StoredPhoto[], spreads: 
 }
 
 /**
- * Die Doppelseiten eines Tages: vorn das Datum als Textseite neben dem schönsten Foto, dahinter die übrigen in der
- * Reihenfolge der Aufnahme. Alle fixiert, damit die Automatik die Tage später nicht ineinander mischt.
+ * Die Doppelseiten eines Tages: vorn die Tagesseite wie eingeklebt (Datum von Hand, der Text zum Tag, bis zu vier Fotos
+ * mit ihren Sätzen), dahinter die übrigen in der Reihenfolge der Aufnahme. Alle fixiert, damit die Automatik die Tage
+ * später nicht ineinander mischt.
  */
-export function daySpreads(photos: StoredPhoto[], heading: string): { spreads: SpreadDraft[]; coverKey: string } {
+export function daySpreads(photos: StoredPhoto[], heading: string, story: string, g: Geom & { tape: string }): { spreads: SpreadDraft[]; coverKey: string } {
   const auto = autoPhotos(photos);
-  const lead = pickCover(auto);
-  const rest = autoSequence(auto.filter((p) => p.key !== lead));
-  const opener: SpreadDraft = { id: spreadId(), keys: [lead], layout: 0, pinned: true, text: { heading, body: "" } };
-  return { spreads: [opener, ...rest.spreads.map((s) => ({ ...s, pinned: true }))], coverKey: lead };
+  const coverKey = pickCover(auto);
+  const { lead, others } = pickForPage(photos, coverKey);
+  const page = dayPage(g, heading, story, lead, others);
+  const onPage = new Set(page.keys);
+  const rest = autoSequence(auto.filter((p) => !onPage.has(p.key)));
+  return { spreads: [page, ...rest.spreads.map((s) => ({ ...s, pinned: true }))], coverKey };
 }
 
 /**
  * Einen Tag hinten an ein Buch legen oder ein neues damit anfangen. Das bestehende Buch wird frisch geladen:
- * auf einem anderen Gerät kann es sich seitdem geändert haben.
+ * auf einem anderen Gerät kann es sich seitdem geändert haben. Die Tagesseite ist frei gestaltet, deshalb bleibt das
+ * Seitenformat ab jetzt, wie es ist (wie nach der Bühne). spread ist die Stelle der Tagesseite im Buch.
  */
-export async function layDay(user: User, prints: Print[], heading: string, into: { book: StoredBook } | { title: string; cloth: ClothId }, step?: (i: number) => void): Promise<{ book: StoredBook; firstKey: string }> {
+export async function layDay(
+  user: User,
+  prints: Print[],
+  day: { heading: string; story: string },
+  into: { book: StoredBook } | { title: string; cloth: ClothId },
+  step?: (i: number) => void,
+): Promise<{ book: StoredBook; firstKey: string; spread: number }> {
   const bookId = "book" in into ? into.book.id : newId();
   const photos = await uploadPrints(user.uid, bookId, prints, step);
-  const day = daySpreads(photos, heading);
-  let book: StoredBook;
-  if ("book" in into) {
-    const fresh = (await loadBook(into.book.id)) ?? into.book;
-    book = { ...fresh, photos: [...fresh.photos, ...photos], spreads: [...fresh.spreads, ...day.spreads] };
-  } else book = newBook(user, bookId, photos, day.spreads, day.coverKey, into);
+  const base = "book" in into ? ((await loadBook(into.book.id)) ?? into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
+  const aspect = pageAspect(base.aspect);
+  const g = { aspect, bottom: bottomFor(aspect), tape: CLOTHS[base.cloth]?.base ?? CLOTHS.ringelblume.base };
+  const d = daySpreads(photos, day.heading, day.story, g);
+  const book: StoredBook =
+    "book" in into
+      ? { ...base, photos: [...base.photos, ...photos], spreads: [...base.spreads, ...d.spreads], aspectLocked: true }
+      : { ...base, coverKey: d.coverKey, spreads: d.spreads, aspectLocked: true };
   await saveBook(book);
-  return { book, firstKey: day.coverKey };
+  return { book, firstKey: d.coverKey, spread: book.spreads.length - d.spreads.length };
 }
