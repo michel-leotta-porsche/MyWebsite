@@ -112,7 +112,7 @@ export function usePultSort({ keys, onDrop }: { keys: string[]; onDrop: (keys: s
     requestAnimationFrame(() => {
       const [bx, by] = offset(el);
       landing.current = null;
-      el.animate([{ translate: `${fx + ax - bx}px ${fy + ay - by}px` }, { translate: "0 0" }], { duration: d.away ? 520 : 360, easing: "cubic-bezier(0.25, 1.35, 0.4, 1)" });
+      el.animate([{ translate: `${fx + ax - bx}px ${fy + ay - by}px` }, { translate: "0 0" }], { duration: d.away ? 520 : 360, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
     });
   };
 
