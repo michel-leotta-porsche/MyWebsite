@@ -1,4 +1,5 @@
 import AVFoundation
+import AVKit
 import Capacitor
 import CoreImage
 import MetalKit
@@ -381,16 +382,18 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     /// Körnung wie preview.ts: Rauschen je Zelle, als weiches Licht gemischt (Mitten am stärksten, Lichter und Tiefen kaum).
     /// Das Rauschen wandert je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
+    /// Wie applyGrain in model.ts: Rauschen ±amount um Mittelgrau, overlay-artig, in den Mitten am stärksten. Gemischt wird in
+    /// Gamma-Werten (sRGB) wie im Web, nicht im linearen Arbeitsraum von Core Image: dort hellte dieselbe Körnung dunkle Stellen
+    /// um ein Vielfaches auf (Salz-und-Pfeffer statt Korn).
     private func grained(_ image: CIImage) -> CIImage {
         guard let noise else { return image }
         let cellPx = max(1, CGFloat(grainCell) * image.extent.width)
         grainTick &+= 1
         let shift = CGFloat(grainTick % 977) * 13
-        let k = CGFloat(grainAmount) * 4
+        let k = CGFloat(grainAmount) * 2
         let grain = noise
             .samplingNearest()
             .transformed(by: CGAffineTransform(translationX: shift, y: shift * 0.37).scaledBy(x: cellPx, y: cellPx))
-            .cropped(to: image.extent)
             .applyingFilter("CIColorMatrix", parameters: [
                 "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0),
                 "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
@@ -398,7 +401,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                 "inputBiasVector": CIVector(x: 0.5 - k / 2, y: 0.5 - k / 2, z: 0.5 - k / 2, w: 1),
             ])
-        return grain.applyingFilter("CISoftLightBlendMode", parameters: [kCIInputBackgroundImageKey: image])
+            // erst nach dem Farbfilter zuschneiden: der macht auch den leeren Rand undurchsichtig, das Bild wäre sonst unendlich
+            // groß und würde beim Einpassen in den Sucher auf nichts verkleinert (schwarzer Sucher)
+            .cropped(to: image.extent)
+        let gamma = image.applyingFilter("CILinearToSRGBToneCurve")
+        return grain
+            .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: gamma])
+            .applyingFilter("CISRGBToneCurveToLinear")
     }
 
     // MARK: Kamera-Knopf (AVCaptureSessionControlsDelegate): nichts zu tun, der Web-Teil zeigt die Werte selbst
