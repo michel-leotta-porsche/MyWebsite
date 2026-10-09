@@ -10,7 +10,10 @@ service cloud.firestore {
     }
 
     match /books/{id} {
-      allow read, update, delete: if signedIn() && resource.data.owner == request.auth.uid;
+      allow read, delete: if signedIn() && resource.data.owner == request.auth.uid;
+      // der Macher bleibt der Macher: niemand schiebt sein Buch einem fremden Konto unter
+      allow update: if signedIn() && resource.data.owner == request.auth.uid
+        && request.resource.data.owner == resource.data.owner;
       allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
 
       // Zwischenstände: nur der Macher des Buchs
@@ -24,7 +27,9 @@ service cloud.firestore {
       allow get: if true;
       allow list: if signedIn() && resource.data.owner == request.auth.uid;
       allow create, update: if signedIn() && request.resource.data.owner == request.auth.uid
-        && (resource == null || resource.data.owner == request.auth.uid);
+        && (resource == null || resource.data.owner == request.auth.uid)
+        // ein vom Admin gesperrter Link bleibt gesperrt
+        && !exists(/databases/$(db)/documents/takedowns/$(token));
       allow delete: if (signedIn() && resource.data.owner == request.auth.uid) || isAdmin();
 
       // Zettel und Eselsohren der Gäste: nur der Macher liest sie
@@ -103,6 +108,9 @@ service cloud.firestore {
       allow create: if request.resource.data.keys().hasOnly(['token', 'owner', 'fromName', 'title', 'reason', 'text', 'reporter', 'at'])
         && request.resource.data.token is string && request.resource.data.token.size() <= 64
         && request.resource.data.owner is string && request.resource.data.owner.size() <= 128
+        // nur echte Links: sonst löst ein Skript mit erfundenen Meldungen die Mails aus und verbraucht ihre Grenze
+        && exists(/databases/$(db)/documents/shares/$(request.resource.data.token))
+        && get(/databases/$(db)/documents/shares/$(request.resource.data.token)).data.owner == request.resource.data.owner
         && request.resource.data.reason in ['anstoessig', 'gewalt', 'belaestigung', 'rechte', 'anderes']
         && request.resource.data.text is string && request.resource.data.text.size() <= 500
         && request.resource.data.fromName is string && request.resource.data.fromName.size() <= 80
@@ -110,6 +118,11 @@ service cloud.firestore {
         && (request.resource.data.reporter == null || (signedIn() && request.resource.data.reporter == request.auth.uid))
         && request.resource.data.at == request.time;
       allow read, delete: if isAdmin();
+    }
+
+    // Vom Admin gesperrte Links (takeDownShare): der Macher kann sie nicht neu anlegen
+    match /takedowns/{token} {
+      allow read, write: if isAdmin();
     }
 
     // Eigene Angaben: wann den Nutzungsbedingungen zugestimmt
