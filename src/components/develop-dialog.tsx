@@ -154,8 +154,8 @@ function pixelsOf(pic: Pic, maxW: number): ImageData {
 }
 
 /** Größe des eingerechneten großen Bilds, damit die Körnung in der Vorschau gleich groß ist */
-const fullOf = (p: StoredPhoto): [number, number] => {
-  const s = Math.min(1, 2560 / Math.max(p.w, p.h));
+const fullOf = (p: StoredPhoto, long: number): [number, number] => {
+  const s = Math.min(1, long / Math.max(p.w, p.h));
   return [Math.round(p.w * s), Math.round(p.h * s)];
 };
 
@@ -375,15 +375,24 @@ export function DevelopDialog({
   uid,
   bookId,
   onDone,
+  onFinish,
+  title = "Bearbeiten",
+  long = 2560,
   onClose,
 }: {
   /** die Fotos der Doppelseite; bearbeitet wird immer eins */
   photos: StoredPhoto[];
   start: string;
   uid: string;
-  bookId: string;
+  /** ohne Buch (Fotostudio) gibt es nichts hochzuladen, dann gilt onFinish */
+  bookId?: string;
   /** geänderte Fotos, als ein Schritt fürs Rückgängig */
-  onDone: (patches: Record<string, DevelopPatch>) => void;
+  onDone?: (patches: Record<string, DevelopPatch>) => void;
+  /** Fotostudio: „Fertig“ gibt nur die Bearbeitung zurück, eingerechnet wird draußen */
+  onFinish?: (edit: PhotoEdit) => void;
+  title?: string;
+  /** lange Kante der eingerechneten Fassung, damit die Körnung in der Vorschau stimmt */
+  long?: number;
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -496,7 +505,7 @@ export function DevelopDialog({
     }
     b.then((pic) => {
       if (!live || !previewer.current) return;
-      previewer.current.setImage(pic, fullOf(photo));
+      previewer.current.setImage(pic, fullOf(photo, long));
       setReady(photo.key);
     }).catch((e) => {
       console.warn("[bearbeiten] Foto", reasonOf(e));
@@ -507,7 +516,7 @@ export function DevelopDialog({
     return () => {
       live = false;
     };
-  }, [photo, attempt]);
+  }, [photo, attempt, long]);
 
   // zeichnen: sofort mit grobem LUT, kurz danach mit dem feinen
   const shown = ready === photo.key;
@@ -910,6 +919,8 @@ export function DevelopDialog({
   };
 
   const finish = async () => {
+    if (onFinish) return onFinish(edits[photo.key]);
+    if (!bookId || !onDone) return onClose();
     const changed = photos.filter((p) => JSON.stringify(edits[p.key]) !== JSON.stringify(initial[p.key]));
     if (!changed.length) return onClose();
     setError(null);
@@ -1010,7 +1021,7 @@ export function DevelopDialog({
     >
       <div className="flex h-full flex-col flat:grid flat:grid-cols-[minmax(0,1fr)_minmax(300px,48%)] flat:grid-rows-[auto_minmax(0,1fr)] lg:mx-auto lg:grid lg:h-full lg:max-w-[1680px] lg:grid-cols-[minmax(0,1fr)_clamp(340px,26vw,400px)] lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-5 lg:px-8 lg:pt-5 lg:pb-6">
         <header className="flex flex-none items-center justify-between gap-4 pt-[max(0.5rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-2 pl-[max(1rem,env(safe-area-inset-left))] flat:col-span-2 lg:col-span-2 lg:p-0">
-          <h2 className="text-xl font-bold tracking-[-0.02em]">Bearbeiten</h2>
+          <h2 className="text-xl font-bold tracking-[-0.02em]">{title}</h2>
           <div className="flex items-center gap-2 lg:gap-3">
             <ToolGroup label="Verlauf">
               <IconButton label="Rückgängig (⌘Z)" onClick={undo} disabled={!past.length || !!busy}>
@@ -1232,6 +1243,7 @@ export function DevelopDialog({
                   disabled={!me}
                   onClick={() => me && act((e) => ({ ...e, ...autoEdit(me), origin: "auto", moodFrom: undefined }))}
                 />
+                {!onFinish && (
                 <Tile
                   img={tileImg}
                   edit={sugg.match}
@@ -1241,6 +1253,8 @@ export function DevelopDialog({
                   disabled={!me || !otherStats.length}
                   onClick={() => me && act((e) => ({ ...e, transfer: matchTransfer(me, otherStats), levels: null, origin: "match", moodFrom: undefined }))}
                 />
+                )}
+                {!onFinish && (
                 <Tile
                   img={tileImg}
                   edit={sugg.mood}
@@ -1261,6 +1275,7 @@ export function DevelopDialog({
                     act((e) => ({ ...e, transfer: moodTransfer(me, moodSt), levels: null, origin: "mood", moodFrom: nameOf(moodSrc) }));
                   }}
                 />
+                )}
               </div>
             )}
             {tab === "s" && (
