@@ -1461,3 +1461,13 @@ html.ohne-schatten [data-shade] {
   outline: 2px solid var(--cloth);
   outline-offset: -6px;
 }
+
+/* Kamera offen (App): die Seite wird durchsichtig, der native Sucher liegt dahinter; nur der Sucher-Dialog bleibt sichtbar */
+html[data-kamera],
+html[data-kamera] body {
+  background: transparent;
+  overflow: hidden;
+}
+html[data-kamera] body > :not(#calima-kamera) {
+  visibility: hidden;
+}

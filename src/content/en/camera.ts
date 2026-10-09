@@ -1,0 +1,22 @@
+// Kamera (Stufe 1, nur App) und der Calima-Look als Rezept in der Datei
+export const CAMERA: Record<string, string> = {
+  "Calima darf die Kamera nicht nutzen. Erlaube sie in den Einstellungen des iPhones unter Calima.": "Calima isn't allowed to use the camera. Allow it in the iPhone's Settings under Calima.",
+  "Die Kamera lässt sich gerade nicht öffnen.": "The camera can't be opened right now.",
+  "Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal.": "The photo couldn't be taken. Try again.",
+  "Loslassen bringt den Look zurück": "Let go to bring the look back",
+  "Zoom {factor}": "Zoom {factor}",
+  "Kamera öffnet …": "Opening camera …",
+  Looks: "Looks",
+  Auslösen: "Shutter",
+  Rückkamera: "Back camera",
+  Frontkamera: "Front camera",
+  "{n} im Stapel. Schließen bringt dich zu Fertig.": "{n} in the stack. Close to get to Done.",
+  "Halten zeigt das Original, Wischen macht heller oder dunkler.": "Hold to see the original, swipe to go brighter or darker.",
+  "Calima-Look": "Calima look",
+  "{label} „{name}“ mitgenommen. Liegt oben bei „Deine Looks“.": "{label} “{name}” taken along. It's up under “Your looks”.",
+  "Aus der Datei gelesen, in Calima nachempfunden": "Read from the file, approximated in Calima",
+  "Aus der Datei gelesen, so wie das Foto gesichert wurde": "Read from the file, just as the photo was saved",
+  "So fotografieren": "Shoot like this",
+  "Calima-Look mitnehmen": "Take the Calima look along",
+  "Farbe und Licht ohne Zuschnitt, so wie das Foto gesichert wurde.": "Colour and light without the crop, just as the photo was saved.",
+};

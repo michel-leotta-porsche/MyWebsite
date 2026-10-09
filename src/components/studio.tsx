@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
-import { BookPlus, ChevronLeft, Pencil, Trash2 } from "lucide-react";
+import { BookPlus, Camera as CameraIcon, ChevronLeft, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ListGroup, ListRow } from "@/components/ui/list";
@@ -18,7 +18,11 @@ import type { SharpenLevel } from "@/lib/develop/detail";
 import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
 import { friendlyError } from "@/lib/errors";
-import { withExif } from "@/lib/exif-write";
+import { fromEdit } from "@/lib/develop/settings";
+import { withExif, withXmp } from "@/lib/exif-write";
+import { hasCamera } from "@/lib/camera";
+import { useQueryParam } from "@/lib/use-query";
+import { calimaXmp } from "@/lib/xmp";
 import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/native";
@@ -35,6 +39,7 @@ import { de, getLang, locale, t, useT } from "@/lib/i18n";
 
 // der Editor ist groß und wird erst geladen, wenn jemand ein Foto öffnet
 const DevelopDialog = dynamic(() => import("@/components/develop-dialog").then((m) => m.DevelopDialog), { ssr: false });
+const Camera = dynamic(() => import("@/components/camera").then((m) => m.Camera), { ssr: false });
 
 /** größer ist keine Fotodatei, sondern etwas, das beim Entpacken den Speicher sprengt */
 const MAX_FILE = 60 * 1024 * 1024;
@@ -70,8 +75,15 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [done, setDone] = useState<Print[] | null>(null);
   const [over, setOver] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  // eine Kamera-Sitzung ist ein Stapel: alle Aufnahmen bis zum Schließen
+  const session = useRef<{ stack: string; prints: Print[] }>({ stack: newId(), prints: [] });
   const input = useRef<HTMLInputElement>(null);
   const t = useT();
+  const router = useRouter();
+  // „So fotografieren“ vom Rezeptzettel: das Zimmer öffnet mit ?kamera=1, der Look liegt schon im Zwischenspeicher
+  const wantsCamera = useQueryParam("kamera") === "1" && hasCamera();
+  const camera = cameraOpen || wantsCamera;
 
   useEffect(() => {
     listPrints(user.uid)
@@ -85,6 +97,27 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     putPrints(user.uid, ps).catch(() => {});
   };
   const stacks = piles(prints);
+
+  const openCamera = () => setCameraOpen(true);
+  const onShot = (p: Print) => {
+    const cur = session.current;
+    const i = cur.prints.findIndex((x) => x.id === p.id);
+    const print = { ...p, stack: cur.stack, pos: i < 0 ? cur.prints.length : cur.prints[i].pos };
+    if (i < 0) cur.prints.push(print);
+    else cur.prints[i] = print;
+    keep([print]);
+  };
+  const closeCamera = () => {
+    setCameraOpen(false);
+    if (wantsCamera) router.replace("/zimmer");
+    const made = session.current.prints;
+    session.current = { stack: newId(), prints: [] };
+    if (!made.length) return;
+    // ein einzelnes Foto ist ein Abzug, kein Stapel
+    const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
+    keep(ps);
+    setDone(ps);
+  };
 
   const open = async (given: File[]) => {
     setError(null);
@@ -179,7 +212,21 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
 
       <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label={t("Abzüge")}>
         {stacks.map((pile, i) => (pile.length > 1 ? <StackTile key={pile[0].stack} pile={pile} i={i} onOpen={() => setEditing(pile)} /> : <PrintTile key={pile[0].id} print={pile[0]} i={i} onOpen={() => setEditing(pile)} />))}
-        <OnTable i={stacks.length} tilt={2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
+        {hasCamera() && (
+          <OnTable i={stacks.length} tilt={-2} className={prints.length ? "ml-4" : "-ml-5 md:-ml-6"}>
+            <button
+              type="button"
+              onClick={openCamera}
+              disabled={!!preparing}
+              className="studio-sheet linen bg-paper-shade text-cloth-ink/70 grid h-[132px] w-[104px] content-between p-3 text-left disabled:opacity-70 md:h-[156px] md:w-[124px]"
+              aria-describedby="studio-h"
+            >
+              <CameraIcon aria-hidden className="h-7 w-7" strokeWidth={1.5} />
+              <span className="text-[15px] leading-tight font-bold">{t("Kamera")}</span>
+            </button>
+          </OnTable>
+        )}
+        <OnTable i={stacks.length + (hasCamera() ? 1 : 0)} tilt={2} className={prints.length || hasCamera() ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
             type="button"
             onClick={() => input.current?.click()}
@@ -222,6 +269,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         </p>
       )}
 
+      {camera && <Camera uid={user.uid} onShot={onShot} onClose={closeCamera} />}
       {editing && (
         <StudioEditor
           prints={editing}
@@ -498,7 +546,10 @@ function DoneSheet({
             quality: 0.92,
             maxBytes: 40 * 1024 * 1024,
           });
-          const jpeg = await withExif(baked.blobs.large, p.meta.exif);
+          let jpeg = await withExif(baked.blobs.large, p.meta.exif);
+          // der Look fährt als Rezept in der Datei mit: wer sie öffnet, sieht ihn auf dem Rezeptzettel
+          const own = fromEdit(e, e.recName);
+          if (own) jpeg = await withXmp(jpeg, calimaXmp(own));
           if (!live) return;
           out.push(new File([jpeg], `${p.name}-calima.jpg`, { type: "image/jpeg", lastModified: Date.now() }));
           shots[p.id] = baked.blobs.thumb;
