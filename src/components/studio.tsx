@@ -116,8 +116,8 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   };
   // Bilder auf einem unentwickelten Film bleiben im Dunkeln: sie liegen schon im Studio, zeigen sich aber erst nach dem Entwickeln
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
-  const shown = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);
-  const stacks = piles(shown);
+  const lit = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);
+  const stacks = piles(lit);
   // auf dem Pult liegt, was noch einsortiert wird oder ins Buch soll; Weggelegtes liegt eine Woche darunter
   const shown = stacks.map((pile) => (isDayStack(pile[0].stack) ? pile.filter((p) => p.pick !== "out") : pile)).filter((pile) => pile.length);
   // von Hand umsortieren: die neue Reihenfolge gilt für alle Fotos eines Stapels und bleibt auf dem Gerät
