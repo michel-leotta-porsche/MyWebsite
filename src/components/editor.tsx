@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, Check, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, Share, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ClipboardCopy, ClipboardPaste, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, Share, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -23,21 +23,27 @@ import { ShareDialog } from "@/components/share-dialog";
 import { Stage } from "@/components/stage";
 import { pickCover, relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
 import { addKey, fromSpread, materialize, removeKey, toSpread, withPages, type SpreadItem } from "@/lib/free-layout";
+import { bakePhoto } from "@/lib/develop/bake";
+import { buildLut, cleanEdit, neutralEdit } from "@/lib/develop/model";
+import { applySettings, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { ingest } from "@/lib/ingest";
 import {
   autoPhotos,
   bottomFor,
   CLOTHS,
+  editedPatch,
   exportBook,
   listVersions,
   loadBook,
   migrate,
   newId,
+  origOf,
   refreshShares,
   saveBook,
   saveVersion,
   SCHEMA,
   toBookData,
+  uploadEdited,
   uploadPhoto,
   type ClothId,
   type StoredBook,
@@ -49,6 +55,7 @@ import { friendlyError } from "@/lib/errors";
 import { takeHandover } from "@/lib/handoff";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
+import { copySettings, useCopiedSettings } from "@/lib/settings-clipboard";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 import { useWide } from "@/lib/use-wide";
@@ -171,6 +178,9 @@ export function Editor() {
   }, [coverSheet]);
   const [crop, setCrop] = useState<string | null>(null);
   const [develop, setDevelop] = useState<string | null>(null);
+  // Einstellungen kopieren und einfügen (siehe pasteOn)
+  const copied = useCopiedSettings();
+  const [pasting, setPasting] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const lastClick = useRef<{ i: number; at: number } | null>(null);
   // Hinweise als Pille von unten (Sonner), nach dem Ablegen mit Rückgängig. Solange einer steht, weicht der Rückgängig-Knopf am Telefon
@@ -688,6 +698,34 @@ export function Editor() {
     update((b) => ({ ...b, photos: b.photos.map((p) => (p.key === key ? { ...p, ...patch } : p)) }), tag);
   const setText = (i: number, patch: Partial<NonNullable<SpreadDraft["text"]>>) =>
     update((b) => mapSpreads(b, (ss) => ss.map((s, n) => (n === i && s.text ? { ...s, text: { ...s.text, ...patch } } : s))), `text-${i}`);
+  /* Einstellungen kopieren und einfügen: Farbe und Licht, nie der Zuschnitt. Einfügen rechnet das Foto neu ein. */
+  const editOf = (p: StoredPhoto) => {
+    const e = cleanEdit(p.edit);
+    return e ? fromEdit(e, undefined, p.title || undefined) : null;
+  };
+  const fileOf = (p: StoredPhoto) => (p.recipe ? fromRecipe(p.recipe, p.title || undefined) : null);
+  const copyFrom = (s: CopiedSettings | null) => {
+    if (!s) return say("Dieses Foto hat noch keine Einstellungen zum Kopieren.");
+    copySettings(s);
+    haptic("select");
+    say(`„${s.name}“ kopiert${s.approx ? ", in Calima nachempfunden" : ""}. Bei einem anderen Foto einfügen.`);
+  };
+  const pasteOn = async (p: StoredPhoto) => {
+    if (!copied || !user || pasting) return;
+    const s = copied;
+    const e = applySettings(cleanEdit(p.edit) ?? neutralEdit(), s);
+    setPasting(p.key);
+    try {
+      const out = await bakePhoto({ url: origOf(p).large, lut: buildLut(e, 33), n: 33, rec: e.rec, geo: e.geo, vignette: e.more?.vignette, clarity: e.more?.clarity });
+      const urls = await uploadEdited(user.uid, book.id, p.key, out.blobs);
+      update((b) => ({ ...b, photos: b.photos.map((x) => (x.key === p.key ? { ...x, ...editedPatch(x, e, { urls, color: out.color }) } : x)) }));
+      say(`„${s.name}“ eingefügt${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`, undo);
+    } catch {
+      say("Einfügen hat nicht geklappt. Prüf die Verbindung und versuch es noch einmal.");
+    } finally {
+      setPasting(null);
+    }
+  };
   /** Titelbild von Hand: bleibt, bis man ein anderes wählt */
   const setCover = (key: string) => update((b) => ({ ...b, coverKey: key, coverPicked: true }));
   const toggleStar = (key: string) =>
@@ -706,6 +744,14 @@ export function Editor() {
       return;
     }
     if (typing || !selPhoto || stageId) return;
+    // ⇧⌘C / ⇧⌘V: Einstellungen des gewählten Fotos, wie in Lightroom (die Seitenbühne kopiert mit ⌘C Elemente)
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key.toLowerCase() === "c" || e.key.toLowerCase() === "v")) {
+      e.preventDefault();
+      if (e.key.toLowerCase() === "c") copyFrom(editOf(selPhoto) ?? fileOf(selPhoto));
+      else if (copied) pasteOn(selPhoto);
+      else say("Erst bei einem Foto Einstellungen kopieren.");
+      return;
+    }
     const i = spreadOf(selPhoto.key);
     if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
       e.preventDefault();
@@ -1244,6 +1290,30 @@ export function Editor() {
                 <button type="button" className={buttonClass("paper", "sm")} onClick={() => setDevelop(selPhoto.key)}>
                   Bearbeiten …
                 </button>
+                {editOf(selPhoto) && (
+                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(editOf(selPhoto))} title="Farbe und Licht ohne Zuschnitt, ⇧⌘C">
+                    <ClipboardCopy aria-hidden />
+                    Einstellungen kopieren
+                  </button>
+                )}
+                {fileOf(selPhoto) && (
+                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(fileOf(selPhoto))} title="für andere Fotos, in Calima nachempfunden">
+                    <ClipboardCopy aria-hidden />
+                    {selPhoto.recipe?.kind === "fuji" ? "Fuji-Rezept kopieren" : "Lightroom-Werte kopieren"}
+                  </button>
+                )}
+                {copied && (
+                  <button
+                    type="button"
+                    className={buttonClass("paper", "sm", "pl-2.5")}
+                    onClick={() => pasteOn(selPhoto)}
+                    disabled={!!pasting}
+                    title={`„${copied.name}“ einfügen, ⇧⌘V`}
+                  >
+                    {pasting === selPhoto.key ? <LoaderCircle aria-hidden className="animate-spin" /> : <ClipboardPaste aria-hidden />}
+                    {pasting === selPhoto.key ? "Füge ein …" : `„${copied.name}“ einfügen`}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={buttonClass("paper", "sm")}

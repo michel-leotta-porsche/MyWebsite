@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Camera, Check, Download, Share, X } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, Camera, Check, ClipboardCopy, Download, Share, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
@@ -11,7 +11,9 @@ import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
 import { plateName, type Plate } from "@/content/books";
 import { cameraOf, recipeOf, type CameraInfo, type FujiRecipe, type LightroomRecipe } from "@/content/recipes";
-import { describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
+import { cleanEdit, describeEdit, isNeutral, type PhotoEdit } from "@/lib/develop/model";
+import { asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
+import { copySettings } from "@/lib/settings-clipboard";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -345,6 +347,77 @@ function EditSlip({ edit, reduce }: { edit: PhotoEdit; reduce: boolean }) {
 const noopSubscribe = () => () => {};
 
 /**
+ * Einstellungen der Tafel mitnehmen, auch aus fremden Büchern: das Rezept aus der Datei (übersetzt) und die
+ * Calima-Bearbeitung, je für sich. Kopieren geht ohne Konto; als Look speichern braucht eins.
+ * Firebase wird erst beim Speichern geladen, damit der Zettel die Startseite nicht schwerer macht.
+ */
+function TakeAlong({ plate, recipe }: { plate: Plate; recipe?: ReturnType<typeof recipeOf> }) {
+  const from = plateName(plate.no, plate.title);
+  const file = recipe ? fromRecipe(recipe, from) : null;
+  const clean = isNeutral(plate.edit) ? null : cleanEdit(plate.edit);
+  const edit = clean ? fromEdit(clean, undefined, from) : null;
+  const [which, setWhich] = useState<"file" | "edit" | null>(null);
+  const done = which === "file" ? file : which === "edit" ? edit : null;
+  const [say, setSay] = useState<string | null>(null);
+  if (!file && !edit) return null;
+  const take = (w: "file" | "edit", s: CopiedSettings) => {
+    copySettings(s);
+    setWhich(w);
+    setSay(`Kopiert. In der Werkbank oder im Fotostudio bei einem eigenen Foto einfügen.`);
+  };
+  const save = async () => {
+    if (!done) return;
+    setSay("Speichere …");
+    try {
+      let uid: string | null = process.env.NEXT_PUBLIC_FUJI_MOCK === "1" ? "test" : null;
+      if (!uid) {
+        const { auth } = await import("@/lib/firebase");
+        await auth().authStateReady();
+        uid = auth().currentUser?.uid ?? null;
+      }
+      if (!uid) return setSay("Zum Speichern als Look brauchst du ein Konto. Kopiert ist es trotzdem.");
+      const { saveRecipe } = await import("@/lib/store");
+      await saveRecipe(uid, asLook(done, `own-${Date.now().toString(36)}`));
+      setSay(`„${done.name}“ liegt jetzt in deinen Looks.`);
+    } catch {
+      setSay("Der Look ließ sich nicht speichern. Kopiert ist er trotzdem.");
+    }
+  };
+  const label = recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
+  return (
+    <div className="mt-4 border-t border-ink/15 pt-4">
+      <div className="flex flex-wrap gap-2">
+        {file && (
+          <button type="button" className={buttonClass(which === "file" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("file", file)}>
+            <ClipboardCopy aria-hidden />
+            {edit ? `${label} kopieren` : "Einstellungen kopieren"}
+          </button>
+        )}
+        {edit && (
+          <button type="button" className={buttonClass(which === "edit" ? "ink" : "paper", "sm", "pl-2.5")} onClick={() => take("edit", edit)}>
+            <ClipboardCopy aria-hidden />
+            {file ? "Bearbeitung kopieren" : "Einstellungen kopieren"}
+          </button>
+        )}
+        {done && (
+          <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={save}>
+            <BookmarkPlus aria-hidden />
+            Als Look speichern
+          </button>
+        )}
+      </div>
+      <p role="status" className="text-ink-2 mt-2 text-[12px] leading-snug">
+        {say ??
+          (file
+            ? `Farbe und Licht ohne Zuschnitt. Das ${label === "Fuji-Rezept" ? "Rezept" : "Preset"} wird in Calima nachempfunden, nicht exakt.`
+            : "Farbe und Licht ohne Zuschnitt, für deine eigenen Fotos.")}
+        {done?.lost.length ? ` Nicht übertragbar: ${done.lost.join(", ")}.` : ""}
+      </p>
+    </div>
+  );
+}
+
+/**
  * side: auf welcher Seite der Zettel liegt. Er liegt auf der Gegenseite seines Fotos, damit er
  * nie das Nachbarbild verdeckt und klar ist, zu welchem Bild er gehört (UX-Kritik K10).
  */
@@ -402,6 +475,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       {camera && <CameraSlip camera={camera} reduce={reduce} />}
       {edit && (recipe || camera) && <div className="my-4 border-t border-ink/15" />}
       {edit && <EditSlip edit={edit} reduce={reduce} />}
+      <TakeAlong plate={plate} recipe={recipe} />
       {recipe?.placeholder && (
         <p className="text-ink-2 mt-4 text-[12px]">
           {recipe.kind === "fuji"
