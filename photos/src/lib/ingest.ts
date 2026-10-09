@@ -3,6 +3,7 @@
 import exifr from "exifr";
 
 import type { CameraInfo, Recipe } from "@/content/recipes";
+import { exifDate, type ExifFields } from "@/lib/exif-write";
 import { readFujiRecipe, readXmp } from "@/lib/fuji";
 import { findSubject } from "@/lib/subject";
 import { parseXmp, toPreset } from "@/lib/xmp";
@@ -171,8 +172,8 @@ function shrink(from: HTMLCanvasElement, long: number): HTMLCanvasElement {
   return canvas;
 }
 
-const toJpeg = (canvas: HTMLCanvasElement) =>
-  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", 0.86));
+const toJpeg = (canvas: HTMLCanvasElement, quality = 0.86) =>
+  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", quality));
 
 // sRGB → Lab (D65), reicht für Farbähnlichkeit
 function toLab(r: number, g: number, b: number): [number, number, number] {
@@ -212,7 +213,10 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : u
 
 const pick = ["Make", "Model", "LensModel", "FocalLengthIn35mmFormat", "FocalLength", "FNumber", "ExposureTime", "ISO", "ExposureCompensation", "DateTimeOriginal"];
 
-export async function ingest(file: File, key: string): Promise<Ingested> {
+/** Was beim Öffnen gelesen wird: Datum, Kamera, Rezept, dazu die Felder fürs Zurückschreiben (ohne Ort) */
+export type PhotoMeta = { taken?: string; camera?: CameraInfo; recipe?: Recipe; exif: ExifFields };
+
+export async function readMeta(file: File): Promise<PhotoMeta> {
   let meta: Record<string, unknown> = {};
   try {
     meta = (await exifr.parse(file, { pick })) ?? {};
@@ -249,6 +253,23 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
       }
     : undefined;
 
+  const exif: ExifFields = {
+    make: make || undefined,
+    model: meta.Model ? String(meta.Model) : undefined,
+    lens: meta.LensModel ? String(meta.LensModel) : undefined,
+    taken: meta.DateTimeOriginal instanceof Date ? exifDate(meta.DateTimeOriginal) : undefined,
+    exposure: num(meta.ExposureTime),
+    fnumber: num(meta.FNumber),
+    iso,
+    ev,
+    focal: num(meta.FocalLength),
+    focal35: num(meta.FocalLengthIn35mmFormat),
+  };
+  return { taken, camera, recipe, exif };
+}
+
+export async function ingest(file: File, key: string, known?: PhotoMeta): Promise<Ingested> {
+  const { taken, camera, recipe } = known ?? (await readMeta(file));
   const src = await open(file);
   try {
     // Stufen statt dreimal vom Original: schneller und genauso scharf
@@ -269,6 +290,27 @@ export async function ingest(file: File, key: string): Promise<Ingested> {
       camera,
       recipe,
     };
+  } finally {
+    src.close();
+  }
+}
+
+/** Fürs Fotostudio: das Foto als Arbeitsfassung (lange Kante 4096, gedreht), dazu Seiten- und Daumengröße für die Vorschau */
+export type StudioSource = { w: number; h: number; work: Blob; page: Blob; thumb: Blob; meta: PhotoMeta };
+export const STUDIO_LONG = 4096;
+
+export async function studioSource(file: File): Promise<StudioSource> {
+  const meta = await readMeta(file);
+  const src = await open(file);
+  try {
+    const large = drawLarge(src, STUDIO_LONG);
+    const page = shrink(large, SIZES.page);
+    const thumb = shrink(page, SIZES.thumb);
+    const [work, bp, bt] = await Promise.all([toJpeg(large, 0.92), toJpeg(page), toJpeg(thumb)]);
+    const out = { w: large.width, h: large.height, work, page: bp, thumb: bt, meta };
+    // Safari gibt den Speicher großer Zeichenflächen sonst erst spät frei
+    for (const c of [large, page, thumb]) c.width = c.height = 0;
+    return out;
   } finally {
     src.close();
   }

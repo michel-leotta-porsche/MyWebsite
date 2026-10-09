@@ -3,7 +3,17 @@
 
 import { applyGrain, applyLut, toLab, type RecipeValues } from "@/lib/develop/model";
 
-export type BakeJob = { url: string; lut: Uint8Array; n: number; rec: RecipeValues; sizes: { large: number; page: number; thumb: number } };
+export type BakeJob = {
+  url: string;
+  lut: Uint8Array;
+  n: number;
+  rec: RecipeValues;
+  sizes: { large: number; page: number; thumb: number };
+  /** JPEG-Qualität; im Buch 0,86 wie beim Hochladen, im Fotostudio höher */
+  quality?: number;
+  /** Höchstgröße des Originals in Byte */
+  maxBytes?: number;
+};
 export type BakeResult = { w: number; h: number; blobs: { large: Blob; page: Blob; thumb: Blob }; color: [number, number, number] };
 
 type AnyCanvas = OffscreenCanvas | HTMLCanvasElement;
@@ -15,13 +25,13 @@ export const bakeable = (url: string) => url.startsWith("https://firebasestorage
 /** große Fassung ist höchstens etwa 2 MB; mehr wäre eine fremde Datei, die beim Entpacken den Speicher sprengt */
 export const MAX_ORIGINAL = 12 * 1024 * 1024;
 
-export const fetchBitmap = async (url: string): Promise<Source> => {
+export const fetchBitmap = async (url: string, maxBytes = MAX_ORIGINAL): Promise<Source> => {
   if (!bakeable(url)) throw new Error("Original liegt nicht im eigenen Speicher");
   // Kopie ohne CORS-Freigabe im Cache: einmal frisch holen
   const res = await fetch(url, { mode: "cors", credentials: "omit" }).catch(() => fetch(url, { mode: "cors", credentials: "omit", cache: "reload" }));
   if (!res.ok) throw new Error(`Original nicht erreichbar (HTTP ${res.status})`);
   const blob = await res.blob();
-  if (blob.size > MAX_ORIGINAL) throw new Error("Original zu groß");
+  if (blob.size > maxBytes) throw new Error("Original zu groß");
   return createImageBitmap(blob);
 };
 const free = (c: AnyCanvas) => {
@@ -38,10 +48,10 @@ function ctxOf(c: AnyCanvas, read = false): Ctx {
 export async function bake(
   job: BakeJob,
   make: (w: number, h: number) => AnyCanvas,
-  encode: (c: AnyCanvas) => Promise<Blob>,
-  load: (url: string) => Promise<Source> = fetchBitmap,
+  encode: (c: AnyCanvas, quality: number) => Promise<Blob>,
+  load: (url: string, maxBytes?: number) => Promise<Source> = fetchBitmap,
 ): Promise<BakeResult> {
-  const bmp = await load(job.url);
+  const bmp = await load(job.url, job.maxBytes);
   const bw = "naturalWidth" in bmp ? bmp.naturalWidth : bmp.width;
   const bh = "naturalHeight" in bmp ? bmp.naturalHeight : bmp.height;
   const s = Math.min(1, job.sizes.large / Math.max(bw, bh));
@@ -69,9 +79,10 @@ export async function bake(
     x.drawImage(from, 0, 0, c.width, c.height);
     return c;
   };
+  const q = job.quality ?? 0.86;
   const page = shrink(large, job.sizes.page);
   const thumb = shrink(page, job.sizes.thumb);
-  const [bl, bp, bt] = await Promise.all([encode(large), encode(page), encode(thumb)]);
+  const [bl, bp, bt] = await Promise.all([encode(large, q), encode(page, q), encode(thumb, q)]);
   free(large);
   free(page);
   // mittlere Farbe für die automatische Folge, wie beim Hochladen

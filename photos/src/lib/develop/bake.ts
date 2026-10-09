@@ -56,13 +56,13 @@ function getWorker(): Worker | null {
 }
 
 const mainMake = (w: number, h: number) => Object.assign(document.createElement("canvas"), { width: w, height: h });
-const mainEncode = (c: OffscreenCanvas | HTMLCanvasElement) =>
-  new Promise<Blob>((ok, fail) => (c as HTMLCanvasElement).toBlob((b) => (b ? ok(b) : fail(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", 0.86));
+const mainEncode = (c: OffscreenCanvas | HTMLCanvasElement, quality: number) =>
+  new Promise<Blob>((ok, fail) => (c as HTMLCanvasElement).toBlob((b) => (b ? ok(b) : fail(new Error("Kodieren fehlgeschlagen"))), "image/jpeg", quality));
 
 // Hauptthread: kann fetch das Original nicht holen, lädt ein img-Element mit CORS
-const mainLoad = async (url: string) => {
+const mainLoad = async (url: string, maxBytes?: number) => {
   try {
-    return await fetchBitmap(url);
+    return await fetchBitmap(url, maxBytes);
   } catch (e) {
     if (!bakeable(url)) throw e;
     return new Promise<HTMLImageElement>((ok, fail) => {
@@ -76,9 +76,9 @@ const mainLoad = async (url: string) => {
 };
 const onMain = (job: BakeJob) => bake(job, mainMake, mainEncode, mainLoad);
 
-/** Ein Foto mit seinem LUT neu rechnen, drei Größen wie beim Hochladen */
-export function bakePhoto(job: Omit<BakeJob, "sizes">): Promise<BakeResult> {
-  const full: BakeJob = { ...job, sizes: SIZES };
+/** Ein Foto mit seinem LUT neu rechnen, drei Größen wie beim Hochladen (oder eigene, fürs Fotostudio) */
+export function bakePhoto(job: Omit<BakeJob, "sizes"> & { sizes?: BakeJob["sizes"] }): Promise<BakeResult> {
+  const full: BakeJob = { ...job, sizes: job.sizes ?? SIZES };
   const w = getWorker();
   if (!w) return onMain(full);
   const id = ++seq;
