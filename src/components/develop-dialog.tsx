@@ -56,11 +56,11 @@ import {
   type RecipeValues,
 } from "@/lib/develop/model";
 import { createPreviewer, type Previewer } from "@/lib/develop/preview";
-import { applySettings, asLook, fromEdit, fromRecipe } from "@/lib/develop/settings";
+import { applySettings, asLook, fromEdit, fromRecipe, sameSettings, type BookLook, type CopiedSettings } from "@/lib/develop/settings";
 import { deleteRecipe, editedPatch, myRecipes, origOf, saveRecipe, uploadEdited, type StoredPhoto } from "@/lib/store";
 import { haptic } from "@/lib/haptics";
 import { setShownPicks, useShownPicks } from "@/lib/pick-prefs";
-import { copySettings, useCopiedSettings } from "@/lib/settings-clipboard";
+import { copySettings, forgetSettings, useRecentSettings } from "@/lib/settings-clipboard";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 // Bearbeiten auf der Werkbank: immer ein Foto, die anderen der Doppelseite liegen daneben und lassen sich antippen.
@@ -309,10 +309,10 @@ const LutThumb = memo(function LutThumb({ img, edit, className }: { img: ImageDa
 
 /* ---------- Bausteine der Werkzeuge ---------- */
 
-function Tile({ img, edit, name, txt, pressed, onClick, disabled }: { img?: ImageData; edit: PhotoEdit; name: string; txt: string; pressed: boolean; onClick: () => void; disabled?: boolean }) {
+function Tile({ img, edit, name, txt, pressed, onClick, disabled, dashed }: { img?: ImageData; edit: PhotoEdit; name: string; txt: string; pressed: boolean; onClick: () => void; disabled?: boolean; dashed?: boolean }) {
   return (
     <button type="button" aria-pressed={pressed} disabled={disabled} onClick={onClick} className="group flex min-w-0 flex-col gap-1 text-left disabled:opacity-40" lang="de">
-      <span className={`bg-paper-shade relative block aspect-[4/5] w-full outline-2 outline-offset-2 transition-[outline-color] duration-150 ${pressed ? "outline-ink" : "outline-transparent"}`}>
+      <span className={`bg-paper-shade relative block aspect-[4/5] w-full outline-2 outline-offset-2 transition-[outline-color] duration-150 ${pressed ? "outline-ink" : dashed ? "outline-ink/40 outline-dashed" : "outline-transparent"}`}>
         {img && <LutThumb img={img} edit={edit} className="block size-full object-cover transition-transform duration-500 ease-out motion-safe:group-hover:-translate-y-[3px]" />}
         {pressed && (
           <span aria-hidden className="bg-ink text-paper absolute top-1.5 right-1.5 grid size-5 place-items-center rounded-full">
@@ -492,6 +492,7 @@ export function DevelopDialog({
   title = "Bearbeiten",
   long = 2560,
   note: opening,
+  looks: inBook,
   onClose,
 }: {
   /** die Fotos der Doppelseite; bearbeitet wird immer eins */
@@ -509,6 +510,8 @@ export function DevelopDialog({
   long?: number;
   /** Hinweis zum Öffnen, etwa wenn nicht alle gewählten Fotos aufgingen */
   note?: string | null;
+  /** Looks, die im Buch schon auf Fotos liegen (Werkbank); ohne Buch keine */
+  looks?: BookLook[];
   onClose: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -1008,7 +1011,8 @@ export function DevelopDialog({
 
   /* ----- Einstellungen kopieren und einfügen: Farbe und Licht, nie der Zuschnitt ----- */
 
-  const copied = useCopiedSettings();
+  const recentAll = useRecentSettings();
+  const copied = recentAll[0] ?? null;
   // das Rezept aus der Datei steckt in diesem Foto schon drin; kopiert wird es nur für andere Fotos
   const fileSettings = useMemo(() => (photo.recipe ? fromRecipe(photo.recipe) : null), [photo.recipe]);
   const fileLabel = photo.recipe?.kind === "fuji" ? "Fuji-Rezept" : "Lightroom-Werte";
@@ -1017,19 +1021,36 @@ export function DevelopDialog({
     if (!s) return setNote("Noch nichts zu kopieren: Stell zuerst Farbe oder Licht ein.");
     copySettings(s);
     haptic("select");
-    setNote(`Einstellungen kopiert. Bei einem anderen Foto unter Vorschläge bei „Kopiert“ einfügen.`);
+    setNote(`Mitgenommen. Liegt oben bei „Deine Looks“, bei jedem Foto mit einem Tipp (⇧⌘V).`);
   };
   const copyFile = () => {
     if (!fileSettings) return;
     copySettings({ ...fileSettings, from: nameOf(photo) });
     haptic("select");
-    setNote(`${fileLabel} „${fileSettings.name}“ kopiert, in Calima nachempfunden. Bei einem anderen Foto einfügen.`);
+    setNote(`${fileLabel} „${fileSettings.name}“ mitgenommen, in Calima nachempfunden. Liegt oben bei „Deine Looks“.`);
   };
   const paste = () => {
-    if (!copied) return setNote("Erst bei einem Foto Einstellungen kopieren.");
-    act((e) => applySettings(e, copied), true);
-    setNote(`„${copied.name}“ eingefügt${copied.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`);
+    if (!copied) return setNote("Erst bei einem Foto einen Look mitnehmen.");
+    take(copied);
   };
+  const take = (s: CopiedSettings) => {
+    act((e) => applySettings(e, s), true);
+    setNote(`„${s.name}“ übernommen${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`);
+  };
+  const wears = (s: CopiedSettings) => wearsLook(edit, asLook(s, ""));
+  /** Mitgenommenes oder ein Look aus dem Buch wird ein eigener Look, für alle Fotos und Bücher */
+  const keep = (s: CopiedSettings) => {
+    const same = own.find((x) => x.name === s.name);
+    const r = asLook(s, same?.id ?? `own-${Date.now().toString(36)}`);
+    setOwn((o) => [...o.filter((x) => x.name !== r.name), r].sort((a, b) => a.name.localeCompare(b.name, "de")));
+    if (recentAll.includes(s)) forgetSettings(s);
+    setNote(`„${r.name}“ steht jetzt bei „Deine Looks“. Umbenennen geht per Rechtsklick oder langem Drücken.`);
+    saveRecipe(uid, r).catch(() => setNote("Der Look ließ sich nicht speichern."));
+  };
+  // jeder Look nur einmal: eigene vor dem Buch, das Buch vor „Zuletzt“
+  const looks = (inBook ?? []).filter((l) => !own.some((r) => sameRecipe(r.v, l.rec) && (!r.f || sameSettings({ rec: r.v, f: r.f }, l))));
+  const recent = recentAll.filter((c) => !looks.some((l) => sameSettings(l, c)) && !own.some((r) => r.f && sameSettings({ rec: r.v, f: r.f }, c)));
+  const mine = own.length > 0 || recent.length > 0;
   const clip = useRef({ copyEdit, paste });
   useEffect(() => {
     clip.current = { copyEdit, paste };
@@ -1809,10 +1830,38 @@ export function DevelopDialog({
             {hint}
           </p>
           <div role="tabpanel" id={`dv-pane-${tab}`} aria-labelledby={`dv-tab-${tab}`} hidden={cropping}>
-            {tab === "s" && own.length > 0 && (
+            {tab === "s" && mine && (
               <div className="mb-7">
                 <h3 className={groupTitle}>Deine Looks</h3>
                 <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
+                  {recent.map((c, i) => (
+                    <ContextMenu
+                      key={`recent-${i}`}
+                      container={dialog}
+                      className="grid min-w-0 select-none"
+                      menu={
+                        <>
+                          <MenuItem icon={<BookmarkPlus />} hint="für alle Fotos und Bücher" onClick={() => keep(c)}>
+                            Zu deinen Looks
+                          </MenuItem>
+                          <MenuSeparator />
+                          <MenuItem icon={<X />} onClick={() => forgetSettings(c)}>
+                            Aus „Zuletzt“ entfernen
+                          </MenuItem>
+                        </>
+                      }
+                    >
+                      <Tile
+                        img={tileImg}
+                        edit={applySettings(edit, c)}
+                        name={c.name}
+                        txt={["mitgenommen", c.source === "fuji" ? "Fuji" : c.source === "lightroom" ? "Lightroom" : c.from].filter(Boolean).join(" · ")}
+                        pressed={wears(c)}
+                        dashed
+                        onClick={() => take(c)}
+                      />
+                    </ContextMenu>
+                  ))}
                   {own.map((r) => (
                     <ContextMenu
                       key={r.id}
@@ -1850,7 +1899,28 @@ export function DevelopDialog({
                 {naming && naming !== true && saveForm}
               </div>
             )}
-            {tab === "s" && own.length > 0 && <h3 className={groupTitle}>Vorschläge</h3>}
+            {tab === "s" && looks.length > 0 && (
+              <div className="mb-7">
+                <h3 className={groupTitle}>In diesem Buch</h3>
+                <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
+                  {looks.map((l) => (
+                    <ContextMenu
+                      key={l.keys.join()}
+                      container={dialog}
+                      className="grid min-w-0 select-none"
+                      menu={
+                        <MenuItem icon={<BookmarkPlus />} hint="für alle Fotos und Bücher" onClick={() => keep(l)}>
+                          Zu deinen Looks
+                        </MenuItem>
+                      }
+                    >
+                      <Tile img={tileImg} edit={applySettings(edit, l)} name={l.name} txt={l.where || "aus diesem Buch"} pressed={wears(l)} onClick={() => take(l)} />
+                    </ContextMenu>
+                  ))}
+                </div>
+              </div>
+            )}
+            {tab === "s" && (mine || looks.length > 0) && <h3 className={groupTitle}>Vorschläge</h3>}
             {tab === "s" && (
               <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
                 <Tile
@@ -1973,24 +2043,9 @@ export function DevelopDialog({
                 )}
               </div>
             )}
-            {tab === "s" && copied && (
-              <div className="mt-7">
-                <h3 className={groupTitle}>Kopiert</h3>
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(92px,1fr))] sm:gap-2.5 lg:grid-cols-3 lg:gap-y-5">
-                  <Tile
-                    img={tileImg}
-                    edit={applySettings(edit, copied)}
-                    name={copied.name}
-                    txt={[copied.from && `von ${copied.from}`, copied.approx ? "nachempfunden" : "Farbe und Licht"].filter(Boolean).join(", ")}
-                    pressed={wearsLook(edit, asLook(copied, ""))}
-                    onClick={paste}
-                  />
-                </div>
-              </div>
-            )}
             {tab === "s" && (
               <div className="mt-7">
-                {own.length === 0 && (
+                {!mine && (
                   <>
                     <h3 className={groupTitle}>Deine Looks</h3>
                     <p className="text-ink-2 text-sm">Noch keine. Stell ein Foto ein, wie es dir gefällt, und speichere es als Look für alle Fotos und Bücher.</p>
@@ -1999,19 +2054,22 @@ export function DevelopDialog({
                 {naming === true ? (
                   saveForm
                 ) : (
-                  <div className={`flex flex-wrap gap-2 ${own.length ? "" : "mt-3.5"}`}>
+                  <div className={`flex flex-wrap gap-2 ${mine ? "" : "mt-3.5"}`}>
                     <Button variant="paper" size="sm" className="pl-2.5" onClick={() => setNaming(true)} disabled={colorIsNeutral(edit)}>
                       <BookmarkPlus aria-hidden />
                       Als eigenen Look speichern
                     </Button>
-                    <Button variant="paper" size="sm" className="pl-2.5" onClick={copyEdit} disabled={colorIsNeutral(edit)} title="Farbe und Licht ohne Zuschnitt, ⇧⌘C">
-                      <ClipboardCopy aria-hidden />
-                      Einstellungen kopieren
-                    </Button>
-                    {fileSettings && (
-                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyFile} title="für andere Fotos, in Calima nachempfunden">
+                    {/* im Buch liegen alle Looks schon unter „In diesem Buch“; mitnehmen braucht es nur ohne Buch */}
+                    {!inBook && (
+                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyEdit} disabled={colorIsNeutral(edit)} title="Farbe und Licht ohne Zuschnitt, für die anderen Fotos, ⇧⌘C">
                         <ClipboardCopy aria-hidden />
-                        {fileLabel} kopieren
+                        Für andere Fotos mitnehmen
+                      </Button>
+                    )}
+                    {fileSettings && (
+                      <Button variant="paper" size="sm" className="pl-2.5" onClick={copyFile} title="für andere Fotos und Bücher, in Calima nachempfunden">
+                        <ClipboardCopy aria-hidden />
+                        {fileLabel} mitnehmen
                       </Button>
                     )}
                   </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Bookmark, BookmarkPlus, Check, ClipboardCopy, ClipboardPaste, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, Share, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
+import { Bookmark, BookmarkPlus, Check, ChevronDown, ClipboardCopy, ClipboardPaste, ChevronLeft, CircleAlert, ChevronRight, Download, Eye, Gift, History, ImagePlus, LayoutGrid, LoaderCircle, MoreHorizontal, Redo2, RotateCcw, Share, SlidersHorizontal, Type, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,7 +12,7 @@ import { Book } from "@/components/book";
 import { buttonClass, Button, IconButton, ToolGroup } from "@/components/ui/button";
 import { Field, noteClass } from "@/components/ui/field";
 import { ListGroup, ListRow } from "@/components/ui/list";
-import { Menu, MenuItem } from "@/components/ui/menu";
+import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/menu";
 import { MountedSheet, Sheet } from "@/components/ui/sheet";
 import { Swatches } from "@/components/ui/swatches";
 import { notify, Toaster } from "@/components/ui/toaster";
@@ -25,7 +25,7 @@ import { pickCover, relayoutFree, spreadId, variantsOf, type SpreadDraft } from 
 import { addKey, fromSpread, materialize, removeKey, toSpread, withPages, type SpreadItem } from "@/lib/free-layout";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, cleanEdit, neutralEdit } from "@/lib/develop/model";
-import { applySettings, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
+import { applySettings, bookLooks, fromEdit, fromRecipe, sameSettings, type CopiedSettings } from "@/lib/develop/settings";
 import { ingest } from "@/lib/ingest";
 import {
   aspectFor,
@@ -56,7 +56,7 @@ import { friendlyError } from "@/lib/errors";
 import { takeHandover } from "@/lib/handoff";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
-import { copySettings, useCopiedSettings } from "@/lib/settings-clipboard";
+import { copySettings, useRecentSettings } from "@/lib/settings-clipboard";
 import { useQueryParam } from "@/lib/use-query";
 import { useUser } from "@/lib/use-user";
 import { useWide } from "@/lib/use-wide";
@@ -172,8 +172,9 @@ export function Editor() {
   }, [coverSheet]);
   const [crop, setCrop] = useState<string | null>(null);
   const [develop, setDevelop] = useState<string | null>(null);
-  // Einstellungen kopieren und einfügen (siehe pasteOn)
-  const copied = useCopiedSettings();
+  // Looks übernehmen: zuletzt mitgenommen und was im Buch schon liegt (siehe pasteOn)
+  const recent = useRecentSettings();
+  const copied = recent[0] ?? null;
   const [pasting, setPasting] = useState<string | null>(null);
   const [stageId, setStageId] = useState<string | null>(null);
   const lastClick = useRef<{ i: number; at: number } | null>(null);
@@ -542,6 +543,8 @@ export function Editor() {
   const selSpreadIndex = sel?.type === "spread" ? book.spreads.findIndex((s) => s.id === sel.id) : -1;
   const selSpread = selSpreadIndex >= 0 ? book.spreads[selSpreadIndex] : undefined;
   const spreadOf = (key: string) => book.spreads.findIndex((s) => s.keys.includes(key));
+  /** Looks, die im Buch schon auf Fotos liegen, mit ihren Doppelseiten */
+  const looksInBook = () => bookLooks(book.photos.filter((p) => !p.shelved).map((p) => ({ key: p.key, edit: p.edit, at: spreadOf(p.key) + 1 || undefined })));
 
   // ---- Änderungen an Doppelseiten und Fotos ----
   const mapSpreads = (b: StoredBook, f: (s: SpreadDraft[]) => SpreadDraft[]) => ({ ...b, spreads: f(b.spreads.map((s) => ({ ...s, keys: [...s.keys] }))) });
@@ -702,20 +705,19 @@ export function Editor() {
     if (!s) return say("Dieses Foto hat noch keine Einstellungen zum Kopieren.");
     copySettings(s);
     haptic("select");
-    say(`„${s.name}“ kopiert${s.approx ? ", in Calima nachempfunden" : ""}. Bei einem anderen Foto einfügen.`);
+    say(`„${s.name}“ mitgenommen${s.approx ? ", in Calima nachempfunden" : ""}. Liegt im Fotostudio oben bei „Deine Looks“.`);
   };
-  const pasteOn = async (p: StoredPhoto) => {
-    if (!copied || !user || pasting) return;
-    const s = copied;
+  const pasteOn = async (p: StoredPhoto, s: CopiedSettings | null = copied) => {
+    if (!s || !user || pasting) return;
     const e = applySettings(cleanEdit(p.edit) ?? neutralEdit(), s);
     setPasting(p.key);
     try {
       const out = await bakePhoto({ url: origOf(p).large, lut: buildLut(e, 33), n: 33, rec: e.rec, geo: e.geo, vignette: e.more?.vignette, clarity: e.more?.clarity });
       const urls = await uploadEdited(user.uid, book.id, p.key, out.blobs);
       update((b) => ({ ...b, photos: b.photos.map((x) => (x.key === p.key ? { ...x, ...editedPatch(x, e, { urls, color: out.color }) } : x)) }));
-      say(`„${s.name}“ eingefügt${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`, undo);
+      say(`„${s.name}“ übernommen${s.approx ? ", nachempfunden" : ""}. Der Zuschnitt bleibt.`, undo);
     } catch {
-      say("Einfügen hat nicht geklappt. Prüf die Verbindung und versuch es noch einmal.");
+      say("Übernehmen hat nicht geklappt. Prüf die Verbindung und versuch es noch einmal.");
     } finally {
       setPasting(null);
     }
@@ -743,7 +745,7 @@ export function Editor() {
       e.preventDefault();
       if (e.key.toLowerCase() === "c") copyFrom(editOf(selPhoto) ?? fileOf(selPhoto));
       else if (copied) pasteOn(selPhoto);
-      else say("Erst bei einem Foto Einstellungen kopieren.");
+      else say("Erst bei einem Foto einen Look mitnehmen.");
       return;
     }
     const i = spreadOf(selPhoto.key);
@@ -1284,30 +1286,45 @@ export function Editor() {
                 <button type="button" className={buttonClass("paper", "sm")} onClick={() => setDevelop(selPhoto.key)}>
                   Bearbeiten …
                 </button>
-                {editOf(selPhoto) && (
-                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(editOf(selPhoto))} title="Farbe und Licht ohne Zuschnitt, ⇧⌘C">
-                    <ClipboardCopy aria-hidden />
-                    Einstellungen kopieren
-                  </button>
-                )}
                 {fileOf(selPhoto) && (
-                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(fileOf(selPhoto))} title="für andere Fotos, in Calima nachempfunden">
+                  <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} onClick={() => copyFrom(fileOf(selPhoto))} title="für andere Fotos und Bücher, in Calima nachempfunden">
                     <ClipboardCopy aria-hidden />
-                    {selPhoto.recipe?.kind === "fuji" ? "Fuji-Rezept kopieren" : "Lightroom-Werte kopieren"}
+                    {selPhoto.recipe?.kind === "fuji" ? "Fuji-Rezept mitnehmen" : "Lightroom-Werte mitnehmen"}
                   </button>
                 )}
-                {copied && (
-                  <button
-                    type="button"
-                    className={buttonClass("paper", "sm", "pl-2.5")}
-                    onClick={() => pasteOn(selPhoto)}
-                    disabled={!!pasting}
-                    title={`„${copied.name}“ einfügen, ⇧⌘V`}
-                  >
-                    {pasting === selPhoto.key ? <LoaderCircle aria-hidden className="animate-spin" /> : <ClipboardPaste aria-hidden />}
-                    {pasting === selPhoto.key ? "Füge ein …" : `„${copied.name}“ einfügen`}
-                  </button>
-                )}
+                {(() => {
+                  // was hier schon liegt, steht nicht zur Wahl
+                  const mineNow = editOf(selPhoto);
+                  const here = looksInBook().filter((l) => !l.keys.includes(selPhoto.key));
+                  const fresh = recent.filter((c) => (!mineNow || !sameSettings(c, mineNow)) && !here.some((l) => sameSettings(l, c)));
+                  if (!here.length && !fresh.length) return null;
+                  return (
+                    <Menu
+                      align="start"
+                      trigger={
+                        <button type="button" className={buttonClass("paper", "sm", "pl-2.5")} disabled={!!pasting} title="Farbe und Licht von einem anderen Foto, der Zuschnitt bleibt. ⇧⌘V nimmt den zuletzt mitgenommenen">
+                          {pasting === selPhoto.key ? <LoaderCircle aria-hidden className="animate-spin" /> : <ClipboardPaste aria-hidden />}
+                          {pasting === selPhoto.key ? "Übernehme …" : "Look übernehmen"}
+                          <ChevronDown aria-hidden />
+                        </button>
+                      }
+                    >
+                      {fresh.length > 0 && <MenuLabel>Zuletzt mitgenommen</MenuLabel>}
+                      {fresh.map((c, i) => (
+                        <MenuItem key={`r${i}`} hint={[c.from, c.approx && "nachempfunden"].filter(Boolean).join(", ") || undefined} onClick={() => pasteOn(selPhoto, c)}>
+                          {c.name}
+                        </MenuItem>
+                      ))}
+                      {fresh.length > 0 && here.length > 0 && <MenuSeparator />}
+                      {here.length > 0 && <MenuLabel>In diesem Buch</MenuLabel>}
+                      {here.map((l) => (
+                        <MenuItem key={l.keys.join()} hint={l.where || undefined} onClick={() => pasteOn(selPhoto, l)}>
+                          {l.name}
+                        </MenuItem>
+                      ))}
+                    </Menu>
+                  );
+                })()}
                 <button
                   type="button"
                   className={buttonClass("paper", "sm")}
@@ -1478,6 +1495,7 @@ export function Editor() {
           start={develop}
           uid={user.uid}
           bookId={book.id}
+          looks={looksInBook()}
           onDone={(patches) => {
             if (Object.keys(patches).length) update((b) => ({ ...b, photos: b.photos.map((p) => (patches[p.key] ? { ...p, ...patches[p.key] } : p)) }));
             setDevelop(null);
