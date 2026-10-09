@@ -9,6 +9,7 @@ import { BookPlus, Camera as CameraIcon, ChevronLeft, Pencil, Trash2 } from "luc
 
 import { Button } from "@/components/ui/button";
 import { ListGroup, ListRow } from "@/components/ui/list";
+import { hitClass } from "@/components/ui-classes";
 import { Segmented } from "@/components/ui/segmented";
 import { MountedSheet } from "@/components/ui/sheet";
 import { notify } from "@/components/ui/toaster";
@@ -91,7 +92,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
 
   useEffect(() => {
     listPrints(user.uid)
-      .then((p) => setPrints(trimPiles(piles(p)).keep.flat()))
+      .then((p) => {
+        const { keep, drop } = trimPiles(piles(p));
+        setPrints(keep.flat());
+        // was über die Grenzen geht, etwa seit einer Woche Weggelegtes, verlässt auch das Gerät
+        for (const x of drop) removePrint(x.id).catch(() => {});
+      })
       .catch(() => {});
   }, [user.uid]);
 
@@ -107,6 +113,10 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
   const shown = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);
   const stacks = piles(shown);
+  // auf dem Pult liegt, was noch einsortiert wird oder ins Buch soll; Weggelegtes liegt eine Woche darunter
+  const desk = stacks.map((pile) => (isDayStack(pile[0].stack) ? pile.filter((p) => p.pick !== "out") : pile)).filter((pile) => pile.length);
+  const onDesk = desk.flat();
+  const away = prints.filter((p) => isDayStack(p.stack) && p.pick === "out");
 
   const openCamera = () => setCameraOpen(true);
   // Quick Action am App-Symbol, während das Zimmer offen ist (app-launch.tsx)
@@ -162,13 +172,15 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     setPreparing(null);
     if (broken) notify(broken === 1 ? t("Ein Foto ließ sich nicht öffnen.") : t("{n} Fotos ließen sich nicht öffnen.", { n: numberWord(broken) }));
   };
-  /** nach dem Einsortieren: der Tag liegt im Buch, sein Stapel verlässt den Pult */
+  /** nach dem Einsortieren: was im Buch liegt, verlässt den Pult; Weggelegtes bleibt darunter, bis die Woche um ist */
   const clearDay = (stack: string) => {
+    const laid = (p: Print) => p.stack === stack && p.pick !== "out";
     setPrints((list) => {
-      for (const p of list) if (p.stack === stack) removePrint(p.id).catch(() => {});
-      return list.filter((p) => p.stack !== stack);
+      for (const p of list) if (laid(p)) removePrint(p.id).catch(() => {});
+      return list.filter((p) => !laid(p));
     });
   };
+  const bringBack = () => keep(away.map((p) => ({ ...p, pick: undefined, pickAt: undefined })));
 
   const open = async (given: File[]) => {
     setError(null);
@@ -232,14 +244,14 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (e.dataTransfer.files.length) open([...e.dataTransfer.files]);
   };
 
-  const sub = shown.length
+  const sub = onDesk.length
     ? `${
-        stacks.length < shown.length
-          ? stacks.length === 1
-            ? t("{prints} in einem Stapel", { prints: abzuege(shown.length) })
-            : t("{prints} in {n} Stapeln", { prints: abzuege(shown.length), n: numberWord(stacks.length).toLowerCase() })
-          : abzuege(shown.length)
-      } · ${t("zuletzt {when}", { when: when(shown[0].at) })}`
+        desk.length < onDesk.length
+          ? desk.length === 1
+            ? t("{prints} in einem Stapel", { prints: abzuege(onDesk.length) })
+            : t("{prints} in {n} Stapeln", { prints: abzuege(onDesk.length), n: numberWord(desk.length).toLowerCase() })
+          : abzuege(onDesk.length)
+      } · ${t("zuletzt {when}", { when: when(onDesk[0].at) })}`
     : t("Fotos bearbeiten, sichern oder in ein Buch legen. Gern mehrere auf einmal.");
 
   return (
@@ -262,16 +274,16 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       </div>
 
       <ul className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 md:pl-8" aria-label={t("Abzüge")}>
-        {stacks.map((pile, i) =>
+        {desk.map((pile, i) =>
           isDayStack(pile[0].stack) ? (
-            <DayTile key={pile[0].stack} pile={pile} i={i} n={stacks.length} onOpen={() => setSorting(pile[0].stack!)} />
+            <DayTile key={pile[0].stack} pile={pile} i={i} n={desk.length} onOpen={() => setSorting(pile[0].stack!)} />
           ) : pile.length > 1 ? (
-            <StackTile key={pile[0].stack} pile={pile} i={i} n={stacks.length} onOpen={() => setEditing(pile)} />
+            <StackTile key={pile[0].stack} pile={pile} i={i} n={desk.length} onOpen={() => setEditing(pile)} />
           ) : (
-            <PrintTile key={pile[0].id} print={pile[0]} i={i} n={stacks.length} onOpen={() => setEditing(pile)} />
+            <PrintTile key={pile[0].id} print={pile[0]} i={i} n={desk.length} onOpen={() => setEditing(pile)} />
           ),
         )}
-        <OnTable i={stacks.length} n={stacks.length} tilt={2} className={shown.length ? "ml-4" : "-ml-5 md:-ml-6"}>
+        <OnTable i={desk.length} n={desk.length} tilt={2} className={onDesk.length ? "ml-4" : "-ml-5 md:-ml-6"}>
           <button
             type="button"
             onClick={() => input.current?.click()}
@@ -283,7 +295,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
               +
             </span>
             <span className="text-[15px] leading-tight font-bold" aria-live="polite">
-              {preparing ?? (shown.length ? t("Neue Fotos") : t("Fotos wählen"))}
+              {preparing ?? (onDesk.length ? t("Neue Fotos") : t("Fotos wählen"))}
             </span>
           </button>
         </OnTable>
@@ -303,11 +315,19 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           if (fs.length) open(fs).finally(() => (el.value = ""));
         }}
       />
-      {shown.length > 0 && (
+      {onDesk.length > 0 && (
         <p className="text-on-table-2 mt-2 text-[13px]">
-          {stacks.some((pile) => isDayStack(pile[0].stack))
+          {desk.some((pile) => isDayStack(pile[0].stack))
             ? t("Ein Tag öffnet sich zum Einsortieren: nach rechts ins Buch, nach links weg. Nichts davon wird hochgeladen, bevor es im Buch liegt.")
             : t("Ein Abzug öffnet das Foto wieder, ein Stapel die ganze Serie, so wie du sie bearbeitet hast. Nichts davon wird hochgeladen.")}
+        </p>
+      )}
+      {away.length > 0 && (
+        <p className="text-on-table-2 text-[13px]">
+          {away.length === 1 ? t("Ein Foto ist weggelegt, nach einer Woche räumt Calima es weg.") : t("{n} Fotos sind weggelegt, nach einer Woche räumt Calima sie weg.", { n: away.length })}{" "}
+          <button type="button" onClick={bringBack} className={`${hitClass} text-on-table decoration-mark font-semibold decoration-2 underline-offset-4 hover:underline`}>
+            {t("Zurückholen")}
+          </button>
         </p>
       )}
       {hasCamera() && <Shutter onShoot={openCamera} hidden={camera || !!sorting} />}
@@ -328,7 +348,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           onChange={keep}
           onAdd={(files) => addToDay(sorting, files)}
           onEditAll={() => {
-            const pile = stacks.find((x) => x[0].stack === sorting);
+            const pile = desk.find((x) => x[0].stack === sorting);
             setSorting(null);
             if (pile) setEditing(pile);
           }}
