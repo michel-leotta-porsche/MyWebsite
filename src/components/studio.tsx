@@ -349,6 +349,7 @@ function DoneSheet({
       n: N,
       rec: e.rec,
       geo: e.geo,
+      vignette: e.more?.vignette,
       sizes: { large: STUDIO_LONG, page: SIZES.page, thumb: SIZES.thumb },
       quality: 0.92,
       maxBytes: 40 * 1024 * 1024,
@@ -423,7 +424,7 @@ function DoneSheet({
       if (edit && !isNeutral(edit)) {
         const local = URL.createObjectURL(ph.blobs.large);
         try {
-          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo });
+          const out = await bakePhoto({ url: local, lut: buildLut(edit, N), n: N, rec: edit.rec, geo: edit.geo, vignette: edit.more?.vignette });
           const urls = await uploadEdited(user.uid, bookId, key, out.blobs);
           photo = { ...photo, ...editedPatch(photo, edit, { urls, color: out.color }) };
         } finally {

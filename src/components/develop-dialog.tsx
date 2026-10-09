@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Redo2, RotateCcw, Trash, Undo2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Aperture, BookmarkPlus, Check, ChevronDown, ChevronLeft, Columns2, Crop, Droplet, Palette, Redo2, RotateCcw, Sun, Trash, Undo2, X, ZoomIn, ZoomOut, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 
 import { CropStage, StraightenDial } from "@/components/crop-stage";
@@ -10,8 +10,9 @@ import { Button, buttonClass, IconButton, ToolGroup } from "@/components/ui/butt
 import { Field } from "@/components/ui/field";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { Segmented } from "@/components/ui/segmented";
+import { Swatches } from "@/components/ui/swatches";
 import { bakePhoto } from "@/lib/develop/bake";
-import { cropFor, fitCrop, GEO0, geoIsNeutral, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
+import { cropFor, fitCrop, GEO0, geoIsNeutral, outMap, outSize, RATIOS, ratioLabel, ratioOf, turned, type Geo, type Ratio } from "@/lib/develop/geo";
 import {
   applyLut,
   cleanEdit,
@@ -21,8 +22,13 @@ import {
   buildLut,
   FINE,
   isNeutral,
+  HUES,
   LOOKS,
   lookOf,
+  MORE0,
+  MORE_SLIDERS,
+  moreIsNeutral,
+  signed100,
   matchTransfer,
   moodTransfer,
   neutralEdit,
@@ -34,6 +40,7 @@ import {
   wearsLook,
   signedStep,
   stats,
+  type More,
   type NamedRecipe,
   type PhotoEdit,
   type PhotoStats,
@@ -166,6 +173,27 @@ const fullOf = (p: StoredPhoto, long: number): [number, number] => {
   const s = Math.min(1, long / Math.max(w, h));
   return [Math.round(w * s), Math.round(h * s)];
 };
+
+/* ---------- Mehr Werkzeuge: Gruppen, die sich unter die fünf Regler klappen ---------- */
+
+type Group = "light" | "color" | "hsl" | "vignette";
+const GROUPS: [Group, string, string, LucideIcon][] = [
+  ["light", "Licht genauer", "Lichter, Weiß, Schwarz", Sun],
+  ["color", "Farbe genauer", "Tönung, Dynamik", Droplet],
+  ["hsl", "Farben einzeln", "acht Farbtöne", Palette],
+  ["vignette", "Vignette", "Ränder abdunkeln", Aperture],
+];
+const GROUPS_KEY = "calima-dev-groups";
+/** Was in einer Gruppe verstellt ist, kurz; leer, wenn nichts */
+function groupNote(m: More | undefined, g: Group): string {
+  if (!m) return "";
+  if (g === "hsl") {
+    const n = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([name]) => name);
+    return n.length ? n.join(", ") : "";
+  }
+  const row = MORE_SLIDERS.find(([k, , grp]) => grp === g && Math.abs(m[k]) > 0.005);
+  return row ? `${row[1]} ${signed100(m[row[0]])}` : "";
+}
 
 /**
  * Lage der Vorschau in der Bühne: die Bühne zeigt den Rahmen, die Zeichenfläche (ganzes Bild) liegt gedreht und
@@ -452,6 +480,17 @@ export function DevelopDialog({
   const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [cropping, setCropping] = useState(false);
+  // offene Gruppen merkt sich das Gerät, für alle Fotos
+  const [groups, setGroups] = useState<Group[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? "[]");
+      return Array.isArray(v) ? GROUPS.map(([g]) => g).filter((g) => v.includes(g)) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [folded, setFolded] = useState<Group[]>([]);
+  const [hue, setHue] = useState(1);
   const croppingNow = useRef(cropping);
   croppingNow.current = cropping;
 
@@ -567,14 +606,15 @@ export function DevelopDialog({
     const gg = edit.geo ?? GEO0();
     const sdir: [number, number] = ([[1, 0], [0, -1], [-1, 0], [0, 1]] as const)[gg.quarter].map((v) => (gg.flip ? -v : v)) as [number, number];
     const at = gg.crop[0] + split * gg.crop[2];
-    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? at : null, original: holding, sdir });
+    const vmap = outMap(edit.geo, fw, fh);
+    const draw = (n: number) => p.draw({ lut: lutFor(edit, n, key), n, rec: edit.rec, split: compare ? at : null, original: holding, sdir, vignette: edit.more?.vignette, vmap });
     const raf = requestAnimationFrame(() => draw(lutCache.has(`${FINE_N}|${key}`) ? FINE_N : FAST));
     const t = window.setTimeout(() => draw(FINE_N), 140);
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(t);
     };
-  }, [edit, compare, split, holding, shown]);
+  }, [edit, compare, split, holding, shown, fw, fh]);
 
   /* ----- Ändern ----- */
 
@@ -659,6 +699,22 @@ export function DevelopDialog({
   const liveRec = (patch: Partial<RecipeValues>) => {
     burst();
     setEdit((e) => ({ ...e, rec: { ...e.rec, ...patch } }));
+  };
+  const liveMore = (fn: (m: More) => Partial<More>) => {
+    burst();
+    setEdit((e) => {
+      const m = { ...(e.more ?? MORE0()) };
+      const next = { ...m, ...fn(m) };
+      return { ...e, more: moreIsNeutral(next) ? undefined : next };
+    });
+  };
+  const keepGroups = (next: Group[]) => {
+    setGroups(next);
+    try {
+      localStorage.setItem(GROUPS_KEY, JSON.stringify(next));
+    } catch {
+      // privates Fenster: dann eben nur für diesen Dialog
+    }
   };
 
   /* ----- Zuschneiden ----- */
@@ -1015,7 +1071,7 @@ export function DevelopDialog({
           continue;
         }
         setBusy(changed.length > 1 ? `Speichere Foto ${i + 1} von ${changed.length} …` : "Speichere das Foto …");
-        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo });
+        const out = await bakePhoto({ url: orig.large, lut: lutFor(e, FINE_N), n: FINE_N, rec: e.rec, geo: e.geo, vignette: e.more?.vignette });
         if (cancelled.current) return;
         const urls = await uploadEdited(uid, bookId, p.key, out.blobs);
         if (cancelled.current) return;
@@ -1553,6 +1609,100 @@ export function DevelopDialog({
                 ))}
               </div>
             )}
+            {tab === "f" &&
+              (() => {
+                const m = edit.more ?? MORE0();
+                const shownGroups = GROUPS.filter(([g]) => groups.includes(g) || groupNote(edit.more, g));
+                const pick = (g: Group) => {
+                  const changed = !!groupNote(edit.more, g);
+                  if (groups.includes(g) && !changed) return keepGroups(groups.filter((x) => x !== g));
+                  if (!groups.includes(g)) keepGroups([...groups, g]);
+                  setFolded((f) => f.filter((x) => x !== g));
+                  // nach dem Aufklappen zur Gruppe rollen
+                  requestAnimationFrame(() => document.getElementById(`dv-g-${g}`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }));
+                };
+                const slider = (k: (typeof MORE_SLIDERS)[number][0], name: string) => (
+                  <Slider key={k} id={`dv-m-${k}`} label={name} value={m[k]} min={-1} max={1} step={0.01} zero={0} format={signed100} onChange={(v) => liveMore(() => ({ [k]: v }))} />
+                );
+                return (
+                  <div className="mt-5 grid gap-3 lg:mt-6">
+                    {shownGroups.map(([g, name]) => {
+                      const note = groupNote(edit.more, g);
+                      const open = !folded.includes(g);
+                      return (
+                        <section key={g} id={`dv-g-${g}`} aria-label={name} className="border-ink/12 border-t pt-2.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              aria-expanded={open}
+                              aria-controls={`dv-gb-${g}`}
+                              onClick={() => setFolded((f) => (open ? [...f, g] : f.filter((x) => x !== g)))}
+                              className="hover:bg-ink/6 -ml-2 flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left text-[15px] font-bold tracking-[-0.01em]"
+                            >
+                              <ChevronDown aria-hidden className={`size-4 flex-none transition-transform duration-150 ${open ? "" : "-rotate-90"}`} />
+                              <span aria-hidden className={`size-2 flex-none rounded-full border-[1.5px] ${note ? "border-ink bg-mark" : "border-ink-2"}`} />
+                              <span className="truncate">{name}</span>
+                              {!open && note && <span className="text-ink-2 ml-auto truncate text-xs font-normal">{note}</span>}
+                            </button>
+                            {!note && (
+                              <IconButton label={`${name} schließen`} variant="paper" onClick={() => keepGroups(groups.filter((x) => x !== g))} className="!bg-transparent">
+                                <X aria-hidden />
+                              </IconButton>
+                            )}
+                          </div>
+                          <div id={`dv-gb-${g}`} hidden={!open} className="grid gap-x-[22px] gap-y-2.5 pt-1 pb-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-4">
+                            {g === "hsl" ? (
+                              <div className="grid gap-2.5 sm:col-span-2 lg:col-span-1">
+                                <Swatches
+                                  label={`${HUES[hue][0]}: ${HUES[hue][3]}`}
+                                  items={HUES.map(([n, , color], i) => ({ id: String(i), label: n, color, ink: "var(--paper)" }))}
+                                  value={String(hue)}
+                                  onChange={(id) => setHue(Number(id))}
+                                />
+                                {(["Farbton", "Sättigung", "Helligkeit"] as const).map((label, j) => (
+                                  <Slider
+                                    key={label}
+                                    id={`dv-hsl-${j}`}
+                                    label={label}
+                                    value={m.hsl[hue][j]}
+                                    min={-1}
+                                    max={1}
+                                    step={0.01}
+                                    zero={0}
+                                    format={signed100}
+                                    onChange={(v) => liveMore((x) => ({ hsl: x.hsl.map((t, i) => (i === hue ? (t.map((y, jj) => (jj === j ? v : y)) as [number, number, number]) : t)) }))}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              MORE_SLIDERS.filter(([, , grp]) => grp === g).map(([k, label]) => slider(k, label))
+                            )}
+                          </div>
+                        </section>
+                      );
+                    })}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <Menu
+                        align="start"
+                        container={dialog}
+                        trigger={
+                          <button type="button" className={buttonClass("paper", "sm", "pl-3")}>
+                            Mehr Werkzeuge
+                            <ChevronDown aria-hidden />
+                          </button>
+                        }
+                      >
+                        {GROUPS.map(([g, name, txt, Icon]) => (
+                          <MenuItem key={g} icon={<Icon />} hint={txt} checked={shownGroups.some(([x]) => x === g)} onClick={() => pick(g)}>
+                            {name}
+                          </MenuItem>
+                        ))}
+                      </Menu>
+                      <span className="text-ink-2 text-xs">{shownGroups.length ? `${shownGroups.length} von ${GROUPS.length} offen` : "Lichter, Tönung, einzelne Farben, Vignette"}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
             {tab === "r" && (
               <div className="grid gap-x-7 gap-y-4 sm:grid-cols-2 lg:grid-cols-1 lg:gap-y-7">

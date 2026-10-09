@@ -26,7 +26,25 @@ export function Menu({ trigger, children, align = "end", container }: { trigger:
   );
 }
 
-export function MenuItem({ icon, children, onClick, danger = false, disabled }: { icon?: ReactNode; children: ReactNode; onClick?: () => void; danger?: boolean; disabled?: boolean }) {
+export function MenuItem({
+  icon,
+  children,
+  hint,
+  checked,
+  onClick,
+  danger = false,
+  disabled,
+}: {
+  icon?: ReactNode;
+  children: ReactNode;
+  /** zweite Zeile, klein: was dahinter steckt */
+  hint?: ReactNode;
+  /** Haken rechts, z. B. für eine schon offene Gruppe */
+  checked?: boolean;
+  onClick?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
   return (
     <BaseMenu.Item
       disabled={disabled}
@@ -37,7 +55,20 @@ export function MenuItem({ icon, children, onClick, danger = false, disabled }: 
       className={`flex min-h-11 cursor-default items-center gap-3 px-4 text-[15px] outline-none select-none data-disabled:opacity-45 data-highlighted:bg-ink/8 [&_svg]:size-[18px] [&_svg]:shrink-0 ${danger ? "text-danger" : ""}`}
     >
       {icon && <span className={danger ? "" : "text-ink-2"}>{icon}</span>}
-      {children}
+      {hint ? (
+        <span className="grid py-1.5 leading-tight">
+          {children}
+          <span className="text-ink-2 text-xs">{hint}</span>
+        </span>
+      ) : (
+        children
+      )}
+      {checked !== undefined && (
+        <svg aria-hidden viewBox="0 0 24 24" className={`ml-auto fill-none stroke-current stroke-[2.4] ${checked ? "" : "opacity-0"}`} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      )}
+      {checked && <span className="sr-only">, offen</span>}
     </BaseMenu.Item>
   );
 }

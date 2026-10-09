@@ -55,7 +55,39 @@ export type PhotoEdit = {
   recName?: string;
   /** Zuschnitt, Drehen, Spiegeln, Geraderichten */
   geo?: Geo;
+  /** „Mehr Werkzeuge“: feinere Regler hinter dem Menü; fehlt, solange keiner benutzt wurde */
+  more?: More;
 };
+
+/** acht Farbtöne für „Farben einzeln“: Name, Mitte in Grad, Probe, wofür er gut ist */
+export const HUES: [string, number, string, string][] = [
+  ["Rot", 0, "#c8423a", "Lippen, Mohn, Rücklichter"],
+  ["Orange", 30, "#d9822f", "Haut, Sand, Abendlicht"],
+  ["Gelb", 58, "#d8b836", "Laub im Herbst, Raps, Kerzenlicht"],
+  ["Grün", 115, "#5f9a45", "Wiesen, Blätter"],
+  ["Türkis", 175, "#3f9c98", "Lagunen, Glas"],
+  ["Blau", 220, "#3f6fb5", "Himmel, Meer, Schatten"],
+  ["Lila", 270, "#7a55b0", "Lavendel, Dämmerung"],
+  ["Magenta", 320, "#b84a8c", "Blüten, Neon"],
+];
+
+export type More = {
+  /** Licht genauer, je −1..1 */
+  highlights: number;
+  whites: number;
+  blacks: number;
+  /** Farbe genauer: Tönung (− grün, + magenta) und Dynamik */
+  tint: number;
+  vibrance: number;
+  /** Farben einzeln: je Farbton [Farbton, Sättigung, Helligkeit], je −1..1 */
+  hsl: [number, number, number][];
+  /** Vignette: − dunkle Ränder, + helle Ränder */
+  vignette: number;
+};
+
+export const MORE0 = (): More => ({ highlights: 0, whites: 0, blacks: 0, tint: 0, vibrance: 0, hsl: HUES.map(() => [0, 0, 0]), vignette: 0 });
+export const moreIsNeutral = (m: More | undefined | null) =>
+  !m || (!m.highlights && !m.whites && !m.blacks && !m.tint && !m.vibrance && !m.vignette && m.hsl.every((t) => !t[0] && !t[1] && !t[2]));
 
 export const REC0 = (): RecipeValues => ({ film: null, wbR: 0, wbB: 0, hl: 0, sh: 0, color: 0, dr: 100, cc: 0, fxb: 0, grain: 0, gsize: "klein" });
 
@@ -85,11 +117,11 @@ export function isNeutral(e: PhotoEdit | undefined | null): boolean {
 
 /** Ändert die Bearbeitung die Farben? (ohne Zuschnitt) */
 export function colorIsNeutral(e: PhotoEdit): boolean {
-  return !e.exposure && !e.contrast && !e.shadows && !e.warmth && !e.sat && !e.look && !e.levels && !e.transfer && recipeIsEmpty(e.rec);
+  return !e.exposure && !e.contrast && !e.shadows && !e.warmth && !e.sat && !e.look && !e.levels && !e.transfer && recipeIsEmpty(e.rec) && moreIsNeutral(e.more);
 }
 
-/** Schlüssel für alles, was den LUT bestimmt: der Zuschnitt gehört nicht dazu */
-export const colorKey = (e: PhotoEdit) => JSON.stringify({ ...e, geo: undefined });
+/** Schlüssel für alles, was den LUT bestimmt: Zuschnitt und Vignette gehören nicht dazu */
+export const colorKey = (e: PhotoEdit) => JSON.stringify({ ...e, geo: undefined, more: e.more && { ...e.more, vignette: 0 } });
 
 /* ---------- Prüfen: Bearbeitungen aus fremden Büchern ---------- */
 
@@ -142,7 +174,24 @@ export function cleanEdit(e: unknown): PhotoEdit | undefined {
     },
     recName: str(x.recName, 40),
     geo: cleanGeo(x.geo),
+    more: cleanMore(x.more),
   };
+}
+
+function cleanMore(v: unknown): More | undefined {
+  if (!v || typeof v !== "object") return undefined;
+  const x = v as Record<string, unknown>;
+  const h = Array.isArray(x.hsl) ? x.hsl : [];
+  const m: More = {
+    highlights: num(x.highlights, -1, 1),
+    whites: num(x.whites, -1, 1),
+    blacks: num(x.blacks, -1, 1),
+    tint: num(x.tint, -1, 1),
+    vibrance: num(x.vibrance, -1, 1),
+    hsl: HUES.map((_, i) => (nums(h[i], 3, -1, 1) as [number, number, number] | null) ?? [0, 0, 0]),
+    vignette: num(x.vignette, -1, 1),
+  };
+  return moreIsNeutral(m) ? undefined : m;
 }
 
 /* ---------- Farbe ---------- */
@@ -231,10 +280,10 @@ export const lookOf = (id: LookId | null) => LOOKS.find((l) => l.id === id);
 /* ---------- Rezepte: fünf voreingestellte, eigene kommen aus dem Profil ---------- */
 
 /** Teil eines eigenen Looks, der nicht vom einzelnen Foto abhängt: Feinschliff und Look mit Stärke */
-export type LookFine = Pick<PhotoEdit, "exposure" | "contrast" | "shadows" | "warmth" | "sat" | "look" | "amount">;
+export type LookFine = Pick<PhotoEdit, "exposure" | "contrast" | "shadows" | "warmth" | "sat" | "look" | "amount" | "more">;
 /** Rezept; mit f ein „eigener Look“, der alle übertragbaren Einstellungen mitnimmt */
 export type NamedRecipe = { id: string; name: string; txt: string; v: RecipeValues; f?: LookFine };
-export const fineOf = (e: PhotoEdit): LookFine => ({ exposure: e.exposure, contrast: e.contrast, shadows: e.shadows, warmth: e.warmth, sat: e.sat, look: e.look, amount: e.amount });
+export const fineOf = (e: PhotoEdit): LookFine => ({ exposure: e.exposure, contrast: e.contrast, shadows: e.shadows, warmth: e.warmth, sat: e.sat, look: e.look, amount: e.amount, more: e.more });
 /** trägt ein Foto genau diesen eigenen Look? */
 export const wearsLook = (e: PhotoEdit, r: NamedRecipe) => sameRecipe(r.v, e.rec) && (!r.f || JSON.stringify(r.f) === JSON.stringify(fineOf(e)));
 
@@ -327,6 +376,7 @@ function pipe(e: PhotoEdit, rgb: RGB): RGB {
   r = cl(r);
   g = cl(g);
   b = cl(b);
+  if (e.more) [r, g, b] = more(e.more, [r, g, b]);
   // Look mit Stärke
   const look = lookOf(e.look);
   if (look) {
@@ -336,6 +386,102 @@ function pipe(e: PhotoEdit, rgb: RGB): RGB {
     b = mix(b, cl(o[2]), e.amount);
   }
   return [r, g, b];
+}
+
+/* ---------- Mehr Werkzeuge ---------- */
+
+function toHsl(r: number, g: number, b: number): RGB {
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const l = (mx + mn) / 2;
+  const d = mx - mn;
+  if (d < 1e-6) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function fromHsl(h: number, s: number, l: number): RGB {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  const [r, g, b] = hp < 1 ? [c, x, 0] : hp < 2 ? [x, c, 0] : hp < 3 ? [0, c, x] : hp < 4 ? [0, x, c] : hp < 5 ? [x, 0, c] : [c, 0, x];
+  const m = l - c / 2;
+  return [r + m, g + m, b + m];
+}
+/** Gewicht eines Farbtons: weiche Glocke bis zum Nachbarn */
+function hueWeight(h: number, i: number): number {
+  const c = HUES[i][1];
+  const prev = HUES[(i + HUES.length - 1) % HUES.length][1];
+  const next = HUES[(i + 1) % HUES.length][1];
+  let d = h - c;
+  d = ((d + 540) % 360) - 180;
+  const span = d < 0 ? (c - prev + 360) % 360 : (next - c + 360) % 360;
+  const t = Math.abs(d) / span;
+  return t >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * t);
+}
+
+/** Licht genauer, Farbe genauer, Farben einzeln; alles Farbe → Farbe, also im LUT */
+function more(m: More, [r, g, b]: RGB): RGB {
+  if (m.highlights || m.whites || m.blacks) {
+    const l = cl(luma(r, g, b));
+    const u = cl((l - 0.35) / 0.65);
+    // Lichter in den hellen Mitten, Weiß und Schwarz an den Enden
+    const d = m.highlights * 0.14 * 4 * u * (1 - u) + m.whites * 0.14 * l ** 4 + m.blacks * 0.12 * (1 - l) ** 4;
+    r += d;
+    g += d;
+    b += d;
+  }
+  if (m.tint) {
+    r = gam(lin(cl(r)) * (1 + m.tint * 0.05));
+    g = gam(lin(cl(g)) * (1 - m.tint * 0.09));
+    b = gam(lin(cl(b)) * (1 + m.tint * 0.05));
+  }
+  if (m.vibrance) {
+    // Dynamik: wenig gesättigte Farben bewegen sich stärker, Hauttöne etwas weniger
+    const s = Math.max(r, g, b) - Math.min(r, g, b);
+    const skin = r > g && g > b ? 0.6 : 1;
+    [r, g, b] = satur([r, g, b], 1 + m.vibrance * (1 - Math.min(1, s * 1.8)) * skin * (m.vibrance > 0 ? 1 : 0.9));
+  }
+  if (m.hsl.some((t) => t[0] || t[1] || t[2])) {
+    const [h, s, l] = toHsl(cl(r), cl(g), cl(b));
+    let dh = 0;
+    let ds = 0;
+    let dl = 0;
+    for (let i = 0; i < HUES.length; i++) {
+      const w = hueWeight(h, i);
+      if (!w) continue;
+      dh += w * m.hsl[i][0];
+      ds += w * m.hsl[i][1];
+      dl += w * m.hsl[i][2];
+    }
+    // Grautöne haben keinen Farbton: je bunter, desto mehr wirkt es
+    const k = Math.min(1, s * 2.5);
+    [r, g, b] = fromHsl(h + dh * 30 * k, cl(s * (1 + ds * k)), cl(l + dl * 0.18 * k * s));
+  }
+  return [cl(r), cl(g), cl(b)];
+}
+
+/* ---------- Vignette: in Vorschau (GLSL) und Einrechnen gleich, bezogen auf den Zuschnitt ---------- */
+
+/** Stärke der Vignette an einer Stelle des Ergebnisses (0..1 in beiden Richtungen) */
+export function vignetteAt(x: number, y: number): number {
+  const d = Math.hypot((x - 0.5) * 2, (y - 0.5) * 2);
+  const t = cl((d - 0.45) / 0.7);
+  return t * t * (3 - 2 * t);
+}
+/** Vignette auf Pixel eines Streifens (Breite w, Gesamthöhe h, ab Zeile y0) */
+export function applyVignette(px: Uint8ClampedArray, w: number, h: number, v: number, y0 = 0) {
+  if (!v) return;
+  const rows = px.length / 4 / w;
+  for (let y = 0; y < rows; y++) {
+    const fy = (y + y0 + 0.5) / h;
+    for (let x = 0; x < w; x++) {
+      const f = vignetteAt((x + 0.5) / w, fy);
+      if (!f) continue;
+      const i = (y * w + x) * 4;
+      for (let k = 0; k < 3; k++) px[i + k] = v < 0 ? px[i + k] * (1 + v * 0.7 * f) : px[i + k] + (255 - px[i + k]) * v * 0.6 * f;
+    }
+  }
 }
 
 /** 3D-LUT als RGBA8, Index (b·N + g)·N + r. 33 Punkte zum Einrechnen, 17 reichen beim Ziehen */
@@ -510,6 +656,12 @@ export function describeEdit(e: PhotoEdit): { label: string; value: string }[] {
   const look = lookOf(e.look);
   if (look) rows.push({ label: "Look", value: `${look.name} ${Math.round(e.amount * 100)} %` });
   for (const [k, label, f] of FINE) if (Math.abs(e[k]) > 0.005) rows.push({ label, value: f(e[k]) });
+  const m = e.more;
+  if (m && !moreIsNeutral(m)) {
+    for (const [k, label] of MORE_SLIDERS) if (Math.abs(m[k]) > 0.005) rows.push({ label, value: signed100(m[k]) });
+    const hues = HUES.filter((_, i) => m.hsl[i].some((v) => Math.abs(v) > 0.005)).map(([n]) => n);
+    if (hues.length) rows.push({ label: "Farben einzeln", value: hues.join(", ") });
+  }
   if (e.geo && !geoIsNeutral(e.geo)) rows.push({ label: "Zuschnitt", value: describeGeo(e.geo) });
   return rows;
 }
@@ -523,3 +675,15 @@ export const FINE: [keyof Pick<PhotoEdit, "exposure" | "contrast" | "shadows" | 
   ["sat", "Farbe", (v) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`, -1, 1],
 ];
 export { signed as signedStep };
+
+const signed100 = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(Math.round(v * 100))}`;
+/** Regler in „Mehr Werkzeuge“ außer den Farben einzeln: Schlüssel, Name, Gruppe */
+export const MORE_SLIDERS: [Exclude<keyof More, "hsl">, string, "light" | "color" | "vignette"][] = [
+  ["highlights", "Lichter", "light"],
+  ["whites", "Weiß", "light"],
+  ["blacks", "Schwarz", "light"],
+  ["tint", "Tönung", "color"],
+  ["vibrance", "Dynamik", "color"],
+  ["vignette", "Vignette", "vignette"],
+];
+export { signed100 };
