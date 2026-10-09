@@ -1,7 +1,8 @@
 "use client";
 
-import { isDayStack } from "@/lib/day-stack";
+import { dayStack, isDayStack } from "@/lib/day-stack";
 import type { PhotoEdit } from "@/lib/develop/model";
+import { undevelopedStacks } from "@/lib/film";
 import { t } from "@/lib/i18n";
 import type { PhotoMeta } from "@/lib/ingest";
 
@@ -71,9 +72,10 @@ export const KEEP_AWAY = 7 * 864e5;
 /**
  * was liegen bleibt: höchstens MAX_PRINTS Stapel und MAX_KEPT Fotos, der neueste Stapel immer ganz.
  * Tagesstapel (Abendstapel) räumt das Studio nicht selbst weg und zählt sie nicht mit: Fotos aus Calimas Kamera
- * gibt es nur hier, bis sie im Buch liegen. Nur was dort seit KEEP_AWAY weggelegt ist, geht.
+ * gibt es nur hier, bis sie im Buch liegen. Nur was dort seit KEEP_AWAY weggelegt ist, geht. Unentwickelte Filme (dark)
+ * bleiben ebenso ganz und zählen nicht mit: ihre Bilder gibt es nirgends sonst, und man sieht sie erst nach dem Entwickeln.
  */
-export function trimPiles(all: Print[][], now = Date.now()): { keep: Print[][]; drop: Print[] } {
+export function trimPiles(all: Print[][], now = Date.now(), dark = undevelopedStacks()): { keep: Print[][]; drop: Print[] } {
   const keep: Print[][] = [];
   let kept = 0;
   let n = 0;
@@ -81,6 +83,10 @@ export function trimPiles(all: Print[][], now = Date.now()): { keep: Print[][]; 
     if (isDayStack(pile[0].stack)) {
       const left = pile.filter((p) => p.pick !== "out" || (p.pickAt ?? now) > now - KEEP_AWAY);
       if (left.length) keep.push(left);
+      continue;
+    }
+    if (pile[0].stack && dark.has(pile[0].stack)) {
+      keep.push(pile);
       continue;
     }
     if (kept && (kept >= MAX_PRINTS || n + pile.length > MAX_KEPT)) continue;
@@ -217,6 +223,18 @@ export async function putPrints(uid: string, ps: Print[]) {
   // Tagesstapel räumt niemand weg, also ändert ein Foto darauf nichts an den anderen: nicht alles neu lesen
   if (ps.every((p) => isDayStack(p.stack))) return;
   for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
+}
+
+/**
+ * Ein entwickelter Film kommt auf den Abendstapel: jedes Bild auf den Stapel seines Tages, eingereiht nach der
+ * Aufnahmezeit. So wird es abends mit den anderen Fotos des Tages einsortiert und nie mit alten Stapeln weggeräumt.
+ */
+export const toDayStack = (p: Print): Print => ({ ...p, stack: dayStack(p.at), pos: p.at });
+
+/** einen Film aus der Kamera über dem Buch entwickeln, ohne dass das Studio offen ist */
+export async function developFilm(uid: string, stack: string) {
+  const roll = (await listPrints(uid)).filter((p) => p.stack === stack);
+  if (roll.length) await putPrints(uid, roll.map(toDayStack));
 }
 
 export async function removePrint(id: string) {

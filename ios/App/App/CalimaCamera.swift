@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import Capacitor
 import CoreImage
+import CoreMotion
 import MetalKit
 import UIKit
 
@@ -28,6 +29,9 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "capture", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discard", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setGrain", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setDials", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMagnify", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setLevel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
     ]
 
@@ -89,7 +93,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                         self.detach()
                         call.reject(error, "camera")
                     } else {
-                        call.resolve(["front": self.camera.front])
+                        call.resolve(self.camera.info())
                     }
                 }
             }
@@ -99,6 +103,29 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     /// Körnung live: amount wie GRAIN.amount, cell als Anteil der Bildbreite (GRAIN.cell in model.ts)
     @objc func setGrain(_ call: CAPPluginCall) {
         camera.setGrain(amount: Float(call.getDouble("amount") ?? 0), cell: Float(call.getDouble("cell") ?? 0))
+        call.resolve()
+    }
+
+    /// Die Räder (Expertenmodus E1): fehlt ein Wert oder ist er null, steht das Rad auf A
+    @objc func setDials(_ call: CAPPluginCall) {
+        let d = CalimaCamera.Dials(
+            duration: call.getDouble("duration"),
+            iso: call.getDouble("iso").map { Float($0) },
+            focus: call.getDouble("focus").map { Float($0) },
+            kelvin: call.getDouble("kelvin").map { Float($0) },
+            tint: call.getDouble("tint").map { Float($0) }
+        )
+        camera.setDials(d)
+        call.resolve()
+    }
+
+    @objc func setMagnify(_ call: CAPPluginCall) {
+        camera.magnify = call.getBool("on") ?? false
+        call.resolve()
+    }
+
+    @objc func setLevel(_ call: CAPPluginCall) {
+        camera.setLevel(on: call.getBool("on") ?? false)
         call.resolve()
     }
 
@@ -155,13 +182,13 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func focus(_ call: CAPPluginCall) {
-        camera.focus(x: CGFloat(call.getDouble("x") ?? 0.5), y: CGFloat(call.getDouble("y") ?? 0.5))
+        camera.focus(x: CGFloat(call.getDouble("x") ?? 0.5), y: CGFloat(call.getDouble("y") ?? 0.5), lock: call.getBool("lock") ?? false)
         call.resolve()
     }
 
     @objc func flip(_ call: CAPPluginCall) {
         camera.flip { error in
-            if let error { call.reject(error, "camera") } else { call.resolve(["front": self.camera.front]) }
+            if let error { call.reject(error, "camera") } else { call.resolve(self.camera.info()) }
         }
     }
 
@@ -248,6 +275,173 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     private var analyzing = false
     /// bei virtuellen Kameras ist 1,0 das Ultraweitwinkel; die Hauptkamera liegt beim ersten Umschaltpunkt
     private var baseZoom: CGFloat = 1
+    /// Die virtuelle Rückkamera (Dreifach-Kamera). Apple erlaubt auf ihr weder Zeit/ISO von Hand noch festen Fokus oder
+    /// festen Weißabgleich; sobald ein Rad nicht auf A steht, läuft deshalb das passende echte Objektiv (`fitLens`).
+    private var virtualDevice: AVCaptureDevice?
+    /// Zoom in Einheiten der virtuellen Kamera (1,0 = Ultraweitwinkel), den die Seite gerade will
+    private var wantedZoom: CGFloat = 1
+    /// Schärfe und Helligkeit per zweitem Tipp festgehalten (focus(lock:)); applyDials lässt sie dann stehen
+    private var tapLock = false
+    /// zählt die Tipps, damit ein verspätetes Festhalten keinen neueren Tipp überschreibt
+    private var lockTicket = 0
+
+    // MARK: Expertenmodus E1: Räder, Messer, Lupe, Wasserwaage (expertenmodus-workshop-2026-10-09/)
+
+    /// Stellung der Räder; nil heißt A (die Kamera stellt selbst)
+    struct Dials {
+        var duration: Double?
+        var iso: Float?
+        var focus: Float?
+        var kelvin: Float?
+        /// Tönung (grün −, magenta +), gilt nur zusammen mit kelvin
+        var tint: Float?
+    }
+    private var dials = Dials()
+    /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
+    var magnify = false
+    private var frameTick = 0
+    private var lastMeter: (offset: Float, duration: Double, iso: Float, lens: Float, kelvin: Float)?
+    private var motion: CMMotionManager?
+    private var lastRoll: Double = .nan
+
+    /// was die Kamera kann: Objektive als Zoomfaktoren zur Hauptkamera, Grenzen von Zeit und ISO
+    func info() -> [String: Any] {
+        guard let device = input?.device else { return ["front": front, "lenses": [1.0], "limits": [:]] }
+        let f = device.activeFormat
+        var lenses = device.virtualDeviceSwitchOverVideoZoomFactors.map { Double(CGFloat(truncating: $0) / baseZoom) }
+        // das Ultraweitwinkel liegt vor dem ersten Umschaltpunkt
+        if device.minAvailableVideoZoomFactor < baseZoom { lenses.insert(Double(device.minAvailableVideoZoomFactor / baseZoom), at: 0) }
+        if lenses.isEmpty { lenses = [1] }
+        return [
+            "front": front,
+            "lenses": lenses,
+            "limits": [
+                "minDuration": CMTimeGetSeconds(f.minExposureDuration),
+                "maxDuration": min(CMTimeGetSeconds(f.maxExposureDuration), 1),
+                "minISO": Double(f.minISO),
+                "maxISO": Double(f.maxISO),
+            ],
+        ]
+    }
+
+    /// Räder stellen. Steht nur Zeit oder nur ISO von Hand, bleibt der andere Wert, wo die Automatik ihn zuletzt hatte: das Bild
+    /// wird sichtbar heller oder dunkler, der Messer zeigt, wie weit (Michel, 9.10.: lieber sichtbar als automatisch ausgeglichen).
+    func setDials(_ d: Dials) {
+        queue.async {
+            self.dials = d
+            self.fitLens()
+            self.applyDials()
+        }
+    }
+
+    /// Auf der Warteschlange: die Räder ans laufende Objektiv geben
+    private func applyDials() {
+        let d = dials
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        defer { device.unlockForConfiguration() }
+        // Belichtung; auf A nur zurück zur Automatik, wenn vorher von Hand gestellt war (eine Sperre per Tipp bleibt)
+        if d.duration == nil && d.iso == nil {
+            if device.exposureMode == .custom, device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        } else if device.isExposureModeSupported(.custom) {
+            device.setExposureModeCustom(duration: clampDuration(d.duration), iso: clampISO(d.iso), completionHandler: nil)
+        }
+        // Schärfe
+        if let focus = d.focus {
+            if device.isLockingFocusWithCustomLensPositionSupported {
+                device.setFocusModeLocked(lensPosition: min(max(focus, 0), 1), completionHandler: nil)
+            }
+        } else if !tapLock, device.focusMode == .locked, device.isFocusModeSupported(.continuousAutoFocus) {
+            device.focusMode = .continuousAutoFocus
+        }
+        // Weiß
+        if let kelvin = d.kelvin {
+            if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: min(max(d.tint ?? 0, -150), 150))
+                device.setWhiteBalanceModeLocked(with: clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
+            }
+        } else if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+            device.whiteBalanceMode = .continuousAutoWhiteBalance
+        }
+    }
+
+    private func clampDuration(_ s: Double?) -> CMTime {
+        guard let device = input?.device, let s else { return AVCaptureDevice.currentExposureDuration }
+        let f = device.activeFormat
+        let lo = CMTimeGetSeconds(f.minExposureDuration)
+        let hi = min(CMTimeGetSeconds(f.maxExposureDuration), 1)
+        return CMTime(seconds: min(max(s, lo), hi), preferredTimescale: 1_000_000)
+    }
+
+    private func clampISO(_ iso: Float?) -> Float {
+        guard let device = input?.device, let iso else { return AVCaptureDevice.currentISO }
+        return min(max(iso, device.activeFormat.minISO), device.activeFormat.maxISO)
+    }
+
+    private func clampGains(_ g: AVCaptureDevice.WhiteBalanceGains, _ device: AVCaptureDevice) -> AVCaptureDevice.WhiteBalanceGains {
+        let hi = device.maxWhiteBalanceGain
+        var out = g
+        out.redGain = min(max(g.redGain, 1), hi)
+        out.greenGain = min(max(g.greenGain, 1), hi)
+        out.blueGain = min(max(g.blueGain, 1), hi)
+        return out
+    }
+
+    /// Alle paar Bilder: Messung an die Seite („meter“) und, wenn nur Zeit oder nur ISO fest steht, das andere nachregeln
+    private func meter() {
+        guard let device = input?.device else { return }
+        frameTick &+= 1
+        guard frameTick % 6 == 0 else { return }
+        let offset = device.exposureTargetOffset
+        let duration = CMTimeGetSeconds(device.exposureDuration)
+        let iso = device.iso
+        let lens = device.lensPosition
+        var kelvin: Float = 0
+        let gains = device.deviceWhiteBalanceGains
+        if gains.redGain >= 1, gains.greenGain >= 1, gains.blueGain >= 1, gains.redGain <= device.maxWhiteBalanceGain, gains.blueGain <= device.maxWhiteBalanceGain {
+            kelvin = device.temperatureAndTintValues(for: gains).temperature
+        }
+        // Halbautomatik (Michels Wahl „Ausgleichen“): steht nur Zeit oder nur ISO von Hand, regelt die Kamera das andere nach,
+        // damit das Foto richtig belichtet bleibt. Der Chip zeigt den ausgleichenden Wert („Zeit A 1/4“). Halbe Schritte, sonst pendelt es
+        let semi = (dials.duration == nil) != (dials.iso == nil)
+        if semi, abs(offset) > 0.15, offset.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
+            let k = pow(2, Double(-offset) * 0.5)
+            if let d = dials.duration {
+                device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
+            } else if let i = dials.iso {
+                device.setExposureModeCustom(duration: clampDuration(duration * k), iso: clampISO(i), completionHandler: nil)
+            }
+            device.unlockForConfiguration()
+        }
+        let now = (offset: offset, duration: duration, iso: iso, lens: lens, kelvin: kelvin)
+        if let l = lastMeter, abs(l.offset - now.offset) < 0.05, abs(l.duration - now.duration) / max(now.duration, 1e-6) < 0.05, abs(l.iso - now.iso) / max(now.iso, 1) < 0.05, abs(l.lens - now.lens) < 0.01, abs(l.kelvin - now.kelvin) < 50 { return }
+        lastMeter = now
+        onEvent?("meter", ["offset": Double(offset), "duration": duration, "iso": Double(iso), "lens": Double(lens), "kelvin": Double(kelvin)])
+    }
+
+    /// Wasserwaage aus der Lage des Telefons; meldet „level“ mit roll in Grad (0 = gerade, hochkant gehalten)
+    func setLevel(on: Bool) {
+        if !on {
+            motion?.stopDeviceMotionUpdates()
+            motion = nil
+            lastRoll = .nan
+            return
+        }
+        guard motion == nil else { return }
+        let m = CMMotionManager()
+        guard m.isDeviceMotionAvailable else { return }
+        m.deviceMotionUpdateInterval = 1 / 15
+        motion = m
+        m.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let g = data?.gravity else { return }
+            var roll = atan2(g.x, -g.y) * 180 / .pi
+            // quer gehalten: die Waage bezieht sich auf die nächste Kante
+            if roll > 45 { roll -= 90 } else if roll < -45 { roll += 90 }
+            if roll.isFinite, abs(roll - self.lastRoll) >= 0.2 || self.lastRoll.isNaN {
+                self.lastRoll = roll
+                self.onEvent?("level", ["roll": roll])
+            }
+        }
+    }
 
     // MARK: Aufbau
 
@@ -297,7 +491,11 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         if let shutterInteraction { view?.superview?.removeInteraction(shutterInteraction) }
         shutterInteraction = nil
         view?.removeFromSuperview()
+        setLevel(on: false)
+        magnify = false
         queue.async {
+            self.dials = Dials()
+            self.tapLock = false
             if self.running {
                 self.session.stopRunning()
                 self.running = false
@@ -350,22 +548,74 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
         // Hauptkamera (24 mm) als Ausgangslage, nicht das Ultraweitwinkel
         baseZoom = device.virtualDeviceSwitchOverVideoZoomFactors.first.map { CGFloat(truncating: $0) } ?? 1
-        // Kamera-Knopf (iOS 18): Wischen darauf zoomt wie zwei Finger; der Web-Teil hört „zoom“ und zeigt die Zahl
-        if #available(iOS 18.0, *), session.supportsControls {
-            for c in session.controls { session.removeControl(c) }
-            let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
-                guard let self else { return }
-                self.onEvent?("zoom", ["factor": Double(CGFloat(factor) / self.baseZoom)])
-            }
-            if session.canAddControl(slider) {
-                session.addControl(slider)
-                session.setControlsDelegate(self, queue: queue)
-            }
-        }
+        wantedZoom = baseZoom
+        virtualDevice = device.isVirtualDevice ? device : nil
+        zoomSlider(for: device)
         try? device.lockForConfiguration()
         device.videoZoomFactor = baseZoom
         if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
         if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+        device.unlockForConfiguration()
+    }
+
+    /// Kamera-Knopf (iOS 18): Wischen darauf zoomt wie zwei Finger; der Web-Teil hört „zoom“ und zeigt die Zahl.
+    /// Nur auf der virtuellen Kamera: auf einem einzelnen Objektiv würde er an den anderen vorbei zoomen.
+    private func zoomSlider(for device: AVCaptureDevice?) {
+        guard #available(iOS 18.0, *), session.supportsControls else { return }
+        for c in session.controls { session.removeControl(c) }
+        guard let device else { return }
+        let slider = AVCaptureSystemZoomSlider(device: device) { [weak self] factor in
+            guard let self else { return }
+            self.wantedZoom = factor
+            self.onEvent?("zoom", ["factor": Double(factor / self.baseZoom)])
+        }
+        if session.canAddControl(slider) {
+            session.addControl(slider)
+            session.setControlsDelegate(self, queue: queue)
+        }
+    }
+
+    /// Objektiv der virtuellen Kamera, das den Zoom `v` abdeckt, und wo es in ihren Einheiten anfängt
+    private func lens(for v: CGFloat) -> (device: AVCaptureDevice, start: CGFloat)? {
+        guard let virtualDevice else { return nil }
+        let lenses = virtualDevice.constituentDevices
+        let starts = [CGFloat(1)] + virtualDevice.virtualDeviceSwitchOverVideoZoomFactors.map { CGFloat(truncating: $0) }
+        guard !lenses.isEmpty, lenses.count == starts.count else { return nil }
+        let i = starts.lastIndex { $0 <= v * 1.001 } ?? 0
+        return (lenses[i], starts[i])
+    }
+
+    /// Auf der Warteschlange: steht ein Rad nicht auf A, läuft das echte Objektiv zur Brennweite, sonst die virtuelle Kamera.
+    /// Danach den Zoom so setzen, dass der Ausschnitt gleich bleibt.
+    private func fitLens() {
+        guard let virtualDevice, !front, let current = input?.device else { return }
+        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil
+        let target = manual ? lens(for: wantedZoom) : (virtualDevice, CGFloat(1))
+        guard let target else { return }
+        if target.device != current, let next = try? AVCaptureDeviceInput(device: target.device) {
+            session.beginConfiguration()
+            if let old = input { session.removeInput(old) }
+            if session.canAddInput(next) {
+                session.addInput(next)
+                input = next
+            } else if let old = input, session.canAddInput(old) {
+                session.addInput(old)
+            }
+            if let c = videoOutput.connection(with: .video) { rotate(c, angle: 90) }
+            session.commitConfiguration()
+            zoomSlider(for: input?.device == virtualDevice ? virtualDevice : nil)
+            // neues Objektiv: frisch auf Automatik, die Räder legt applyDials gleich danach darüber
+            tapLock = false
+            if let device = input?.device, (try? device.lockForConfiguration()) != nil {
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+                device.unlockForConfiguration()
+            }
+        }
+        // sonst nur den Zoom: Belichtung und Schärfe auf Automatik zurückzusetzen ließ sie bei jeder Rad-Bewegung pumpen
+        guard let device = input?.device, (try? device.lockForConfiguration()) != nil else { return }
+        let start = device == virtualDevice ? 1 : target.start
+        device.videoZoomFactor = min(max(wantedZoom / start, device.minAvailableVideoZoomFactor), device.maxAvailableVideoZoomFactor)
         device.unlockForConfiguration()
     }
 
@@ -379,6 +629,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func flip(_ done: @escaping (String?) -> Void) {
         queue.async {
+            self.dials = Dials()
+            self.tapLock = false
             do {
                 try self.configure(position: self.front ? .back : .front)
                 done(nil)
@@ -414,8 +666,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         lock.unlock()
     }
 
-    /// Körnung wie preview.ts: Rauschen je Zelle, als weiches Licht gemischt (Mitten am stärksten, Lichter und Tiefen kaum).
-    /// Das Rauschen wandert je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
+    /// Körnung wie preview.ts: Rauschen je Zelle, nur auf der Helligkeit (Mitten am stärksten, Lichter und Tiefen kaum).
+    /// Das Rauschen springt je Bild, damit es wie Film flimmert und nicht wie Schmutz auf dem Glas klebt.
     /// Wie applyGrain in model.ts: Rauschen ±amount um Mittelgrau, overlay-artig, in den Mitten am stärksten. Gemischt wird in
     /// Gamma-Werten (sRGB) wie im Web, nicht im linearen Arbeitsraum von Core Image: dort hellte dieselbe Körnung dunkle Stellen
     /// um ein Vielfaches auf (Salz-und-Pfeffer statt Korn).
@@ -431,10 +683,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         let grain = noise
             .samplingNearest()
             .transformed(by: CGAffineTransform(translationX: dx, y: dy).scaledBy(x: cellPx, y: cellPx))
+            // Als Zufallszahl dient der Alphakanal, nicht Rot: CIRandomGenerator würfelt alle vier Kanäle einzeln, und Core
+            // Image rechnet mit vormultiplizierten Farben. Rot durch Alpha geteilt läuft bei jedem zweiten Pixel auf 1 hinaus,
+            // das Korn wurde zu lauter hellen Sprenkeln (Kalkwand, Nachmittag). Alpha selbst bleibt gleichverteilt.
             .applyingFilter("CIColorMatrix", parameters: [
-                "inputRVector": CIVector(x: k, y: 0, z: 0, w: 0),
-                "inputGVector": CIVector(x: k, y: 0, z: 0, w: 0),
-                "inputBVector": CIVector(x: k, y: 0, z: 0, w: 0),
+                "inputRVector": CIVector(x: 0, y: 0, z: 0, w: k),
+                "inputGVector": CIVector(x: 0, y: 0, z: 0, w: k),
+                "inputBVector": CIVector(x: 0, y: 0, z: 0, w: k),
                 "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0),
                 "inputBiasVector": CIVector(x: 0.5 - k / 2, y: 0.5 - k / 2, z: 0.5 - k / 2, w: 1),
             ])
@@ -442,8 +697,21 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             // groß und würde beim Einpassen in den Sucher auf nichts verkleinert (schwarzer Sucher)
             .cropped(to: image.extent)
         let gamma = image.applyingFilter("CILinearToSRGBToneCurve")
+        // Das Korn nur auf die Helligkeit legen, nie auf die Farbkanäle einzeln: Overlay entscheidet je Kanal, ob es aufhellt
+        // oder abdunkelt, und bei einer satten Farbe geht Rot hoch, während Blau runtergeht. Das sah aus wie buntes Rauschen.
+        // Im Web (applyGrain) bekommt jeder Kanal denselben Zuschlag; hier: Korn über das Grauwertbild, dann nur die Helligkeit
+        // davon ins Farbbild übernehmen (CILuminosityBlendMode: Farbton und Sättigung vom Hintergrund, Helligkeit vom Korn).
+        let luma = CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0)
+        let grey = gamma.applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": luma,
+            "inputGVector": luma,
+            "inputBVector": luma,
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+            "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        ])
         return grain
-            .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: gamma])
+            .applyingFilter("CIOverlayBlendMode", parameters: [kCIInputBackgroundImageKey: grey])
+            .applyingFilter("CILuminosityBlendMode", parameters: [kCIInputBackgroundImageKey: gamma])
             .applyingFilter("CISRGBToneCurveToLinear")
     }
 
@@ -468,6 +736,15 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     @discardableResult
     func setZoom(_ factor: CGFloat) -> Double {
         guard let device = input?.device else { return 1 }
+        if let virtualDevice, device != virtualDevice {
+            // von Hand: der Ausschnitt kann ein anderes Objektiv brauchen
+            return queue.sync {
+                wantedZoom = min(max(baseZoom * factor, virtualDevice.minAvailableVideoZoomFactor), baseZoom * 10)
+                fitLens()
+                applyDials()
+                return Double(wantedZoom / baseZoom)
+            }
+        }
         let lo = device.minAvailableVideoZoomFactor
         let hi = min(device.maxAvailableVideoZoomFactor, baseZoom * 10)
         let v = min(max(baseZoom * factor, lo), hi)
@@ -475,24 +752,40 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             device.videoZoomFactor = v
             device.unlockForConfiguration()
         }
+        wantedZoom = v
         return Double(v / baseZoom)
     }
 
     /// x, y in 0..1 des Suchers (hochkant); die Kamera rechnet quer, deshalb gedreht
-    func focus(x: CGFloat, y: CGFloat) {
-        guard let device = input?.device, !front else { return }
+    /// Tippen: an der Stelle scharf stellen und messen. lock hält danach Schärfe und Helligkeit fest (AE/AF-Sperre:
+    /// einmal messen, dann stehen lassen). Räder von Hand bleiben, wie sie sind.
+    func focus(x: CGFloat, y: CGFloat, lock: Bool = false) {
         let p = CGPoint(x: min(max(y, 0), 1), y: min(max(1 - x, 0), 1))
         queue.async {
-            guard (try? device.lockForConfiguration()) != nil else { return }
-            if device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.autoFocus) {
+            guard let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+            defer { device.unlockForConfiguration() }
+            self.tapLock = lock
+            self.lockTicket &+= 1
+            let focusFree = !self.front && self.dials.focus == nil
+            let exposureFree = self.dials.duration == nil && self.dials.iso == nil
+            // erst an der Stelle messen (fortlaufend, wie die Kamera-App: folgt der Stelle, bis man woanders tippt)
+            if focusFree, device.isFocusPointOfInterestSupported, device.isFocusModeSupported(.continuousAutoFocus) {
                 device.focusPointOfInterest = p
-                device.focusMode = .autoFocus
+                device.focusMode = .continuousAutoFocus
             }
-            if device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.continuousAutoExposure) {
+            if exposureFree, device.isExposurePointOfInterestSupported, device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposurePointOfInterest = p
                 device.exposureMode = .continuousAutoExposure
             }
-            device.unlockForConfiguration()
+            guard lock else { return }
+            // dann festhalten, sobald Schärfe und Licht sich gesetzt haben; ein neuer Tipp in der Zwischenzeit gewinnt
+            let ticket = self.lockTicket
+            self.queue.asyncAfter(deadline: .now() + 0.6) {
+                guard ticket == self.lockTicket, self.tapLock, let device = self.input?.device, (try? device.lockForConfiguration()) != nil else { return }
+                defer { device.unlockForConfiguration() }
+                if focusFree, device.isFocusModeSupported(.locked) { device.focusMode = .locked }
+                if exposureFree, device.isExposureModeSupported(.locked) { device.exposureMode = .locked }
+            }
         }
     }
 
@@ -500,6 +793,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        meter()
         var image = CIImage(cvPixelBuffer: buffer)
         lock.lock()
         if !original, let cube {
@@ -533,7 +827,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         drawPending = false
         let image = latest
         lock.unlock()
-        guard let image, let ciContext, let commandQueue, let drawable = view.currentDrawable, let buffer = commandQueue.makeCommandBuffer() else { return }
+        guard var image, let ciContext, let commandQueue, let drawable = view.currentDrawable, let buffer = commandQueue.makeCommandBuffer() else { return }
+        // Lupe: das mittlere Drittel füllt den Sucher, zum Scharfstellen von Hand
+        if magnify {
+            let e = image.extent
+            image = image.cropped(to: CGRect(x: e.midX - e.width / 6, y: e.midY - e.height / 6, width: e.width / 3, height: e.height / 3))
+        }
         // Bild in die Ansicht einpassen (das Seitenverhältnis stellt der Web-Teil, 3:4 wie das Foto)
         let size = view.drawableSize
         let scale = min(size.width / image.extent.width, size.height / image.extent.height)

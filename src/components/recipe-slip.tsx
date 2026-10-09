@@ -17,7 +17,7 @@ import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from 
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
-import { putPrints, type Print } from "@/lib/studio-store";
+import { developFilm, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -490,7 +490,7 @@ async function currentUid(): Promise<string | null> {
  */
 function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
   const t = useT();
-  const made = useRef({ shots: new Set<string>(), films: new Set<string>() });
+  const made = useRef({ shots: new Set<string>(), films: new Set<string>(), developed: new Set<string>() });
   const onShot = (p: Print, filmStack?: string) => {
     // auf einem Film zählt die Kamera selbst, der Stapel ist der Film
     if (filmStack) {
@@ -502,12 +502,19 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
     putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]).catch(() => {});
   };
   const close = () => {
-    const { shots, films } = made.current;
+    const { shots, films, developed } = made.current;
     onClose();
-    if (shots.size) notify(shots.size === 1 ? t("Das Foto liegt auf dem Stapel von heute.") : t("Die {n} Fotos liegen auf dem Stapel von heute.", { n: shots.size }));
+    if (developed.size) notify(t("Entwickelt. Die Bilder liegen auf dem Stapel ihres Tages."));
+    else if (shots.size) notify(shots.size === 1 ? t("Das Foto liegt auf dem Stapel von heute.") : t("Die {n} Fotos liegen auf dem Stapel von heute.", { n: shots.size }));
     else if (films.size) notify(t("Der Film liegt im Fotostudio."));
   };
-  return <CameraView uid={uid} onShot={onShot} onFilmDone={() => {}} onClose={close} />;
+  // ein entwickelter Film kommt wie im Zimmer auf den Abendstapel
+  const onFilmDone = (stack: string) => {
+    made.current.films.delete(stack);
+    made.current.developed.add(stack);
+    developFilm(uid, stack).catch(() => {});
+  };
+  return <CameraView uid={uid} taken onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
 }
 
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {

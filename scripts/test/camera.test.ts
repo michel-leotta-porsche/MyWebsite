@@ -7,6 +7,7 @@ import exifr from "exifr";
 import { applySettings, cleanSettings, fromEdit } from "@/lib/develop/settings";
 import { withXmp } from "@/lib/exif-write";
 import { neutralEdit, PRESETS } from "@/lib/develop/model";
+import { fmtDuration, ISO_STOPS, nearest, realFocals, SHUTTER_STOPS } from "@/lib/camera";
 import { calimaXmp, parseCalimaXmp } from "@/lib/xmp";
 import { jpeg, LR_XMP } from "./fixtures.mjs";
 
@@ -48,4 +49,19 @@ test("fremde oder kaputte Blöcke ergeben kein Rezept", () => {
   assert.equal(parseCalimaXmp(LR_XMP), null);
   assert.equal(parseCalimaXmp("<calima:settings>{kaputt</calima:settings>"), null);
   assert.equal(cleanSettings(parseCalimaXmp("<calima:settings>{&quot;v&quot;:1}</calima:settings>")), null);
+});
+
+// Expertenmodus E1: Reihen und Beschriftungen der Räder
+test("Zeiten lesbar und in Drittelstufen", () => {
+  assert.equal(fmtDuration(1 / 250), "1/250");
+  assert.equal(fmtDuration(1 / 8000), "1/8000");
+  assert.equal(fmtDuration(0.5), "0,5 s");
+  assert.equal(fmtDuration(1), "1 s");
+  assert.equal(SHUTTER_STOPS[0] < 1 / 8000, true);
+  assert.equal(SHUTTER_STOPS.at(-1), 1);
+  assert.equal(nearest(SHUTTER_STOPS, 1 / 1000) > 1 / 1100 && nearest(SHUTTER_STOPS, 1 / 1000) < 1 / 900, true);
+  assert.equal(nearest(ISO_STOPS, 90), 100);
+  // Umschaltpunkte eines iPhone 15 Pro Max: 0,5× Ultraweit, 1× Haupt, 5× Tele
+  assert.deepEqual(realFocals([0.5, 1, 5]), [13, 24, 120]);
+  assert.deepEqual(realFocals([1]), [24]);
 });
