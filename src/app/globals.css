@@ -856,6 +856,18 @@ html.ohne-struktur .printed::after {
 .studio-slot[data-lift] {
   --lz: 48px;
 }
+/* beim Umsortieren: der gehaltene Abzug liegt über allen und folgt der Hand ohne Verzögerung (pult-sort.ts) */
+.studio-slot[data-drag] {
+  z-index: 60 !important;
+  --lz: 72px;
+  cursor: grabbing;
+}
+[data-sorted] > .deal {
+  animation: none;
+}
+.studio-slot[data-drag] .studio-sheet {
+  transition-duration: 200ms;
+}
 /* zwei Schatten aus dem Vokabular des Buchs: liegend scharf, angehoben weit und weich; nur die Deckkraft wechselt */
 .studio-shadow,
 .studio-shadow-lift {
