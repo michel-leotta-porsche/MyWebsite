@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -21,7 +22,39 @@ import {
   type AbsStroke,
   type PathEl,
 } from "@/content/shapes";
-import { BringToFront, Captions, CaptionsOff, Check, ChevronDown, ChevronLeft, ChevronUp, Copy, Crop, Ellipsis, Grid3x3, Images, Layers, PenLine, Plus, Redo2, RotateCcw, SendToBack, Shapes, SlidersHorizontal, Trash, Type, Undo2 } from "lucide-react";
+import {
+  BringToFront,
+  Captions,
+  CaptionsOff,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronsDown,
+  ChevronsUp,
+  ChevronUp,
+  ClipboardPaste,
+  Copy,
+  CopyPlus,
+  Crop,
+  Ellipsis,
+  Grid3x3,
+  Heading,
+  Images,
+  Layers,
+  PenLine,
+  Pilcrow,
+  Plus,
+  Redo2,
+  RotateCcw,
+  Scissors,
+  SendToBack,
+  Shapes,
+  SlidersHorizontal,
+  StickyNote,
+  Trash,
+  Type,
+  Undo2,
+} from "lucide-react";
 
 import { Button, buttonClass, IconButton as ToolIcon, ToolGroup } from "@/components/ui/button";
 import { Field, noteClass } from "@/components/ui/field";
@@ -44,6 +77,7 @@ import {
 import type { StoredPhoto } from "@/lib/store";
 import { haptic, warmHaptics } from "@/lib/haptics";
 import { IS_APP, keys, withKeys } from "@/lib/app-mode";
+import { LONG_PRESS_MS, pressMoved, sheetPlan, type MenuTile } from "@/lib/stage-menu";
 import { de, useT } from "@/lib/i18n";
 
 // Die Bühne: eine Doppelseite groß, Fotos und Texte direkt auf der Seite bewegen, vergrößern, zuschneiden.
@@ -520,7 +554,7 @@ export function Stage({
         setGuides({ xs: [], ys: [] });
         held.current = { cx: clientX, cy: clientY, id: it.id };
         haptic("press");
-      }, 550);
+      }, LONG_PRESS_MS);
     }
     snapped.current = [];
     warmHaptics();
@@ -793,14 +827,24 @@ export function Stage({
     if (!sk || sk.kind === "erase") return;
     if (sk.kind === "pen") return finishStroke(sk.pts, sk.pen);
     // ein Klick ohne Ziehen legt die Form in Standardgröße hin
-    let shape: { box: Box; from?: Corner };
-    if (!sk.moved) {
-      const w = grid.cw * 2 + 2;
-      if (isLinear(sk.shape)) shape = lineBox(sk.a, { x: Math.min(200, sk.a.x + w * 1.5), y: sk.a.y });
-      else shape = { box: { x: Math.min(sk.a.x, 200 - w), y: Math.min(sk.a.y, 100 - (w / grid.H) * 100), w, h: (w / grid.H) * 100 } };
-    } else shape = shapeBox(sk, !!last.current?.shiftKey);
+    addShape(sk.shape, sk.moved ? shapeBox(sk, !!last.current?.shiftKey) : shapeAt(sk.shape, sk.a));
+  };
+  /** Form in Standardgröße mit der oberen linken Ecke (bzw. dem Anfang) an a */
+  const shapeAt = (kind: ShapeKind, a: Pt): { box: Box; from?: Corner } => {
+    const w = grid.cw * 2 + 2;
+    if (isLinear(kind)) return lineBox(a, { x: Math.min(200, a.x + w * 1.5), y: a.y });
+    return { box: { x: Math.min(a.x, 200 - w), y: Math.min(a.y, 100 - (w / grid.H) * 100), w, h: (w / grid.H) * 100 } };
+  };
+  /** Form in Standardgröße mittig unter dem Finger, ganz auf seiner Seite (Papier-Menü am Handy) */
+  const shapeUnder = (kind: ShapeKind, at: Pt) => {
+    const { w, h } = shapeAt(kind, { x: 0, y: 0 }).box;
+    const p = pageAt(at.x);
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    return shapeAt(kind, { x: clamp(at.x - w / 2, p * 100, p * 100 + 100 - w), y: clamp(at.y - h / 2, 0, 100 - h) });
+  };
+  const addShape = (kind: ShapeKind, shape: { box: Box; from?: Corner }) => {
     const id = itemId();
-    commit([...items, { t: "shape", id, kind: sk.shape, box: shape.box, look: lookFor(sk.shape), ...(shape.from && shape.from !== "tl" ? { from: shape.from } : {}) }], undefined, t("{what} hinzugefügt: {where}", { what: t(SHAPES[sk.shape].label), where: where(shape.box) }));
+    commit([...items, { t: "shape", id, kind, box: shape.box, look: lookFor(kind), ...(shape.from && shape.from !== "tl" ? { from: shape.from } : {}) }], undefined, t("{what} hinzugefügt: {where}", { what: t(SHAPES[kind].label), where: where(shape.box) }));
     // wie in Keynote und PowerPoint: nach dem Aufziehen zurück zur Auswahl, die neue Form ist gewählt
     setToolState("select");
     setSel(id);
@@ -880,6 +924,44 @@ export function Stage({
     setEditing(null);
     setMenu({ cx, cy, id, at: pointOf(cx, cy) });
   };
+  /**
+   * Langes Drücken aufs leere Papier (#218): iOS meldet kein contextmenu, darum ein eigener Zeitgeber wie auf Elementen.
+   * Das Blatt öffnet beim Loslassen an der Fingerstelle; Ziehen, ein zweiter Finger oder ein Abbruch heben es auf.
+   * Auf window in der Capture-Phase, weil Kamerafahrt und Zoom den Finger an sich ziehen und den zweiten Finger abfangen.
+   */
+  const paperPress = useRef<(() => void) | null>(null);
+  const pressPaper = (e: React.PointerEvent) => {
+    paperPress.current?.();
+    if (e.pointerType !== "touch" || tool !== "select" || cropping) return;
+    const id = e.pointerId;
+    const start = { x: e.clientX, y: e.clientY };
+    let ripe = false;
+    const timer = window.setTimeout(() => {
+      ripe = true;
+      haptic("press");
+    }, LONG_PRESS_MS);
+    const stop = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("pointermove", onMove, true);
+      window.removeEventListener("pointerup", onEnd, true);
+      window.removeEventListener("pointercancel", onEnd, true);
+      paperPress.current = null;
+    };
+    const onDown = (ev: PointerEvent) => ev.pointerId !== id && stop();
+    const onMove = (ev: PointerEvent) => ev.pointerId === id && pressMoved(start, { x: ev.clientX, y: ev.clientY }) && stop();
+    const onEnd = (ev: PointerEvent) => {
+      if (ev.pointerId !== id) return;
+      stop();
+      if (ripe && ev.type === "pointerup") openMenu(start.x, start.y, null);
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("pointermove", onMove, true);
+    window.addEventListener("pointerup", onEnd, true);
+    window.addEventListener("pointercancel", onEnd, true);
+    paperPress.current = stop;
+  };
+  useEffect(() => () => paperPress.current?.(), []);
   const copyItem = (it: SpreadItem) => {
     const marker = remember(it);
     // in der App gehen nur Texte ins System; Fotos und Formen bleiben in Calimas eigener Ablage (Workshop Paket 6)
@@ -943,6 +1025,100 @@ export function Stage({
       "sep",
       ...(Object.keys(TEXT_ROLE) as TextRole[]).map((r): MenuEntry => ({ label: t("{what} hier", { what: t(TEXT_ROLE[r].label) }), run: () => addText(r, pageAt(at.x), at) })),
     ];
+  };
+
+  /** Am Handy: Blatt mit Kacheln oben, darunter, was zum Element gehört, die Ebene als eine Zeile (#275); fürs Papier Text, Form, Einfügen (#218) */
+  const pressSheet = () => {
+    if (!menu) return null;
+    const it = menu.id ? items.find((i) => i.id === menu.id) : undefined;
+    if (menu.id && !it) return null;
+    const at = menu.at;
+    const plan = sheetPlan(it ? it.t : "paper", { clip: !!clipboard });
+    const close = () => setMenu(null);
+    const done = (f: () => void) => () => {
+      close();
+      f();
+    };
+    const ROLE_ICON: Record<TextRole, React.ReactNode> = { heading: <Heading />, body: <Pilcrow />, note: <StickyNote /> };
+    const tile = (k: MenuTile): SheetTile => {
+      if (k === "heading" || k === "body" || k === "note") return { key: k, label: t(TEXT_ROLE[k].label), icon: ROLE_ICON[k], run: done(() => addText(k, pageAt(at.x), at)) };
+      if (k === "paste") return { key: k, label: t("Einfügen"), icon: <ClipboardPaste />, run: done(() => pasteFromMenu(it ? undefined : at)) };
+      const el = it!;
+      if (k === "copy") return { key: k, label: t("Kopieren"), icon: <Copy />, run: done(() => copyItem(el)) };
+      if (k === "duplicate") return { key: k, label: t("Duplizieren"), icon: <CopyPlus />, run: done(() => paste(el)) };
+      if (k === "cut") return { key: k, label: t("Ausschneiden"), icon: <Scissors />, run: done(() => (copyItem(el), remove(el))) };
+      // ein Foto geht zurück in die Ablage, alles andere ist weg
+      return { key: k, label: el.t === "photo" ? t("Entfernen") : t("Löschen"), icon: <Trash />, danger: true, run: done(() => remove(el)) };
+    };
+    const flip = (patch: (i: SpreadItem) => SpreadItem) => commit(items.map((i) => (i.id === it?.id ? patch(i) : i)));
+    const row = (k: (typeof plan.rows)[number]) => {
+      if (k === "shapes")
+        return (
+          <div key={k} className="flex min-h-12 items-center gap-3 px-3">
+            <Shapes aria-hidden className="text-ink-2 size-5 flex-none" />
+            <span className="flex-1">{t("Form hier")}</span>
+            <div className="-mr-1.5 flex" role="group" aria-label={t("Form hier")}>
+              {(Object.keys(SHAPES) as ShapeKind[]).map((kind) => (
+                <button key={kind} type="button" aria-label={t(SHAPES[kind].label)} onClick={done(() => addShape(kind, shapeUnder(kind, at)))} className={sheetIcon}>
+                  <svg aria-hidden viewBox="0 0 20 20" className="size-5">
+                    {TOOL_ICON[kind]}
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      if (k === "paste") return <SheetRow key={k} icon={<ClipboardPaste />} label={t("Einfügen")} onClick={done(() => pasteFromMenu())} />;
+      if (it?.t === "photo" && k === "crop")
+        return <SheetRow key={k} icon={<Crop />} label={t("Zuschneiden")} onClick={done(() => setCropping(it.id))} />;
+      if (it?.t === "photo" && k === "caption")
+        return (
+          <SheetRow key={k} icon={<Captions />} label={t("Unterschrift auf der Seite")} on={it.caption === "auto"} onClick={() => flip((i) => (i.t === "photo" ? { ...i, caption: i.caption === "auto" ? "off" : "auto" } : i))} />
+        );
+      if (it?.t === "text" && k === "write") return <SheetRow key={k} icon={<PenLine />} label={t("Text schreiben")} onClick={done(() => setEditing(it.id))} />;
+      if (it?.t === "text" && k === "role")
+        return (
+          <div key={k} className="flex min-h-12 items-center gap-3 px-3">
+            <Type aria-hidden className="text-ink-2 size-5 flex-none" />
+            <Segmented
+              label={t("Art")}
+              tone="paper"
+              value={it.role}
+              options={(Object.keys(TEXT_ROLE) as TextRole[]).map((r) => ({ value: r, label: t(TEXT_ROLE[r].label) }))}
+              onChange={(r) => flip((i) => (i.t === "text" ? { ...i, role: r } : i))}
+            />
+          </div>
+        );
+      if (it?.t === "text" && k === "light")
+        return <SheetRow key={k} icon={<Type />} label={t("Helle Schrift")} on={!!it.light} onClick={() => flip((i) => (i.t === "text" ? { ...i, light: i.light ? undefined : true } : i))} />;
+      return null;
+    };
+    const steps: { to: "back" | "down" | "up" | "front"; label: string; icon: React.ReactNode; ok: boolean }[] = it
+      ? [
+          { to: "back", label: t("Ganz nach hinten"), icon: <ChevronsDown />, ok: canLayer(it.id, "down") },
+          { to: "down", label: t("Nach hinten"), icon: <ChevronDown />, ok: canLayer(it.id, "down") },
+          { to: "up", label: t("Nach vorn"), icon: <ChevronUp />, ok: canLayer(it.id, "up") },
+          { to: "front", label: t("Ganz nach vorn"), icon: <ChevronsUp />, ok: canLayer(it.id, "up") },
+        ]
+      : [];
+    return (
+      <PressSheet tiles={plan.tiles.map(tile)} onClose={close}>
+        {plan.rows.map(row)}
+        {plan.layer && it && (
+          <div className="flex min-h-12 items-center gap-3 px-3">
+            <Layers aria-hidden className="text-ink-2 size-5 flex-none" />
+            <span className="flex-1">{t("Ebene")}</span>
+            <div className="-mr-1.5 flex" role="group" aria-label={t("Ebene")}>
+              {steps.map((s) => (
+                <button key={s.to} type="button" aria-label={s.label} disabled={!s.ok} onClick={() => layer(it.id, s.to)} className={sheetIcon}>
+                  {s.icon}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </PressSheet>
+    );
   };
 
   /** Ebenen: die Reihenfolge der Elemente ist die Stapelung, das letzte liegt oben */
@@ -1717,6 +1893,7 @@ export function Stage({
                     if (e.target !== e.currentTarget) return;
                     setSel(null);
                     setEditing(null);
+                    pressPaper(e);
                   }}
                   onContextMenu={(e) => {
                     if (e.target !== e.currentTarget) return;
@@ -2089,7 +2266,7 @@ export function Stage({
           )}
           {phone ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
-              {t("Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken zeigt alles, was mit dem Element geht.")}
+              {t("Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken auf ein Element zeigt alles, was damit geht, aufs leere Papier legt etwas an.")}
             </p>
           ) : narrow && coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
@@ -2099,7 +2276,7 @@ export function Stage({
           {phone ? null : coarse ? (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
               {t("Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.")}{" "}
-              {t("Lange drücken zeigt alles, was mit dem Element geht.")}
+              {t("Lange drücken auf ein Element zeigt alles, was damit geht, aufs leere Papier legt etwas an.")}
             </p>
           ) : (
             <p className="text-on-table-2 mt-4 max-w-[70ch] text-[13px] leading-relaxed">
@@ -2240,7 +2417,7 @@ export function Stage({
         </aside>
       </div>
 
-      {menu && <ContextMenu x={menu.cx} y={menu.cy} sheet={coarse} entries={menuEntries()} onClose={() => setMenu(null)} />}
+      {menu && (coarse ? pressSheet() : <ContextMenu x={menu.cx} y={menu.cy} entries={menuEntries()} onClose={() => setMenu(null)} />)}
       {cropItem && cropItem.t === "photo" && photos.get(cropItem.key) && (
         <CropDialog
           photo={{ ...photos.get(cropItem.key)!, ...(cropItem.crop ?? {}) }}
@@ -2374,23 +2551,18 @@ function LayerButtons({
 
 type MenuEntry = "sep" | { label: string; hint?: string; checked?: boolean; disabled?: boolean; run: () => void };
 
-/**
- * Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt.
- * Mit dem Finger (sheet) ein Blatt von unten mit 48px-Zeilen und ohne Tastenkürzel, weg vom Daumen.
- */
-function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; sheet: boolean; entries: MenuEntry[]; onClose: () => void }) {
+/** Kontextmenü am Zeiger: Pfeiltasten, Enter, Esc; ein Klick daneben schließt. Mit dem Finger kommt stattdessen PressSheet. */
+function ContextMenu({ x, y, entries, onClose }: { x: number; y: number; entries: MenuEntry[]; onClose: () => void }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (!sheet) {
-      const r = el.getBoundingClientRect();
-      setPos({ left: Math.max(8, Math.min(x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, innerHeight - r.height - 8)) });
-    }
+    const r = el.getBoundingClientRect();
+    setPos({ left: Math.max(8, Math.min(x, innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, innerHeight - r.height - 8)) });
     el.querySelector<HTMLButtonElement>("[role=menuitem], [role=menuitemcheckbox]")?.focus({ preventScroll: true });
-  }, [x, y, sheet]);
+  }, [x, y]);
   // der Klick, den der Browser nach dem Loslassen schickt, darf keinen Eintrag treffen
   const armed = useRef(false);
   useEffect(() => {
@@ -2424,15 +2596,9 @@ function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; 
         role="menu"
         aria-label={t("Aktionen")}
         onKeyDown={move}
-        className={`slip text-ink fixed overflow-hidden ${
-          sheet
-            ? "inset-x-0 bottom-0 max-h-[70svh] overflow-y-auto overscroll-contain rounded-t-cut px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
-            : "min-w-56 rounded-tool py-1.5 text-sm shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]"
-        }`}
-        style={sheet ? undefined : pos}
+        className="slip text-ink rounded-tool fixed min-w-56 overflow-hidden py-1.5 text-sm shadow-[0_24px_40px_-18px_rgb(12_10_8/0.75)]"
+        style={pos}
       >
-        {/* Handy: Blatt von unten mit Griff wie die anderen Blätter */}
-        {sheet && <div aria-hidden className="bg-ink/20 mx-auto mb-2 h-[5px] w-10 rounded-full" />}
         {entries.map((en, i) =>
           en === "sep" ? (
             <div key={i} role="separator" className="bg-ink/12 mx-2 my-1 h-px" />
@@ -2448,17 +2614,115 @@ function ContextMenu({ x, y, sheet, entries, onClose }: { x: number; y: number; 
                 onClose();
                 en.run();
               }}
-              className={`hover:bg-ink/8 focus-visible:bg-ink/8 flex disabled:opacity-40 disabled:hover:bg-transparent w-full items-center gap-3 text-left focus-visible:outline-none ${sheet ? "min-h-12 rounded-full px-3" : "min-h-8 px-3"}`}
+              className="hover:bg-ink/8 focus-visible:bg-ink/8 flex min-h-8 w-full items-center gap-3 px-3 text-left focus-visible:outline-none disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <span aria-hidden className="grid w-4 place-items-center">
                 {en.checked && <Check className="size-4" />}
               </span>
               <span className="flex-1">{en.label}</span>
-              {en.hint && !sheet && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
+              {en.hint && <span className="text-ink-2 text-[12px]">{en.hint}</span>}
             </button>
           ),
         )}
       </div>
+    </div>
+  );
+}
+
+type SheetTile = { key: string; label: string; icon: React.ReactNode; danger?: boolean; run: () => void };
+/** runder Symbolknopf im Blatt (Ebene, Formen): 44px, gedimmt, wenn es nicht geht */
+const sheetIcon = "text-ink grid size-11 place-items-center rounded-full transition-[background-color,transform] duration-150 active:scale-[0.94] active:bg-ink/10 disabled:opacity-30 disabled:active:scale-100 [&_svg]:size-5";
+
+/** Zeile im Blatt: Symbol, Name, rechts ein Schalter, wenn sie ein- und ausschaltet */
+function SheetRow({ icon, label, on, onClick }: { icon: React.ReactNode; label: string; on?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role={on === undefined ? undefined : "switch"}
+      aria-checked={on}
+      onClick={onClick}
+      className="active:bg-ink/8 flex min-h-12 w-full items-center gap-3 rounded-[14px] px-3 text-left transition-colors duration-150 [&>svg]:size-5"
+    >
+      <span aria-hidden className="text-ink-2 grid size-5 flex-none place-items-center [&_svg]:size-5">
+        {icon}
+      </span>
+      <span className="flex-1">{label}</span>
+      {on !== undefined && (
+        <span aria-hidden className={`relative h-[22px] w-10 flex-none rounded-full transition-colors duration-150 ${on ? "bg-ink" : "bg-ink/10 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.2)]"}`}>
+          <span className={`bg-paper absolute top-[3px] left-[3px] size-4 rounded-full shadow-[0_1px_2px_rgb(12_10_8/0.35)] transition-transform duration-200 ease-out ${on ? "translate-x-[18px]" : ""}`} />
+        </span>
+      )}
+    </button>
+  );
+}
+
+/**
+ * Blatt beim langen Drücken am Handy (#275): oben große Symbol-Kacheln, Löschen in Rot, darunter die Zeilen.
+ * Es öffnet beim Loslassen; der Klick, den der Browser danach schickt, darf nichts auslösen. Tippen daneben und Esc schließen.
+ */
+function PressSheet({ tiles, onClose, children }: { tiles: SheetTile[]; onClose: () => void; children: React.ReactNode }) {
+  const t = useT();
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const armed = useRef(false);
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const id = window.setTimeout(() => (armed.current = true), 350);
+    ref.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    // Esc schließt, auch wenn der Tipp, der das Blatt geöffnet hat, den Fokus mitgenommen hat; vor dem Esc der Bühne
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      closeRef.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.clearTimeout(id);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, []);
+  return (
+    <div
+      className="fixed inset-0 z-[690] bg-[rgb(12_10_8/0.35)]"
+      onPointerDown={(e) => e.target === e.currentTarget && armed.current && onClose()}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <motion.div
+        ref={ref}
+        role="dialog"
+        aria-modal
+        aria-label={t("Aktionen")}
+        initial={reduce ? false : { y: "100%" }}
+        animate={{ y: 0 }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0 }}
+        onClickCapture={(e) => {
+          if (armed.current) return;
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        className="slip text-ink rounded-t-cut fixed inset-x-0 bottom-0 max-h-[85svh] overflow-y-auto overscroll-contain px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
+      >
+        <div aria-hidden className="bg-ink/20 mx-auto mb-3 h-[5px] w-10 rounded-full" />
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+          {tiles.map((tl) => (
+            <button
+              key={tl.key}
+              type="button"
+              onClick={tl.run}
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-0 text-[12px] leading-tight font-semibold transition-[background-color,transform] duration-150 active:scale-[0.96] [&>svg]:size-[22px] ${
+                tl.danger ? "text-danger bg-danger/8 active:bg-danger/14" : "bg-ink/6 active:bg-ink/12 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.08)]"
+              }`}
+            >
+              {tl.icon}
+              <span className="max-w-full truncate">{tl.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="divide-ink/10 mt-2 divide-y">{children}</div>
+      </motion.div>
     </div>
   );
 }
@@ -3017,19 +3281,22 @@ const TOOL_INFO: Record<Tool, { label: string; key: string }> = {
 };
 
 /** Werkzeugknopf mit kleinem Zeichen; Name und Kürzel im Tooltip und für Screenreader */
+/** Symbole der Werkzeuge, auch für die Formen im Blatt am Handy */
+const TOOL_ICON: Record<Tool, React.ReactNode> = {
+  select: <path d="M5 3l12 8-5.5 1.2L9 18z" fill="currentColor" />,
+  pen: <path d="M4 16c3-1 4-5 7-8l3-3 2 2-3 3c-3 3-6 5-9 6z M13 6l2 2" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
+  eraser: <path d="M3 14l7-8 6 5-6 6H6z M8 17h9" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
+  line: <path d="M4 16L16 4" stroke="currentColor" strokeWidth={1.6} />,
+  arrow: <path d="M4 16L15 5 M9 5h6v6" fill="none" stroke="currentColor" strokeWidth={1.6} />,
+  rect: <rect x={4} y={5} width={12} height={10} fill="none" stroke="currentColor" strokeWidth={1.6} />,
+  ellipse: <circle cx={10} cy={10} r={6} fill="none" stroke="currentColor" strokeWidth={1.6} />,
+  tape: <path d="M3 12l3-4 1 1 1-1 7 0 1 1 1-1-3 4-1-1-1 1H5l-1-1z" fill="currentColor" opacity={0.75} />,
+};
+
 function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; onClick: () => void }) {
   const t = useT();
   const info = TOOL_INFO[tool];
-  const icon: Record<Tool, React.ReactNode> = {
-    select: <path d="M5 3l12 8-5.5 1.2L9 18z" fill="currentColor" />,
-    pen: <path d="M4 16c3-1 4-5 7-8l3-3 2 2-3 3c-3 3-6 5-9 6z M13 6l2 2" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
-    eraser: <path d="M3 14l7-8 6 5-6 6H6z M8 17h9" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />,
-    line: <path d="M4 16L16 4" stroke="currentColor" strokeWidth={1.6} />,
-    arrow: <path d="M4 16L15 5 M9 5h6v6" fill="none" stroke="currentColor" strokeWidth={1.6} />,
-    rect: <rect x={4} y={5} width={12} height={10} fill="none" stroke="currentColor" strokeWidth={1.6} />,
-    ellipse: <circle cx={10} cy={10} r={6} fill="none" stroke="currentColor" strokeWidth={1.6} />,
-    tape: <path d="M3 12l3-4 1 1 1-1 7 0 1 1 1-1-3 4-1-1-1 1H5l-1-1z" fill="currentColor" opacity={0.75} />,
-  };
+
   return (
     <button
       type="button"
@@ -3040,7 +3307,7 @@ function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; on
       className={`flex size-10 items-center justify-center rounded-full pointer-coarse:size-11 transition-[background-color,color,transform] duration-150 active:scale-[0.94] ${active ? "bg-on-table text-table" : "text-on-table hover:bg-on-table/10"}`}
     >
       <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5">
-        {icon[tool]}
+        {TOOL_ICON[tool]}
       </svg>
     </button>
   );
