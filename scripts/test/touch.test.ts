@@ -21,7 +21,13 @@ test("langes Drücken auf Knöpfe markiert keinen Text, Eingaben bleiben markier
   assert.match(button, /user-select:\s*none/);
   assert.match(button, /-webkit-touch-callout:\s*none/);
   assert.ok(rules("input").some((b) => /user-select:\s*text/.test(b)), "Eingabefelder bleiben markierbar");
-  assert.ok(rules("[contenteditable]").some((b) => /user-select:\s*text/.test(b)), "contenteditable bleibt markierbar");
+  assert.ok(rules('[contenteditable]:not([contenteditable="false"])').some((b) => /user-select:\s*text/.test(b)), "contenteditable bleibt markierbar");
+});
+
+test("Verweise bleiben markierbar, Einbände als Verweis nicht", () => {
+  assert.ok(!rules("a").some((b) => /user-select:\s*none/.test(b)), "Anschrift im Impressum muss kopierbar bleiben");
+  assert.match(src("components/book-room.tsx"), /href="\/neu"\s+className="[^"]*select-none \[-webkit-touch-callout:none\]/, "Rohling „Neues Buch“");
+  assert.match(src("components/ui/button-class.ts"), /select-none \[-webkit-touch-callout:none\]/, "Verweise, die wie Knöpfe aussehen");
 });
 
 test(".press:active ist nur einmal definiert", () => {
@@ -29,7 +35,7 @@ test(".press:active ist nur einmal definiert", () => {
 });
 
 test("kein Text unter 11px", () => {
-  for (const f of ["components/white-dial.tsx", "components/editor.tsx"]) assert.doesNotMatch(src(f), /text-\[(?:[0-9]|10)px\]/, f);
+  for (const f of ["components/white-dial.tsx", "components/editor.tsx"]) assert.doesNotMatch(src(f), /text-\[(?:[0-9]|10)(?:\.[0-9]+)?px\]/, f);
 });
 
 test("Eselsohr und Zettel wachsen nicht aus dem Nichts", () => {

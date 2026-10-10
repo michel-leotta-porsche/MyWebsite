@@ -173,7 +173,7 @@ export function WhiteDial({
             <span key={l.id} className={`absolute top-0 flex -translate-x-1/2 flex-col items-center ${i === at ? "text-on-table" : "text-on-table-2/80"}`} style={{ left: i * STEP }}>
               <LightIcon icon={l.icon} size={22} className="mt-1.5" />
               <span className={`mt-[9px] h-2.5 w-px ${i === at ? "bg-on-table" : "bg-on-table-2"}`} />
-              <span className={`mt-0.5 text-[9.5px] tracking-[.04em] tabular-nums ${i === at ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
+              <span className={`mt-0.5 text-[11px] tracking-[.04em] tabular-nums ${i === at ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
             </span>
           ))}
         </div>

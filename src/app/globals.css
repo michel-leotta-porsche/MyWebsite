@@ -87,17 +87,20 @@ body {
   button,
   [role="button"],
   label,
-  summary,
-  a {
+  summary {
     touch-action: manipulation;
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
   }
+  /* Verweise bleiben markierbar (Anschrift im Impressum); Einbände als Verweis setzen select-none selbst */
+  a {
+    touch-action: manipulation;
+  }
   /* Eingaben bleiben markierbar, auch in Knöpfen und Beschriftungen */
   input,
   textarea,
-  [contenteditable] {
+  [contenteditable]:not([contenteditable="false"]) {
     -webkit-user-select: text;
     user-select: text;
     -webkit-touch-callout: default;

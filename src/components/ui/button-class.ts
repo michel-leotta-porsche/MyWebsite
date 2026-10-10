@@ -22,5 +22,5 @@ const SIZE: Record<ButtonSize, string> = {
 };
 
 export function buttonClass(variant: ButtonVariant = "quiet", size: ButtonSize = "md", className = "") {
-  return `inline-flex select-none items-center justify-center rounded-full font-semibold tracking-[-0.005em] whitespace-nowrap transition-[transform,background-color,box-shadow] duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[1.15em] [&_svg]:shrink-0 ${VARIANT[variant]} ${SIZE[size]} ${className}`;
+  return `inline-flex select-none [-webkit-touch-callout:none] items-center justify-center rounded-full font-semibold tracking-[-0.005em] whitespace-nowrap transition-[transform,background-color,box-shadow] duration-150 ease-out active:scale-[0.96] disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[1.15em] [&_svg]:shrink-0 ${VARIANT[variant]} ${SIZE[size]} ${className}`;
 }
