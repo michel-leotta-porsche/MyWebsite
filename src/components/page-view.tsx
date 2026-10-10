@@ -141,6 +141,24 @@ function Element({ book, el, eager, z, sizes, paper, pageH }: { book: BookData; 
     }
     case "caption":
       return <Caption book={book} el={el} z={z} />;
+    case "colophon":
+      // ein Block, der von unten wächst: bricht eine Zeile auf dem Telefon öfter um, schiebt sie die anderen nach oben
+      return (
+        <div
+          className="absolute flex flex-col"
+          style={{ zIndex: z, left: `${el.x}cqw`, top: `${el.bottom}cqw`, transform: "translateY(-100%)", maxWidth: `${el.w}cqw`, gap: `${el.gap}cqw` }}
+        >
+          {el.lines.map((line, i) => (
+            <p
+              key={i}
+              className={toneClass[i === 0 ? "ink" : "ink2"]}
+              style={{ fontSize: `max(11px, ${el.size}cqw)`, fontWeight: i === 0 ? 600 : 400, lineHeight: el.lh }}
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+      );
     case "text": {
       const Tag = el.display ? "h2" : "p";
       return (

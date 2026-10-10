@@ -3,7 +3,7 @@
 import { getImageProps, type StaticImageData } from "next/image";
 
 import { plateOf, type BookData, type FontKey, type Page } from "@/content/books";
-import { CAPTION, LEADING, layoutPage, type Layout } from "@/content/layout";
+import { CAPTION, LEADING, layoutPage, stackFromBottom, type Layout } from "@/content/layout";
 import { EDGE, FOLD_STOPS, FOLD_WIDTH, foldColor, PRINT } from "@/lib/book-look";
 
 // Zeichnet eine Buchseite auf ein Canvas, als Textur für das umblätternde Blatt in WebGL.
@@ -352,6 +352,22 @@ function drawLayout(
           ctx.stroke(path);
         }
         ctx.restore();
+        return;
+      }
+      case "colophon": {
+        // wie im HTML: Höhen erst jetzt messen, dann von unten stapeln
+        const px = Math.max(11, el.size * cq);
+        const rows = el.lines.map((line, i) => {
+          setFont(ctx, i === 0 ? 600 : 400, px, family);
+          return wrap(ctx, line, el.w * cq);
+        });
+        const tops = stackFromBottom(rows.map((r) => r.length * el.lh * px), el.gap * cq, el.bottom * cq);
+        rows.forEach((lines, i) => {
+          setFont(ctx, i === 0 ? 600 : 400, px, family);
+          track(ctx, 0, px);
+          ctx.fillStyle = i === 0 ? C.ink : C.ink2;
+          lines.forEach((r, n) => ctx.fillText(r, el.x * cq, baseline(tops[i] + n * el.lh * px, px, el.lh)));
+        });
         return;
       }
       case "text": {

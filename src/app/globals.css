@@ -412,6 +412,39 @@ html.ohne-struktur .printed::after {
   scroll-snap-align: center;
   transform-origin: 50% 100%;
   will-change: transform;
+  /* die Bücher haben Dicke: Rücken und Papierkanten stehen senkrecht nach hinten und zeigen sich beim Drehen */
+  transform-style: preserve-3d;
+}
+.carousel > li > button,
+.carousel .lift {
+  transform-style: preserve-3d;
+}
+/* Papierkanten rechts und Leinenrücken links klappen um ihre Kante am Einband nach hinten */
+.carousel .book-block-r,
+.carousel .book-spine {
+  display: block;
+  transform-origin: 0 50%;
+  transform: rotateY(90deg);
+}
+/* Schatten des angehobenen Buchs: Deckkraft setzt paintRow je Bild, eine Überblendung hinkte dem Finger nach */
+.carousel .lift-shadow {
+  transition: none;
+}
+/* Schatten, den das mittlere Buch auf die Innenkante eines Nachbarn wirft */
+.cover-cast-l,
+.cover-cast-r {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+.cover-cast-l {
+  background: linear-gradient(to right, rgb(12 10 8 / 0.85), rgb(12 10 8 / 0.25) 30%, transparent 60%);
+}
+.cover-cast-r {
+  background: linear-gradient(to left, rgb(12 10 8 / 0.85), rgb(12 10 8 / 0.25) 30%, transparent 60%);
 }
 /* Ankommen: die Bücher gleiten nacheinander von rechts herein, sichtbar von Anfang an */
 .carousel > li.arrive .lift {
