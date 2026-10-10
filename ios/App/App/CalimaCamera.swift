@@ -35,6 +35,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setLevel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveToLibrary", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "measureWhite", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -43,7 +44,10 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     public override func load() {
         // Ereignisse der Erkenner kommen als `event` mit `name` und `data` auf der Seite an
         camera.onEvent = { [weak self] name, data in
-            DispatchQueue.main.async { self?.notifyListeners("event", data: ["name": name, "data": data]) }
+            // NaN oder unendlich (etwa die Messung, solange die Belichtung umschaltet) kann JSON nicht: solche Werte fallen weg,
+            // sonst kommt das ganze Ereignis leer an
+            let clean = data.filter { !(($0.value as? Double).map { !$0.isFinite } ?? false) }
+            DispatchQueue.main.async { self?.notifyListeners("event", data: ["name": name, "data": clean]) }
         }
         // Quick Action, während die Seite schon läuft: melden, dass etwas wartet; abgeholt wird mit `launch`
         _ = NotificationCenter.default.addObserver(forName: CalimaLaunch.waiting, object: nil, queue: .main) { [weak self] _ in
@@ -115,10 +119,26 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             iso: call.getDouble("iso").map { Float($0) },
             focus: call.getDouble("focus").map { Float($0) },
             kelvin: call.getDouble("kelvin").map { Float($0) },
-            tint: call.getDouble("tint").map { Float($0) }
+            tint: call.getDouble("tint").map { Float($0) },
+            gains: call.getObject("gains").flatMap { o in
+                guard let r = o["r"] as? Double, let g = o["g"] as? Double, let b = o["b"] as? Double else { return nil }
+                return AVCaptureDevice.WhiteBalanceGains(redGain: Float(r), greenGain: Float(g), blueGain: Float(b))
+            }
         )
         camera.setDials(d)
         call.resolve()
+    }
+
+    /// Weiß-Pipette (#184): mittleres Licht im Feld rect (Anteile des Sucherbilds, hochkant, 0…1), linear, vor Look
+    /// und Korn, dazu die Gains, die für genau dieses Bild galten. Die Rechnung macht das Web (src/lib/white.ts).
+    @objc func measureWhite(_ call: CAPPluginCall) {
+        guard let o = call.getObject("rect"), let x = o["x"] as? Double, let y = o["y"] as? Double, let w = o["w"] as? Double, let h = o["h"] as? Double else {
+            call.reject("Kein Feld", "white")
+            return
+        }
+        camera.measureWhiteSettled(rect: CGRect(x: x, y: y, width: w, height: h)) { m in
+            if let m { call.resolve(m) } else { call.reject("Noch kein Bild", "white") }
+        }
     }
 
     @objc func setMagnify(_ call: CAPPluginCall) {
@@ -283,6 +303,9 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Kamera-Knopf und Lautstärketasten (iOS 17.2) lösen aus; der Web-Teil hört auf das Ereignis „shutter“
     private var shutterInteraction: UIInteraction?
     private var latest: CIImage?
+    /// das letzte Sucherbild ohne Look und Korn und die Gains, die dafür galten (für die Weiß-Pipette)
+    private var raw: CIImage?
+    private var rawGains = AVCaptureDevice.WhiteBalanceGains(redGain: 1, greenGain: 1, blueGain: 1)
     private let lock = NSLock()
     private var drawPending = false
     /// Original zeigen (gedrückt halten): der Würfel bleibt liegen, wird nur nicht angewandt
@@ -318,6 +341,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         var kelvin: Float?
         /// Tönung (grün −, magenta +), gilt nur zusammen mit kelvin
         var tint: Float?
+        /// gemessenes Weiß (Pipette): feste Gains, gehen vor kelvin
+        var gains: AVCaptureDevice.WhiteBalanceGains?
     }
     private var dials = Dials()
     /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
@@ -376,8 +401,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         } else if !tapLock, device.focusMode == .locked, device.isFocusModeSupported(.continuousAutoFocus) {
             device.focusMode = .continuousAutoFocus
         }
-        // Weiß
-        if let kelvin = d.kelvin {
+        // Weiß: gemessene Gains vor Kelvin
+        if let g = d.gains {
+            if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
+                device.setWhiteBalanceModeLocked(with: clampGains(g, device), completionHandler: nil)
+            }
+        } else if let kelvin = d.kelvin {
             if device.isLockingWhiteBalanceWithCustomDeviceGainsSupported {
                 let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: min(max(kelvin, 2000), 10000), tint: min(max(d.tint ?? 0, -150), 150))
                 device.setWhiteBalanceModeLocked(with: clampGains(device.deviceWhiteBalanceGains(for: values), device), completionHandler: nil)
@@ -612,7 +641,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Danach den Zoom so setzen, dass der Ausschnitt gleich bleibt.
     private func fitLens() {
         guard let virtualDevice, !front, let current = input?.device else { return }
-        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil
+        // feste Gains (Pipette) kann die virtuelle Dreifach-Kamera so wenig wie Kelvin
+        let manual = dials.duration != nil || dials.iso != nil || dials.focus != nil || dials.kelvin != nil || dials.gains != nil
         let target = manual ? lens(for: wantedZoom) : (virtualDevice, CGFloat(1))
         guard let target else { return }
         if target.device != current, let next = try? AVCaptureDeviceInput(device: target.device) {
@@ -818,7 +848,10 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         meter()
         var image = CIImage(cvPixelBuffer: buffer)
+        let gains = input?.device.deviceWhiteBalanceGains
         lock.lock()
+        raw = image
+        if let gains { rawGains = gains }
         if !original, let cube {
             cube.setValue(image, forKey: kCIInputImageKey)
             image = cube.outputImage ?? image
@@ -894,6 +927,47 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             self.pendingCapture = done
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
+    }
+
+    /// Wie measureWhite, aber erst, wenn Belichtung und Weiß stillstehen und danach ein paar neue Bilder kamen (höchstens
+    /// 1,5 s). Nach einem Objektivwechsel sind die ersten Bilder dunkel und die Gains noch unterwegs; so gemessen kippte
+    /// die Pipette in der zweiten Runde (am iPhone gesehen: r/g/b um 0,04, danach überkorrigiert ins Blaue).
+    func measureWhiteSettled(rect: CGRect, _ done: @escaping ([String: Any]?) -> Void) {
+        let start = Date()
+        var calm = 0
+        var lastTick = frameTick
+        func poll() {
+            let device = input?.device
+            let busy = device.map { $0.isAdjustingExposure || $0.isAdjustingWhiteBalance || $0.isAdjustingFocus } ?? false
+            let tick = frameTick
+            if !busy, tick != lastTick { calm += 1 } else if busy { calm = 0 }
+            lastTick = tick
+            if calm >= 3 || Date().timeIntervalSince(start) > 1.5 {
+                done(measureWhite(rect: rect))
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.04) { poll() }
+        }
+        poll()
+    }
+
+    /// Mittel des Felds rect (hochkant, oben links 0/0) im letzten rohen Sucherbild, linear, mit den Gains dieses Bilds.
+    /// Das Sucherbild kommt schon hochkant (Verbindung um 90° gedreht); Core Image zählt y von unten.
+    func measureWhite(rect: CGRect) -> [String: Any]? {
+        lock.lock()
+        let image = raw
+        let gains = rawGains
+        lock.unlock()
+        guard let image, let ciContext, let linear = CGColorSpace(name: CGColorSpace.linearSRGB) else { return nil }
+        let e = image.extent
+        let area = CGRect(x: e.minX + rect.minX * e.width, y: e.minY + (1 - rect.maxY) * e.height, width: rect.width * e.width, height: rect.height * e.height)
+        let avg = image.applyingFilter("CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: area)])
+        var px = [Float](repeating: 0, count: 4)
+        ciContext.render(avg, toBitmap: &px, rowBytes: 16, bounds: CGRect(origin: avg.extent.origin, size: CGSize(width: 1, height: 1)), format: .RGBAf, colorSpace: linear)
+        return [
+            "r": Double(px[0]), "g": Double(px[1]), "b": Double(px[2]),
+            "gains": ["r": Double(gains.redGain), "g": Double(gains.greenGain), "b": Double(gains.blueGain)],
+        ]
     }
 
     /// Drehung fürs Foto nach der Lage des Telefons (die Oberfläche selbst bleibt hochkant)
