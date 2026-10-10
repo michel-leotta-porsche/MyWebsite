@@ -1,6 +1,7 @@
 "use client";
 
 import { autoSequence, pickCover, type SpreadDraft } from "@/lib/auto-sequence";
+import { checkRoom } from "@/lib/book-limit";
 import { dayPage, pickForPage } from "@/lib/day-page";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, isNeutral } from "@/lib/develop/model";
@@ -102,6 +103,7 @@ export type LayIo = {
  * Einen Tag hinten an ein Buch legen oder ein neues damit anfangen. Das bestehende Buch wird frisch geladen:
  * auf einem anderen Gerät kann es sich seitdem geändert haben. Die Tagesseite ist frei gestaltet, deshalb bleibt das
  * Seitenformat ab jetzt, wie es ist (wie nach der Bühne). spread ist die Stelle der Tagesseite im Buch.
+ * Passt der Tag nicht mehr ganz ins Buch (höchstens BOOK_MAX Fotos), wirft das BookFull mit dem frischen Stand.
  * Geteilte Links bekommen den Tag gleich mit, wie nach jedem Speichern in der Werkbank.
  */
 export async function layDay(
@@ -112,9 +114,18 @@ export async function layDay(
   step?: (i: number) => void,
   io: LayIo = { uploadPrints, loadBook, saveBook, refreshShares },
 ): Promise<{ book: StoredBook; firstKey: string; spread: number }> {
+  // Ein Tag kommt nur ganz in ein Buch (#212): vor dem Hochladen prüfen und nach dem Hochladen noch einmal,
+  // falls ein anderes Gerät das Buch inzwischen gefüllt hat. Passt er nicht, wirft das BookFull.
+  const fresh = async (b: StoredBook) => {
+    const now = (await io.loadBook(b.id)) ?? b;
+    checkRoom(now, prints.length);
+    return now;
+  };
+  if ("book" in into) await fresh(into.book);
+  else checkRoom({ id: "", title: into.title, photos: [] }, prints.length);
   const bookId = "book" in into ? into.book.id : newId();
   const photos = await io.uploadPrints(user.uid, bookId, prints, step);
-  const base = "book" in into ? ((await io.loadBook(into.book.id)) ?? into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
+  const base = "book" in into ? await fresh(into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
   const aspect = pageAspect(base.aspect);
   const g = { aspect, bottom: bottomFor(aspect) };
   const d = daySpreads(photos, day.heading, day.story, g);
