@@ -121,6 +121,8 @@ export function ClosedBook({
             aria-hidden
             className="lift-shadow book-shadow-lift absolute inset-0 opacity-0 transition-opacity duration-200 ease-out"
           />
+          {/* Buchrücken in Leinen: sieht man nur, wenn sich das Buch dreht (Karussell im Bücherzimmer) */}
+          <div aria-hidden className="book-spine absolute top-[1.2%] bottom-[0.4%] left-0 hidden" style={{ width: edge, background: book.cloth.deep }} />
           {/* Buchblock: Papierkanten rechts, so dick wie das Buch Seiten hat */}
           <div
             aria-hidden
