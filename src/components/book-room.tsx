@@ -26,6 +26,7 @@ import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-caro
 import { OpenBook, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
 import { IS_APP } from "@/lib/app-mode";
+import { shutterRoom } from "@/lib/shutter";
 import { friendlyError } from "@/lib/errors";
 import { handOver } from "@/lib/handoff";
 import { getLang, locale, t, useLang, useT } from "@/lib/i18n";
@@ -699,7 +700,8 @@ function Panel({
         {title}
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      {/* in der App hält die Reihe auf dem Telefon rechts Platz für den Auslöser frei und bricht vorher um (#242) */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 max-md:pr-(--shutter-room)" style={shutterRow}>
         {primary ??
           (book && (
             <Button variant="cloth" onClick={() => open(book.id)}>
@@ -712,6 +714,9 @@ function Panel({
     </div>
   );
 }
+
+/** Den Auslöser gibt es nur in der App (hasCamera); der Tisch hat px-4, so weit liegt die Reihe auf dem Telefon vom Rand */
+const shutterRow = IS_APP ? ({ "--shutter-room": `${shutterRoom(16)}px` } as CSSProperties) : undefined;
 
 const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString(locale(getLang()), { day: "numeric", month: "short" }) : null);
 
