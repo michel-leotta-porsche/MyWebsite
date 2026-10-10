@@ -15,6 +15,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
 import { nextFlash, readFlash, type FlashMode } from "@/lib/flash";
+import { turnFor } from "@/lib/camera-turn";
 import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
@@ -142,6 +143,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   const [grid, setGrid] = useState(false);
   const [meter, setMeter] = useState<Meter | null>(null);
   const [roll, setRoll] = useState<number | null>(null);
+  /** Querformat (#221): die Knöpfe drehen sich mit dem Telefon, der Sucher bleibt stehen */
+  const [turn, setTurn] = useState(0);
+  const turned: CSSProperties = { transform: `rotate(${turn}deg)`, transition: "transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
   const [shelf, setShelf] = useState<Shelf>(readShelf);
   const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
@@ -713,6 +717,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
       else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
+      else if (e.name === "orientation") setTurn((last) => turnFor(typeof e.data.orientation === "string" ? e.data.orientation : undefined, last));
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -753,7 +758,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       <header className="bg-table-deep flex items-center justify-between gap-2 px-3 pb-2" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
         <span className="flex items-center gap-1">
           <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
-            <X aria-hidden />
+            <X aria-hidden style={turned} />
           </IconButton>
           {!fixed && !front && (
             <IconButton
@@ -762,7 +767,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               onClick={cycleFlash}
               className={`relative ${flashMode === "on" ? "text-cloth" : "text-on-table"}`}
             >
-              {flashMode === "off" ? <ZapOff aria-hidden /> : <Zap aria-hidden />}
+              {flashMode === "off" ? <ZapOff aria-hidden style={turned} /> : <Zap aria-hidden style={turned} />}
               {flashMode === "auto" && (
                 <span aria-hidden className="absolute right-1 bottom-1 text-[11px] leading-none font-bold">
                   A
@@ -776,11 +781,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           <p className="text-on-table-2 truncate text-[12px] leading-tight">{sub || " "}</p>
         </div>
         <span className="flex items-center gap-1">
-          <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
+          <span className="text-on-table-2 inline-block text-right text-[13px] tabular-nums" style={turned} aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
             {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
           </span>
           <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} disabled={!!fixed} aria-pressed={tools} className={`${tools || !allAuto(dials) ? "text-cloth" : "text-on-table"} disabled:opacity-30`}>
-            <SlidersHorizontal aria-hidden />
+            <SlidersHorizontal aria-hidden style={turned} />
           </IconButton>
         </span>
       </header>
@@ -1056,6 +1061,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               type="button"
               onClick={openReview}
               disabled={!!film || !review}
+              style={turned}
               aria-label={t("Letztes Foto ansehen")}
               className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60"
             >
@@ -1082,7 +1088,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           </button>
           <span className="justify-self-end">
             <IconButton label={front ? t("Rückkamera") : t("Frontkamera")} variant="quiet" onClick={flip} className="text-on-table border-on-table-2/60 h-12 w-12 rounded-full border-2">
-              <SwitchCamera aria-hidden />
+              <SwitchCamera aria-hidden style={turned} />
             </IconButton>
           </span>
         </div>
