@@ -24,6 +24,7 @@ import { friendlyError } from "@/lib/errors";
 import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
+import { takeLockedShots } from "@/lib/locked-import";
 import { dayOf, daysAgo, dayStack, isDayStack } from "@/lib/day-stack";
 import { undevelopedStacks } from "@/lib/film";
 import { newBook, uploadPrints } from "@/lib/shelve";
@@ -116,6 +117,25 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       .then(() => setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x))))
       .catch(() => {});
   };
+  // Sperrbildschirm (#187): was die gesperrte Kamera aufgenommen hat, kommt beim Öffnen mit seinem Look auf den Stapel
+  // seines Tages und in die Mediathek, wie jedes Foto aus Calimas Kamera
+  // ohne keep: ein Effekt, der keep ruft, nimmt dem Studio die Optimierung des React Compilers
+  useEffect(() => {
+    if (!hasCamera()) return;
+    takeLockedShots()
+      .then((ps) => {
+        if (!ps.length) return;
+        // erst sichern, dann neu lesen: so überholt das erste Laden des Pults die neuen Fotos nicht
+        putPrints(user.uid, ps)
+          .then(() => listPrints(user.uid))
+          .then((all) => setPrints(trimPiles(piles(all)).keep.flat()))
+          .catch(() => setPrints((list) => [...ps, ...list]));
+        saveToLibrary(ps).catch(() => {});
+        notify(ps.length === 1 ? t("Ein Foto vom Sperrbildschirm liegt auf dem Stapel seines Tages.") : t("{n} Fotos vom Sperrbildschirm liegen auf dem Stapel ihres Tages.", { n: ps.length }));
+      })
+      .catch(() => {});
+  }, [user.uid, t]);
+
   // Bilder auf einem unentwickelten Film bleiben im Dunkeln: sie liegen schon im Studio, zeigen sich aber erst nach dem Entwickeln
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
   const lit = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);

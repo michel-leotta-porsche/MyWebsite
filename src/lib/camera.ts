@@ -54,6 +54,13 @@ type Plugin = {
   discard(o: { path: string }): Promise<void>;
   /** Körnung live im Sucher: amount wie GRAIN.amount, cell wie GRAIN.cell (Anteil der Bildbreite); 0 schaltet sie ab */
   setGrain(o: { amount: number; cell: number }): Promise<void>;
+  /**
+   * Sperrbildschirm (#187): Looks für die gesperrte Kamera ablegen (gemeinsamer Ordner der App-Gruppe). lut/n wie bei
+   * setLut; ohne lut ist es „Original“. Die erste ist die gewählte.
+   */
+  shareLooks(o: { looks: { id: string; name: string; lut?: string; n?: number }[] }): Promise<void>;
+  /** gesperrt aufgenommene Fotos abholen, einmal: die App legt sie in ihren Cache, takeShot holt und löscht sie dann */
+  takeLocked(): Promise<{ shots: { path: string; at: number; look?: string }[] }>;
   /** die Quick Action vom App-Symbol abholen, einmal: „kamera“ oder nichts (SceneDelegate.swift, CalimaLaunch) */
   launch(): Promise<{ action?: string }>;
   /**

@@ -15,6 +15,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
 import { haptic } from "@/lib/haptics";
+import { LOCKED_KEY, lockedLooks } from "@/lib/locked";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
 import { useT } from "@/lib/i18n";
@@ -252,6 +253,27 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     // nur beim Öffnen; der Look danach läuft über setLut
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sperrbildschirm (#187): die gesperrte Kamera bekommt die ersten Looks mit, der gewählte zuerst. Erst wenn der Sucher
+  // läuft und kurz Ruhe ist (bis zu 1,5 MB Würfel über die Brücke), und nur wenn sich die Auswahl geändert hat
+  const share = useMemo(() => lockedLooks(looks, chosen.id), [looks, chosen.id]);
+  const shareKey = share.map((l) => l.id).join("|");
+  useEffect(() => {
+    if (!ready) return;
+    const timer = window.setTimeout(() => {
+      try {
+        if (localStorage.getItem(`${LOCKED_KEY}:ids`) === shareKey) return;
+      } catch {}
+      CalimaCamera.shareLooks({ looks: share.map((l) => ({ id: l.id, name: l.name, ...(l.edit ? lutOf(l.edit) : {}) })) })
+        .then(() => {
+          // die Bearbeitung je Look merken: damit ordnet das Fotostudio gesperrt aufgenommene Fotos zu
+          localStorage.setItem(LOCKED_KEY, JSON.stringify(share));
+          localStorage.setItem(`${LOCKED_KEY}:ids`, shareKey);
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [ready, shareKey]); // eslint-disable-line react-hooks/exhaustive-deps -- share hängt an shareKey
 
   // Look wechseln: der LUT geht hinüber, der Name bleibt gemerkt. Beim Ziehen im Weiß-Raster höchstens alle 120 ms ein
   // neuer LUT (190 kB über die Brücke), der letzte Stand kommt immer an
