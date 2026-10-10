@@ -64,6 +64,8 @@
 	<string>UIStatusBarStyleLightContent</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Calima nutzt die Kamera nur, wenn du ein Foto direkt für dein Buch aufnimmst.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Calima nimmt den Ton deiner Live Photos auf.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Calima legt jedes Foto aus seiner Kamera zusätzlich in deine Mediathek, damit es nicht verloren geht.</string>
 	<key>UIApplicationShortcutItems</key>
