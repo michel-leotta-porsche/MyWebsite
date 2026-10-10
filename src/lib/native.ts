@@ -94,7 +94,7 @@ export async function saveFilesInApp(files: File[]): Promise<ShareResult> {
   }
 }
 
-const base64 = (b: Blob) =>
+export const base64 = (b: Blob) =>
   new Promise<string>((ok, fail) => {
     const r = new FileReader();
     r.onload = () => ok(String(r.result).split(",", 2)[1] ?? "");
