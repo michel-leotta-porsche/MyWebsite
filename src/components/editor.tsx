@@ -54,6 +54,7 @@ import {
 } from "@/lib/store";
 import { IS_APP, withKeys } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
+import { openBook } from "@/lib/open-book";
 import { takeHandover } from "@/lib/handoff";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
@@ -149,6 +150,7 @@ export function Editor() {
   const t = useT();
 
   const [loaded, setLoaded] = useState<StoredBook | null>(null);
+  const [missing, setMissing] = useState<"gone" | "failed" | null>(null);
   // neues Buch: leer, bis das erste Foto kommt
   const blank = useMemo<StoredBook | null>(
     () =>
@@ -224,9 +226,13 @@ export function Editor() {
   useEffect(() => {
     if (!user || !idParam || bookRef.current?.id === idParam) return;
     let alive = true;
-    loadBook(idParam)
-      .then((b) => {
-        if (!alive || !b) return;
+    setMissing(null);
+    openBook(idParam, user.uid, loadBook)
+      .then((o) => {
+        if (!alive) return;
+        // gelöscht, fremd oder nicht ladbar: Meldung statt leerem Tisch (#213)
+        if (o.state !== "open") return setMissing(o.state);
+        const b = o.book;
         savedOnce.current = true;
         setLoaded(b);
         // aus dem offenen Buch (langes Drücken, „Bearbeiten“): gleich die Doppelseite, die dort aufgeschlagen war
@@ -236,8 +242,7 @@ export function Editor() {
         // auch eine Textseite: auf der Bühne lässt sie sich beschreiben und bekleben, das Formular bleibt in der Liste
         const s = b.spreads[Number(at) - 1];
         if (s?.id) setStageId(s.id);
-      })
-      .catch(() => {});
+      });
     return () => {
       alive = false;
     };
@@ -551,6 +556,17 @@ export function Editor() {
       <SignInTable title={t("Ein Buch gestalten")}>
         {t("Melde dich an, dann ziehst du deine Fotos hier hinein. Rezepte und Kameradaten werden gelesen, GPS-Daten fallen weg.")}
       </SignInTable>
+    );
+  if (!book && missing)
+    return (
+      <main className="linen table-surface flex min-h-svh flex-col items-center justify-center gap-6 bg-table px-6">
+        <p className="text-on-table-2 max-w-sm text-center">
+          {missing === "gone" ? t("Dieses Buch liegt hier nicht mehr.") : t("Das Buch ließ sich nicht laden. Versuch es gleich nochmal.")}
+        </p>
+        <Link href="/zimmer" className={buttonClass("quiet")}>
+          {t("Zum Bücherzimmer")}
+        </Link>
+      </main>
     );
   if (!book) return <main className="linen table-surface min-h-svh bg-table" />;
 
