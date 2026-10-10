@@ -44,7 +44,10 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     public override func load() {
         // Ereignisse der Erkenner kommen als `event` mit `name` und `data` auf der Seite an
         camera.onEvent = { [weak self] name, data in
-            DispatchQueue.main.async { self?.notifyListeners("event", data: ["name": name, "data": data]) }
+            // NaN oder unendlich (etwa die Messung, solange die Belichtung umschaltet) kann JSON nicht: solche Werte fallen weg,
+            // sonst kommt das ganze Ereignis leer an
+            let clean = data.filter { !(($0.value as? Double).map { !$0.isFinite } ?? false) }
+            DispatchQueue.main.async { self?.notifyListeners("event", data: ["name": name, "data": clean]) }
         }
         // Quick Action, während die Seite schon läuft: melden, dass etwas wartet; abgeholt wird mit `launch`
         _ = NotificationCenter.default.addObserver(forName: CalimaLaunch.waiting, object: nil, queue: .main) { [weak self] _ in
