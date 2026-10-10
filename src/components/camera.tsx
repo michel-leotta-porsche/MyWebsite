@@ -704,7 +704,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           : t("Ohne Look");
 
   return createPortal(
-    <div id="calima-kamera" data-turn={turn || undefined} className="text-on-table fixed inset-0 z-[600] flex flex-col bg-transparent select-none" role="dialog" aria-label={t("Kamera")}>
+    <div id="calima-kamera" className="text-on-table fixed inset-0 z-[600] flex flex-col bg-transparent select-none" role="dialog" aria-label={t("Kamera")}>
       <header className="bg-table-deep flex items-center justify-between gap-2 px-3 pb-2" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
         <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
           <X aria-hidden style={turned} />
