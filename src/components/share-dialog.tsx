@@ -19,7 +19,8 @@ import Link from "next/link";
 import { acceptTerms, deleteNote, mySharesOf, notesOf, refreshShares, shareBook, termsAccepted, unshare, type Note, type Share as BookShare, type StoredBook } from "@/lib/store";
 
 // In der iOS-App ist die eigene Adresse capacitor://localhost; geteilt wird immer eine Web-Adresse
-const linkFor = (token: string) => `${location.protocol.startsWith("http") ? location.origin : SITE_URL}/b?t=${token}`;
+// Links zeigen immer auf die Hauptadresse, auch wenn jemand über calima.web.app angemeldet ist; nur lokal bleibt es der eigene Server
+const linkFor = (token: string) => `${location.hostname === "localhost" ? location.origin : SITE_URL}/b?t=${token}`;
 
 const noSubscribe = () => () => {};
 const hasShare = () => typeof navigator.share === "function";

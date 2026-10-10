@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 // Vorschau für geteilte Links (WhatsApp, Signal, Mail …). Seiten mit eigenem openGraph überschreiben das
 // ganze Objekt (Next führt Metadaten nur flach zusammen), deshalb bauen sie es hiermit neu.
-export const SITE_URL = "https://calima.web.app";
+export const SITE_URL = "https://calima.photos";
 
 // Wortmarke und Buch im Ringelblumen-Leinen mit Foto im Fenster, 1200×630. Neuer Dateiname, damit Messenger die alte Vorschau nicht aus dem Cache holen
 const image = { url: "/og-calima.jpg", width: 1200, height: 630, alt: "Calima: Fotobuch im gelben Leineneinband mit einer Mittagsblume im Titelfenster" };
