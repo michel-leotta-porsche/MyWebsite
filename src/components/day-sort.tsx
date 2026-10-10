@@ -20,6 +20,7 @@ import { haptic } from "@/lib/haptics";
 import { de, getLang, locale, useT } from "@/lib/i18n";
 import { STORY_MAX } from "@/lib/day-page";
 import { layDay } from "@/lib/shelve";
+import { BOOK_MAX, BookFull, nextVolume, roomIn } from "@/lib/book-limit";
 import { toBookData, type ClothId, type StoredBook } from "@/lib/store";
 import type { Print } from "@/lib/studio-store";
 
@@ -585,6 +586,10 @@ function Finish({
   const [story, setStory] = useState(() => readStory(stack));
   const runningBook = own.find((b) => b.id === running);
   const chosen: Target = target ?? (runningBook ? { book: runningBook } : { kind: 0 });
+  // Ein Tag kommt nur ganz in ein Buch (#212). Passt er nicht mehr ins gewählte, geht er in dessen nächsten Band.
+  const tooMany = ins.length - BOOK_MAX;
+  const full = "book" in chosen && roomIn(chosen.book) < ins.length ? chosen.book : null;
+  const volume = full ? { title: nextVolume(full.title || t("Tagebuch")), cloth: full.cloth } : null;
 
   if (!ins.length)
     return (
@@ -604,13 +609,15 @@ function Finish({
     setBusy(0);
     onBusy(true);
     try {
-      const into = "book" in chosen ? { book: chosen.book } : { title: t(KINDS[chosen.kind].title), cloth: KINDS[chosen.kind].cloth };
+      const into = volume ?? ("book" in chosen ? { book: chosen.book } : { title: t(KINDS[chosen.kind].title), cloth: KINDS[chosen.kind].cloth });
       const r = await layDay(user, ins, { heading: dayLong, story }, into, (i) => setBusy(i));
       writeRunning(r.book.id);
       writeStory(stack, "");
       haptic("success");
       onLaid({ book: r.book, firstKey: r.firstKey, count: ins.length, spread: r.spread });
     } catch (e) {
+      // auf einem anderen Gerät voll geworden: den frischen Stand zeigen, dann bietet der Abschluss den nächsten Band an
+      if (e instanceof BookFull && "book" in chosen) return setTarget({ book: e.book as StoredBook });
       setError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
     } finally {
       setBusy(null);
@@ -618,7 +625,11 @@ function Finish({
     }
   };
 
-  const cta = "book" in chosen ? t("In „{title}“ legen", { title: chosen.book.title || t("Ohne Titel") }) : t("{kind} anlegen", { kind: t(KINDS[chosen.kind].title) });
+  const cta = volume
+    ? t("„{title}“ anfangen", { title: volume.title })
+    : "book" in chosen
+      ? t("In „{title}“ legen", { title: chosen.book.title || t("Ohne Titel") })
+      : t("{kind} anlegen", { kind: t(KINDS[chosen.kind].title) });
 
   return (
     <Scroll>
@@ -643,7 +654,7 @@ function Finish({
               key={b.id}
               lead={<Cover book={b} />}
               title={b.title || t("Ohne Titel")}
-              detail={b.id === running ? t("Zuletzt dein Tagebuch") : undefined}
+              detail={roomIn(b) < ins.length ? t("Voll, der Tag braucht {n} Plätze", { n: ins.length }) : b.id === running ? t("Zuletzt dein Tagebuch") : undefined}
               onClick={() => {
                 setTarget({ book: b });
                 setChoosing(false);
@@ -664,7 +675,13 @@ function Finish({
           <Cover book={chosen.book} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-semibold">{chosen.book.title || t("Ohne Titel")}</p>
-            <p className="text-on-table-2 text-[13px]">{t("Der Tag kommt hinten dazu.")}</p>
+            <p className="text-on-table-2 text-[13px]">
+              {!full
+                ? t("Der Tag kommt hinten dazu.")
+                : roomIn(full)
+                  ? t("Hat nur noch Platz für {room} Fotos. Der Tag kommt ganz in einen neuen Band.", { room: roomIn(full) })
+                  : t("Ist voll ({max} Fotos). Der Tag kommt in einen neuen Band.", { max: BOOK_MAX })}
+            </p>
           </div>
           <Button size="sm" onClick={() => setChoosing(true)} disabled={busy !== null}>
             {t("Anderes Buch")}
@@ -701,7 +718,12 @@ function Finish({
 
       {!choosing && (
         <div className="grid gap-1.5">
-          <Button variant="cloth" className="w-full" onClick={lay} disabled={busy !== null}>
+          {tooMany > 0 && (
+            <p className="text-on-table text-[15px]" role="status">
+              {t("Ein Buch fasst {max} Fotos, und ein Tag kommt nur ganz hinein. Leg noch {n} weg: oben mit Rückgängig zurück zum Einsortieren.", { max: BOOK_MAX, n: tooMany })}
+            </p>
+          )}
+          <Button variant="cloth" className="w-full" onClick={lay} disabled={busy !== null || tooMany > 0}>
             {busy !== null ? t("Lege Foto {i} von {n} …", { i: busy + 1, n: ins.length }) : cta}
           </Button>
           {busy !== null && (

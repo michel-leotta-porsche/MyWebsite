@@ -34,6 +34,12 @@ export const EVENING: Record<string, string> = {
   "Zuletzt dein Tagebuch": "Your journal last time",
   "Neues Tagebuch": "New journal",
   "Der Tag kommt hinten dazu.": "The day goes at the end.",
+  "Hat nur noch Platz für {room} Fotos. Der Tag kommt ganz in einen neuen Band.": "Only has room for {room} more photos. The whole day goes into a new volume.",
+  "Ist voll ({max} Fotos). Der Tag kommt in einen neuen Band.": "Is full ({max} photos). The day goes into a new volume.",
+  "„{title}“ anfangen": "Start “{title}”",
+  "Voll, der Tag braucht {n} Plätze": "Full, the day needs {n} spaces",
+  "Ein Buch fasst {max} Fotos, und ein Tag kommt nur ganz hinein. Leg noch {n} weg: oben mit Rückgängig zurück zum Einsortieren.":
+    "A book holds {max} photos, and a day only goes in whole. Put {n} more aside: use Undo at the top to go back to sorting.",
   "Anderes Buch": "Other book",
   "Dein erstes Tagebuch. Calima schlägt vor:": "Your first journal. Calima suggests:",
   Buchart: "Kind of book",

@@ -22,6 +22,7 @@ import { PageView } from "@/components/page-view";
 import { ShareDialog } from "@/components/share-dialog";
 import { Stage } from "@/components/stage";
 import { pickCover, relayoutFree, spreadId, variantsOf, type SpreadDraft } from "@/lib/auto-sequence";
+import { BOOK_MAX } from "@/lib/book-limit";
 import { addKey, fromSpread, materialize, removeKey, toSpread, withPages, type SpreadItem } from "@/lib/free-layout";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, cleanEdit, neutralEdit } from "@/lib/develop/model";
@@ -69,7 +70,7 @@ import { de, getLang, locale, t, useT } from "@/lib/i18n";
 type Pending = { key: string; name: string; state: "lesen" | "laden" | "fertig" | "fehler"; error?: string };
 type Selection = { type: "photo"; key: string } | { type: "spread"; id: string } | null;
 
-const MAX = 60;
+const MAX = BOOK_MAX;
 /** so viele Fotos laden höchstens gleichzeitig hoch (je drei Größen) */
 const MAX_UPLOADS = 3;
 /** Unter 768px: Panel des Gewählten als Blatt am unteren Rand, direkt beim Foto statt weit darunter */
