@@ -49,6 +49,7 @@ export const START: Record<string, string> = {
   "Ein Fotobuch zum Umblättern, von Michel. Kostenlos, ohne Konto zum Anschauen.": "A photo book you actually leaf through, by Michel. Free, no account needed to look.",
   "Mach dein eigenes.": "Make your own.",
   "Was Calima kann": "What Calima does",
+  "Alles, was Calima kann": "Everything Calima does",
   "So geht’s": "How it works",
   "Die Kamera gibt es nur in der iPhone-App.": "The camera is only in the iPhone app.",
   "Sie kommt bald in den App Store.": "It's coming to the App Store soon.",

@@ -22,7 +22,7 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection title={<T>Ein Buch anlegen</T>}>
+      <LegalSection id="buch-anlegen" title={<T>Ein Buch anlegen</T>}>
         <p>
           <T>
             Im Bücherzimmer auf „Neues Buch anlegen“, dann „Fotos auswählen“. Calima ordnet die Fotos zu Doppelseiten; mit „Gestalten“ ordnest du
@@ -31,7 +31,17 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection title={<T>Ein Buch teilen</T>}>
+      <LegalSection id="fotos-bearbeiten" title={<T>Fotos bearbeiten</T>}>
+        <p>
+          <T>
+            Im Bücherzimmer beim Fotostudio auf „Fotos wählen“, gern mehrere auf einmal, oder auf der Werkbank „Fotos bearbeiten“. Tippe auf einen Look
+            und wisch auf dem Foto, dann änderst du die Stärke; unter „Feinschliff“ stellst du einzelne Regler ein, „Auf alle“ überträgt die Einstellung.
+            Der Reiter „Rezept“ stellt die Werte ein wie an einer Fuji, nachempfunden. Im Fotostudio wird nichts hochgeladen.
+          </T>
+        </p>
+      </LegalSection>
+
+      <LegalSection id="buch-teilen" title={<T>Ein Buch teilen</T>}>
         <p>
           <T>
             Auf der Werkbank „Hinlegen für …“ wählen und einen Namen eintragen. Jede Person bekommt ihren eigenen Link; lesen geht ohne Konto.
