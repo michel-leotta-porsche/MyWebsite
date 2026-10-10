@@ -20,7 +20,7 @@ export function SampleBook() {
   const t = useT();
   return (
     <main>
-      <Library books={[book]} bookEnd={<OwnBook />}>
+      <Library books={[book]} bookEnd={<OwnBook />} backLabel={t("Zurück|Buch")}>
         <Table label={t("Beispielbuch Fuerteventura")} title={<Wordmark />}>
           <Shelf
             feature

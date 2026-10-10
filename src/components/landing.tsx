@@ -736,6 +736,7 @@ function Features() {
 const PARTS: Record<SectionId, () => ReactNode> = { blaettern: Hero, eigenes: Own, kann: Features, "so-gehts": HowTo };
 
 export function Landing() {
+  const t = useT();
   const [first, ...rest] = SECTIONS;
   const Top = PARTS[first.id];
   return (
@@ -746,6 +747,7 @@ export function Landing() {
       <Library
         books={[book]}
         bookEnd={<OwnBook />}
+        backLabel={t("Zurück|Buch")}
         footer={
           <>
             {rest.map(({ id }) => {
