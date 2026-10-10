@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizontal, Sun, SwitchCamera, X, Zap } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizontal, Sun, SwitchCamera, X, Zap, ZapOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -14,6 +14,9 @@ import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, l
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
+import { nextFlash, readFlash, type FlashMode } from "@/lib/flash";
+import { turnFor } from "@/lib/camera-turn";
+import { EV_TICKS, evLabel, evMode, evStep } from "@/lib/ev";
 import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
@@ -41,7 +44,6 @@ const SHIFT_KEY = "calima:kamera-weiss";
 const TOOLS_KEY = "calima:kamera-werkzeug";
 const HOLD_MS = 220;
 const MOVE_PX = 10;
-const EV_MAX = 2;
 /** Seite des Messquadrats der Weiß-Pipette, Anteil der Sucherbreite */
 const PATCH = 0.18;
 
@@ -55,7 +57,9 @@ const stamp = () => {
 };
 /** so viele Bilder passen auf den Film: eine Einwegkamera bringt ihre eigene Zahl mit */
 const framesOf = (f: Film) => f.rules?.frames ?? FILM_FRAMES;
-const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
+
+/** gemerkter Blitz-Knopf (#221) */
+const FLASH_KEY = "calima:blitz";
 
 /** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
 /**
@@ -92,6 +96,22 @@ export function Camera({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [front, setFront] = useState(false);
+  /** Blitz Aus, Auto, An (#221); bleibt auf dem Gerät. Einwegkameras bringen ihren eigenen mit */
+  const [flashMode, setFlashMode] = useState<FlashMode>(() => {
+    try {
+      return readFlash(localStorage.getItem(FLASH_KEY));
+    } catch {
+      return "off";
+    }
+  });
+  const cycleFlash = () => {
+    haptic("select");
+    const next = nextFlash(flashMode);
+    setFlashMode(next);
+    try {
+      localStorage.setItem(FLASH_KEY, next);
+    } catch {}
+  };
   const [zoom, setZoom] = useState(1);
   const [ev, setEv] = useState(0);
   const [showEv, setShowEv] = useState(false);
@@ -140,6 +160,9 @@ export function Camera({
   const [grid, setGrid] = useState(false);
   const [meter, setMeter] = useState<Meter | null>(null);
   const [roll, setRoll] = useState<number | null>(null);
+  /** Querformat (#221): die Knöpfe drehen sich mit dem Telefon, der Sucher bleibt stehen */
+  const [turn, setTurn] = useState(0);
+  const turned: CSSProperties = { transform: `rotate(${turn}deg)`, transition: "transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
   const [shelf, setShelf] = useState<Shelf>(readShelf);
   const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
@@ -523,9 +546,11 @@ export function Camera({
       if (!fixed) setShowEv(true);
     }
     if (g.mode === "drag") {
-      const next = Math.round(Math.min(EV_MAX, Math.max(-EV_MAX, g.ev0 - dy / 120)) * 10) / 10;
-      if (next !== ev) {
+      // Zeit und ISO von Hand: es gibt nichts nachzuregeln, der Sucher sagt das statt still nichts zu tun (#224)
+      const next = evStep(g.ev0 - dy / 120);
+      if (evMode(dials) !== "manual" && next !== ev) {
         setEv(next);
+        haptic("select");
         later(() => CalimaCamera.setExposure({ ev: next }).catch(() => {}));
       }
     }
@@ -641,7 +666,9 @@ export function Camera({
     window.setTimeout(() => setFlash(false), 140);
     let saving = false;
     try {
-      const { path } = await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
+      // Einwegkamera: ihr Blitz gilt; sonst der Blitz-Knopf (die Frontkamera hat keinen)
+      const flashFor = fixed ? fixed.flash || undefined : front || flashMode === "off" ? undefined : flashMode === "on" || "auto";
+      const { path } = await CalimaCamera.capture(flashFor ? { flash: flashFor } : undefined);
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = lookNow.edit ?? undefined;
@@ -726,6 +753,7 @@ export function Camera({
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
       else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
+      else if (e.name === "orientation") setTurn((last) => turnFor(typeof e.data.orientation === "string" ? e.data.orientation : undefined, last));
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -764,19 +792,36 @@ export function Camera({
   return createPortal(
     <div id="calima-kamera" className="text-on-table fixed inset-0 z-[600] flex flex-col bg-transparent select-none" role="dialog" aria-label={t("Kamera")}>
       <header className="bg-table-deep flex items-center justify-between gap-2 px-3 pb-2" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
-        <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
-          <X aria-hidden />
-        </IconButton>
+        <span className="flex items-center gap-1">
+          <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
+            <X aria-hidden style={turned} />
+          </IconButton>
+          {!fixed && !front && (
+            <IconButton
+              label={flashMode === "off" ? t("Blitz aus") : flashMode === "auto" ? t("Blitz automatisch") : t("Blitz an")}
+              variant="quiet"
+              onClick={cycleFlash}
+              className={`relative ${flashMode === "on" ? "text-cloth" : "text-on-table"}`}
+            >
+              {flashMode === "off" ? <ZapOff aria-hidden style={turned} /> : <Zap aria-hidden style={turned} />}
+              {flashMode === "auto" && (
+                <span aria-hidden className="absolute right-1 bottom-1 text-[11px] leading-none font-bold">
+                  A
+                </span>
+              )}
+            </IconButton>
+          )}
+        </span>
         <div className="min-w-0 text-center" aria-live="polite">
           <p className="truncate text-[15px] leading-tight font-bold tracking-[-0.01em]">{title}</p>
           <p className="text-on-table-2 truncate text-[12px] leading-tight">{sub || " "}</p>
         </div>
         <span className="flex items-center gap-1">
-          <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
+          <span className="text-on-table-2 inline-block text-right text-[13px] tabular-nums" style={turned} aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
             {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
           </span>
           <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} disabled={!!fixed} aria-pressed={tools} className={`${tools || !allAuto(dials) ? "text-cloth" : "text-on-table"} disabled:opacity-30`}>
-            <SlidersHorizontal aria-hidden />
+            <SlidersHorizontal aria-hidden style={turned} />
           </IconButton>
         </span>
       </header>
@@ -830,11 +875,22 @@ export function Camera({
               )}
             </span>
           )}
-          {showEv && (
-            <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 right-3 rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums">
-              {evLabel(ev)}
-            </span>
-          )}
+          {showEv &&
+            (evMode(dials) === "manual" ? (
+              <p role="status" className="bg-table-deep/80 text-on-table absolute inset-x-6 top-3 rounded-2xl px-3 py-2 text-center text-[13px] leading-snug">
+                {t("Zeit und ISO stehen von Hand. Für Heller/Dunkler stell eins der beiden Räder auf A.")}
+              </p>
+            ) : (
+              // Skala in Dritteln: man sieht, wie weit man gewischt hat, auch wenn das Bild sich nur wenig ändert
+              <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 right-3 flex items-center gap-2 rounded-full py-1 pr-2.5 pl-2 text-[13px] font-semibold tabular-nums">
+                <span className="relative flex h-3 items-center gap-[3px]">
+                  {EV_TICKS.map((v) => (
+                    <i key={v} className={`block w-px ${Number.isInteger(v) ? "h-3" : "h-1.5"} ${Math.abs(v - ev) < 0.01 ? "bg-cloth" : "bg-on-table-2/60"}`} />
+                  ))}
+                </span>
+                <span className="min-w-8 text-right">{evLabel(ev)}</span>
+              </span>
+            ))}
         </div>
       </div>
 
@@ -1052,6 +1108,7 @@ export function Camera({
               type="button"
               onClick={openReview}
               disabled={!!film || !review}
+              style={turned}
               aria-label={t("Letztes Foto ansehen")}
               className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60"
             >
@@ -1078,7 +1135,7 @@ export function Camera({
           </button>
           <span className="justify-self-end">
             <IconButton label={front ? t("Rückkamera") : t("Frontkamera")} variant="quiet" onClick={flip} className="text-on-table border-on-table-2/60 h-12 w-12 rounded-full border-2">
-              <SwitchCamera aria-hidden />
+              <SwitchCamera aria-hidden style={turned} />
             </IconButton>
           </span>
         </div>

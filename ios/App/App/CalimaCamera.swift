@@ -236,7 +236,9 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func capture(_ call: CAPPluginCall) {
-        camera.capture(flash: call.getBool("flash") ?? false) { result in
+        // flash: true = An, "auto" = Auto, fehlt = Aus (getBool auf einen String liefert nil und umgekehrt)
+        let mode: AVCaptureDevice.FlashMode = call.getString("flash") == "auto" ? .auto : (call.getBool("flash") ?? false) ? .on : .off
+        camera.capture(flash: mode) { result in
             switch result {
             case .success(let url):
                 call.resolve(["path": url.path])
@@ -348,8 +350,15 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
     var magnify = false
     private var frameTick = 0
+    /// Heller/Dunkler in EV, wie zuletzt gewischt (#257)
+    private var bias: Float = 0
     private var lastMeter: (offset: Float, duration: Double, iso: Float, lens: Float, kelvin: Float)?
     private var motion: CMMotionManager?
+    /// Lage des Telefons aus dem Beschleunigungssensor (wie die Kamera-App): UIDevice.orientation meldet bei
+    /// eingeschalteter Ausrichtungssperre nie quer. upright ist die letzte aufrechte Lage, flach zählt nicht fürs Foto.
+    private var orientMotion: CMMotionManager?
+    private var orientation: UIDeviceOrientation = .unknown
+    private var upright: UIDeviceOrientation = .portrait
     private var lastRoll: Double = .nan
 
     /// was die Kamera kann: Objektive als Zoomfaktoren zur Hauptkamera, Grenzen von Zeit und ISO
@@ -390,6 +399,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         // Belichtung; auf A nur zurück zur Automatik, wenn vorher von Hand gestellt war (eine Sperre per Tipp bleibt)
         if d.duration == nil && d.iso == nil {
             if device.exposureMode == .custom, device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            // zurück in der Vollautomatik gilt die Korrektur wieder am Gerät
+            device.setExposureTargetBias(min(max(bias, device.minExposureTargetBias), device.maxExposureTargetBias))
         } else if device.isExposureModeSupported(.custom) {
             device.setExposureModeCustom(duration: clampDuration(d.duration), iso: clampISO(d.iso), completionHandler: nil)
         }
@@ -454,9 +465,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
         // Halbautomatik (Michels Wahl „Ausgleichen“): steht nur Zeit oder nur ISO von Hand, regelt die Kamera das andere nach,
         // damit das Foto richtig belichtet bleibt. Der Chip zeigt den ausgleichenden Wert („Zeit A 1/4“). Halbe Schritte, sonst pendelt es
+        // Heller/Dunkler (#257): iOS beachtet die Korrektur im Custom-Modus nicht, also auf offset − bias regeln. Damit
+        // offset sicher ohne Korrektur gemessen ist, steht die Korrektur am Gerät in der Halbautomatik auf 0.
         let semi = (dials.duration == nil) != (dials.iso == nil)
-        if semi, abs(offset) > 0.15, offset.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
-            let k = pow(2, Double(-offset) * 0.5)
+        let err = offset - bias
+        if semi, abs(err) > 0.15, err.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
+            if device.exposureTargetBias != 0 { device.setExposureTargetBias(0) }
+            let k = pow(2, Double(-err) * 0.5)
             if let d = dials.duration {
                 device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
             } else if let i = dials.iso {
@@ -524,7 +539,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     }
 
     func start(_ done: @escaping (String?) -> Void) {
-        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        startOrientation()
         queue.async {
             do {
                 try self.configure(position: .back)
@@ -544,6 +559,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         shutterInteraction = nil
         view?.removeFromSuperview()
         setLevel(on: false)
+        orientMotion?.stopAccelerometerUpdates()
+        orientMotion = nil
         magnify = false
         queue.async {
             self.dials = Dials()
@@ -557,6 +574,47 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         lock.lock()
         latest = nil
         lock.unlock()
+    }
+
+    // MARK: Querformat (#253): das Web dreht Knöpfe mit, die Oberfläche selbst bleibt hochkant
+
+    private func startOrientation() {
+        orientMotion?.stopAccelerometerUpdates()
+        orientation = .unknown
+        let m = CMMotionManager()
+        guard m.isAccelerometerAvailable else {
+            sendOrientation(UIDevice.current.orientation)
+            return
+        }
+        m.accelerometerUpdateInterval = 0.15
+        m.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+            guard let self, let a = data?.acceleration else { return }
+            // Schwerkraft zeigt nach unten: hochkant y ≈ −1, Oberkante links (landscapeLeft) x ≈ −1, flach z ≈ ∓1.
+            // Ein Abstand von 0,25 zwischen den Achsen verhindert Flattern um die Diagonale.
+            let o: UIDeviceOrientation
+            if abs(a.z) > 0.85 { o = a.z < 0 ? .faceUp : .faceDown }
+            else if abs(a.x) > abs(a.y) + 0.25 { o = a.x < 0 ? .landscapeLeft : .landscapeRight }
+            else if abs(a.y) > abs(a.x) + 0.25 { o = a.y < 0 ? .portrait : .portraitUpsideDown }
+            else { return }
+            if o != self.orientation { self.sendOrientation(o) }
+        }
+        orientMotion = m
+    }
+
+    private func sendOrientation(_ o: UIDeviceOrientation) {
+        orientation = o
+        if o.isPortrait || o.isLandscape { upright = o }
+        let name: String
+        switch o {
+        case .portrait: name = "portrait"
+        case .portraitUpsideDown: name = "portraitUpsideDown"
+        case .landscapeLeft: name = "landscapeLeft"
+        case .landscapeRight: name = "landscapeRight"
+        case .faceUp: name = "faceUp"
+        case .faceDown: name = "faceDown"
+        default: name = "unknown"
+        }
+        onEvent?("orientation", ["orientation": name])
     }
 
     private func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
@@ -778,9 +836,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func setExposure(ev: Float) {
         guard let device = input?.device else { return }
         queue.async {
-            guard (try? device.lockForConfiguration()) != nil else { return }
             let v = min(max(ev, device.minExposureTargetBias), device.maxExposureTargetBias)
-            device.setExposureTargetBias(v)
+            // gemerkt für die Halbautomatik (meter() regelt dort auf diese Korrektur); am Gerät nur in der Vollautomatik
+            self.bias = v
+            let semi = (self.dials.duration == nil) != (self.dials.iso == nil)
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            device.setExposureTargetBias(semi ? 0 : v)
             device.unlockForConfiguration()
         }
     }
@@ -904,8 +965,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     // MARK: Auslösen
 
-    /// flash: echter Blitz für dieses Bild (Einwegkamera), sofern das Objektiv einen kann
-    func capture(flash: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
+    /// flash: Blitz für dieses Bild (An, Auto oder Aus), sofern das Objektiv ihn kann
+    func capture(flash: AVCaptureDevice.FlashMode = .off, _ done: @escaping (Result<URL, Error>) -> Void) {
         queue.async {
             guard self.running else {
                 done(.failure(NSError(domain: "calima", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kamera läuft nicht"])))
@@ -919,7 +980,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             // Zeit von Hand (etwa 1/6 s): .balanced verrechnet mehrere Bilder und verlängert die Aufnahme spürbar,
             // .speed nimmt genau die eingestellte Belichtung
             settings.photoQualityPrioritization = self.dials.duration != nil ? .speed : .balanced
-            if flash, self.photoOutput.supportedFlashModes.contains(.on) { settings.flashMode = .on }
+            if flash != .off, self.photoOutput.supportedFlashModes.contains(flash) { settings.flashMode = flash }
             if let c = self.photoOutput.connection(with: .video) {
                 self.rotate(c, angle: self.angle())
                 if c.isVideoMirroringSupported { c.isVideoMirrored = self.front }
@@ -972,7 +1033,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     /// Drehung fürs Foto nach der Lage des Telefons (die Oberfläche selbst bleibt hochkant)
     private func angle() -> CGFloat {
-        switch UIDevice.current.orientation {
+        switch upright {
         case .landscapeLeft: return front ? 180 : 0
         case .landscapeRight: return front ? 0 : 180
         case .portraitUpsideDown: return 270

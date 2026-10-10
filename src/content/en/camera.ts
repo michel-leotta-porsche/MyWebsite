@@ -133,4 +133,10 @@ export const CAMERA: Record<string, string> = {
   "Der iPhone-Speicher ist fast voll. Schaff Platz unter Einstellungen → Allgemein → iPhone-Speicher, sonst lassen sich keine Fotos sichern.": "Your iPhone storage is almost full. Free up space in Settings → General → iPhone Storage, otherwise photos can't be saved.",
   "Der Speicher auf diesem Gerät ist fast voll. Schaff Platz, sonst lassen sich keine Fotos sichern.": "This device's storage is almost full. Free up space, otherwise photos can't be saved.",
   OK: "OK",
+  "Blitz aus": "Flash off",
+  "Blitz automatisch": "Flash auto",
+  "Blitz an": "Flash on",
+  "ausgelöst": "fired",
+  quer: "landscape",
+  "Zeit und ISO stehen von Hand. Für Heller/Dunkler stell eins der beiden Räder auf A.": "Shutter and ISO are both manual. For brighter/darker, set one of them back to A.",
 };
