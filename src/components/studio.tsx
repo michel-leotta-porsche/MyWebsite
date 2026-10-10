@@ -25,7 +25,8 @@ import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "
 import { errorDetail } from "@/lib/errors";
 import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
-import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
+import { CalimaCamera, hasCamera, OPEN_CAMERA } from "@/lib/camera";
+import { restoreFilms } from "@/lib/film-restore";
 import { dayOf, daysAgo, dayStack } from "@/lib/day-stack";
 import { envelopeLabel, framesMissing, isEnvelope, isSortPile, missingFrames, toEnvelope } from "@/lib/envelope";
 import { undevelopedStacks, type Film } from "@/lib/film";
@@ -41,7 +42,7 @@ import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, typ
 import { changeNotSaved, isNoStore, listPrints, MAX_STACK, notDeveloped, notSaved, patchShot, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 import { SHUTTER } from "@/lib/shutter";
-import { saveToLibrary } from "@/lib/library-save";
+import { libraryDenied, saveToLibrary } from "@/lib/library-save";
 import { browserStore, FIRST_HINT, hintDone, markHintDone } from "@/lib/help";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
@@ -100,7 +101,9 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   // was sicher auf dem Gerät liegt; ein neues Foto, das sich nicht sichern lässt, verlässt den Pult wieder (#285)
   const stored = useRef(new Set<string>());
   useEffect(() => {
-    listPrints(user.uid)
+    // erst die Filme aus der Sicherung der App (#247), dann lesen und aufräumen
+    (hasCamera() ? restoreFilms(user.uid).catch(() => 0) : Promise.resolve(0))
+      .then(() => listPrints(user.uid))
       .then((p) => {
         for (const x of p) stored.current.add(x.id);
         const { keep, drop } = trimPiles(piles(p));
@@ -217,7 +220,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     // die Arbeitsfassungen liegen schon auf dem Gerät (die Kamera wartet aufs Sichern): nur die Einträge neu schreiben
     const roll = envelopes.flat().map((p) => ({ ...p, work: undefined }));
     // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210), dort sind sie auch sicher, wenn das Gerät voll ist
-    saveToLibrary(roll).catch(() => {});
+    // liegen sie dort, räumt die App ihre Sicherung weg (#247); nur bei vollständigen Filmen und mit Erlaubnis,
+    // sonst gibt es die Bilder nur im WebKit-Speicher
+    const whole = films.filter((f) => !missing.some((m) => m.name === f.name)).map((f) => f.stack);
+    saveToLibrary(roll)
+      .then(() => (hasCamera() && !libraryDenied() ? Promise.all(whole.map((stack) => CalimaCamera.dropFilm({ stack }))) : undefined))
+      .catch(() => {});
     const first = envelopes[0];
     const name = first[0].roll!;
     const open = { action: { label: t("Ansehen"), onClick: () => setSorting(first[0].stack!) } };
