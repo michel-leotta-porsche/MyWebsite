@@ -45,6 +45,7 @@ export function Library({
   onEdit,
   onPin,
   pins,
+  bookEnd,
 }: {
   books: BookData[];
   /** Der Tisch mit seinen Reihen; jede Reihe schlägt ihre Bände über OpenBook auf */
@@ -63,6 +64,8 @@ export function Library({
   onPin?: ((spot: Spot) => void) | Record<string, (spot: Spot) => void>;
   /** Zettel an Stellen im Foto (fest oder je Buch) */
   pins?: Pinned[] | Record<string, Pinned[]>;
+  /** Leise unter dem offenen Buch, sobald das Ende aufliegt */
+  bookEnd?: ReactNode;
 }) {
   const bookById = (id: string) => books.find((b) => b.id === id);
   const [wide, setWide] = useState<boolean | null>(null);
@@ -157,6 +160,7 @@ export function Library({
         onEdit={edit}
         onPin={typeof onPin === "function" ? onPin : onPin?.[book.id]}
         pins={Array.isArray(pins) ? pins : pins?.[book.id]}
+        end={bookEnd}
       />
     );
   }
