@@ -36,6 +36,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveToLibrary", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "measureWhite", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAids", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -236,7 +237,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func capture(_ call: CAPPluginCall) {
-        camera.capture(flash: call.getBool("flash") ?? false) { result in
+        camera.capture(flash: call.getBool("flash") ?? false, raw: call.getBool("raw") ?? false) { result in
             switch result {
             case .success(let url):
                 call.resolve(["path": url.path])
@@ -244,6 +245,12 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject(error.localizedDescription, "capture")
             }
         }
+    }
+
+    /// Profi-Hilfen im Sucher (#185): Peaking, Zebra, Histogramm; gelten bis zum nächsten Aufruf, nie im Foto
+    @objc func setAids(_ call: CAPPluginCall) {
+        camera.setAids(peaking: call.getBool("peaking") ?? false, zebra: call.getBool("zebra") ?? false, histogram: call.getBool("histogram") ?? false)
+        call.resolve()
     }
 
     @objc func discard(_ call: CAPPluginCall) {
@@ -312,6 +319,22 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     var original = false
 
     private var pendingCapture: ((Result<URL, Error>) -> Void)?
+    /// RAW-Aufnahme: es kommen zwei Rückrufe (JPEG und DNG); done erst, wenn beide da sind
+    private var pendingRaw = false
+    private var pendingJPEG: URL?
+    private var pendingDNG: Data?
+
+    // MARK: Profi-Hilfen (#185): nur im Sucher, nie im Foto
+    private var aidPeaking = false
+    private var aidZebra = false
+    private var aidHistogram = false
+    private var lastHistogram = Date.distantPast
+    /// schräge Streifen fürs Zebra, einmal erzeugt; liegen fest im Bild, damit sie nicht wandern
+    private lazy var stripes: CIImage? = CIFilter(name: "CIStripesGenerator", parameters: [
+        "inputColor0": CIColor(red: 1, green: 1, blue: 1, alpha: 1),
+        "inputColor1": CIColor(red: 0, green: 0, blue: 0, alpha: 1),
+        "inputWidth": 3,
+    ])?.outputImage?.transformed(by: CGAffineTransform(rotationAngle: .pi / 4))
 
     /// Weitere Analysen der Sucherbilder (Reisebuch-Workshop, Runde 2: Dokument-Ecken, Strichcode, Klassifikation).
     /// Noch leer; ein Erkenner meldet sich mit `onEvent` zurück, die Seite hört über `CalimaCamera.addListener("event", …)`.
@@ -362,6 +385,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         if lenses.isEmpty { lenses = [1] }
         return [
             "front": front,
+            "raw": photoOutput.isAppleProRAWEnabled,
             "lenses": lenses,
             "limits": [
                 "minDuration": CMTimeGetSeconds(f.minExposureDuration),
@@ -559,6 +583,61 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         lock.unlock()
     }
 
+    func setAids(peaking: Bool, zebra: Bool, histogram: Bool) {
+        lock.lock()
+        aidPeaking = peaking
+        aidZebra = zebra
+        aidHistogram = histogram
+        lock.unlock()
+    }
+
+    /// Peaking und Zebra über das fertige Sucherbild legen; gemessen wird am rohen Bild vor dem Look.
+    /// Peaking auf halber Auflösung, damit der Sucher flüssig bleibt.
+    private func overlayAids(_ shown: CIImage, raw: CIImage, peaking: Bool, zebra: Bool) -> CIImage {
+        var out = shown
+        let e = shown.extent
+        let luma = CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0)
+        let grey = raw.applyingFilter("CILinearToSRGBToneCurve").applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": luma, "inputGVector": luma, "inputBVector": luma,
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1), "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        ])
+        if zebra, let stripes {
+            // Lichter ab 0,95 (Gamma) als Maske, mit den festen Streifen multipliziert
+            let hot = grey.applyingFilter("CIColorThreshold", parameters: ["inputThreshold": 0.95])
+            let mask = stripes.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: hot]).cropped(to: e)
+            let paint = CIImage(color: CIColor(red: 0.92, green: 0.92, blue: 0.92)).cropped(to: e)
+            out = paint.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: out, kCIInputMaskImageKey: mask])
+        }
+        if peaking {
+            let half = grey.transformed(by: CGAffineTransform(scaleX: 0.5, y: 0.5))
+            let edges = half.applyingFilter("CIEdges", parameters: [kCIInputIntensityKey: 4])
+                .applyingFilter("CIColorThreshold", parameters: ["inputThreshold": 0.35])
+                .transformed(by: CGAffineTransform(scaleX: 2, y: 2))
+                .cropped(to: e)
+            let paint = CIImage(color: CIColor(red: 0xE8 / 255.0, green: 0xB3 / 255.0, blue: 0x3A / 255.0)).cropped(to: e)
+            out = paint.applyingFilter("CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: out, kCIInputMaskImageKey: edges])
+        }
+        return out
+    }
+
+    /// Helligkeits-Histogramm des Bilds nach dem Look (64 Fächer, auf das größte normiert), höchstens zehnmal je Sekunde
+    private func sendHistogram(_ shown: CIImage) {
+        guard let ciContext, Date().timeIntervalSince(lastHistogram) > 0.1 else { return }
+        lastHistogram = Date()
+        let small = shown.transformed(by: CGAffineTransform(scaleX: 0.25, y: 0.25))
+        let luma = CIVector(x: 0.2126, y: 0.7152, z: 0.0722, w: 0)
+        let grey = small.applyingFilter("CILinearToSRGBToneCurve").applyingFilter("CIColorMatrix", parameters: [
+            "inputRVector": luma, "inputGVector": luma, "inputBVector": luma,
+            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1), "inputBiasVector": CIVector(x: 0, y: 0, z: 0, w: 0),
+        ])
+        let hist = grey.applyingFilter("CIAreaHistogram", parameters: [kCIInputExtentKey: CIVector(cgRect: grey.extent), "inputCount": 64, "inputScale": 1])
+        var px = [Float](repeating: 0, count: 64 * 4)
+        ciContext.render(hist, toBitmap: &px, rowBytes: 64 * 16, bounds: CGRect(x: 0, y: 0, width: 64, height: 1), format: .RGBAf, colorSpace: nil)
+        let bins = stride(from: 0, to: px.count, by: 4).map { Double(px[$0]) }
+        let top = max(bins.max() ?? 0, 1e-9)
+        onEvent?("histogram", ["bins": bins.map { $0 / top }])
+    }
+
     private func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
         let types: [AVCaptureDevice.DeviceType] = position == .back
             ? [.builtInTripleCamera, .builtInDualWideCamera, .builtInDualCamera, .builtInWideAngleCamera]
@@ -588,6 +667,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             session.addOutput(photoOutput)
         }
         photoOutput.maxPhotoQualityPrioritization = .balanced
+        // ProRAW nur einschalten, wenn das Gerät es kann (#185); aufgenommen wird es nur auf Wunsch (capture raw)
+        if photoOutput.isAppleProRAWSupported { photoOutput.isAppleProRAWEnabled = true }
         if #available(iOS 17.0, *), photoOutput.isZeroShutterLagSupported {
             photoOutput.isZeroShutterLagEnabled = true
         }
@@ -857,6 +938,11 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             image = cube.outputImage ?? image
             if grainAmount > 0 { image = grained(image) }
         }
+        let (peaking, zebra, histogram) = (aidPeaking, aidZebra, aidHistogram)
+        lock.unlock()
+        if peaking || zebra { image = overlayAids(image, raw: CIImage(cvPixelBuffer: buffer), peaking: peaking, zebra: zebra) }
+        if histogram { sendHistogram(image) }
+        lock.lock()
         latest = image
         let pending = drawPending
         drawPending = true
@@ -905,7 +991,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     // MARK: Auslösen
 
     /// flash: echter Blitz für dieses Bild (Einwegkamera), sofern das Objektiv einen kann
-    func capture(flash: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
+    func capture(flash: Bool = false, raw: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
         queue.async {
             guard self.running else {
                 done(.failure(NSError(domain: "calima", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kamera läuft nicht"])))
@@ -915,7 +1001,14 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
                 done(.failure(NSError(domain: "calima", code: 4, userInfo: [NSLocalizedDescriptionKey: "Noch beim Auslösen"])))
                 return
             }
-            let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            // RAW: ProRAW plus JPEG; das JPEG geht wie immer ans Web, die DNG-Datei in die Mediathek
+            let rawFormat = raw && self.photoOutput.isAppleProRAWEnabled
+                ? self.photoOutput.availableRawPhotoPixelFormatTypes.first(where: { AVCapturePhotoOutput.isAppleProRAWPixelFormat($0) }) : nil
+            let settings = rawFormat.map { AVCapturePhotoSettings(rawPixelFormatType: $0, processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg]) }
+                ?? AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            self.pendingRaw = rawFormat != nil
+            self.pendingJPEG = nil
+            self.pendingDNG = nil
             // Zeit von Hand (etwa 1/6 s): .balanced verrechnet mehrere Bilder und verlängert die Aufnahme spürbar,
             // .speed nimmt genau die eingestellte Belichtung
             settings.photoQualityPrioritization = self.dials.duration != nil ? .speed : .balanced
@@ -982,22 +1075,44 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         let done = pendingCapture
-        pendingCapture = nil
         if let error {
+            pendingCapture = nil
             done?(.failure(error))
             return
         }
         guard let data = photo.fileDataRepresentation() else {
+            pendingCapture = nil
             done?(.failure(NSError(domain: "calima", code: 5, userInfo: [NSLocalizedDescriptionKey: "Kein Bild"])))
             return
         }
-        do {
-            try FileManager.default.createDirectory(at: CalimaCamera.folder, withIntermediateDirectories: true)
-            let url = CalimaCamera.folder.appendingPathComponent("calima-\(Int(Date().timeIntervalSince1970 * 1000)).jpg")
-            try data.write(to: url, options: .atomic)
-            done?(.success(url))
-        } catch {
-            done?(.failure(error))
+        if photo.isRawPhoto {
+            pendingDNG = data
+        } else {
+            do {
+                try FileManager.default.createDirectory(at: CalimaCamera.folder, withIntermediateDirectories: true)
+                let url = CalimaCamera.folder.appendingPathComponent("calima-\(Int(Date().timeIntervalSince1970 * 1000)).jpg")
+                try data.write(to: url, options: .atomic)
+                pendingJPEG = url
+            } catch {
+                pendingCapture = nil
+                done?(.failure(error))
+                return
+            }
+        }
+        // bei RAW auf beide warten (JPEG und DNG), sonst reicht das JPEG
+        guard let url = pendingJPEG, !pendingRaw || pendingDNG != nil else { return }
+        pendingCapture = nil
+        if let dng = pendingDNG { CalimaCamera.saveDNG(dng) }
+        pendingDNG = nil
+        pendingJPEG = nil
+        done?(.success(url))
+    }
+
+    /// DNG zusätzlich in die Mediathek, nur „Fotos hinzufügen“ wie beim JPEG
+    private static func saveDNG(_ data: Data) {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else { return }
+            PHPhotoLibrary.shared().performChanges({ PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil) })
         }
     }
 }

@@ -139,7 +139,7 @@ export function DialChips({
         );
       })}
       <li className="flex-none">
-        <button type="button" onClick={onGrid} aria-pressed={grid} className={`${chip(false, grid)} flex h-full items-center`} aria-label={t("Raster und Wasserwaage")}>
+        <button type="button" onClick={onGrid} aria-pressed={grid} className={`${chip(false, grid)} flex h-full items-center`} aria-label={t("Hilfen")}>
           <span aria-hidden className="grid h-3.5 w-3.5 grid-cols-3 grid-rows-3 gap-px">
             {Array.from({ length: 9 }, (_, i) => (
               <span key={i} className="bg-current opacity-60" />
