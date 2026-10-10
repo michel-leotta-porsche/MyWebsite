@@ -212,7 +212,7 @@ function Hero() {
   return (
     <section id="blaettern" aria-labelledby="blaettern-h" className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
+      <header className="relative z-20 flex items-baseline justify-between gap-6 px-page pt-[max(1rem,env(safe-area-inset-top))] md:pt-6">
         <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
           Calima
         </p>
@@ -224,7 +224,7 @@ function Hero() {
         </nav>
       </header>
 
-      <div className="relative z-10 grid flex-1 content-center items-center gap-4 px-4 pt-8 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12 flat:grid-cols-12">
+      <div className="relative z-10 grid flex-1 content-center items-center gap-4 px-page pt-8 pb-10 md:grid-cols-12 md:gap-8 md:pt-0 md:pb-12 flat:grid-cols-12">
         <div className="md:col-span-5 md:pb-[8svh] flat:col-span-5">
           <h1 id="blaettern-h" className="word-rise text-on-table leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
             {t("Blätter mal.")}
@@ -254,7 +254,7 @@ function Hero() {
 function Own() {
   const t = useT();
   return (
-    <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-20 md:px-8 md:py-32">
+    <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-20 md:py-32">
       <div className="grid gap-8 md:grid-cols-12 md:gap-8">
         <h2 id="eigenes-h" className={`${displayHeading} md:col-span-5`} style={display}>
           {t("Mach dein eigenes.")}
@@ -413,7 +413,7 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
   const t = useT();
   return (
     <div id="werkbank" role="group" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
-      <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-4 py-12 md:px-8 md:py-10">
+      <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-page py-12 md:py-10">
         <div className="relative z-10 grid items-center gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
             {eyebrow}
@@ -517,7 +517,7 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
 function Recipe() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-36">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <h3 id="recipe-h" className={`${displayHeading} md:col-span-7`} style={display}>
           {t("Das Rezept liegt bei.")}
@@ -563,7 +563,7 @@ function Recipe() {
 function Share() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-24 md:py-36">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
         <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0">
           <Clip clip={CLIPS.hinlegen} label={t("Clip: Fotos werden ein Buch, das Buch wird einer Person hingelegt")} className="w-[66%] -rotate-[2deg] md:w-[58%]" />
@@ -598,7 +598,7 @@ const APP_ICONS = { look: Aperture, film: Film, white: Pipette } as const;
 function AppCamera() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-36">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <div className="md:col-span-7">
           <p className="text-on-table-2 flex items-center gap-2 text-sm font-semibold">
@@ -644,7 +644,7 @@ function AppCamera() {
 function HowTo() {
   const t = useT();
   return (
-    <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-20 md:px-8 md:py-32">
+    <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-page py-20 md:py-32">
       <h2 id="so-gehts-h" className={displayHeading} style={display}>
         {t("So geht’s")}
       </h2>
@@ -673,7 +673,7 @@ function Closing() {
   const t = useT();
   return (
     <>
-      <section aria-labelledby="end-h" className="linen table-surface relative overflow-hidden bg-table px-4 pt-24 pb-20 md:px-8 md:pt-40 md:pb-28">
+      <section aria-labelledby="end-h" className="linen table-surface relative overflow-hidden bg-table px-page pt-24 pb-20 md:pt-40 md:pb-28">
         <SunAndShade light="sun" />
         <div className="relative z-20">
           <h2 id="end-h" className="text-on-table max-w-[12ch] leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(56px, 9vw, 144px)" }}>
@@ -694,7 +694,7 @@ function Closing() {
           </div>
         </div>
       </section>
-      <footer className="linen table-surface relative bg-table px-4 pb-10 text-sm text-on-table-2 md:px-8">
+      <footer className="linen table-surface relative bg-table px-page pb-10 text-sm text-on-table-2">
         <div className="border-on-table-2/25 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t pt-6">
           <p>
             <span className="text-on-table font-semibold">Calima</span> · {t("Beispielfotos von Michel Leotta")}
