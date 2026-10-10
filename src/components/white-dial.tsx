@@ -5,25 +5,17 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNod
 import { type Dials, type Meter } from "@/lib/camera";
 import { haptic } from "@/lib/haptics";
 import { useLang, useT } from "@/lib/i18n";
+import { LIGHTS, lightOf, MEASURED, type Light } from "@/lib/white";
 
-// Weiß wie an einer Fujifilm, in zwei Ebenen (Entwurf „Gravur“, weissabgleich-workshop 9.10.):
+// Weiß wie an einer Fujifilm, in drei Ebenen (Entwurf „Gravur“, weissabgleich-workshop 9.10.):
 // 1. das Licht: A, Kunstlicht, Neon, Sonne, Wolken, Schatten, als Gravuren auf einem Lineal, das unter der Marke einrastet.
 //    Gestellt wird der echte Weißabgleich der Kamera (Kelvin, bei Neon mit Tönung gegen den Grünstich).
 // 2. die Feinabstimmung: das Shift-Raster R −9…+9 und B −9…+9 wie bei Fuji. Es verschiebt wbR/wbB im Look, landet also
 //    wie ein Rezeptwert im Foto. Magenta und Grün liegen in den Ecken (R+ B+ / R− B−).
+// 3. die Pipette (#184): wie „Custom WB“ an einer Fuji. Ein Quadrat in der Mitte, der Auslöser misst, das Licht heißt dann
+//    „Gemessen“ und gilt, bis die Kamera zugeht. Gemessen wird vor dem Look, die Wärme des Looks bleibt also drauf.
 
-// Namen nicht über t(): „Schatten“ heißt im Fotostudio „Shadows“, hier das Licht im Schatten („Shade“)
-export type Light = { id: string; name: string; en: string; kelvin: number | null; tint: number; icon: string };
-/** Kelvin sind Richtwerte der üblichen Kameravoreinstellungen; Neon zieht mit Magenta gegen den Grünstich */
-export const LIGHTS: Light[] = [
-  { id: "auto", name: "Auto", en: "Auto", kelvin: null, tint: 0, icon: "a" },
-  { id: "kunst", name: "Kunstlicht", en: "Tungsten", kelvin: 3200, tint: 0, icon: "bulb" },
-  { id: "neon", name: "Neon", en: "Fluorescent", kelvin: 4000, tint: 18, icon: "neon" },
-  { id: "sonne", name: "Sonne", en: "Daylight", kelvin: 5500, tint: 0, icon: "sun" },
-  { id: "wolken", name: "Wolken", en: "Cloudy", kelvin: 6500, tint: 0, icon: "cloud" },
-  { id: "schatten", name: "Schatten", en: "Shade", kelvin: 7500, tint: 0, icon: "shade" },
-];
-export const lightOf = (d: Dials): Light => LIGHTS.find((l) => l.kelvin === d.kelvin) ?? LIGHTS[0];
+export { LIGHTS, lightOf, MEASURED, type Light } from "@/lib/white";
 export const useLightName = () => {
   const lang = useLang();
   return (l: Light) => (lang === "en" ? l.en : l.name);
@@ -56,6 +48,7 @@ const PATHS: Record<string, ReactNode> = {
   ),
   cloud: <path d="M7 18.5h10a3.75 3.75 0 0 0 .55-7.46A5.5 5.5 0 0 0 7.1 9.9 4.3 4.3 0 0 0 7 18.5z" />,
   shade: <path d="M3.5 11 12 4.5l8.5 6.5M5.8 9.3v10.2h12.4V9.3M12 7v12.5M12 19.5l6.2-6.2M12 15.2l6.2-6.2M15.4 19.5l2.8-2.8" />,
+  pipette: <path d="M14.6 4.6a2.4 2.4 0 0 1 3.4 0l1.4 1.4a2.4 2.4 0 0 1 0 3.4l-2 2-4.8-4.8zM13.2 7.4 5.4 15.2 4.5 19.5l4.3-.9 7.8-7.8M11.6 9l3.4 3.4" />,
   fine: (
     <>
       <rect x="4" y="4" width="16" height="16" rx="1.5" />
@@ -84,6 +77,8 @@ export function WhiteDial({
   base,
   onDials,
   onShift,
+  metering,
+  onPipette,
 }: {
   dials: Dials;
   meter: Meter | null;
@@ -93,12 +88,16 @@ export function WhiteDial({
   base: Shift;
   onDials: (next: Dials) => void;
   onShift: (next: Shift) => void;
+  /** das Messquadrat steht im Sucher, der Auslöser misst */
+  metering: boolean;
+  onPipette: () => void;
 }) {
   const t = useT();
   const nameOf = useLightName();
   const [fine, setFine] = useState(false);
   const light = lightOf(dials);
-  const at = LIGHTS.indexOf(light);
+  // gemessenes Weiß steht nicht auf dem Lineal: die Marke wartet bei Auto
+  const at = Math.max(0, LIGHTS.indexOf(light));
   const drag = useRef<{ id: number; x: number; start: number; moved: boolean } | null>(null);
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -107,7 +106,7 @@ export function WhiteDial({
     const l = LIGHTS[Math.max(0, Math.min(LIGHTS.length - 1, i))];
     if (l === light) return;
     haptic("select");
-    onDials({ ...dials, kelvin: l.kelvin, tint: l.kelvin == null ? null : l.tint });
+    onDials({ ...dials, kelvin: l.kelvin, tint: l.kelvin == null ? null : l.tint, gains: null });
   };
 
   // Lineal: relativ ziehen, je Gravur ein Rast; tippen auf eine Gravur springt hin
@@ -169,26 +168,40 @@ export function WhiteDial({
           {Array.from({ length: (LIGHTS.length + 5) * 4 }, (_, i) => -12 + i).map((i) =>
             i % 4 ? <span key={i} className="bg-on-table-2/50 absolute top-[40px] h-1 w-px" style={{ left: (i * STEP) / 4 }} /> : null,
           )}
-          {LIGHTS.map((l, i) => (
-            <span key={l.id} className={`absolute top-0 flex -translate-x-1/2 flex-col items-center ${i === at ? "text-on-table" : "text-on-table-2/80"}`} style={{ left: i * STEP }}>
+          {LIGHTS.map((l, i) => {
+            const on = i === at && light !== MEASURED;
+            return (
+            <span key={l.id} className={`absolute top-0 flex -translate-x-1/2 flex-col items-center ${on ? "text-on-table" : "text-on-table-2/80"}`} style={{ left: i * STEP }}>
               <LightIcon icon={l.icon} size={22} className="mt-1.5" />
-              <span className={`mt-[9px] h-2.5 w-px ${i === at ? "bg-on-table" : "bg-on-table-2"}`} />
-              <span className={`mt-0.5 text-[11px] tracking-[.04em] tabular-nums ${i === at ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
+              <span className={`mt-[9px] h-2.5 w-px ${on ? "bg-on-table" : "bg-on-table-2"}`} />
+              <span className={`mt-0.5 text-[11px] tracking-[.04em] tabular-nums ${on ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
             </span>
-          ))}
+            );
+          })}
         </div>
         <span aria-hidden className="bg-cloth pointer-events-none absolute top-[30px] left-1/2 h-[18px] w-0.5 -translate-x-1/2 rounded-full" />
       </div>
       <div className="flex items-center justify-between px-4 pt-2 pb-3 text-[13px]">
         <span className="tabular-nums">
           <b className="font-bold">{nameOf(light)}</b>
-          {light.kelvin ? ` · ${light.kelvin} K` : measured ? <span className="text-on-table-2"> · {measured} {t("gemessen")}</span> : null}
+          {light.kelvin ? ` · ${light.kelvin} K` : light === MEASURED ? (measured ? ` · ${measured}` : null) : measured ? <span className="text-on-table-2"> · {measured} {t("gemessen")}</span> : null}
         </span>
-        <button type="button" onClick={() => setFine(true)} className="border-on-table-2/50 relative flex h-[30px] items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold">
-          <LightIcon icon="fine" size={14} />
-          {moved ? fmtShift(shift) : t("Feinabstimmung")}
-          {moved && <span className="bg-cloth border-table-deep absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-2" />}
-        </button>
+        <span className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onPipette}
+            aria-pressed={metering}
+            aria-label={t("Weiß messen")}
+            className={`flex h-[30px] w-[30px] items-center justify-center rounded-full border ${metering ? "bg-on-table text-table-deep border-on-table" : "border-on-table-2/50"}`}
+          >
+            <LightIcon icon="pipette" size={15} />
+          </button>
+          <button type="button" onClick={() => setFine(true)} className="border-on-table-2/50 relative flex h-[30px] items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold">
+            <LightIcon icon="fine" size={14} />
+            {moved ? fmtShift(shift) : t("Feinabstimmung")}
+            {moved && <span className="bg-cloth border-table-deep absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border-2" />}
+          </button>
+        </span>
       </div>
     </div>
   );
