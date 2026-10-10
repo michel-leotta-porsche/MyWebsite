@@ -17,6 +17,7 @@ import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from 
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
+import type { Film } from "@/lib/film";
 import { developFilm, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
@@ -510,10 +511,12 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
     else if (films.size) notify(t("Der Film liegt im Fotostudio."));
   };
   // ein entwickelter Film kommt wie im Zimmer als Umschlag auf den Pult (#244)
-  const onFilmDone = (stack: string, name: string) => {
-    made.current.films.delete(stack);
-    made.current.developed.push(name);
-    developFilm(uid, stack, name).catch(() => {});
+  const onFilmDone = (films: Film[]) => {
+    for (const f of films) {
+      made.current.films.delete(f.stack);
+      made.current.developed.push(f.name);
+      developFilm(uid, f.stack, f.name).catch(() => {});
+    }
   };
   return <CameraView uid={uid} taken onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
 }

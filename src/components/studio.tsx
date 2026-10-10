@@ -25,8 +25,8 @@ import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
 import { dayOf, daysAgo, dayStack } from "@/lib/day-stack";
-import { envelopeLabel, envelopeOf, isEnvelope, isSortPile, toEnvelope } from "@/lib/envelope";
-import { undevelopedStacks } from "@/lib/film";
+import { envelopeLabel, isEnvelope, isSortPile, toEnvelope } from "@/lib/envelope";
+import { undevelopedStacks, type Film } from "@/lib/film";
 import { newBook, uploadPrints } from "@/lib/shelve";
 import { useQueryParam } from "@/lib/use-query";
 import { calimaXmp } from "@/lib/xmp";
@@ -163,22 +163,28 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     keep([{ ...p, stack: dayStack(p.at), pos: p.at }]);
   };
   // ein entwickelter Film (voll oder bewusst entwickelt) kommt als Umschlag vorn auf den Pult (#244): alle Bilder auf
-  // einmal ansehen und einsortieren, wie vom Labor, statt sie über die Tage der Aufnahmen verstreut zu suchen
-  const onFilmDone = (stack: string, name: string) => {
-    const fresh = onFilm.current.filter((p) => p.stack === stack);
-    onFilm.current = onFilm.current.filter((p) => p.stack !== stack);
+  // einmal ansehen und einsortieren, wie vom Labor, statt sie über die Tage der Aufnahmen verstreut zu suchen.
+  // „Alle entwickeln“ (#245) bringt mehrere Filme auf einmal, jeder wird ein eigener Umschlag.
+  const onFilmDone = (films: Film[]) => {
     const now = Date.now(); // eslint-disable-line react-hooks/purity -- läuft beim Entwickeln, nicht beim Zeichnen
-    const roll = toEnvelope([...prints.filter((p) => p.stack === stack && !fresh.some((q) => q.id === p.id)), ...fresh], stack, name, now);
+    const stacks = new Set(films.map((f) => f.stack));
+    const fresh = onFilm.current.filter((p) => stacks.has(p.stack!));
+    onFilm.current = onFilm.current.filter((p) => !stacks.has(p.stack!));
+    const envelopes = films
+      .map((f) => toEnvelope([...prints.filter((p) => p.stack === f.stack && !fresh.some((q) => q.id === p.id)), ...fresh.filter((p) => p.stack === f.stack)], f.stack, f.name, now))
+      .filter((roll) => roll.length);
     setCameraOpen(false);
     if (wantsCamera) router.replace("/zimmer");
-    if (!roll.length) return;
+    if (!envelopes.length) return;
+    const roll = envelopes.flat();
     keep(roll);
     // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210)
     saveToLibrary(roll).catch(() => {});
-    const env = envelopeOf(stack);
-    notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), {
-      action: { label: t("Ansehen"), onClick: () => setSorting(env) },
-    });
+    const first = envelopes[0];
+    const name = first[0].roll!;
+    const open = { action: { label: t("Ansehen"), onClick: () => setSorting(first[0].stack!) } };
+    if (envelopes.length > 1) notify(t("Entwickelt: {n} Umschläge liegen vorn auf dem Pult.", { n: envelopes.length }));
+    else notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), open);
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
   const closeCamera = () => {
