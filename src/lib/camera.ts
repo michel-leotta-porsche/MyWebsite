@@ -49,6 +49,8 @@ type Plugin = {
   setLevel(o: { on: boolean }): Promise<void>;
   /** flash: echter Blitz für dieses Bild (Einwegkamera-Vorlagen); eine App ohne Blitz-Unterstützung löst ohne aus */
   capture(o?: { flash?: boolean }): Promise<{ path: string }>;
+  /** fertiges Foto (JPEG, Base64) zusätzlich in die Mediathek; denied, wenn „Fotos hinzufügen“ nicht erlaubt ist */
+  saveToLibrary(o: { data: string }): Promise<{ saved: boolean; denied?: boolean }>;
   discard(o: { path: string }): Promise<void>;
   /** Körnung live im Sucher: amount wie GRAIN.amount, cell wie GRAIN.cell (Anteil der Bildbreite); 0 schaltet sie ab */
   setGrain(o: { amount: number; cell: number }): Promise<void>;

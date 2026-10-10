@@ -16,6 +16,7 @@ import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
 import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
+import { saveToLibrary } from "@/lib/library-save";
 import { useT } from "@/lib/i18n";
 import { correctWhite } from "@/lib/white";
 import { useRecentSettings } from "@/lib/settings-clipboard";
@@ -598,6 +599,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           update((s) => ({ ...s, films: s.films.map((f) => (f.stack === next.stack ? next : f)) }));
         }
       } else {
+        // zusätzlich in die Mediathek (#210), groß und mit Look; Filme erst beim Entwickeln
+        saveToLibrary([print], () => {
+          setError(t("Ohne Erlaubnis für die Mediathek liegen die Fotos nur in Calima. Erlauben kannst du es in den iPhone-Einstellungen unter Calima → Fotos."));
+          window.setTimeout(() => setError(null), 5000);
+        });
         setCount((n) => n + 1);
         setLast((old) => {
           if (old) URL.revokeObjectURL(old);

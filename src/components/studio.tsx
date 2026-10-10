@@ -37,6 +37,8 @@ import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_STACK, piles, putPrints, removePrint, toDayStack, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
+import { SHUTTER } from "@/lib/shutter";
+import { saveToLibrary } from "@/lib/library-save";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
 // bearbeiten, dann sichern oder in ein Buch legen. Bis dahin bleibt alles auf dem Gerät. Die letzten Fotos liegen als Abzüge
@@ -169,6 +171,8 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (wantsCamera) router.replace("/zimmer");
     if (!roll.length) return;
     keep(roll);
+    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210)
+    saveToLibrary(roll).catch(() => {});
     notify(roll.length === 1 ? t("Entwickelt. Das Bild liegt auf dem Stapel seines Tages.") : t("Entwickelt. Die {n} Bilder liegen auf dem Stapel ihres Tages.", { n: roll.length }));
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
@@ -529,8 +533,8 @@ export function dayName(stack: string) {
 
 /**
  * Der Auslöser im Bücherzimmer (nur in der App): immer an derselben Stelle unten rechts, ein heller Ring wie die Schrift
- * auf dem Tisch. Gelb bleibt dem einen Hauptknopf. In der Mitte läge er auf gängigen iPhones über den Knöpfen des
- * ersten Buchs; rechts sind die frei, weil die Knöpfe links anfangen. Öffnet Calimas Kamera, jedes Foto landet auf dem
+ * auf dem Tisch. Gelb bleibt dem einen Hauptknopf. Die Knopfreihe unter dem Buch hält rechts Platz für ihn frei
+ * (shutterRoom, #242). Öffnet Calimas Kamera, jedes Foto landet auf dem
  * Stapel von heute.
  */
 function Shutter({ onShoot, hidden }: { onShoot: () => void; hidden: boolean }) {
@@ -544,8 +548,13 @@ function Shutter({ onShoot, hidden }: { onShoot: () => void; hidden: boolean }) 
         onShoot();
       }}
       aria-label={t("Fotografieren")}
-      className="press border-on-table fixed z-40 grid size-[68px] place-items-center rounded-full border-[3.5px] bg-[rgb(18_17_16/0.55)] shadow-[0_12px_28px_-8px_rgb(12_10_8/0.9)] backdrop-blur-sm"
-      style={{ right: "max(18px, env(safe-area-inset-right))", bottom: "max(18px, calc(env(safe-area-inset-bottom) + 6px))" }}
+      className="press border-on-table fixed z-40 grid place-items-center rounded-full border-[3.5px] bg-[rgb(18_17_16/0.55)] shadow-[0_12px_28px_-8px_rgb(12_10_8/0.9)] backdrop-blur-sm"
+      style={{
+        width: SHUTTER.size,
+        height: SHUTTER.size,
+        right: `max(${SHUTTER.edge}px, env(safe-area-inset-right))`,
+        bottom: `max(${SHUTTER.edge}px, calc(env(safe-area-inset-bottom) + 6px))`,
+      }}
     >
       <span className="bg-on-table text-table grid size-[52px] place-items-center rounded-full">
         <CameraIcon aria-hidden className="size-[22px]" strokeWidth={2.2} />

@@ -4,6 +4,7 @@ import Capacitor
 import CoreImage
 import CoreMotion
 import MetalKit
+import Photos
 import UIKit
 
 // Calimas Kamera (Workshop 9.10.2026, kamera-workshop-2026-10-09/): der Sucher liegt hinter der Webansicht, und der
@@ -33,6 +34,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setMagnify", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setLevel", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveToLibrary", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -186,6 +188,27 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    /// Ein fertiges Foto (JPEG als Base64, mit Look) zusätzlich in die Mediathek legen (#210). Fragt nur nach „Fotos
+    /// hinzufügen“, nie nach Lesezugriff; deshalb kein eigenes Album (dafür bräuchte es Lesezugriff auf die Mediathek).
+    /// Antwort: saved true, oder denied true, wenn die Berechtigung fehlt.
+    @objc func saveToLibrary(_ call: CAPPluginCall) {
+        guard let b64 = call.getString("data"), let data = Data(base64Encoded: b64) else {
+            call.reject("Kein Bild", "library")
+            return
+        }
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                call.resolve(["saved": false, "denied": true])
+                return
+            }
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
+            }) { ok, error in
+                if ok { call.resolve(["saved": true]) } else { call.reject(error?.localizedDescription ?? "Nicht gesichert", "library") }
+            }
+        }
+    }
+
     @objc func flip(_ call: CAPPluginCall) {
         camera.flip { error in
             if let error { call.reject(error, "camera") } else { call.resolve(self.camera.info()) }
@@ -193,7 +216,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func capture(_ call: CAPPluginCall) {
-        camera.capture { result in
+        camera.capture(flash: call.getBool("flash") ?? false) { result in
             switch result {
             case .success(let url):
                 call.resolve(["path": url.path])
@@ -848,7 +871,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     // MARK: Auslösen
 
-    func capture(_ done: @escaping (Result<URL, Error>) -> Void) {
+    /// flash: echter Blitz für dieses Bild (Einwegkamera), sofern das Objektiv einen kann
+    func capture(flash: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
         queue.async {
             guard self.running else {
                 done(.failure(NSError(domain: "calima", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kamera läuft nicht"])))
@@ -859,7 +883,10 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
                 return
             }
             let settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
-            settings.photoQualityPrioritization = .balanced
+            // Zeit von Hand (etwa 1/6 s): .balanced verrechnet mehrere Bilder und verlängert die Aufnahme spürbar,
+            // .speed nimmt genau die eingestellte Belichtung
+            settings.photoQualityPrioritization = self.dials.duration != nil ? .speed : .balanced
+            if flash, self.photoOutput.supportedFlashModes.contains(.on) { settings.flashMode = .on }
             if let c = self.photoOutput.connection(with: .video) {
                 self.rotate(c, angle: self.angle())
                 if c.isVideoMirroringSupported { c.isVideoMirrored = self.front }
