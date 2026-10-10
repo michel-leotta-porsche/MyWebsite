@@ -2,6 +2,7 @@
 
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
+import { withLong, type LongMode } from "@/lib/long";
 import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELVIN, nearest, SHUTTER_STOPS, type CameraInfo, type Dials, type Meter } from "@/lib/camera";
 import { LightIcon, lightOf, useLightName } from "@/components/white-dial";
 import { useT } from "@/lib/i18n";
@@ -18,7 +19,8 @@ export const DIALS: DialKey[] = ["duration", "iso", "focus", "kelvin"];
 
 /** Zeiten und ISO, die diese Kamera wirklich kann */
 export function stopsFor(key: DialKey, info: CameraInfo | null): number[] {
-  if (key === "duration") return SHUTTER_STOPS.filter((s) => !info || (s >= info.limits.minDuration * 0.99 && s <= info.limits.maxDuration * 1.01));
+  // über 1 s rechnet die App viele Einzelbilder zusammen (#249)
+  if (key === "duration") return withLong(SHUTTER_STOPS.filter((s) => !info || (s >= info.limits.minDuration * 0.99 && s <= info.limits.maxDuration * 1.01)));
   if (key === "iso") return ISO_STOPS.filter((i) => !info || (i >= info.limits.minISO * 0.99 && i <= info.limits.maxISO * 1.01));
   return [];
 }
@@ -318,3 +320,20 @@ export function MeterBadge({ meter }: { meter: Meter | null }) {
 
 export const allAuto = (d: Dials) => DIALS.every((k) => !isManual(d, k));
 export { AUTO };
+
+/** Langzeitbelichtung (#249): unter dem Zeit-Rad, sobald es über 1 s steht. Sagt ehrlich, woraus das Bild entsteht */
+export function LongRow({ mode, onMode, frames }: { mode: LongMode; onMode: (m: LongMode) => void; frames: number }) {
+  const t = useT();
+  const opt = (m: LongMode, label: string) => (
+    <button type="button" onClick={() => onMode(m)} aria-pressed={mode === m} className={`rounded-full border px-3 py-1.5 text-[13px] font-semibold ${mode === m ? "bg-cloth border-cloth text-cloth-ink" : "border-on-table-2/50 text-on-table"}`}>
+      {label}
+    </button>
+  );
+  return (
+    <div className="flex items-center gap-2 px-4">
+      {opt("fliessend", t("Fließend"))}
+      {opt("spuren", t("Lichtspuren"))}
+      <span className="text-on-table-2 ml-auto text-[12px] tabular-nums">{t("aus etwa {n} Bildern", { n: frames })}</span>
+    </div>
+  );
+}

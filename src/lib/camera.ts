@@ -49,6 +49,13 @@ type Plugin = {
   setLevel(o: { on: boolean }): Promise<void>;
   /** flash: echter Blitz für dieses Bild (Einwegkamera-Vorlagen); eine App ohne Blitz-Unterstützung löst ohne aus */
   capture(o?: { flash?: boolean }): Promise<{ path: string }>;
+  /**
+   * Langzeitbelichtung (#249): seconds lang Einzelbilder verrechnen, mode „fliessend“ mittelt, „spuren“ behält das
+   * Hellste. Ereignis „long“ während der Belichtung: data.frames (bisher), data.shaky (das Telefon bewegt sich).
+   * cancelled, wenn cancelLong dazwischenkam; dann gibt es kein Foto
+   */
+  captureLong(o: { seconds: number; mode: "fliessend" | "spuren" }): Promise<{ path?: string; frames?: number; cancelled?: boolean }>;
+  cancelLong(): Promise<void>;
   /** fertiges Foto (JPEG, Base64) zusätzlich in die Mediathek; denied, wenn „Fotos hinzufügen“ nicht erlaubt ist */
   saveToLibrary(o: { data: string }): Promise<{ saved: boolean; denied?: boolean }>;
   discard(o: { path: string }): Promise<void>;
