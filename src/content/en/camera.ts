@@ -125,4 +125,5 @@ export const CAMERA: Record<string, string> = {
   "Blitz automatisch": "Flash auto",
   "Blitz an": "Flash on",
   "ausgelöst": "fired",
+  quer: "landscape",
 };
