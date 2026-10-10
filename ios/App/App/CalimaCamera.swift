@@ -36,6 +36,7 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "launch", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveToLibrary", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "measureWhite", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setLive", returnType: CAPPluginReturnPromise),
     ]
 
     private let camera = CalimaCamera()
@@ -216,17 +217,35 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Kein Bild", "library")
             return
         }
+        // video (#188): das Foto mit Look wird das Standbild eines Live Photos; das Video bleibt ohne Look
+        let video = call.getString("video").map { URL(fileURLWithPath: $0) }.flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 call.resolve(["saved": false, "denied": true])
                 return
             }
-            PHPhotoLibrary.shared().performChanges({
-                PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: nil)
-            }) { ok, error in
-                if ok { call.resolve(["saved": true]) } else { call.reject(error?.localizedDescription ?? "Nicht gesichert", "library") }
+            Task {
+                var photo = data
+                if let video, let id = await CalimaCamera.liveIdentifier(video), let tagged = CalimaCamera.tag(data, liveIdentifier: id) { photo = tagged }
+                PHPhotoLibrary.shared().performChanges({
+                    let r = PHAssetCreationRequest.forAsset()
+                    r.addResource(with: .photo, data: photo, options: nil)
+                    if let video {
+                        let o = PHAssetResourceCreationOptions()
+                        o.shouldMoveFile = true
+                        r.addResource(with: .pairedVideo, fileURL: video, options: o)
+                    }
+                }) { ok, error in
+                    if let video { try? FileManager.default.removeItem(at: video) }
+                    if ok { call.resolve(["saved": true]) } else { call.reject(error?.localizedDescription ?? "Nicht gesichert", "library") }
+                }
             }
         }
+    }
+
+    /// Live Photos (#188) an oder aus; beim ersten Einschalten fragt iOS nach dem Mikrofon
+    @objc func setLive(_ call: CAPPluginCall) {
+        camera.setLive(call.getBool("on") ?? false) { call.resolve() }
     }
 
     @objc func flip(_ call: CAPPluginCall) {
@@ -236,10 +255,15 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func capture(_ call: CAPPluginCall) {
-        camera.capture(flash: call.getBool("flash") ?? false) { result in
+        camera.capture(flash: call.getBool("flash") ?? false, live: call.getBool("live") ?? false) { result in
             switch result {
             case .success(let url):
-                call.resolve(["path": url.path])
+                var out: [String: Any] = ["path": url.path]
+                if let movie = self.camera.lastLiveMovie {
+                    out["live"] = movie.path
+                    out["audio"] = self.camera.lastLiveAudio
+                }
+                call.resolve(out)
             case .failure(let error):
                 call.reject(error.localizedDescription, "capture")
             }
@@ -313,6 +337,16 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
 
     private var pendingCapture: ((Result<URL, Error>) -> Void)?
 
+    // MARK: Live Photos (#188): Bewegung und Ton nur für die Mediathek, ins Buch kommt das Standbild
+    private var micInput: AVCaptureDeviceInput?
+    /// Live-Aufnahme: das Standbild wartet, bis auch das Video da ist
+    private var pendingLiveMovie: URL?
+    private var pendingPhoto: URL?
+    private var pendingMovieDone = false
+    /// Video und Ton der letzten Aufnahme, fürs Plugin
+    private(set) var lastLiveMovie: URL?
+    private(set) var lastLiveAudio = false
+
     /// Weitere Analysen der Sucherbilder (Reisebuch-Workshop, Runde 2: Dokument-Ecken, Strichcode, Klassifikation).
     /// Noch leer; ein Erkenner meldet sich mit `onEvent` zurück, die Seite hört über `CalimaCamera.addListener("event", …)`.
     var analyzers: [FrameAnalyzer] = []
@@ -362,6 +396,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         if lenses.isEmpty { lenses = [1] }
         return [
             "front": front,
+            "live": photoOutput.isLivePhotoCaptureSupported,
             "lenses": lenses,
             "limits": [
                 "minDuration": CMTimeGetSeconds(f.minExposureDuration),
@@ -905,7 +940,7 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     // MARK: Auslösen
 
     /// flash: echter Blitz für dieses Bild (Einwegkamera), sofern das Objektiv einen kann
-    func capture(flash: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
+    func capture(flash: Bool = false, live: Bool = false, _ done: @escaping (Result<URL, Error>) -> Void) {
         queue.async {
             guard self.running else {
                 done(.failure(NSError(domain: "calima", code: 3, userInfo: [NSLocalizedDescriptionKey: "Kamera läuft nicht"])))
@@ -923,6 +958,17 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             if let c = self.photoOutput.connection(with: .video) {
                 self.rotate(c, angle: self.angle())
                 if c.isVideoMirroringSupported { c.isVideoMirrored = self.front }
+            }
+            self.lastLiveMovie = nil
+            self.lastLiveAudio = false
+            self.pendingPhoto = nil
+            self.pendingMovieDone = false
+            self.pendingLiveMovie = nil
+            if live, self.photoOutput.isLivePhotoCaptureEnabled {
+                try? FileManager.default.createDirectory(at: CalimaCamera.folder, withIntermediateDirectories: true)
+                let movie = CalimaCamera.folder.appendingPathComponent("live-\(UUID().uuidString).mov")
+                settings.livePhotoMovieFileURL = movie
+                self.pendingLiveMovie = movie
             }
             self.pendingCapture = done
             self.photoOutput.capturePhoto(with: settings, delegate: self)
@@ -980,6 +1026,66 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
     }
 
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingLivePhotoToMovieFileAt outputFileURL: URL, duration: CMTime, photoDisplayTime: CMTime, resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
+        pendingMovieDone = true
+        if error == nil {
+            lastLiveMovie = outputFileURL
+            lastLiveAudio = micInput != nil
+        }
+        pendingLiveMovie = nil
+        if let url = pendingPhoto, let done = pendingCapture {
+            pendingPhoto = nil
+            pendingCapture = nil
+            done(.success(url))
+        }
+    }
+
+    /// Kennung, die Standbild und Video eines Live Photos verbindet (steht im Video)
+    static func liveIdentifier(_ video: URL) async -> String? {
+        let asset = AVURLAsset(url: video)
+        guard let items = try? await asset.load(.metadata) else { return nil }
+        for item in items where item.identifier == .quickTimeMetadataContentIdentifier {
+            if let v = try? await item.load(.stringValue) { return v }
+        }
+        return nil
+    }
+
+    /// dieselbe Kennung ins JPEG schreiben (MakerApple „17“), sonst erkennt Fotos die beiden nicht als Paar
+    static func tag(_ jpeg: Data, liveIdentifier id: String) -> Data? {
+        guard let src = CGImageSourceCreateWithData(jpeg as CFData, nil), let type = CGImageSourceGetType(src) else { return nil }
+        let out = NSMutableData()
+        guard let dst = CGImageDestinationCreateWithData(out, type, 1, nil) else { return nil }
+        var props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]) ?? [:]
+        var maker = (props[kCGImagePropertyMakerAppleDictionary] as? [String: Any]) ?? [:]
+        maker["17"] = id
+        props[kCGImagePropertyMakerAppleDictionary] = maker
+        CGImageDestinationAddImageFromSource(dst, src, 0, props as CFDictionary)
+        return CGImageDestinationFinalize(dst) ? out as Data : nil
+    }
+
+    func setLive(_ on: Bool, _ done: @escaping () -> Void) {
+        let apply = { (mic: Bool) in
+            self.queue.async {
+                self.session.beginConfiguration()
+                if on, mic, self.micInput == nil, let dev = AVCaptureDevice.default(for: .audio), let input = try? AVCaptureDeviceInput(device: dev), self.session.canAddInput(input) {
+                    self.session.addInput(input)
+                    self.micInput = input
+                }
+                if !on, let input = self.micInput {
+                    // sonst leuchtet der orange Mikrofon-Punkt die ganze Zeit
+                    self.session.removeInput(input)
+                    self.micInput = nil
+                }
+                self.session.commitConfiguration()
+                self.photoOutput.isLivePhotoCaptureEnabled = on && self.photoOutput.isLivePhotoCaptureSupported
+                done()
+            }
+        }
+        guard on else { return apply(false) }
+        // ohne Erlaubnis trotzdem Live an, nur ohne Ton
+        AVCaptureDevice.requestAccess(for: .audio) { granted in apply(granted) }
+    }
+
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         let done = pendingCapture
         pendingCapture = nil
@@ -995,6 +1101,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             try FileManager.default.createDirectory(at: CalimaCamera.folder, withIntermediateDirectories: true)
             let url = CalimaCamera.folder.appendingPathComponent("calima-\(Int(Date().timeIntervalSince1970 * 1000)).jpg")
             try data.write(to: url, options: .atomic)
+            // Live: erst antworten, wenn auch das Video fertig ist (kommt etwa 1,5 s später)
+            if pendingLiveMovie != nil, !pendingMovieDone {
+                pendingCapture = done
+                pendingPhoto = url
+                return
+            }
             done?(.success(url))
         } catch {
             done?(.failure(error))
