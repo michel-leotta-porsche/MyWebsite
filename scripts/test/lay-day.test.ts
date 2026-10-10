@@ -43,3 +43,29 @@ test("ohne gespeichertes Buch werden keine Links angefasst", async () => {
   await assert.rejects(layDay(user, [], { heading: "x", story: "" }, { book: shared }, undefined, fake));
   assert.equal(calls.refreshed.length, 0);
 });
+
+// 60-Fotos-Grenze (#212): ein Tag kommt nur ganz in ein Buch; in ein volles wird nichts hochgeladen und nichts gespeichert
+const prints = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}` })) as unknown as Parameters<typeof layDay>[1];
+const filled = (n: number): StoredBook => ({ ...shared, photos: Array.from({ length: n }, (_, i) => photo(`f${i}`)) });
+
+test("passt der Tag nicht mehr ins Buch, wird nichts hochgeladen und nichts gespeichert", async () => {
+  let uploads = 0;
+  const { fake, calls } = io({ loadBook: async () => filled(59), uploadPrints: async () => (uploads++, [photo("n1"), photo("n2")]) });
+  await assert.rejects(layDay(user, prints(2), { heading: "x", story: "" }, { book: shared }, undefined, fake), (e: Error) => e.name === "BookFull");
+  assert.equal(uploads, 0);
+  assert.equal(calls.saved.length, 0);
+});
+
+test("wird das Buch während des Hochladens voll, wird es nicht über die Grenze gespeichert", async () => {
+  const fills = [filled(58), filled(60)];
+  const { fake, calls } = io({ loadBook: async () => fills.shift() ?? filled(60) });
+  await assert.rejects(layDay(user, prints(2), { heading: "x", story: "" }, { book: shared }, undefined, fake), (e: Error) => e.name === "BookFull");
+  assert.equal(calls.saved.length, 0);
+});
+
+test("ein Tag, der genau passt, kommt ganz hinein", async () => {
+  const { fake, calls } = io({ loadBook: async () => filled(58) });
+  const r = await layDay(user, prints(2), { heading: "x", story: "" }, { book: shared }, undefined, fake);
+  assert.equal(r.book.photos.length, 60);
+  assert.equal(calls.saved.length, 1);
+});
