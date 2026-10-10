@@ -357,9 +357,11 @@ export async function deleteRecipe(uid: string, id: string) {
 /**
  * Buch speichern und seinen Stand hochzählen (#287). Mit base nur, wenn auf dem Server noch dieser Stand liegt,
  * sonst wirft das BookConflict mit dem Stand vom Server. Ohne Netz geht das Buch wie bisher in die Warteschlange von
- * Firestore, dann ohne Prüfung: eine Transaktion braucht den Server.
+ * Firestore, dann ohne Prüfung: eine Transaktion braucht den Server. Dieses Versprechen kehrt sofort zurück (Firestore
+ * bestätigt erst mit Netz, und eine beendete App verlöre sonst, was dahinter wartet); weist der Server den Schreibvorgang
+ * später ab, meldet das late.
  */
-export async function saveBook(b: StoredBook, base?: number): Promise<StoredBook> {
+export async function saveBook(b: StoredBook, base?: number, late?: (e: unknown) => void): Promise<StoredBook> {
   b = { ...b, schema: SCHEMA };
   if (MOCK) {
     const next = commitBook(mem.books.get(b.id) ?? null, b, base);
@@ -368,9 +370,9 @@ export async function saveBook(b: StoredBook, base?: number): Promise<StoredBook
     return next;
   }
   const at = doc(db(), "books", b.id);
-  const queue = async () => {
+  const queue = () => {
     const next = { ...b, rev: (base ?? revOf(b)) + 1 };
-    await setDoc(at, { ...next, updatedAt: serverTimestamp() }, { merge: false });
+    setDoc(at, { ...next, updatedAt: serverTimestamp() }, { merge: false }).catch((e) => late?.(e));
     return next;
   };
   if (typeof navigator !== "undefined" && !navigator.onLine) return queue();

@@ -236,20 +236,31 @@ export function Editor() {
     conflictRef.current = conflict;
   }, [conflict]);
 
+  /** Fragen, wie es weitergeht; kommt währenddessen ein noch neuerer Stand, gilt der */
+  const raise = useCallback((r: StoredBook) => {
+    if (conflictRef.current && revOf(conflictRef.current) >= revOf(r)) return;
+    conflictRef.current = r;
+    setConflict(r);
+  }, []);
+
   /** Speichern auf dem bekannten Stand; null, solange ein Konflikt auf die Wahl wartet */
   const persist = useCallback((b: StoredBook): Promise<StoredBook | null> => {
     const run = queue.current.then(async () => {
       if (conflictRef.current) return null;
       const known = revOf(base.current);
       writing.current = known + 1;
+      // ohne Netz ungeprüft in die Warteschlange; lehnt der Server das später ab, liegt hier nichts davon dort: fragen
+      const late = () =>
+        loadBook(b.id)
+          .then((r) => r && raise(r))
+          .catch(() => {});
       try {
-        const saved = await saveBook(b, known);
+        const saved = await saveBook(b, known, late);
         base.current = saved;
         return saved;
       } catch (e) {
         if (e instanceof BookConflict) {
-          conflictRef.current = e.current;
-          setConflict(e.current);
+          raise(e.current);
           return null;
         }
         throw e;
@@ -259,7 +270,7 @@ export function Editor() {
     });
     queue.current = run.catch(() => {});
     return run;
-  }, []);
+  }, [raise]);
 
   // vorhandenes Buch laden
   useEffect(() => {
@@ -301,7 +312,7 @@ export function Editor() {
         .then((ok) => {
           window.clearTimeout(offline);
           if (!ok) return setSaved(null);
-          setSaved("gespeichert");
+          setSaved(navigator.onLine ? "gespeichert" : "offline");
           savedOnce.current = true;
           // geteilte Links bekommen denselben Stand wie das Buch
           refreshShares(book).catch(() => {});
@@ -333,19 +344,24 @@ export function Editor() {
     };
   }, [persist]);
 
-  /** Den Stand von dort übernehmen; Rückgängig führte sonst zurück hinter die Änderung des anderen Geräts */
-  const adopt = useCallback((r: StoredBook) => {
-    base.current = r;
-    unsaved.current = null;
-    bookRef.current = r;
+  /** Rückgängig führte nach einem Stand von woanders zurück hinter dessen Änderung */
+  const clearHistory = useCallback(() => {
     past.current = [];
     future.current = [];
     lastTag.current = null;
     setUndoState({ past: 0, future: 0 });
+  }, []);
+
+  /** Den Stand von dort übernehmen */
+  const adopt = useCallback((r: StoredBook) => {
+    base.current = r;
+    unsaved.current = null;
+    bookRef.current = r;
+    clearHistory();
     setTouched(false);
     setSaved(null);
     setLoaded(r);
-  }, []);
+  }, [clearHistory]);
 
   // Änderungen von anderen Geräten (#287): ist hier nichts offen, zeigt die Werkbank still den neuen Stand, sonst fragt sie
   // ein neues Buch gibt es auf dem Server erst nach dem ersten Speichern; bis dahin meldet watchBook nichts
@@ -353,16 +369,15 @@ export function Editor() {
   useEffect(() => {
     if (!user || !bookId) return;
     return watchBook(bookId, (r) => {
-      const what = remoteChange({ remote: revOf(r), known: revOf(base.current), writing: writing.current, dirty: !!unsaved.current || writing.current !== null });
+      // offen ist auch, was hinter einer gestellten Frage wartet
+      const dirty = !!unsaved.current || writing.current !== null || !!conflictRef.current;
+      const what = remoteChange({ remote: revOf(r), known: revOf(base.current), writing: writing.current, dirty });
       if (what === "adopt") {
         adopt(r);
         say(msg.elsewhere());
-      } else if (what === "ask") {
-        conflictRef.current = r;
-        setConflict(r);
-      }
+      } else if (what === "ask") raise(r);
     });
-  }, [user, bookId, adopt, say]);
+  }, [user, bookId, adopt, say, raise]);
 
   /** Neu laden: der Stand von dort, was hier offen war, fällt weg */
   const reloadTheirs = () => {
@@ -380,10 +395,7 @@ export function Editor() {
     base.current = r;
     conflictRef.current = null;
     setConflict(null);
-    // Rückgängig führte sonst hinter das, was dort dazukam
-    past.current = [];
-    future.current = [];
-    setUndoState({ past: 0, future: 0 });
+    clearHistory();
     setTouched(true);
     setSaved("speichert");
     setLoaded(merged);
