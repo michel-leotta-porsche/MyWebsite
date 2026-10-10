@@ -17,6 +17,7 @@ import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from 
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
+import { framesMissing, missingFrames } from "@/lib/envelope";
 import type { Film } from "@/lib/film";
 import { developFilm, notDeveloped, patchShot, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
@@ -522,7 +523,12 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
     for (const f of films) {
       made.current.films.delete(f.stack);
       developFilm(uid, f.stack, f.name)
-        .then(() => made.current.developed.push(f.name))
+        .then((n) => {
+          // was die Kamera gezählt hat, aber nicht auf dem Gerät liegt, sagt Calima, statt still nichts zu tun
+          const [gone] = missingFrames([f], [Array(n)]);
+          if (gone) notifyLasting(framesMissing(gone));
+          if (n) made.current.developed.push(f.name);
+        })
         .catch((e) => notifyLasting(notDeveloped(e)));
     }
   };

@@ -127,6 +127,8 @@ export const CAMERA: Record<string, string> = {
   "{n} Fotos sind nicht gesichert.": "{n} photos weren't saved.",
   "Der Film ist nicht entwickelt, seine Bilder liegen als Stapel im Fotostudio.": "The film wasn't developed; its pictures are in the photo studio as a stack.",
   "Die Änderung ist nicht gesichert.": "The change wasn't saved.",
+  "Auf dem Film „{name}“ liegen keine Bilder mehr auf diesem Gerät.": "There are no pictures from the film “{name}” left on this device.",
+  "Vom Film „{name}“ fehlen {n} von {count} Bildern auf diesem Gerät.": "{n} of {count} pictures from the film “{name}” are missing on this device.",
   "Das Foto ließ sich nicht sichern.": "The photo couldn't be saved.",
   "{n} Fotos ließen sich nicht sichern.": "{n} photos couldn't be saved.",
   "Versuch es noch einmal.": "Try again.",

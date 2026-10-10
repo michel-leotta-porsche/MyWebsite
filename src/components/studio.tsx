@@ -25,7 +25,7 @@ import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
 import { dayOf, daysAgo, dayStack } from "@/lib/day-stack";
-import { envelopeLabel, isEnvelope, isSortPile, toEnvelope } from "@/lib/envelope";
+import { envelopeLabel, framesMissing, isEnvelope, isSortPile, missingFrames, toEnvelope } from "@/lib/envelope";
 import { undevelopedStacks, type Film } from "@/lib/film";
 import { newBook, uploadPrints } from "@/lib/shelve";
 import { useQueryParam } from "@/lib/use-query";
@@ -195,11 +195,13 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     const stacks = new Set(films.map((f) => f.stack));
     const fresh = onFilm.current.filter((p) => stacks.has(p.stack!));
     onFilm.current = onFilm.current.filter((p) => !stacks.has(p.stack!));
-    const envelopes = films
-      .map((f) => toEnvelope([...prints.filter((p) => p.stack === f.stack && !fresh.some((q) => q.id === p.id)), ...fresh.filter((p) => p.stack === f.stack)], f.stack, f.name, now))
-      .filter((roll) => roll.length);
+    const rolls = films.map((f) => toEnvelope([...prints.filter((p) => p.stack === f.stack && !fresh.some((q) => q.id === p.id)), ...fresh.filter((p) => p.stack === f.stack)], f.stack, f.name, now));
+    const envelopes = rolls.filter((roll) => roll.length);
     setCameraOpen(false);
     if (wantsCamera) router.replace("/zimmer");
+    // was die Kamera gezählt hat, aber nicht auf dem Gerät liegt, sagt Calima, statt still zuzugehen
+    const missing = missingFrames(films, rolls);
+    if (missing.length) notifyLasting(missing.map(framesMissing).join(" "));
     if (!envelopes.length) return;
     // die Arbeitsfassungen liegen schon auf dem Gerät (die Kamera wartet aufs Sichern): nur die Einträge neu schreiben
     const roll = envelopes.flat().map((p) => ({ ...p, work: undefined }));
