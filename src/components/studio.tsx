@@ -37,6 +37,7 @@ import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { listPrints, MAX_STACK, piles, putPrints, removePrint, toDayStack, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
+import { saveToLibrary } from "@/lib/library-save";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
 // bearbeiten, dann sichern oder in ein Buch legen. Bis dahin bleibt alles auf dem Gerät. Die letzten Fotos liegen als Abzüge
@@ -169,6 +170,8 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (wantsCamera) router.replace("/zimmer");
     if (!roll.length) return;
     keep(roll);
+    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210)
+    saveToLibrary(roll).catch(() => {});
     notify(roll.length === 1 ? t("Entwickelt. Das Bild liegt auf dem Stapel seines Tages.") : t("Entwickelt. Die {n} Bilder liegen auf dem Stapel ihres Tages.", { n: roll.length }));
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
