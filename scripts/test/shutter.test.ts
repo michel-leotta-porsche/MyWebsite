@@ -18,4 +18,5 @@ test("Auslöser und Knopfreihen lesen dieselben Maße", () => {
   const rows = [...room.matchAll(/className="([^"]*max-md:pr-\(--shutter-room\)[^"]*)" style=\{shutterRow\}/g)].map((m) => m[1]);
   assert.equal(rows.length, 2, "Knopfreihe unter dem Buch und Kopf der Rückmeldungen („Alle“)");
   assert.ok(rows.every((c) => /\bmin-w-0\b/.test(c)), "bei sehr großer Schrift macht der freie Platz das Buch nicht breiter als den Bildschirm");
+  assert.ok(rows.every((c) => /\[&>(?:\*|button)\]:shrink-0/.test(c)), "Knöpfe werden dabei nicht gequetscht, ihre Schrift bleibt in der Pille");
 });

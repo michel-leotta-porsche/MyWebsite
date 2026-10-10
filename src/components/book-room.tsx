@@ -701,7 +701,7 @@ function Panel({
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
       {/* in der App hält die Reihe auf dem Telefon rechts Platz für den Auslöser frei und bricht vorher um (#242) */}
-      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 max-md:pr-(--shutter-room)" style={shutterRow}>
+      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 max-md:pr-(--shutter-room) [&>*]:shrink-0" style={shutterRow}>
         {primary ??
           (book && (
             <Button variant="cloth" onClick={() => open(book.id)}>
@@ -755,7 +755,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
   const head = [notes.length && noteCount(notes.length), ears.length && earCount(ears.length), fresh && t("{n} neu", { n: fresh })].filter(Boolean).join(" · ");
   return (
     <div className="mt-6 grid gap-4">
-      <div className="text-on-table-2 flex min-w-0 items-center justify-between gap-3 text-[13px] max-md:pr-(--shutter-room)" style={shutterRow}>
+      <div className="text-on-table-2 flex min-w-0 items-center justify-between gap-3 text-[13px] max-md:pr-(--shutter-room) [&>button]:shrink-0" style={shutterRow}>
         <span>{head}</span>
         <Button size="sm" onClick={onAll}>
           {t("Alle")}
