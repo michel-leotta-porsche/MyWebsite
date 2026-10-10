@@ -6,7 +6,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, isNeutral } from "@/lib/develop/model";
 import type { User } from "@/lib/firebase";
 import type { Geom } from "@/lib/free-layout";
-import { aspectFor, autoPhotos, bottomFor, pageAspect, editedPatch, loadBook, newId, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
+import { aspectFor, autoPhotos, bottomFor, pageAspect, editedPatch, loadBook, newId, refreshShares, saveBook, SCHEMA, uploadEdited, uploadPhoto, type ClothId, type StoredBook, type StoredPhoto } from "@/lib/store";
 import { workOf, type Print } from "@/lib/studio-store";
 
 // Abzüge vom Pult in ein Buch legen: hochladen, Bearbeitung einrechnen, ins Buch schreiben. Das Fotostudio legt sie
@@ -90,10 +90,19 @@ export function daySpreads(photos: StoredPhoto[], heading: string, story: string
   return { spreads: [page, ...rest.spreads.map((s) => ({ ...s, pinned: true }))], coverKey };
 }
 
+/** Was layDay nach draußen braucht; der Test tauscht es aus, damit er ohne Netz läuft */
+export type LayIo = {
+  uploadPrints: typeof uploadPrints;
+  loadBook: typeof loadBook;
+  saveBook: typeof saveBook;
+  refreshShares: typeof refreshShares;
+};
+
 /**
  * Einen Tag hinten an ein Buch legen oder ein neues damit anfangen. Das bestehende Buch wird frisch geladen:
  * auf einem anderen Gerät kann es sich seitdem geändert haben. Die Tagesseite ist frei gestaltet, deshalb bleibt das
  * Seitenformat ab jetzt, wie es ist (wie nach der Bühne). spread ist die Stelle der Tagesseite im Buch.
+ * Geteilte Links bekommen den Tag gleich mit, wie nach jedem Speichern in der Werkbank.
  */
 export async function layDay(
   user: User,
@@ -101,10 +110,11 @@ export async function layDay(
   day: { heading: string; story: string },
   into: { book: StoredBook } | { title: string; cloth: ClothId },
   step?: (i: number) => void,
+  io: LayIo = { uploadPrints, loadBook, saveBook, refreshShares },
 ): Promise<{ book: StoredBook; firstKey: string; spread: number }> {
   const bookId = "book" in into ? into.book.id : newId();
-  const photos = await uploadPrints(user.uid, bookId, prints, step);
-  const base = "book" in into ? ((await loadBook(into.book.id)) ?? into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
+  const photos = await io.uploadPrints(user.uid, bookId, prints, step);
+  const base = "book" in into ? ((await io.loadBook(into.book.id)) ?? into.book) : newBook(user, bookId, photos, [], photos[0].key, into);
   const aspect = pageAspect(base.aspect);
   const g = { aspect, bottom: bottomFor(aspect) };
   const d = daySpreads(photos, day.heading, day.story, g);
@@ -112,6 +122,8 @@ export async function layDay(
     "book" in into
       ? { ...base, photos: [...base.photos, ...photos], spreads: [...base.spreads, ...d.spreads], aspectLocked: true }
       : { ...base, coverKey: d.coverKey, spreads: d.spreads, aspectLocked: true };
-  await saveBook(book);
+  await io.saveBook(book);
+  // nicht abwarten: ein Link, der nicht nachkommt, hält den Tag nicht auf; Firestore schickt es nach, sobald Netz da ist
+  io.refreshShares(book).catch(() => {});
   return { book, firstKey: d.coverKey, spread: book.spreads.length - d.spreads.length };
 }
