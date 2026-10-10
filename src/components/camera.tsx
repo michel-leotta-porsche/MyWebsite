@@ -308,6 +308,12 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     setDials(next);
   };
   const lenses = useMemo(() => realFocals(info?.lenses ?? [1]), [info]);
+  /** Lupe beim Scharfstellen von Hand: angekündigt, damit die Vergrößerung nicht wie Unschärfe wirkt (#225) */
+  const [magnified, setMagnified] = useState(false);
+  const magnifyWhile = (on: boolean) => {
+    setMagnified(on);
+    CalimaCamera.setMagnify({ on }).catch(() => {});
+  };
 
   /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel. Beiseitelegen und später weiter belichten geht; die Bilder
      sieht man erst, wenn der Film entwickelt ist (voll oder bewusst entwickelt) ----- */
@@ -663,6 +669,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           )}
           {tools && grid && <GridOverlay roll={roll} />}
           {tools && ready && <MeterBadge meter={meter} />}
+          {magnified && (
+            <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 left-3 rounded-full px-2.5 py-1 text-[13px] font-semibold">
+              {t("Lupe 3×")}
+            </span>
+          )}
           {flash && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
           {reticle && (
             <span
@@ -739,7 +750,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             )}
             {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} />}
             {tools && dial && dial !== "focal" && dial !== "kelvin" && (
-              <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
+              <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? magnifyWhile : undefined} />
             )}
           </div>
         </div>
@@ -915,6 +926,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               ? t("Noch ein Tipp auf die Marke hält Schärfe und Licht fest.")
               : tools && dial === "kelvin"
                 ? t("Ziehen oder tippen wählt das Licht. Feinabstimmung verschiebt die Farbe wie bei Fuji.")
+                : tools && dial === "focus"
+                  ? t("Ziehen stellt scharf. Solange du ziehst, zeigt die Lupe die Mitte dreifach groß.")
                 : tools && dial && dial !== "focal"
             ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
             : tools && focal != null && !lenses.includes(focal)
