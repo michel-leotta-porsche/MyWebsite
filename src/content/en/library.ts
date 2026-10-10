@@ -53,6 +53,7 @@ export const LIBRARY: Record<string, string> = {
   Bearbeitung: "Edits",
   "Fotobuch {title}": "Photo book {title}",
   "Calima, zurück zum Tisch": "Calima, back to the table",
+  "Zurück|Buch": "Back",
   Bearbeiten: "Edit",
   "Bearbeiten (oder lange aufs Buch drücken)": "Edit (or press and hold the book)",
   "Oder lange aufs Buch drücken": "Or press and hold the book",

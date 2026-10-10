@@ -341,6 +341,7 @@ export function Book({
   onPin,
   pins,
   end,
+  backLabel,
 }: {
   book: BookData;
   mode: Mode;
@@ -364,6 +365,8 @@ export function Book({
   onEdit?: (step: number) => void;
   /** Leise unter dem Buch, sobald die letzte Doppelseite oder der Rückdeckel aufliegt (z. B. der Weg zum eigenen Buch) */
   end?: React.ReactNode;
+  /** Statt „Calima“ oben links, wo der Name nicht als Weg zurück erkannt wird (Besucher der Landing) */
+  backLabel?: string;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -1005,11 +1008,11 @@ export function Book({
             onClick={onClose}
             className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 justify-self-start pr-2 text-lg font-bold whitespace-nowrap tracking-[-0.02em] transition-opacity duration-150 active:opacity-60 flat:whitespace-normal"
             style={{ fontVariationSettings: '"wdth" 80' }}
-            aria-label={t("Calima, zurück zum Tisch")}
+            aria-label={backLabel ?? t("Calima, zurück zum Tisch")}
           >
             {/* Pfeil zeigt, dass der Name zurückführt (wie „‹ Bücherzimmer“ in der Werkbank); auf dem Telefon gibt es kein Esc */}
             <ChevronLeft aria-hidden className="text-on-table-2 size-5" />
-            Calima
+            {backLabel ?? "Calima"}
           </button>
           {/* Bildtitel der randlosen Tafeln (auf der Seite selbst steht nichts) und ihr Rezept: je Seite eine Gruppe */}
           <div className="hidden items-start gap-x-8 gap-y-2 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col">

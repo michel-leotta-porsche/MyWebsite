@@ -45,7 +45,8 @@ const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 // Große Überschrift eines Abschnitts oder einer Funktion
-const displayHeading = "text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl";
+// wächst fließend von 48 px (Telefon) bis 84 px bei 1280 px, ab da bleibt die Spalte gleich breit und die Schrift auch
+const displayHeading = "text-on-table text-[clamp(3rem,1.75rem+4.4vw,5.25rem)] leading-[0.9] font-bold tracking-[-0.035em]";
 
 const book = sampleBook();
 
@@ -212,8 +213,8 @@ function Hero() {
   return (
     <section id="blaettern" aria-labelledby="blaettern-h" className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
-        <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
+      <header className="relative z-20 flex items-baseline justify-between gap-6 px-page pt-[max(1rem,env(safe-area-inset-top))] md:pt-6 xl:pt-8">
+        <p className="text-on-table text-lg font-bold md:text-xl tracking-[-0.02em]" style={narrow}>
           Calima
         </p>
         <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-5 text-sm md:gap-6">
@@ -224,7 +225,7 @@ function Hero() {
         </nav>
       </header>
 
-      <div className="relative z-10 grid flex-1 content-center items-center gap-4 px-4 pt-8 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12 flat:grid-cols-12">
+      <div className="relative z-10 grid flex-1 content-center items-center gap-4 px-page pt-8 pb-10 md:grid-cols-12 md:gap-8 md:pt-0 md:pb-12 flat:grid-cols-12">
         <div className="md:col-span-5 md:pb-[8svh] flat:col-span-5">
           <h1 id="blaettern-h" className="word-rise text-on-table leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
             {t("Blätter mal.")}
@@ -254,13 +255,13 @@ function Hero() {
 function Own() {
   const t = useT();
   return (
-    <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-20 md:px-8 md:py-32">
+    <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-20 md:py-32">
       <div className="grid gap-8 md:grid-cols-12 md:gap-8">
         <h2 id="eigenes-h" className={`${displayHeading} md:col-span-5`} style={display}>
           {t("Mach dein eigenes.")}
         </h2>
         <div className="md:col-span-6 md:col-start-7">
-          <p className="text-on-table max-w-[30rem] text-lg leading-relaxed opacity-80">
+          <p className="text-on-table max-w-[30rem] text-lg leading-relaxed opacity-80 lg:max-w-[34rem] lg:text-xl">
             {t("Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.")}
           </p>
           <div className="mt-8">
@@ -413,7 +414,7 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
   const t = useT();
   return (
     <div id="werkbank" role="group" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
-      <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-4 py-12 md:px-8 md:py-10">
+      <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-page py-12 md:py-10">
         <div className="relative z-10 grid items-center gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
             {eyebrow}
@@ -422,7 +423,7 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
               <br />
               {t("Fertig gesetzt.")}
             </h3>
-            <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg">
+            <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg xl:text-xl">
               {t(
                 "Fotos vom Handy, von der Fuji oder aus Lightroom auf die Werkbank ziehen, auch HEIC und DNG. Nach ein, zwei Sekunden stehen sie als Doppelseiten da, nach Aufnahmezeit geordnet. Ortsdaten fallen beim Hochladen weg.",
               )}
@@ -517,18 +518,18 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
 function Recipe() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-28">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <h3 id="recipe-h" className={`${displayHeading} md:col-span-7`} style={display}>
           {t("Das Rezept liegt bei.")}
         </h3>
-        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-5 md:col-start-8 md:self-end lg:text-xl">
           {t("Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man gleich als .xmp mit.")}
           <span className="mt-4 block">{t("Im Fotostudio liest Calima Rezept und Preset aus der Datei und legt den Look mit einem Tipp über alle Fotos.")}</span>
         </p>
       </div>
 
-      <figure className="relative mx-auto mt-14 max-w-[880px] md:mt-20">
+      <figure className="relative mx-auto mt-14 max-w-[880px] md:mt-16 xl:max-w-[1040px]">
         <Clip clip={CLIPS.rezept} label={t("Clip: Calima liest Fuji-Rezept und Lightroom-Preset, ein Look für alle Fotos")} className="mx-auto w-[74%] -rotate-[1.5deg] md:mx-0 md:ml-[8%] md:w-[38%]" />
         {/* Zettel schiebt sich unter dem Clip hervor, sobald er ins Bild kommt */}
         <Slip className="reveal-slip relative mt-[-18%] ml-auto w-[88%] rotate-[3deg] p-5 md:absolute md:right-0 md:bottom-[14%] md:mt-0 md:w-[50%] md:p-8">
@@ -563,9 +564,9 @@ function Recipe() {
 function Share() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-24 md:py-28">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
-        <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0">
+        <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0 xl:max-w-[640px]">
           <Clip clip={CLIPS.hinlegen} label={t("Clip: Fotos werden ein Buch, das Buch wird einer Person hingelegt")} className="w-[66%] -rotate-[2deg] md:w-[58%]" />
           <Slip className="reveal-slip top-[6%] right-0 w-[46%] rotate-[3deg] text-[15px]">
             {t("Für Jana, von Michel")}
@@ -580,10 +581,10 @@ function Share() {
           <h3 id="share-h" className={displayHeading} style={display}>
             {t("Hinlegen, nicht posten.")}
           </h3>
-          <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80">
+          <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80 lg:max-w-[34rem] lg:text-xl">
             {t("Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die nur du liest.")}
           </p>
-          <p className="text-on-table-2 mt-6 max-w-[30rem] text-base leading-relaxed">
+          <p className="text-on-table-2 mt-6 max-w-[30rem] text-base leading-relaxed lg:max-w-[34rem] lg:text-lg">
             {t("Kein Profil, kein Feed. Ein Buch sieht nur, wer den Link hat, und jeden Link kannst du einzeln zurückziehen.")}
           </p>
         </div>
@@ -598,7 +599,7 @@ const APP_ICONS = { look: Aperture, film: Film, white: Pipette } as const;
 function AppCamera() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-28">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <div className="md:col-span-7">
           <p className="text-on-table-2 flex items-center gap-2 text-sm font-semibold">
@@ -610,7 +611,7 @@ function AppCamera() {
             {t("Die Kamera gibt es nur in der iPhone-App.").replace("iPhone-App", "iPhone\u2011App")}
           </h3>
         </div>
-        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-5 md:col-start-8 md:self-end lg:text-xl">
           {t("Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch.")}{" "}
           {TESTFLIGHT_URL ? (
             <a href={TESTFLIGHT_URL} className={`${linkClass} font-semibold opacity-100`}>
@@ -630,7 +631,7 @@ function AppCamera() {
               <h4 className="text-on-table mt-4 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
                 {t(f.title)}
               </h4>
-              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(f.text)}</p>
+              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed lg:text-lg">{t(f.text)}</p>
             </li>
           );
         })}
@@ -644,7 +645,7 @@ function AppCamera() {
 function HowTo() {
   const t = useT();
   return (
-    <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-20 md:px-8 md:py-32">
+    <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-page py-20 md:py-32">
       <h2 id="so-gehts-h" className={displayHeading} style={display}>
         {t("So geht’s")}
       </h2>
@@ -655,7 +656,7 @@ function HowTo() {
             <h3 className="text-on-table mt-2 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
               {t(s.title)}
             </h3>
-            <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(s.text)}</p>
+            <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed lg:text-lg">{t(s.text)}</p>
             <Link href={s.href} className={`${linkClass} text-on-table mt-3 inline-flex items-center gap-1 text-sm font-semibold`}>
               {t("Mehr in der Hilfe")}
               <ArrowRight aria-hidden className="size-3.5" />
@@ -673,7 +674,7 @@ function Closing() {
   const t = useT();
   return (
     <>
-      <section aria-labelledby="end-h" className="linen table-surface relative overflow-hidden bg-table px-4 pt-24 pb-20 md:px-8 md:pt-40 md:pb-28">
+      <section aria-labelledby="end-h" className="linen table-surface relative overflow-hidden bg-table px-page pt-24 pb-20 md:pt-40 md:pb-28">
         <SunAndShade light="sun" />
         <div className="relative z-20">
           <h2 id="end-h" className="text-on-table max-w-[12ch] leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(56px, 9vw, 144px)" }}>
@@ -694,7 +695,7 @@ function Closing() {
           </div>
         </div>
       </section>
-      <footer className="linen table-surface relative bg-table px-4 pb-10 text-sm text-on-table-2 md:px-8">
+      <footer className="linen table-surface relative bg-table px-page pb-10 text-sm text-on-table-2">
         <div className="border-on-table-2/25 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t pt-6">
           <p>
             <span className="text-on-table font-semibold">Calima</span> · {t("Beispielfotos von Michel Leotta")}
@@ -736,6 +737,7 @@ function Features() {
 const PARTS: Record<SectionId, () => ReactNode> = { blaettern: Hero, eigenes: Own, kann: Features, "so-gehts": HowTo };
 
 export function Landing() {
+  const t = useT();
   const [first, ...rest] = SECTIONS;
   const Top = PARTS[first.id];
   return (
@@ -746,6 +748,7 @@ export function Landing() {
       <Library
         books={[book]}
         bookEnd={<OwnBook />}
+        backLabel={t("Zurück|Buch")}
         footer={
           <>
             {rest.map(({ id }) => {

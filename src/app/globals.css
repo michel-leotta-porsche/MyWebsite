@@ -1482,3 +1482,11 @@ html[data-kamera] body {
 html[data-kamera] body > :not(#calima-kamera) {
   visibility: hidden;
 }
+
+/* Seitenrand der Landing: auf breiten Bildschirmen bleibt der Inhalt auf 80rem in der Mitte, der Tisch läuft weiter bis an den Rand */
+@utility px-page {
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: max(2rem, calc((100% - 80rem) / 2));
+  }
+}
