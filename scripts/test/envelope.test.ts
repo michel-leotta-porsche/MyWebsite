@@ -27,7 +27,8 @@ test("der Zettel trägt Filmname und Zeitraum", () => {
   assert.equal(envelopeLabel(one, "de-DE"), "Hafen · 8. Okt.", "nach Mitternacht gehört noch zum Tag davor");
   const week = toEnvelope([print("a", at(2026, 10, 8), "s"), print("b", at(2026, 10, 15), "s")], "s", "Sonnenschein", 0);
   assert.equal(envelopeLabel(week, "de-DE"), "Sonnenschein · 8.–15. Okt.");
-  assert.equal(envelopeLabel(week, "en-GB").replace(/\s/g, " "), "Sonnenschein · 8–15 Oct");
+  // Leerzeichen um den Strich setzt jede ICU-Fassung anders
+  assert.equal(envelopeLabel(week, "en-GB").replace(/\s/g, ""), "Sonnenschein·8–15Oct");
 });
 
 test("frisch entwickelt liegt vorn, auch wenn die Bilder älter sind als der Tag von heute", () => {
