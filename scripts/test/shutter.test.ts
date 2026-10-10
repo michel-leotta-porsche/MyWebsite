@@ -1,24 +1,21 @@
-// #242: Der Auslöser unten rechts im Bücherzimmer darf die Knopfreihe unter dem Buch nicht verdecken.
+// #242: Der Auslöser unten rechts im Bücherzimmer darf die Knöpfe unter dem Buch nicht verdecken.
+// Prüft die Quellen; ob die Reihe wirklich umbricht, zeigt erst der Browser (QA auf 320–430 px, große Schrift).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { SHUTTER, shutterRoom } from "@/lib/shutter";
+import { SHUTTER, SHUTTER_ROOM } from "@/lib/shutter";
 
 const src = (p: string) => readFileSync(new URL(`../../src/${p}`, import.meta.url), "utf8");
 
-test("auf iPhone-Breite endet die Knopfreihe links vom Auslöser", () => {
-  for (const width of [320, 375, 390, 430]) {
-    const rowRight = width - 16 - shutterRoom(16); // Tisch mit px-4
-    const shutterLeft = width - SHUTTER.edge - SHUTTER.size;
-    assert.ok(rowRight <= shutterLeft - 8, `${width} pt: Reihe endet bei ${rowRight}, Auslöser beginnt bei ${shutterLeft}`);
-  }
+test("der freie Platz reicht vom Bildschirmrand bis hinter den Auslöser", () => {
+  assert.ok(SHUTTER_ROOM >= SHUTTER.edge + SHUTTER.size + 8);
 });
 
-test("Auslöser und Knopfreihe lesen dieselben Maße", () => {
+test("Auslöser und Knopfreihen lesen dieselben Maße", () => {
   assert.match(src("components/studio.tsx"), /SHUTTER\.size/, "Auslöser nimmt seine Größe aus lib/shutter");
   const room = src("components/book-room.tsx");
-  assert.match(room, /shutterRoom\(/, "Knopfreihe hält Platz frei");
-  assert.match(room, /max-md:pr-\(--shutter-room\)/, "nur auf schmalen Bildschirmen");
-  assert.match(room, /shutterRoom\(0\)\}px - 1rem\)/, "der Tischrand wächst mit der Schrift, der Auslöser nicht");
-  assert.match(room, /min-w-0 flex-wrap[^"]*max-md:pr-\(--shutter-room\)/, "bei sehr großer Schrift macht der freie Platz das Buch nicht breiter als den Bildschirm");
+  assert.match(room, /SHUTTER_ROOM\}px - 1rem\)/, "der Tischrand wächst mit der Schrift, der Auslöser nicht");
+  const rows = [...room.matchAll(/className="([^"]*max-md:pr-\(--shutter-room\)[^"]*)" style=\{shutterRow\}/g)].map((m) => m[1]);
+  assert.equal(rows.length, 2, "Knopfreihe unter dem Buch und Kopf der Rückmeldungen („Alle“)");
+  assert.ok(rows.every((c) => /\bmin-w-0\b/.test(c)), "bei sehr großer Schrift macht der freie Platz das Buch nicht breiter als den Bildschirm");
 });
