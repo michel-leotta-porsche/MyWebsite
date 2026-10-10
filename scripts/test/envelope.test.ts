@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { envelopeLabel, envelopeOf, isEnvelope, isSortPile, toEnvelope } from "@/lib/envelope";
+import { envelopeLabel, envelopeOf, framesMissing, isEnvelope, isSortPile, missingFrames, toEnvelope } from "@/lib/envelope";
 import { piles, trimPiles, type Print } from "@/lib/studio-store";
 
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min).getTime();
@@ -44,4 +44,16 @@ test("Umschläge räumt das Fotostudio nie weg und zählt sie nicht zu den acht 
   assert.equal(keep.flat().filter((p) => isEnvelope(p.stack)).length, 27);
   assert.equal(keep.length, 1 + 8);
   assert.deepEqual(drop.map((p) => p.id), ["n0"]);
+});
+
+test("Film ohne Bilder auf dem Gerät: entwickeln meldet, wie viele fehlen, statt still nichts zu tun", () => {
+  const film = (stack: string, name: string, count: number) => ({ stack, name, count, approx: false, edit: null });
+  const rolls = [[print("a", 1, "f1")], []];
+  assert.deepEqual(missingFrames([film("f1", "Hafen", 3), film("f2", "Sonnenhut", 3)], rolls), [
+    { name: "Hafen", missing: 2, count: 3 },
+    { name: "Sonnenhut", missing: 3, count: 3 },
+  ]);
+  assert.deepEqual(missingFrames([film("f1", "Hafen", 1)], [[print("a", 1, "f1")]]), []);
+  assert.equal(framesMissing({ name: "Sonnenhut", missing: 3, count: 3 }), "Auf dem Film „Sonnenhut“ liegen keine Bilder mehr auf diesem Gerät.");
+  assert.equal(framesMissing({ name: "Hafen", missing: 2, count: 3 }), "Vom Film „Hafen“ fehlen 2 von 3 Bildern auf diesem Gerät.");
 });

@@ -15,7 +15,7 @@ import { ListGroup, ListRow } from "@/components/ui/list";
 import { hitClass } from "@/components/ui-classes";
 import { Segmented } from "@/components/ui/segmented";
 import { MountedSheet } from "@/components/ui/sheet";
-import { notify } from "@/components/ui/toaster";
+import { notify, notifyLasting } from "@/components/ui/toaster";
 import type { User } from "@/lib/firebase";
 import { pickCover, relayoutFree } from "@/lib/auto-sequence";
 import { bakePhoto } from "@/lib/develop/bake";
@@ -27,7 +27,7 @@ import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
 import { dayOf, daysAgo, dayStack } from "@/lib/day-stack";
-import { envelopeLabel, isEnvelope, isSortPile, toEnvelope } from "@/lib/envelope";
+import { envelopeLabel, framesMissing, isEnvelope, isSortPile, missingFrames, toEnvelope } from "@/lib/envelope";
 import { undevelopedStacks, type Film } from "@/lib/film";
 import { newBook, uploadPrints } from "@/lib/shelve";
 import { useQueryParam } from "@/lib/use-query";
@@ -38,7 +38,7 @@ import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { listPrints, MAX_STACK, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
+import { changeNotSaved, isNoStore, listPrints, MAX_STACK, notDeveloped, notSaved, patchShot, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 import { SHUTTER } from "@/lib/shutter";
 import { saveToLibrary } from "@/lib/library-save";
@@ -97,9 +97,12 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   const wantsCamera = useQueryParam("kamera") === "1" && hasCamera();
   const camera = cameraOpen || wantsCamera;
 
+  // was sicher auf dem Gerät liegt; ein neues Foto, das sich nicht sichern lässt, verlässt den Pult wieder (#285)
+  const stored = useRef(new Set<string>());
   useEffect(() => {
     listPrints(user.uid)
       .then((p) => {
+        for (const x of p) stored.current.add(x.id);
         const { keep, drop } = trimPiles(piles(p));
         setPrints(keep.flat());
         // was über die Grenzen geht, etwa seit einer Woche Weggelegtes, verlässt auch das Gerät
@@ -108,18 +111,35 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       .catch(() => {});
   }, [user.uid]);
 
-  // nacheinander sichern: ein Bild, das gerade noch auf dem Film gesichert wird, darf nicht nach dem Entwickeln ankommen
-  const saving = useRef<Promise<unknown>>(Promise.resolve());
   // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist. Liegt ein Abzug
-  // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher
-  const keep = (ps: Print[]) => {
-    setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
-    saving.current = saving.current
-      .catch(() => {})
-      .then(() => putPrints(user.uid, ps))
-      .then(() => setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x))))
-      .catch(() => {});
+  // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher.
+  // Gesichert wird nacheinander (putPrints reiht ein): ein Bild auf dem Film liegt, bevor der Film entwickelt wird.
+  // Scheitert das Sichern (#285), zeigt der Pult wieder, was auf dem Gerät liegt: neue Fotos gehen, Änderungen werden
+  // zurückgenommen, und ein Hinweis bleibt stehen. quiet: die Kamera sagt es selbst. Das Versprechen lehnt ab, damit
+  // die Kamera ein nicht gesichertes Bild nicht mitzählt.
+  const keep = (ps: Print[], { film = false, quiet = false } = {}): Promise<void> => {
+    let before: Print[] = [];
+    setPrints((list) => {
+      before = list;
+      return trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat();
+    });
+    return putPrints(user.uid, ps).then(
+      () => {
+        for (const p of ps) stored.current.add(p.id);
+        setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x)));
+      },
+      (e) => {
+        if (isNoStore(e)) throw e;
+        const lost = ps.filter((p) => !stored.current.has(p.id));
+        const was = new Map(before.map((x) => [x.id, x]));
+        setPrints((list) => list.filter((x) => !lost.some((p) => p.id === x.id)).map((x) => (ps.some((p) => p.id === x.id) ? (was.get(x.id) ?? x) : x)));
+        if (!quiet) notifyLasting(film ? notDeveloped(e) : lost.length ? notSaved(e, lost.length) : changeNotSaved(e));
+        throw e;
+      },
+    );
   };
+  /** keep, wo niemand auf das Ergebnis wartet: den Fehler meldet keep selbst */
+  const keepQuietly = (ps: Print[]) => void keep(ps).catch(() => {});
   // Bilder auf einem unentwickelten Film bleiben im Dunkeln: sie liegen schon im Studio, zeigen sich aber erst nach dem Entwickeln
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
   const lit = useMemo(() => prints.filter((p) => !p.stack || !dark.has(p.stack)), [prints, dark]);
@@ -134,7 +154,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     });
     const all = ranked.flat();
     setPrints((list) => list.map((x) => all.find((p) => p.id === x.id) ?? x));
-    putPrints(user.uid, all.map((p) => ({ ...p, work: undefined }))).catch(() => {});
+    keepQuietly(all.map((p) => ({ ...p, work: undefined })));
   };
   const sort = usePultSort({ keys: shown.map(pileKey), onDrop: resort });
   const desk = sort.order ? sort.order.map((k) => shown.find((pile) => pileKey(pile) === k)!).filter(Boolean) : shown;
@@ -163,15 +183,20 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     markHintDone(browserStore);
   };
   // Abendstapel: ohne Film legt die Kamera jedes Foto auf den Stapel seines Tages, sortiert nach der Aufnahmezeit
-  const onShot = (p: Print, filmStack?: string) => {
+  const onShot = (p: Print, filmStack?: string): Promise<void> => {
     if (hint) hintAway();
-    // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film
+    // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film; erst gesichert gehört das Bild zum Film
     if (filmStack) {
       const q = { ...p, stack: filmStack };
-      onFilm.current = [...onFilm.current, { ...q, work: undefined }];
-      return keep([q]);
+      return keep([q], { quiet: true }).then(() => void (onFilm.current = [...onFilm.current, { ...q, work: undefined }]));
     }
-    keep([{ ...p, stack: dayStack(p.at), pos: p.at }]);
+    return keep([{ ...p, stack: dayStack(p.at), pos: p.at }], { quiet: true });
+  };
+  // das eingerechnete Vorschaubild kommt nach dem Foto, vielleicht erst nach dem Entwickeln: es ergänzt nur shot (#284)
+  const onLook = (id: string, shot: Blob) => {
+    onFilm.current = onFilm.current.map((p) => (p.id === id ? { ...p, shot } : p));
+    setPrints((list) => list.map((x) => (x.id === id ? { ...x, shot } : x)));
+    patchShot(user.uid, id, shot).catch(() => {});
   };
   // ein entwickelter Film (voll oder bewusst entwickelt) kommt als Umschlag vorn auf den Pult (#244): alle Bilder auf
   // einmal ansehen und einsortieren, wie vom Labor, statt sie über die Tage der Aufnahmen verstreut zu suchen.
@@ -181,21 +206,28 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     const stacks = new Set(films.map((f) => f.stack));
     const fresh = onFilm.current.filter((p) => stacks.has(p.stack!));
     onFilm.current = onFilm.current.filter((p) => !stacks.has(p.stack!));
-    const envelopes = films
-      .map((f) => toEnvelope([...prints.filter((p) => p.stack === f.stack && !fresh.some((q) => q.id === p.id)), ...fresh.filter((p) => p.stack === f.stack)], f.stack, f.name, now))
-      .filter((roll) => roll.length);
+    const rolls = films.map((f) => toEnvelope([...prints.filter((p) => p.stack === f.stack && !fresh.some((q) => q.id === p.id)), ...fresh.filter((p) => p.stack === f.stack)], f.stack, f.name, now));
+    const envelopes = rolls.filter((roll) => roll.length);
     setCameraOpen(false);
     if (wantsCamera) router.replace("/zimmer");
+    // was die Kamera gezählt hat, aber nicht auf dem Gerät liegt, sagt Calima, statt still zuzugehen
+    const missing = missingFrames(films, rolls);
+    if (missing.length) notifyLasting(missing.map(framesMissing).join(" "));
     if (!envelopes.length) return;
-    const roll = envelopes.flat();
-    keep(roll);
-    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210)
+    // die Arbeitsfassungen liegen schon auf dem Gerät (die Kamera wartet aufs Sichern): nur die Einträge neu schreiben
+    const roll = envelopes.flat().map((p) => ({ ...p, work: undefined }));
+    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210), dort sind sie auch sicher, wenn das Gerät voll ist
     saveToLibrary(roll).catch(() => {});
     const first = envelopes[0];
     const name = first[0].roll!;
     const open = { action: { label: t("Ansehen"), onClick: () => setSorting(first[0].stack!) } };
-    if (envelopes.length > 1) notify(t("Entwickelt: {n} Umschläge liegen vorn auf dem Pult.", { n: envelopes.length }));
-    else notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), open);
+    // „Entwickelt“ erst, wenn der Umschlag auf dem Gerät liegt; sonst meldet keep, dass der Film nicht entwickelt ist
+    keep(roll, { film: true })
+      .then(() => {
+        if (envelopes.length > 1) notify(t("Entwickelt: {n} Umschläge liegen vorn auf dem Pult.", { n: envelopes.length }));
+        else notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), open);
+      })
+      .catch(() => {});
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
   const closeCamera = () => {
@@ -218,7 +250,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       }
       // eingereiht nach der Aufnahmezeit, sonst nach dem Datum der Datei
       const taken = s.meta.taken ? Date.parse(s.meta.taken) : NaN;
-      keep([{ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: Number.isFinite(taken) ? taken : file.lastModified || at }]);
+      keepQuietly([{ id: newId(), name: stem(file.name), at, w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, stack, pos: Number.isFinite(taken) ? taken : file.lastModified || at }]);
     }
     setPreparing(null);
     if (broken) notify(broken === 1 ? t("Ein Foto ließ sich nicht öffnen.") : t("{n} Fotos ließen sich nicht öffnen.", { n: numberWord(broken) }));
@@ -231,7 +263,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
       return list.filter((p) => !laid(p));
     });
   };
-  const bringBack = () => keep(away.map((p) => ({ ...p, pick: undefined, pickAt: undefined })));
+  const bringBack = () => keepQuietly(away.map((p) => ({ ...p, pick: undefined, pickAt: undefined })));
 
   const open = async (given: File[]) => {
     setError(null);
@@ -277,7 +309,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (!made.length) return setError(notes.join(" "));
     // bleibt nur eins übrig, ist es ein einzelner Abzug
     const ps = made.length === 1 ? [{ ...made[0], stack: undefined, pos: undefined }] : made;
-    keep(ps);
+    keepQuietly(ps);
     // der Hinweis gehört in den Editor, der das Studio sonst verdeckt
     setOpenNote(
       !notes.length
@@ -402,7 +434,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
         </p>
       )}
 
-      {camera && <Camera uid={user.uid} taken={wantsCamera} onShot={onShot} onFilmDone={onFilmDone} onClose={closeCamera} />}
+      {camera && <Camera uid={user.uid} taken={wantsCamera} onShot={onShot} onLook={onLook} onFilmDone={onFilmDone} onClose={closeCamera} />}
       {sorting && (
         <DaySort
           stack={sorting}
@@ -433,7 +465,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           onFinish={(edits) => {
             const at = Date.now();
             const ps = editing.map((p) => ({ ...p, edit: edits[p.id] ?? p.edit, at }));
-            keep(ps);
+            keepQuietly(ps);
             setEditing(null);
             setOpenNote(null);
             setDone(ps);
@@ -447,7 +479,7 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           user={user}
           books={books}
           onClose={() => setDone(null)}
-          onShots={(shots) => keep(done.filter((p) => shots[p.id]).map((p) => ({ ...p, shot: shots[p.id] })))}
+          onShots={(shots) => keepQuietly(done.filter((p) => shots[p.id]).map((p) => ({ ...p, shot: shots[p.id] })))}
           onEdit={() => {
             setDone(null);
             setEditing(done);
