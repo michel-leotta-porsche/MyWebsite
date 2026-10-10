@@ -23,7 +23,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     id: "buch",
     title: de("Buch machen"),
     lead: de("Ein paar Fotos auswählen, Calima setzt sie zu Doppelseiten. Den Rest machst du nur, wenn du willst."),
-    help: "/hilfe#buch-anlegen",
+    help: "/hilfe/erstes-buch",
     features: [
       {
         id: "fotos",
@@ -46,7 +46,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       {
         id: "einband",
         title: de("Einband"),
-        text: de("Unter „Titelbild …“ kommt ein Foto auf den Einband. Dort wählst du auch Titel und Farbe des Einbands."),
+        text: de("Unter „Titelbild …“ kommt ein Foto auf den Einband. Daneben wählst du Titel und Farbe des Einbands."),
         ratio: 585 / 1050,
       },
     ],
@@ -55,7 +55,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     id: "fotos",
     title: de("Fotos bearbeiten"),
     lead: de("Licht und Farbe stellst du mit dem Finger direkt auf dem Foto ein. Ein Foto oder gleich mehrere auf einmal."),
-    help: "/hilfe#fotos-bearbeiten",
+    help: "/hilfe/fotostudio",
     features: [
       {
         id: "looks",
@@ -75,7 +75,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     id: "rezepte",
     title: de("Rezepte"),
     lead: de("Wie ein Foto entstanden ist, liegt als Zettel dabei."),
-    help: "/hilfe#fotos-bearbeiten",
+    help: "/hilfe/fotostudio",
     features: [
       {
         id: "fuji",
@@ -95,7 +95,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     id: "hinlegen",
     title: de("Hinlegen|Funktionen"),
     lead: de("Hinlegen heißt: Eine Person bekommt ihren eigenen Link zu deinem Buch."),
-    help: "/hilfe#buch-teilen",
+    help: "/hilfe/hinlegen",
     features: [
       {
         id: "link",
@@ -127,7 +127,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     id: "kamera",
     title: de("Kamera"),
     lead: de("Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch. Sie kommt bald in den App Store."),
-    help: "/hilfe",
+    help: "/hilfe/kamera",
     features: APP_FEATURES.map((f) => ({ id: f.icon, title: f.title, text: f.text, app: true as const })),
   },
 ];
