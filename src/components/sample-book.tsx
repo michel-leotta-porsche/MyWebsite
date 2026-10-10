@@ -35,7 +35,7 @@ export function SampleBook() {
 }
 
 /** Am Ende des Buchs: kein Knopf, der drängelt, nur ein Satz und ein Link */
-function OwnBook() {
+export function OwnBook() {
   const t = useT();
   return (
     <p className="text-on-table-2 text-sm">

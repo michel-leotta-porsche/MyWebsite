@@ -3,39 +3,40 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { Link2Off, Undo2 } from "lucide-react";
+import { Aperture, ArrowRight, Film, Pipette } from "lucide-react";
 
+import { Library } from "@/components/books";
 import { hitClass, linkClass } from "@/components/ui-base";
 import { buttonClass } from "@/components/ui/button";
 import { LegalLinks } from "@/components/legal";
-import type { Mode } from "@/components/book";
-import { ScrollBook } from "@/components/scroll-book";
+import { OwnBook } from "@/components/sample-book";
 import { SunAndShade } from "@/components/sun-and-shade";
+import { ClosedBook } from "@/components/table";
 import { foldGradient, FOLD_WIDTH, printedStyle } from "@/lib/book-look";
 import { APPLE_READY, SignInButtons } from "@/components/sign-in-buttons";
 import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
-import { landingBook } from "@/content/landing-book";
-import { de, useT } from "@/lib/i18n";
+import { APP_FEATURES, CLIPS, HOWTO, SECTIONS, TESTFLIGHT_URL, cueAt, type Clip as ClipData, type SectionId } from "@/lib/landing";
+import { sampleBook } from "@/lib/sample-book";
+import { useReducedMotion } from "@/lib/use-reduced-motion";
+import { de, useLang, useT } from "@/lib/i18n";
 
 import drachenbaum from "../../public/photos/08-drachenbaum.jpg";
 import mittagsblume from "../../public/photos/06-mittagsblume.jpg";
 import markisen from "../../public/photos/markisen.jpg";
 import reifen from "../../public/photos/reifen.jpg";
-import schild from "../../public/photos/01-schild-am-meer.jpg";
-import torii from "../../public/photos/japan/torii.jpg";
-import bougainvillea from "../../public/photos/04-bougainvillea.jpg";
 
-// Landing Page. Das Produkt führt sich selbst vor, ohne Bildschirmfotos:
-// 1. Kopf: ein Buch auf dem Basalttisch, Scrollen schlägt es auf und blättert, wie in der Leseansicht (Feder, WebGL-Biegung).
-// 2. Werkbank: vier lose Abzüge fliegen beim Scrollen an ihren Platz auf einer Doppelseite und biegen sich dabei wie Fotopapier.
-// 3. Rezept: ein großes Foto, der Zettel schiebt sich darunter hervor.
-// 4. Hinlegen: der Band mit Zettel für eine Person, ein Zettel kommt zurück.
-// Die übrige Bewegung hängt am Scrollen (CSS scroll-driven animations, kein JavaScript dafür) und nutzt nur
-// transform und opacity. Ohne Unterstützung oder bei reduzierter Bewegung steht jede Szene fertig da.
+// Landing Page (#264). Freunde öffnen den Link auf dem Telefon; sie sollen erst blättern, dann gefragt werden:
+// 1. Blätter mal: das Beispielbuch Fuerteventura liegt auf dem Basalttisch, ein Tipp schlägt es auf, ohne Konto.
+// 2. Mach dein eigenes: Anmeldung.
+// 3. Was Calima kann: Werkbank (Abzüge fliegen beim Scrollen an ihren Platz), Rezept und Hinlegen mit Michels Clips,
+//    zum Schluss ehrlich, was nur die iPhone-App kann (Kamera).
+// 4. So geht’s: drei Schritte, jeder führt in die Hilfe.
+// Die Werkbank hängt am Scrollen (CSS scroll-driven animations) und nutzt nur transform und opacity.
+// Ohne Unterstützung oder bei reduzierter Bewegung steht sie fertig da; die Clips laufen dann nicht von selbst.
 
 const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
 const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
@@ -43,6 +44,10 @@ const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
 const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
+// Große Überschrift eines Abschnitts oder einer Funktion
+const displayHeading = "text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl";
+
+const book = sampleBook();
 
 /** Anmelden und gleich ins Bücherzimmer; wer schon angemeldet ist, geht direkt hinein */
 function useEnter() {
@@ -71,12 +76,11 @@ function useEnter() {
 function HeaderSession() {
   const user = useLazyUser();
   const t = useT();
-  // solange Firebase prüft, bleibt die Stelle leer statt zu springen
-  if (user === undefined) return <span aria-hidden className="inline-block min-h-9 w-24" />;
-  // zwei Anbieter passen nicht in den Kopf: die Anmeldung im Bücherzimmer zeigt beide
+  // Angemeldete gehen gleich hinein; alle anderen blättern erst, die Anmeldung kommt im zweiten Abschnitt (#264)
+  if (!user) return null;
   return (
     <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
-      {user ? t("Ins Bücherzimmer") : t("Anmelden")}
+      {t("Ins Bücherzimmer")}
     </Link>
   );
 }
@@ -137,209 +141,155 @@ function PageFace({ side, children, className = "" }: { side: "left" | "right"; 
   );
 }
 
-/** Geschlossener Band in Ringelblumen-Leinen, Maße wie der echte Einband (layout.ts, „cover“) */
-function Cover({
-  photo,
-  title,
-  author,
-  cloth = "bg-cloth text-cloth-ink",
-  className = "",
-}: {
-  photo: StaticImageData;
-  title: string;
-  author: string;
-  /** Leinen und Prägung als Klassen; Standard Ringelblume */
-  cloth?: string;
-  className?: string;
-}) {
-  return (
-    <div className={`relative ${className}`}>
-      <div aria-hidden className="book-shadow-closed absolute inset-0" />
-      <div aria-hidden className="book-block-r absolute top-[1.2%] bottom-[0.4%] left-full w-[10px]" />
-      <div className={`linen relative aspect-[2/3] w-full overflow-hidden [container-type:inline-size] ${cloth}`}>
-        <div aria-hidden className="absolute inset-y-0 left-0 w-[5cqw] bg-[rgb(12_10_8/0.08)]" />
-        <div aria-hidden className="absolute inset-y-0 left-[5cqw] w-[0.25cqw] bg-[rgb(12_10_8/0.18)]" />
-        <div className="absolute top-[9cqw] left-[12cqw] aspect-[4/5] w-[54cqw] shadow-[1px_2px_3px_rgb(58_39_6/0.35),0_0_0_0.5px_rgb(58_39_6/0.2)]">
-          <Image src={photo} alt="" fill sizes="(min-width: 768px) 260px, 50vw" className="object-cover" />
-        </div>
-        <p className="absolute bottom-[22cqw] left-[12cqw] text-[11cqw] leading-[0.9] font-bold tracking-[-0.035em]" style={{ fontVariationSettings: '"wdth" 78, "opsz" 96' }}>
-          {title}
-        </p>
-        <p className="absolute bottom-[14cqw] left-[12cqw] text-[3.6cqw] font-medium">{author}</p>
-      </div>
-    </div>
-  );
-}
-
 /** Zettel: dünnes, vergilbtes Papier, wie der Rezeptzettel im Buch */
 function Slip({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`slip text-ink absolute rounded-cut p-4 shadow-[0_14px_24px_-12px_rgb(12_10_8/0.8)] ${className}`}>{children}</div>;
 }
 
-/* ------------------------------------------------------------------ 1. Kopf: das Buch blättert */
-
-/** Überschrift, die Wort für Wort auf den Tisch kommt (globals.css, word-rise); Screenreader lesen den Satz am Stück */
-function Words({ text }: { text: string }) {
-  const words = text.split(" ");
-  return (
-    <>
-      <span className="sr-only">{text}</span>
-      <span aria-hidden>
-        {words.map((w, i) => (
-          <span key={i}>
-            <span className="word-rise inline-block" style={{ ["--i" as string]: i }}>
-              {w}
-            </span>
-            {i < words.length - 1 ? " " : ""}
-          </span>
-        ))}
-      </span>
-    </>
-  );
-}
-
 /**
- * Zwei Geschwisterbände liegen neben dem geschlossenen Buch, wie auf dem Tisch im Bücherzimmer.
- * Beim Aufschlagen rücken sie zur Seite und blenden aus (globals.css, hero-neighbour). Ohne Scroll-Animationen
- * bleiben sie weg, sonst lägen sie unter der aufgeschlagenen Doppelseite.
+ * Ein Clip von Michel als stiller Loop, wie ein Abzug auf dem Tisch. Lädt erst kurz bevor er ins Bild kommt und hält an,
+ * wenn er hinausscrollt. Auf der deutschen Seite laufen deutsche Untertitel mit (die Schrift im Bild ist englisch).
+ * Bei reduzierter Bewegung startet er nicht von selbst; dann gibt es die Bedienleiste.
  */
-function Neighbours({ width }: { width: string }) {
-  // gleiche Lage wie der geschlossene Einband: rechte Hälfte der Doppelseite, um ein Viertel nach links gerückt, gekippt
+function Clip({ clip, label, className = "" }: { clip: ClipData; label: string; className?: string }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const reduce = useReducedMotion();
+  const lang = useLang();
+  const [line, setLine] = useState<string | null>(null);
+  // Stromsparmodus oder Browser verbieten das Abspielen: dann wenigstens die Bedienleiste
+  const [blocked, setBlocked] = useState(false);
+
+  useEffect(() => {
+    const v = video.current;
+    if (!v || reduce) return;
+    // iOS spielt nur stumm von selbst ab; das Attribut allein setzt React nicht zuverlässig
+    v.muted = true;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) v.play().catch(() => setBlocked(true));
+        else v.pause();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    io.observe(v);
+    return () => {
+      io.disconnect();
+      v.pause();
+    };
+  }, [reduce]);
+
   return (
-    <div aria-hidden className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2" style={{ width: `calc(${width} / 2)` }}>
-      <div style={{ transform: "perspective(1800px) rotateX(16deg) scale(0.94)" }}>
-        <div className="hero-neighbour hero-neighbour-l absolute inset-x-0 top-0" style={{ ["--at" as string]: "-50%", ["--to" as string]: "-95%", ["--rot" as string]: "-7deg" }}>
-          <Cover photo={torii} title="Japan" author="Michel Leotta" cloth="bg-[#c9c8c3] text-[#1b1c1a]" className="w-full" />
-        </div>
-        <div className="hero-neighbour hero-neighbour-r absolute inset-x-0 top-0" style={{ ["--at" as string]: "48%", ["--to" as string]: "95%", ["--rot" as string]: "6deg" }}>
-          {/* Leinen „Meer“ und „Nebel“ wie in CLOTHS (store.ts); store.ts zieht Firebase nach, darum hier die Werte */}
-          <Cover photo={bougainvillea} title="Garten" author="Michel Leotta" cloth="bg-[#5b979c] text-[#0f1f21]" className="w-full" />
-        </div>
+    <div className={`bg-paper p-[6px] md:p-[8px] ${lifted} ${className}`}>
+      <div className="bg-table-deep relative aspect-[9/16] w-full overflow-hidden">
+        <video
+          ref={video}
+          src={clip.src}
+          poster={clip.poster}
+          muted
+          loop
+          playsInline
+          preload="none"
+          controls={reduce || blocked}
+          aria-label={label}
+          onTimeUpdate={(e) => setLine(lang === "de" ? cueAt(clip.cues, e.currentTarget.currentTime) : null)}
+          className="absolute inset-0 size-full object-cover"
+        />
+        {lang === "de" && line && (
+          // direkt unter der englischen Zeile im Bild (oben links); unten liegen auf der Landing die Zettel
+          <p aria-hidden className="pointer-events-none absolute top-[19%] left-[8%] max-w-[80%] text-[13px] leading-[1.6] md:text-[15px]">
+            <span className="bg-[rgb(12_10_8/0.72)] px-2 py-0.5 text-on-table [box-decoration-break:clone]">{line}</span>
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-const wide = (f: () => void) => {
-  const mq = window.matchMedia("(min-width: 768px)");
-  mq.addEventListener("change", f);
-  return () => mq.removeEventListener("change", f);
-};
-
-/**
- * Passt der Kopf samt Buch in die Bildschirmhöhe? Quer auf dem Telefon, mit großer Schrift oder Zoom nicht:
- * dann steht der Kopf nicht still, sondern scrollt normal, und das Buch bekommt eine feste Größe (Härtetest B1/B2).
- * Nebenbei misst der Hook, wie viel Höhe Kopfzeile und Text brauchen, damit das Buch genau den Rest bekommt.
- */
-function useHeroFit(phone: boolean) {
-  const header = useRef<HTMLElement>(null);
-  const text = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ fixed: false, used: 470 });
-  useLayoutEffect(() => {
-    const measure = () => {
-      const h = header.current?.offsetHeight ?? 0;
-      const t = text.current?.offsetHeight ?? 0;
-      const vh = window.innerHeight;
-      // Abstände im Raster plus Zeile „Scrollen zum Blättern“
-      const used = Math.ceil(h + (phone ? t : 0) + 120);
-      // Telefon: die Doppelseite braucht mindestens 170px Höhe
-      const fixed = phone ? vh - used < 170 : h + t + 80 > vh || vh - 230 < 260;
-      setFit((f) => (f.fixed === fixed && f.used === used ? f : { fixed, used }));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (header.current) ro.observe(header.current);
-    if (text.current) ro.observe(text.current);
-    window.addEventListener("resize", measure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [phone]);
-  return { header, text, ...fit };
-}
+/* ------------------------------------------------------------------ 1. Blätter mal */
 
 function Hero() {
   const t = useT();
-  const track = useRef<HTMLElement>(null);
-  // Immer die ganze Doppelseite, auch auf dem Telefon (dort kleiner, unter dem Text)
-  const phone = useSyncExternalStore(wide, () => !window.matchMedia("(min-width: 768px)").matches, () => false);
-  const mode: Mode = "spread";
-  const leaves = landingBook.spreads.length;
-  const { header, text, fixed, used } = useHeroFit(phone);
-  // Papierkanten ragen links und rechts über das Buch hinaus: auf dem Telefon 28px Luft je Seite
-  const width = fixed
-    ? phone
-      ? "calc(100vw - 56px)"
-      : "min(100%, 900px)"
-    : phone
-      ? `min(calc(100vw - 56px), calc((100svh - ${used}px) * 4 / 3))`
-      : "min(100%, calc((100svh - 230px) * 4 / 3))";
   return (
-    <section
-      ref={track}
-      aria-labelledby="hero-h"
-      data-fixed={fixed || undefined}
-      className="hero-track relative"
-      style={{ ["--leaves" as string]: leaves }}
-    >
-      <div className="hero-stick linen table-surface sticky top-0 flex min-h-svh flex-col overflow-hidden bg-table">
-        <SunAndShade light="sun" />
-        <header ref={header} className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
-          <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
-            Calima
-          </p>
-          <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-6 text-sm">
-            <a href="#werkbank" className="text-on-table-2 decoration-mark hidden decoration-2 underline-offset-4 hover:text-on-table hover:underline md:inline">
-              {t("So entsteht ein Buch")}
-            </a>
-            <HeaderSession />
-          </nav>
-        </header>
+    <section id="blaettern" aria-labelledby="blaettern-h" className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
+      <SunAndShade light="sun" />
+      <header className="relative z-20 flex items-baseline justify-between gap-6 px-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-8 md:pt-6">
+        <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
+          Calima
+        </p>
+        <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-5 text-sm md:gap-6">
+          <a href="#kann" className="text-on-table-2 decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
+            {t("Was Calima kann")}
+          </a>
+          <HeaderSession />
+        </nav>
+      </header>
 
-        <div className="relative z-10 grid flex-1 items-center gap-8 px-4 pt-6 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12">
-          <div ref={text} className="md:col-span-4 md:self-end md:pb-[14svh]">
-            <h1 id="hero-h" className="text-on-table leading-[0.86] font-bold tracking-[-0.04em] [text-wrap:balance]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
-              <Words text={t("Deine Fotos, gebunden.")} />
-            </h1>
-            <p className="word-rise text-on-table mt-6 max-w-[26rem] text-lg leading-relaxed opacity-80 md:text-xl" style={{ ["--i" as string]: 4 }}>
-              {t("Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.")}
-            </p>
-            <div className="word-rise mt-8 flex flex-wrap items-center gap-x-7 gap-y-4" style={{ ["--i" as string]: 5 }}>
-              <EnterButton />
-            </div>
-            <p className="text-on-table-2 mt-5 flex items-start gap-2 text-sm">
-              <span aria-hidden className="bg-cloth mt-[0.5lh] size-1.5 shrink-0 -translate-y-1/2 rounded-full" />
-              {t("Kostenlos. Wer einen Link bekommt, liest ohne Konto.")}
-            </p>
-            <p className="text-on-table-2 mt-2 text-xs leading-relaxed">
-              {t("Ein Buch zum Blättern im Browser, kein Druck. Anmeldung mit {providers}, es gelten die", { providers: t(PROVIDERS) })}{" "}
-              <Link href="/nutzungsbedingungen" className={linkClass}>
-                {t("Nutzungsbedingungen")}
-              </Link>{" "}
-              {t("und der")}{" "}
-              <Link href="/datenschutz" className={linkClass}>
-                {t("Datenschutz")}
-              </Link>
-              .
-            </p>
+      <div className="relative z-10 grid flex-1 content-center items-center gap-4 px-4 pt-8 pb-10 md:grid-cols-12 md:gap-8 md:px-8 md:pt-0 md:pb-12 flat:grid-cols-12">
+        <div className="md:col-span-5 md:pb-[8svh] flat:col-span-5">
+          <h1 id="blaettern-h" className="word-rise text-on-table leading-[0.86] font-bold tracking-[-0.04em]" style={{ ...display, fontSize: "clamp(52px, 7.4vw, 112px)" }}>
+            {t("Blätter mal.")}
+          </h1>
+          <p className="word-rise text-on-table mt-4 max-w-[26rem] text-lg leading-relaxed opacity-80 md:mt-6 md:text-xl" style={{ ["--i" as string]: 2 }}>
+            {t("Ein Fotobuch zum Umblättern, von Michel. Kostenlos, ohne Konto zum Anschauen.")}
+          </p>
+        </div>
+        {/* Das echte Beispielbuch: ein Tipp schlägt es auf, wie unter /beispiel. --reserve lässt Platz für Überschrift, Zettel und Knopf */}
+        <ul className="flex justify-center pt-14 md:col-span-7 md:pt-20 flat:col-span-7 flat:pt-0">
+          <ClosedBook
+            book={book}
+            index={0}
+            feature
+            note={t("Ein Beispiel von Michel")}
+            meta={t("{n} Tafeln · ohne Konto", { n: book.plates.length })}
+            className="[--reserve:27rem]! md:[--reserve:15rem]! flat:[--reserve:7.5rem]!"
+          />
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ 2. Mach dein eigenes */
+
+function Own() {
+  const t = useT();
+  return (
+    <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-20 md:px-8 md:py-32">
+      <div className="grid gap-8 md:grid-cols-12 md:gap-8">
+        <h2 id="eigenes-h" className={`${displayHeading} md:col-span-5`} style={display}>
+          {t("Mach dein eigenes.")}
+        </h2>
+        <div className="md:col-span-6 md:col-start-7">
+          <p className="text-on-table max-w-[30rem] text-lg leading-relaxed opacity-80">
+            {t("Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.")}
+          </p>
+          <div className="mt-8">
+            <EnterButton />
           </div>
-          <div className="md:col-span-8 md:col-start-5 md:pl-[4vw]">
-            <div className="relative">
-              <Neighbours width={width} />
-              <div className="relative">
-                <ScrollBook book={landingBook} mode={mode} track={track} width={width} />
-              </div>
-            </div>
-            <p className="hero-hint text-on-table-2 mt-3 text-center text-sm">{t("Scrollen zum Blättern")}</p>
-          </div>
+          <p className="text-on-table-2 mt-5 flex items-start gap-2 text-sm">
+            <span aria-hidden className="bg-cloth mt-[0.5lh] size-1.5 shrink-0 -translate-y-1/2 rounded-full" />
+            {t("Kostenlos. Wer einen Link bekommt, liest ohne Konto.")}
+          </p>
+          <p className="text-on-table-2 mt-2 max-w-[30rem] text-xs leading-relaxed">
+            {t("Ein Buch zum Blättern im Browser, kein Druck. Anmeldung mit {providers}, es gelten die", { providers: t(PROVIDERS) })}{" "}
+            <Link href="/nutzungsbedingungen" className={linkClass}>
+              {t("Nutzungsbedingungen")}
+            </Link>{" "}
+            {t("und der")}{" "}
+            <Link href="/datenschutz" className={linkClass}>
+              {t("Datenschutz")}
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </section>
   );
 }
 
-/* ------------------------------------------------------------------ 2. Werkbank: Abzüge werden eine Doppelseite */
+/* ------------------------------------------------------------------ 3. Was Calima kann */
+
+/* ------------------------------------------------------------------ Werkbank: Abzüge werden eine Doppelseite */
 
 // Platz auf der Doppelseite in % (Breite 2 Seiten, Höhe 1.5 Seiten) und Startlage als loser Abzug auf dem Tisch.
 // Auf dem Telefon liegt der Text über dem Buch: dort gleiten die Abzüge von links und rechts herein (phone), nicht von oben
@@ -458,18 +408,20 @@ function Sheet({ src, sizes, bend }: { src: StaticImageData; sizes: string; bend
   );
 }
 
-function Workbench() {
+/** eyebrow: die kleine Überschrift des Abschnitts, in dem die Werkbank als erste Funktion steht */
+function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
   const t = useT();
   return (
-    <section id="werkbank" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
+    <div id="werkbank" role="group" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
       <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-4 py-12 md:px-8 md:py-10">
         <div className="relative z-10 grid items-center gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
-            <h2 id="bench-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl" style={display}>
+            {eyebrow}
+            <h3 id="bench-h" className={displayHeading} style={display}>
               {t("Reinziehen.")}
               <br />
               {t("Fertig gesetzt.")}
-            </h2>
+            </h3>
             <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg">
               {t(
                 "Fotos vom Handy, von der Fuji oder aus Lightroom auf die Werkbank ziehen, auch HEIC und DNG. Nach ein, zwei Sekunden stehen sie als Doppelseiten da, nach Aufnahmezeit geordnet. Ortsdaten fallen beim Hochladen weg.",
@@ -558,33 +510,28 @@ function Workbench() {
         </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
-
-/* ------------------------------------------------------------------ 3. Rezept */
 
 function Recipe() {
   const t = useT();
   return (
-    <section aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
-        <h2 id="recipe-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:col-span-7 md:text-7xl" style={display}>
+        <h3 id="recipe-h" className={`${displayHeading} md:col-span-7`} style={display}>
           {t("Das Rezept liegt bei.")}
-        </h2>
+        </h3>
         <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
           {t("Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man gleich als .xmp mit.")}
+          <span className="mt-4 block">{t("Im Fotostudio liest Calima Rezept und Preset aus der Datei und legt den Look mit einem Tipp über alle Fotos.")}</span>
         </p>
       </div>
 
-      <figure className="relative mx-auto mt-14 max-w-[1040px] md:mt-20">
-        <div className={`bg-paper w-[86%] p-[6px] md:w-[52%] md:p-[10px] ${lifted} -rotate-[1.5deg]`}>
-          <div className="relative aspect-[2/3] w-full">
-            <Image src={schild} alt={t("Schild über der Bucht")} fill sizes="(min-width: 768px) 520px, 86vw" className="object-cover" />
-          </div>
-        </div>
-        {/* Zettel schiebt sich unter dem Abzug hervor, sobald er ins Bild kommt */}
-        <Slip className="reveal-slip relative mt-[-30%] ml-auto w-[92%] rotate-[3deg] p-5 md:absolute md:right-0 md:bottom-[12%] md:mt-0 md:w-[50%] md:p-8">
+      <figure className="relative mx-auto mt-14 max-w-[880px] md:mt-20">
+        <Clip clip={CLIPS.rezept} label={t("Clip: Calima liest Fuji-Rezept und Lightroom-Preset, ein Look für alle Fotos")} className="mx-auto w-[74%] -rotate-[1.5deg] md:mx-0 md:ml-[8%] md:w-[38%]" />
+        {/* Zettel schiebt sich unter dem Clip hervor, sobald er ins Bild kommt */}
+        <Slip className="reveal-slip relative mt-[-18%] ml-auto w-[88%] rotate-[3deg] p-5 md:absolute md:right-0 md:bottom-[14%] md:mt-0 md:w-[50%] md:p-8">
           <span className="text-ink-2 block text-xs md:text-sm">{t("Rezept · Beispielwerte")}</span>
           <span className="mt-1 block text-2xl font-bold tracking-[-0.02em] md:text-4xl" style={narrow}>
             Classic Chrome
@@ -609,51 +556,113 @@ function Recipe() {
           </dl>
         </Slip>
       </figure>
-    </section>
+    </div>
   );
 }
-
-/* ------------------------------------------------------------------ 4. Hinlegen */
-
-const DETAILS = [
-  { icon: Undo2, title: de("Frei, wenn du willst"), text: de("Bilder schieben, zuschneiden, über den Bund ziehen. Text in vier Schriften, Linien, Klebestreifen, ein Stift. Jeder Handgriff lässt sich zurücknehmen.") },
-  { icon: Link2Off, title: de("Kein Profil, kein Feed"), text: de("Ein Buch sieht nur, wer den Link hat. Jeden Link kannst du einzeln zurückziehen.") },
-] as const;
 
 function Share() {
   const t = useT();
   return (
-    <section aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
+    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-24 md:px-8 md:py-36">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
-        <div aria-hidden className="relative mx-auto aspect-[1/1] w-full max-w-[560px] md:col-span-6 md:mx-0">
-          <Cover photo={torii} title="Japan" author="Michel Leotta" cloth="bg-[#c9c8c3] text-[#1b1c1a]" className="absolute top-[2%] left-[4%] w-[54%] -rotate-[4deg]" />
-          <Slip className="reveal-slip top-[10%] right-[2%] w-[46%] rotate-[3deg] text-[15px]">
+        <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0">
+          <Clip clip={CLIPS.hinlegen} label={t("Clip: Fotos werden ein Buch, das Buch wird einer Person hingelegt")} className="w-[66%] -rotate-[2deg] md:w-[58%]" />
+          <Slip className="reveal-slip top-[6%] right-0 w-[46%] rotate-[3deg] text-[15px]">
             {t("Für Jana, von Michel")}
             <span className="text-ink-2 mt-1.5 block font-mono text-[11px] break-all">calima.web.app/b?t=…</span>
           </Slip>
-          <Slip className="reveal-slip reveal-late right-[8%] bottom-[8%] w-[56%] -rotate-[2deg] text-[15px] leading-snug">
+          <Slip className="reveal-slip reveal-late top-[42%] right-[2%] w-[50%] -rotate-[2deg] text-[15px] leading-snug">
             <span className="text-ink-2 block text-xs">{t("Zettel zu Tafel 7, von Jana")}</span>
             {t("Das Tor im Regen hätte ich gern an der Wand.")}
           </Slip>
         </div>
         <div className="md:col-span-5 md:col-start-8">
-          <h2 id="share-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl" style={display}>
+          <h3 id="share-h" className={displayHeading} style={display}>
             {t("Hinlegen, nicht posten.")}
-          </h2>
+          </h3>
           <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80">
             {t("Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die nur du liest.")}
           </p>
-          <ul className="mt-12 grid gap-3 lg:grid-cols-2">
-            {DETAILS.map((d) => (
-              <li key={d.title} className="bg-on-table/5 rounded-cut p-5 shadow-[inset_0_0_0_1px_rgb(236_230_220/0.08)]">
-                <d.icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
-                <h3 className="text-on-table mt-4 text-lg font-semibold tracking-[-0.015em]">{t(d.title)}</h3>
-                <p className="text-on-table-2 mt-1.5 text-base leading-relaxed">{t(d.text)}</p>
-              </li>
-            ))}
-          </ul>
+          <p className="text-on-table-2 mt-6 max-w-[30rem] text-base leading-relaxed">
+            {t("Kein Profil, kein Feed. Ein Buch sieht nur, wer den Link hat, und jeden Link kannst du einzeln zurückziehen.")}
+          </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+const APP_ICONS = { look: Aperture, film: Film, white: Pipette } as const;
+
+/** Ehrlich sagen, was im Web fehlt: die Kamera kommt mit der iPhone-App */
+function AppCamera() {
+  const t = useT();
+  return (
+    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+      <div className="grid gap-6 md:grid-cols-12 md:gap-8">
+        <div className="md:col-span-7">
+          <p className="text-on-table-2 flex items-center gap-2 text-sm font-semibold">
+            <span aria-hidden className="bg-cloth size-1.5 rounded-full" />
+            {t("Bald im App Store")}
+          </p>
+          <h3 id="app-h" className={`${displayHeading} mt-4 [text-wrap:balance]`} style={display}>
+            {/* geschütztes Trennzeichen: „iPhone-App“ bricht nicht am Bindestrich */}
+            {t("Die Kamera gibt es nur in der iPhone-App.").replace("iPhone-App", "iPhone\u2011App")}
+          </h3>
+        </div>
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+          {t("Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch.")}{" "}
+          {TESTFLIGHT_URL ? (
+            <a href={TESTFLIGHT_URL} className={`${linkClass} font-semibold opacity-100`}>
+              {t("Vorab testen mit TestFlight")}
+            </a>
+          ) : (
+            t("Sie kommt bald in den App Store.")
+          )}
+        </p>
+      </div>
+      <ul className="mt-14 grid gap-10 md:mt-20 md:grid-cols-3 md:gap-8">
+        {APP_FEATURES.map((f) => {
+          const Icon = APP_ICONS[f.icon];
+          return (
+            <li key={f.title} className="border-on-table-2/25 border-t pt-5">
+              <Icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
+              <h4 className="text-on-table mt-4 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
+                {t(f.title)}
+              </h4>
+              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(f.text)}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ 4. So geht’s */
+
+function HowTo() {
+  const t = useT();
+  return (
+    <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-20 md:px-8 md:py-32">
+      <h2 id="so-gehts-h" className={displayHeading} style={display}>
+        {t("So geht’s")}
+      </h2>
+      <ol className="mt-12 grid gap-10 md:mt-16 md:grid-cols-3 md:gap-8">
+        {HOWTO.map((s, i) => (
+          <li key={s.title} className="border-on-table-2/25 border-t pt-5">
+            <span className="text-on-table-2 block text-sm font-semibold tabular-nums">{i + 1}</span>
+            <h3 className="text-on-table mt-2 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
+              {t(s.title)}
+            </h3>
+            <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(s.text)}</p>
+            <Link href={s.href} className={`${linkClass} text-on-table mt-3 inline-flex items-center gap-1 text-sm font-semibold`}>
+              {t("Mehr in der Hilfe")}
+              <ArrowRight aria-hidden className="size-3.5" />
+            </Link>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -704,16 +713,51 @@ function Closing() {
   );
 }
 
-export function Landing() {
+/** 3. Was Calima kann: Werkbank, Rezept, Hinlegen, Kamera aus der App; die Überschrift steht klein über der Werkbank */
+function Features() {
+  const t = useT();
   return (
-    // Safari zählt in 3D gedrehte Abzüge sonst zur Seitenhöhe mit, auch wenn ihr Abschnitt sie abschneidet;
-    // clip schneidet ab, ohne einen Scrollbereich zu bilden, das Kleben der Szenen bleibt erhalten
-    <main className="overflow-clip">
-      <Hero />
-      <Workbench />
+    <section id="kann" aria-labelledby="kann-h">
+      <Workbench
+        eyebrow={
+          <h2 id="kann-h" className="text-on-table-2 mb-5 text-sm font-semibold tracking-[0.08em] uppercase">
+            {t("Was Calima kann")}
+          </h2>
+        }
+      />
       <Recipe />
       <Share />
-      <Closing />
+      <AppCamera />
+    </section>
+  );
+}
+
+// Jeder Abschnitt aus SECTIONS (lib/landing.ts) mit seinem Bauteil; die Reihenfolge kommt von dort
+const PARTS: Record<SectionId, () => ReactNode> = { blaettern: Hero, eigenes: Own, kann: Features, "so-gehts": HowTo };
+
+export function Landing() {
+  const [first, ...rest] = SECTIONS;
+  const Top = PARTS[first.id];
+  return (
+    // Safari zählt in 3D gedrehte Abzüge sonst zur Seitenhöhe mit, auch wenn ihr Abschnitt sie abschneidet;
+    // clip schneidet ab, ohne einen Scrollbereich zu bilden, das Kleben der Werkbank bleibt erhalten
+    <main className="overflow-clip">
+      {/* Aufgeschlagen nimmt das Buch die ganze Seite ein (#fuerteventura); zugeklappt liegt die Landing wieder da */}
+      <Library
+        books={[book]}
+        bookEnd={<OwnBook />}
+        footer={
+          <>
+            {rest.map(({ id }) => {
+              const Part = PARTS[id];
+              return <Part key={id} />;
+            })}
+            <Closing />
+          </>
+        }
+      >
+        <Top />
+      </Library>
     </main>
   );
 }
