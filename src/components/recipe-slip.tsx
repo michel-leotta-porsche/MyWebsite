@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, buttonClass } from "@/components/ui/button";
-import { notify } from "@/components/ui/toaster";
+import { notify, notifyLasting } from "@/components/ui/toaster";
 import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
@@ -18,7 +18,7 @@ import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
 import type { Film } from "@/lib/film";
-import { developFilm, notSaved, patchShot, putPrints, type Print } from "@/lib/studio-store";
+import { developFilm, notDeveloped, patchShot, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -521,8 +521,9 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
   const onFilmDone = (films: Film[]) => {
     for (const f of films) {
       made.current.films.delete(f.stack);
-      made.current.developed.push(f.name);
-      developFilm(uid, f.stack, f.name).catch((e) => notify(notSaved(e, 0), { id: "speicher-voll", duration: Infinity, cancel: { label: t("OK"), onClick: () => {} } }));
+      developFilm(uid, f.stack, f.name)
+        .then(() => made.current.developed.push(f.name))
+        .catch((e) => notifyLasting(notDeveloped(e)));
     }
   };
   return <CameraView uid={uid} taken onShot={onShot} onLook={onLook} onFilmDone={onFilmDone} onClose={close} />;

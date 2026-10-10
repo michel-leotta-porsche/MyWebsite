@@ -13,7 +13,7 @@ import { ListGroup, ListRow } from "@/components/ui/list";
 import { hitClass } from "@/components/ui-classes";
 import { Segmented } from "@/components/ui/segmented";
 import { MountedSheet } from "@/components/ui/sheet";
-import { notify } from "@/components/ui/toaster";
+import { notify, notifyLasting } from "@/components/ui/toaster";
 import type { User } from "@/lib/firebase";
 import { pickCover, relayoutFree } from "@/lib/auto-sequence";
 import { bakePhoto } from "@/lib/develop/bake";
@@ -36,7 +36,7 @@ import { safeFileName, saveFile, saveFilesInApp, type ShareResult } from "@/lib/
 import { zipFiles } from "@/lib/zip";
 import { SIZES, STUDIO_LONG } from "@/lib/ingest";
 import { autoPhotos, loadBook, newId, numberWord, saveBook, type StoredBook, type StoredPhoto } from "@/lib/store";
-import { isStorageFull, listPrints, MAX_STACK, notSaved, patchShot, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
+import { changeNotSaved, isNoStore, listPrints, MAX_STACK, notDeveloped, notSaved, patchShot, piles, putPrints, removePrint, trimPiles, workOf, type Print } from "@/lib/studio-store";
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 import { SHUTTER } from "@/lib/shutter";
 import { saveToLibrary } from "@/lib/library-save";
@@ -111,26 +111,31 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   // ohne IndexedDB (privates Fenster) hält das Studio die Abzüge nur, solange die Seite offen ist. Liegt ein Abzug
   // sicher auf dem Gerät, lässt das Studio seine Arbeitsfassung los: ein Tag voller Fotos passt sonst nicht in den Speicher.
   // Gesichert wird nacheinander (putPrints reiht ein): ein Bild auf dem Film liegt, bevor der Film entwickelt wird.
-  // Ist der Speicher voll (#285), sagt das Studio es und zeigt neue Fotos nicht als gesichert: sie verlassen den Pult.
-  // Das Versprechen lehnt bei jedem Fehler ab, damit die Kamera ein nicht gesichertes Bild nicht mitzählt.
-  const keep = (ps: Print[]): Promise<void> => {
-    setPrints((list) => trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat());
+  // Scheitert das Sichern (#285), zeigt der Pult wieder, was auf dem Gerät liegt: neue Fotos gehen, Änderungen werden
+  // zurückgenommen, und ein Hinweis bleibt stehen. quiet: die Kamera sagt es selbst. Das Versprechen lehnt ab, damit
+  // die Kamera ein nicht gesichertes Bild nicht mitzählt.
+  const keep = (ps: Print[], { film = false, quiet = false } = {}): Promise<void> => {
+    let before: Print[] = [];
+    setPrints((list) => {
+      before = list;
+      return trimPiles(piles([...ps, ...list.filter((x) => !ps.some((p) => p.id === x.id))])).keep.flat();
+    });
     return putPrints(user.uid, ps).then(
       () => {
         for (const p of ps) stored.current.add(p.id);
         setPrints((list) => list.map((x) => (x.work && ps.some((p) => p.work === x.work) ? { ...x, work: undefined } : x)));
       },
       (e) => {
-        if (isStorageFull(e)) {
-          const lost = ps.filter((p) => !stored.current.has(p.id));
-          setPrints((list) => list.filter((x) => !lost.some((p) => p.id === x.id)));
-          notify(notSaved(e, Math.max(lost.length, 1)), { id: "speicher-voll", duration: Infinity, cancel: { label: t("OK"), onClick: () => {} } });
-        }
+        if (isNoStore(e)) throw e;
+        const lost = ps.filter((p) => !stored.current.has(p.id));
+        const was = new Map(before.map((x) => [x.id, x]));
+        setPrints((list) => list.filter((x) => !lost.some((p) => p.id === x.id)).map((x) => (ps.some((p) => p.id === x.id) ? (was.get(x.id) ?? x) : x)));
+        if (!quiet) notifyLasting(film ? notDeveloped(e) : lost.length ? notSaved(e, lost.length) : changeNotSaved(e));
         throw e;
       },
     );
   };
-  /** keep, wo niemand auf das Ergebnis wartet: Speicher voll meldet keep selbst */
+  /** keep, wo niemand auf das Ergebnis wartet: den Fehler meldet keep selbst */
   const keepQuietly = (ps: Print[]) => void keep(ps).catch(() => {});
   // Bilder auf einem unentwickelten Film bleiben im Dunkeln: sie liegen schon im Studio, zeigen sich aber erst nach dem Entwickeln
   const dark = useMemo(() => undevelopedStacks(), [camera, prints]); // eslint-disable-line react-hooks/exhaustive-deps -- liest das Gerät neu, wenn die Kamera zugeht oder Abzüge kommen
@@ -172,9 +177,9 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film; erst gesichert gehört das Bild zum Film
     if (filmStack) {
       const q = { ...p, stack: filmStack };
-      return keep([q]).then(() => void (onFilm.current = [...onFilm.current, { ...q, work: undefined }]));
+      return keep([q], { quiet: true }).then(() => void (onFilm.current = [...onFilm.current, { ...q, work: undefined }]));
     }
-    return keep([{ ...p, stack: dayStack(p.at), pos: p.at }]);
+    return keep([{ ...p, stack: dayStack(p.at), pos: p.at }], { quiet: true });
   };
   // das eingerechnete Vorschaubild kommt nach dem Foto, vielleicht erst nach dem Entwickeln: es ergänzt nur shot (#284)
   const onLook = (id: string, shot: Blob) => {
@@ -198,14 +203,18 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
     if (!envelopes.length) return;
     // die Arbeitsfassungen liegen schon auf dem Gerät (die Kamera wartet aufs Sichern): nur die Einträge neu schreiben
     const roll = envelopes.flat().map((p) => ({ ...p, work: undefined }));
-    keepQuietly(roll);
-    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210)
+    // entwickelt: jetzt dürfen die Bilder auch in die Mediathek (#210), dort sind sie auch sicher, wenn das Gerät voll ist
     saveToLibrary(roll).catch(() => {});
     const first = envelopes[0];
     const name = first[0].roll!;
     const open = { action: { label: t("Ansehen"), onClick: () => setSorting(first[0].stack!) } };
-    if (envelopes.length > 1) notify(t("Entwickelt: {n} Umschläge liegen vorn auf dem Pult.", { n: envelopes.length }));
-    else notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), open);
+    // „Entwickelt“ erst, wenn der Umschlag auf dem Gerät liegt; sonst meldet keep, dass der Film nicht entwickelt ist
+    keep(roll, { film: true })
+      .then(() => {
+        if (envelopes.length > 1) notify(t("Entwickelt: {n} Umschläge liegen vorn auf dem Pult.", { n: envelopes.length }));
+        else notify(roll.length === 1 ? t("Entwickelt: ein Bild im Umschlag „{name}“.", { name }) : t("Entwickelt: {n} Bilder im Umschlag „{name}“.", { n: roll.length, name }), open);
+      })
+      .catch(() => {});
   };
   // tagsüber fragt Calima nichts: die Fotos liegen schon auf dem Stapel des Tages, eingeordnet wird abends
   const closeCamera = () => {

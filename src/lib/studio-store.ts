@@ -110,16 +110,25 @@ const STORE = "prints";
 /** Arbeitsfassungen, je Abzug ein Eintrag mit derselben id */
 const WORK = "work";
 
+/** Calima kann auf diesem Gerät gar nichts ablegen (kein IndexedDB, gesperrter Speicher): das Studio arbeitet ohne Gedächtnis */
+class NoStore extends Error {}
+export const isNoStore = (e: unknown) => e instanceof NoStore;
+
 function db(): Promise<IDBDatabase> {
   return new Promise((ok, fail) => {
-    const req = indexedDB.open(DB, 2);
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(DB, 2);
+    } catch (e) {
+      return fail(new NoStore(String(e)));
+    }
     req.onupgradeneeded = () => {
       const names = req.result.objectStoreNames;
       if (!names.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: "id" });
       if (!names.contains(WORK)) req.result.createObjectStore(WORK, { keyPath: "id" });
     };
     req.onsuccess = () => ok(req.result);
-    req.onerror = () => fail(req.error);
+    req.onerror = () => fail(isStorageFull(req.error) ? req.error : new NoStore(String(req.error)));
   });
 }
 
@@ -160,12 +169,19 @@ async function within(mode: IDBTransactionMode, stores: string[], fn: (tx: IDBTr
 /** Der Speicher des Geräts ist voll: WebKit meldet das als QuotaExceededError */
 export const isStorageFull = (e: unknown): boolean => e instanceof DOMException && e.name === "QuotaExceededError";
 
-/** was man sieht, wenn Fotos nicht gesichert sind (n = 0: ein Film ließ sich nicht entwickeln), beim vollen Speicher mit dem Weg, Platz zu schaffen */
+const full = () => (IS_APP ? t("Der iPhone-Speicher ist voll.") : t("Der Speicher auf diesem Gerät ist voll."));
+const makeRoom = () => (IS_APP ? ` ${t("Platz schaffen kannst du unter Einstellungen → Allgemein → iPhone-Speicher.")}` : "");
+
+/** was man sieht, wenn n neue Fotos nicht gesichert sind: beim vollen Speicher mit dem Weg, Platz zu schaffen */
 export function notSaved(e: unknown, n = 1): string {
-  const what = n === 0 ? t("Der Film ist nicht entwickelt.") : n === 1 ? t("Das Foto ist nicht gesichert.") : t("{n} Fotos sind nicht gesichert.", { n });
-  if (!isStorageFull(e)) return `${n === 0 ? what : n === 1 ? t("Das Foto ließ sich nicht sichern.") : t("{n} Fotos ließen sich nicht sichern.", { n })} ${t("Versuch es noch einmal.")}`;
-  return IS_APP ? `${t("Der iPhone-Speicher ist voll.")} ${what} ${t("Platz schaffen kannst du unter Einstellungen → Allgemein → iPhone-Speicher.")}` : `${t("Der Speicher auf diesem Gerät ist voll.")} ${what}`;
+  if (!isStorageFull(e)) return `${n === 1 ? t("Das Foto ließ sich nicht sichern.") : t("{n} Fotos ließen sich nicht sichern.", { n })} ${t("Versuch es noch einmal.")}`;
+  return `${full()} ${n === 1 ? t("Das Foto ist nicht gesichert.") : t("{n} Fotos sind nicht gesichert.", { n })}${makeRoom()}`;
 }
+/** ein Film ließ sich nicht entwickeln: seine Bilder liegen weiter als Stapel im Fotostudio */
+export const notDeveloped = (e: unknown) =>
+  `${isStorageFull(e) ? `${full()} ` : ""}${t("Der Film ist nicht entwickelt, seine Bilder liegen als Stapel im Fotostudio.")}${isStorageFull(e) ? makeRoom() : ` ${t("Versuch es noch einmal.")}`}`;
+/** eine Änderung an Fotos, die schon gesichert sind (Bearbeitung, Reihenfolge): die Fotos selbst sind sicher */
+export const changeNotSaved = (e: unknown) => `${isStorageFull(e) ? `${full()} ` : ""}${t("Die Änderung ist nicht gesichert.")}${isStorageFull(e) ? makeRoom() : ` ${t("Versuch es noch einmal.")}`}`;
 /** vor dem Auslösen, wenn der Platz nicht mehr reicht */
 export const tooFull = () => (IS_APP ? t("Der iPhone-Speicher ist fast voll. Schaff Platz unter Einstellungen → Allgemein → iPhone-Speicher, sonst lassen sich keine Fotos sichern.") : t("Der Speicher auf diesem Gerät ist fast voll. Schaff Platz, sonst lassen sich keine Fotos sichern."));
 
@@ -228,13 +244,18 @@ async function light(p: Print, uid: string): Promise<Stored> {
   return { ...p, work: undefined, owner: uid, page: await pack(p.page), thumb: await pack(p.thumb), shot: p.shot ? await pack(p.shot) : undefined };
 }
 
-/** Eintrag und, wenn sie mitkommt, Arbeitsfassung in einer Transaktion: beides liegt danach auf dem Gerät oder keins */
-async function write(p: Print, uid: string) {
-  const w = p.work ? { id: p.id, ...(await pack(p.work)) } : null;
-  const l = await light(p, uid);
+/**
+ * Einträge und, wo sie mitkommen, Arbeitsfassungen in einer Transaktion: danach liegt alles auf dem Gerät oder nichts.
+ * Ein Film wird so ganz entwickelt oder gar nicht, auch wenn der Speicher mittendrin voll wird (#284, #285).
+ */
+async function write(ps: Print[], uid: string) {
+  const packed: { w: (Packed & { id: string }) | null; l: Stored }[] = [];
+  for (const p of ps) packed.push({ w: p.work ? { id: p.id, ...(await pack(p.work)) } : null, l: await light(p, uid) });
   await within("readwrite", [STORE, WORK], (tx) => {
-    if (w) tx.objectStore(WORK).put(w);
-    tx.objectStore(STORE).put(l);
+    for (const { w, l } of packed) {
+      if (w) tx.objectStore(WORK).put(w);
+      tx.objectStore(STORE).put(l);
+    }
   });
 }
 
@@ -249,7 +270,7 @@ export async function listPrints(uid: string): Promise<Print[]> {
       continue;
     }
     // ältere Einträge tragen die Arbeitsfassung noch selbst: einmal umziehen, danach liegt sie für sich
-    if (p.work) await write(p, uid).catch(() => {});
+    if (p.work) await write([p], uid).catch(() => {});
     out.push({ ...p, work: undefined });
   }
   return out.sort((a, b) => b.at - a.at);
@@ -273,7 +294,7 @@ export const putPrints = (uid: string, ps: Print[]) => serial(() => put(uid, ps)
 async function put(uid: string, ps: Print[]) {
   // ein Tag auf dem Pult: iOS soll den Speicher bei Platzmangel nicht von selbst leeren
   if (ps.some((p) => isSortPile(p.stack))) navigator.storage?.persist?.().catch(() => {});
-  for (const p of ps) await write(p, uid);
+  await write(ps, uid);
   // Tage und Umschläge räumt niemand weg, also ändert ein Foto darauf nichts an den anderen: nicht alles neu lesen
   if (ps.every((p) => isSortPile(p.stack))) return;
   // die Fotos liegen schon sicher; scheitert nur das Aufräumen, holt es das nächste Sichern nach

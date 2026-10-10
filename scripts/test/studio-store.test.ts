@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 
 import { envelopeOf } from "@/lib/envelope";
-import { clearPrints, developFilm, isStorageFull, listPrints, patchShot, putPrints, removePrint, roomLow, workOf, type Print } from "@/lib/studio-store";
+import { changeNotSaved, clearPrints, developFilm, isNoStore, isStorageFull, listPrints, notDeveloped, notSaved, patchShot, putPrints, removePrint, roomLow, workOf, type Print } from "@/lib/studio-store";
 
 const blob = (s = "x") => new Blob([s], { type: "image/jpeg" });
 const print = (id: string, more: Partial<Print> = {}): Print => ({ id, name: id, at: 1, w: 4, h: 3, page: blob(), thumb: blob(), meta: { exif: {} } as Print["meta"], ...more });
@@ -128,4 +128,37 @@ test("#284: letztes Bild → Entwickeln → Vorschaubild, ohne aufeinander zu wa
 test("#284: ein Vorschaubild für ein schon gelöschtes Foto legt nichts Neues an", async () => {
   await patchShot("u", "weg", blob("look"));
   assert.deepEqual(await keys("prints"), []);
+});
+
+test("#284/#285: ein Film wird ganz entwickelt oder gar nicht, auch wenn der Speicher mittendrin voll wird", async () => {
+  await putPrints("u", [print("p0", { stack: "film1", pos: 0 }), print("p1", { stack: "film1", pos: 1 }), print("p2", { stack: "film1", pos: 2 })]);
+  let n = 0;
+  IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
+    if (this.name === "prints" && ++n === 2) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    return realPut.apply(this, args);
+  };
+  await assert.rejects(developFilm("u", "film1", "Hafen"), (e) => isStorageFull(e));
+  IDBObjectStore.prototype.put = realPut;
+  assert.deepEqual((await listPrints("u")).map((p) => p.stack), ["film1", "film1", "film1"], "kein halber Umschlag");
+});
+
+test("#285: ohne Datenbank (privates Fenster) heißt der Fehler nicht „Speicher voll“", async () => {
+  const open = indexedDB.open;
+  indexedDB.open = () => {
+    throw new DOMException("blocked", "SecurityError");
+  };
+  try {
+    await assert.rejects(putPrints("u", [print("a")]), (e) => isNoStore(e) && !isStorageFull(e));
+  } finally {
+    indexedDB.open = open;
+  }
+});
+
+test("#285: die Hinweise sagen, was nicht gesichert ist", () => {
+  const voll = new DOMException("x", "QuotaExceededError");
+  assert.equal(notSaved(voll), "Der Speicher auf diesem Gerät ist voll. Das Foto ist nicht gesichert.");
+  assert.equal(notSaved(voll, 3), "Der Speicher auf diesem Gerät ist voll. 3 Fotos sind nicht gesichert.");
+  assert.equal(notSaved(new Error("x")), "Das Foto ließ sich nicht sichern. Versuch es noch einmal.");
+  assert.match(notDeveloped(voll), /voll\. Der Film ist nicht entwickelt/);
+  assert.match(changeNotSaved(voll), /voll\. Die Änderung ist nicht gesichert/);
 });

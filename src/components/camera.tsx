@@ -723,6 +723,7 @@ export function Camera({
       }
     } catch (e) {
       haptic("warning");
+      if (saving) storageLow().then((v) => (low.current = v));
       setError(saving ? notSaved(e) : t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
       window.setTimeout(() => setError(null), saving ? 5000 : 2500);
     } finally {
