@@ -701,7 +701,7 @@ function Panel({
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
       {/* in der App hält die Reihe auf dem Telefon rechts Platz für den Auslöser frei und bricht vorher um (#242) */}
-      <div className="mt-4 flex flex-wrap items-center gap-2 max-md:pr-(--shutter-room)" style={shutterRow}>
+      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 max-md:pr-(--shutter-room)" style={shutterRow}>
         {primary ??
           (book && (
             <Button variant="cloth" onClick={() => open(book.id)}>
@@ -715,8 +715,12 @@ function Panel({
   );
 }
 
-/** Den Auslöser gibt es nur in der App (hasCamera); der Tisch hat px-4, so weit liegt die Reihe auf dem Telefon vom Rand */
-const shutterRow = IS_APP ? ({ "--shutter-room": `${shutterRoom(16)}px` } as CSSProperties) : undefined;
+/**
+ * Den Auslöser gibt es nur in der App (hasCamera). Der Tisch hat px-4, so weit liegt die Reihe auf dem Telefon vom Rand;
+ * dieser Rand wächst mit der Schrift, der Auslöser nicht. min-w-0 an der Reihe: Ein Knopf, der allein breiter ist als
+ * der Rest, macht das Buch nicht breiter als den Bildschirm.
+ */
+const shutterRow = IS_APP ? ({ "--shutter-room": `max(0px, calc(${shutterRoom(0)}px - 1rem))` } as CSSProperties) : undefined;
 
 const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString(locale(getLang()), { day: "numeric", month: "short" }) : null);
 

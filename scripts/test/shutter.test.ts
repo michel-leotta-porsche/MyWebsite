@@ -19,4 +19,6 @@ test("Auslöser und Knopfreihe lesen dieselben Maße", () => {
   const room = src("components/book-room.tsx");
   assert.match(room, /shutterRoom\(/, "Knopfreihe hält Platz frei");
   assert.match(room, /max-md:pr-\(--shutter-room\)/, "nur auf schmalen Bildschirmen");
+  assert.match(room, /shutterRoom\(0\)\}px - 1rem\)/, "der Tischrand wächst mit der Schrift, der Auslöser nicht");
+  assert.match(room, /min-w-0 flex-wrap[^"]*max-md:pr-\(--shutter-room\)/, "bei sehr großer Schrift macht der freie Platz das Buch nicht breiter als den Bildschirm");
 });
