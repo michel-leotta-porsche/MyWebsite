@@ -4,13 +4,13 @@ import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizont
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { allAuto, DIALS, DialChips, GridOverlay, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
+import { allAuto, DIALS, DialChips, GridOverlay, isManual, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
 import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { DISPOSABLE_FRAMES, DISPOSABLES, disposableEdit, type Disposable } from "@/lib/disposable";
 import { filmStrip, readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
-import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Meter } from "@/lib/camera";
+import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Gains, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
@@ -18,6 +18,7 @@ import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
 import { useT } from "@/lib/i18n";
+import { correctWhite } from "@/lib/white";
 import { useRecentSettings } from "@/lib/settings-clipboard";
 import { myRecipes, newId } from "@/lib/store";
 import type { Print } from "@/lib/studio-store";
@@ -41,6 +42,8 @@ const TOOLS_KEY = "calima:kamera-werkzeug";
 const HOLD_MS = 220;
 const MOVE_PX = 10;
 const EV_MAX = 2;
+/** Seite des Messquadrats der Weiß-Pipette, Anteil der Sucherbreite */
+const PATCH = 0.18;
 
 const lookOfSettings = (s: CopiedSettings, id: string): Look => ({ id, name: s.name, approx: s.approx, edit: applySettings(neutralEdit(), s) });
 const lookOfRecipe = (r: NamedRecipe): Look => ({ id: r.id, name: r.name, approx: false, edit: { ...neutralEdit(), ...(r.f ?? {}), rec: { ...r.v }, recName: r.name } });
@@ -111,6 +114,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   });
   const [info, setInfo] = useState<CameraInfo | null>(null);
   const [dials, setDials] = useState<Dials>(AUTO);
+  /** Weiß-Pipette: das Messquadrat steht im Sucher, der Auslöser misst statt aufzunehmen */
+  const [pipette, setMetering] = useState(false);
+  const [whiteMsg, setWhiteMsg] = useState<string | null>(null);
   const [dial, setDial] = useState<DialKey | "focal" | null>(null);
   const [focal, setFocal] = useState<number | null>(null);
   const [grid, setGrid] = useState(false);
@@ -296,6 +302,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       return !on;
     });
     setDial(null);
+    setMetering(false);
   };
   const pickFocal = (mm: number) => {
     haptic("select");
@@ -309,6 +316,18 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     setDials(next);
   };
   const lenses = useMemo(() => realFocals(info?.lenses ?? [1]), [info]);
+  // die Pipette gehört zum Weiß-Rad: wer es zuklappt oder ein anderes Rad nimmt, misst nicht mehr
+  const whiteOpen = tools && dial === "kelvin";
+  const metering = pipette && whiteOpen;
+  const resetDial = (k: DialKey) => {
+    haptic("press");
+    setDials((d) => ({ ...d, [k]: null, ...(k === "kelvin" ? { tint: null, gains: null } : {}) }));
+  };
+  const togglePipette = () => {
+    haptic("select");
+    setWhiteMsg(null);
+    setMetering(!metering);
+  };
   /** Lupe beim Scharfstellen von Hand: angekündigt, damit die Vergrößerung nicht wie Unschärfe wirkt (#225) */
   const [magnified, setMagnified] = useState(false);
   const magnifyWhile = (on: boolean) => {
@@ -509,7 +528,54 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
 
   /* ----- Auslösen: das Original kommt als Datei, der Look liegt als Bearbeitung auf dem Abzug ----- */
 
+  /**
+   * Weiß messen wie „Custom WB“ an einer Fuji: Quadrat lesen, Gains rechnen, stellen und zur Kontrolle noch einmal lesen
+   * (höchstens drei Runden). Das Quadrat liegt in der Mitte, seine Seite ist PATCH der Sucherbreite (der Sucher ist 3:4).
+   */
+  const measureWhite = async () => {
+    if (!ready || busy) return;
+    setBusy(true);
+    haptic("press");
+    const rect = { x: 0.5 - PATCH / 2, y: 0.5 - (PATCH * 0.75) / 2, w: PATCH, h: PATCH * 0.75 };
+    const lock = (gains: Gains) => ({ ...dials, kelvin: null, tint: null, gains });
+    try {
+      let gains: Gains | null = null;
+      for (let round = 0; round < 3; round++) {
+        const res = correctWhite(await CalimaCamera.measureWhite({ rect }));
+        if (!res.ok) {
+          if (gains) break;
+          haptic("warning");
+          setWhiteMsg(
+            res.reason === "hell"
+              ? t("Zu hell zum Messen. Stell Heller/Dunkler etwas dunkler oder nimm eine Stelle ohne Glanz.")
+              : res.reason === "dunkel"
+                ? t("Zu dunkel zum Messen. Mehr Licht, oder stell Heller/Dunkler etwas heller.")
+                : t("Das sieht nicht weiß aus. Richte das Quadrat auf etwas Weißes oder Graues."),
+          );
+          return;
+        }
+        gains = res.gains;
+        if (res.done) break;
+        // stellen und die Kamera kurz nachziehen lassen, dann misst die nächste Runde das neue Bild
+        await CalimaCamera.setDials(lock(gains));
+        await new Promise((r) => window.setTimeout(r, 350));
+      }
+      if (gains) {
+        haptic("success");
+        setDials(lock(gains));
+        setMetering(false);
+        setWhiteMsg(null);
+      }
+    } catch {
+      haptic("warning");
+      setWhiteMsg(t("Messen hat nicht geklappt. Versuch es noch einmal."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const shoot = async () => {
+    if (metering) return measureWhite();
     if (!ready || busy) return;
     setBusy(true);
     haptic("press");
@@ -675,6 +741,12 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           )}
           {tools && grid && <GridOverlay roll={roll} />}
           {tools && ready && <MeterBadge meter={meter} />}
+          {metering && (
+            // das Messquadrat: hierauf zielt die Pipette, wie das Feld bei „Custom WB“ an einer Fuji
+            <span aria-hidden className="border-on-table pointer-events-none absolute top-1/2 left-1/2 aspect-square -translate-x-1/2 -translate-y-1/2 border-2 shadow-[0_0_0_1px_rgb(0_0_0/.35)]" style={{ width: `${PATCH * 100}%` }}>
+              <span className="bg-table-deep/70 absolute -top-7 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">{t("Weiß messen")}</span>
+            </span>
+          )}
           {magnified && (
             <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 left-3 rounded-full px-2.5 py-1 text-[13px] font-semibold">
               {t("Lupe 3×")}
@@ -736,7 +808,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             <span aria-hidden className="bg-on-table-2/60 h-1 w-9 rounded-full" />
             {toolsDown && (
               <span className="text-on-table-2 flex items-center gap-1.5 text-[11px] font-semibold tabular-nums">
-                {DIALS.filter((k) => dials[k] != null).length ? t("{n} von Hand", { n: DIALS.filter((k) => dials[k] != null).length }) : t("alles auf A")}
+                {DIALS.filter((k) => isManual(dials, k)).length ? t("{n} von Hand", { n: DIALS.filter((k) => isManual(dials, k)).length }) : t("alles auf A")}
                 {(shift.r !== base.r || shift.b !== base.b) && ` · ${fmtShift(shift)}`}
               </span>
             )}
@@ -752,9 +824,12 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         >
           <div ref={panel} className="grid gap-3 pt-3">
             {tools && (
-              <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={setDial} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} />
+              <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={(k) => {
+                  setMetering(false);
+                  setDial(k);
+                }} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} onReset={resetDial} />
             )}
-            {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} />}
+            {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} metering={metering} onPipette={togglePipette} />}
             {tools && dial && dial !== "focal" && dial !== "kelvin" && (
               <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? magnifyWhile : undefined} />
             )}
@@ -914,7 +989,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             type="button"
             onClick={shoot}
             disabled={!ready || busy}
-            aria-label={t("Auslösen")}
+            aria-label={metering ? t("Weiß messen") : t("Auslösen")}
             className="border-on-table grid h-[76px] w-[76px] place-items-center rounded-full border-4 disabled:opacity-50"
           >
             <span aria-hidden className={`bg-on-table block h-[60px] w-[60px] rounded-full transition-transform ${busy ? "scale-90" : ""}`} />
@@ -930,6 +1005,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             ? t("Schärfe und Licht stehen fest. Ein Tipp auf die Marke löst sie.")
             : reticle
               ? t("Noch ein Tipp auf die Marke hält Schärfe und Licht fest.")
+              : metering
+                ? (whiteMsg ?? t("Richte das Quadrat auf etwas Weißes oder Graues und drück den Auslöser. Es wird kein Foto gemacht."))
               : tools && dial === "kelvin"
                 ? t("Ziehen oder tippen wählt das Licht. Feinabstimmung verschiebt die Farbe wie bei Fuji.")
                 : tools && dial === "focus"
