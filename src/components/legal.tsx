@@ -38,9 +38,9 @@ export function LegalPage({ title, binding = false, children }: { title: ReactNo
   );
 }
 
-export function LegalSection({ title, children }: { title: ReactNode; children: ReactNode }) {
+export function LegalSection({ title, id, children }: { title: ReactNode; id?: string; children: ReactNode }) {
   return (
-    <section className="border-on-table-2/25 border-t pt-5">
+    <section id={id} className="border-on-table-2/25 scroll-mt-6 border-t pt-5">
       <h2 className="text-on-table text-xl font-semibold tracking-[-0.01em]">{title}</h2>
       <div className="text-on-table-2 mt-3 flex max-w-[64ch] flex-col gap-3 text-base leading-relaxed">{children}</div>
     </section>

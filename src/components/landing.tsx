@@ -20,6 +20,7 @@ import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
 import { APP_FEATURES, CLIPS, HOWTO, SECTIONS, TESTFLIGHT_URL, cueAt, type Clip as ClipData, type SectionId } from "@/lib/landing";
+import { FEATURES_PATH } from "@/lib/features";
 import { sampleBook } from "@/lib/sample-book";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { de, useLang, useT } from "@/lib/i18n";
@@ -38,15 +39,15 @@ import reifen from "../../public/photos/reifen.jpg";
 // Die Werkbank hängt am Scrollen (CSS scroll-driven animations) und nutzt nur transform und opacity.
 // Ohne Unterstützung oder bei reduzierter Bewegung steht sie fertig da; die Clips laufen dann nicht von selbst.
 
-const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
-const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
+export const display: CSSProperties = { fontVariationSettings: '"wdth" 75, "opsz" 96' };
+export const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
 // Wortlaut auf Deutsch, t() übersetzt beim Zeichnen
 const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 // Große Überschrift eines Abschnitts oder einer Funktion
 // wächst fließend von 48 px (Telefon) bis 84 px bei 1280 px, ab da bleibt die Spalte gleich breit und die Schrift auch
-const displayHeading = "text-on-table text-[clamp(3rem,1.75rem+4.4vw,5.25rem)] leading-[0.9] font-bold tracking-[-0.035em]";
+export const displayHeading = "text-on-table text-[clamp(3rem,1.75rem+4.4vw,5.25rem)] leading-[0.9] font-bold tracking-[-0.035em]";
 
 const book = sampleBook();
 
@@ -87,7 +88,7 @@ function HeaderSession() {
 }
 
 /** label: ein einzelner Link ins Bücherzimmer (Schluss der Seite); ohne label die Anmeldung mit Apple und Google */
-function EnterButton({ label }: { label?: string }) {
+export function EnterButton({ label }: { label?: string }) {
   const { user, busy, error, enter, warm } = useEnter();
   const t = useT();
   if (user || label)
@@ -218,9 +219,9 @@ function Hero() {
           Calima
         </p>
         <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-5 text-sm md:gap-6">
-          <a href="#kann" className="text-on-table-2 decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
+          <Link href={FEATURES_PATH} className="text-on-table-2 decoration-mark decoration-2 underline-offset-4 hover:text-on-table hover:underline">
             {t("Was Calima kann")}
-          </a>
+          </Link>
           <HeaderSession />
         </nav>
       </header>
@@ -729,6 +730,13 @@ function Features() {
       <Recipe />
       <Share />
       <AppCamera />
+      {/* alle Funktionen mit Bildern aus der App auf einer eigenen Seite (#267) */}
+      <div className="linen table-surface bg-table px-page pb-20 md:pb-28">
+        <Link href={FEATURES_PATH} className={`${buttonClass("quiet", "md", "px-6")} text-on-table`}>
+          {t("Alles, was Calima kann")}
+          <ArrowRight aria-hidden />
+        </Link>
+      </div>
     </section>
   );
 }
