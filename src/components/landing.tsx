@@ -45,7 +45,8 @@ const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
 // Große Überschrift eines Abschnitts oder einer Funktion
-const displayHeading = "text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl";
+// wächst fließend von 48 px (Telefon) bis 84 px bei 1280 px, ab da bleibt die Spalte gleich breit und die Schrift auch
+const displayHeading = "text-on-table text-[clamp(3rem,1.75rem+4.4vw,5.25rem)] leading-[0.9] font-bold tracking-[-0.035em]";
 
 const book = sampleBook();
 
@@ -212,8 +213,8 @@ function Hero() {
   return (
     <section id="blaettern" aria-labelledby="blaettern-h" className="linen table-surface relative flex min-h-svh flex-col overflow-hidden bg-table">
       <SunAndShade light="sun" />
-      <header className="relative z-20 flex items-baseline justify-between gap-6 px-page pt-[max(1rem,env(safe-area-inset-top))] md:pt-6">
-        <p className="text-on-table text-lg font-bold tracking-[-0.02em]" style={narrow}>
+      <header className="relative z-20 flex items-baseline justify-between gap-6 px-page pt-[max(1rem,env(safe-area-inset-top))] md:pt-6 xl:pt-8">
+        <p className="text-on-table text-lg font-bold md:text-xl tracking-[-0.02em]" style={narrow}>
           Calima
         </p>
         <nav aria-label={t("Auf dieser Seite")} className="flex items-baseline gap-5 text-sm md:gap-6">
