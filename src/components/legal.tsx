@@ -16,7 +16,7 @@ export const OPERATOR = {
     .split("|")
     .map((l) => l.trim())
     .filter(Boolean),
-  email: "michel.leotta@hotmail.com",
+  email: "hallo@calima.photos",
 };
 
 /** binding: Rechtstext, auf Englisch mit dem Hinweis, dass die deutsche Fassung gilt */
