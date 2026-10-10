@@ -63,6 +63,14 @@ export const START: Record<string, string> = {
   "Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da.": "Each person gets their own link. They leaf through without an account and leave you notes.",
   "Hinlegen|Landing": "Hand it over",
   "Mehr in der Hilfe": "More in the help",
+  "Im Fotostudio liest Calima Rezept und Preset aus der Datei und legt den Look mit einem Tipp über alle Fotos.": "In the photo studio, Calima reads the recipe and preset from the file and lays the look over every photo with one tap.",
+  "Bald im App Store": "Coming soon to the App Store",
+  "Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch.": "Shoot like you would with a Fuji, and the pictures go straight into the book.",
+  "Der Look schon im Sucher": "The look, right in the viewfinder",
+  "Fuji-Rezept oder Calima-Look liegen beim Fotografieren schon über dem Bild. Halten zeigt das Original.": "The Fuji recipe or Calima look is already on the picture while you shoot. Hold to see the original.",
+  "Wie mit der Einwegkamera: Die Bilder siehst du erst nach dem Entwickeln, dann liegen sie als Umschlag im Fotostudio.": "Like a disposable camera: you only see the pictures once they're developed, then they wait as an envelope in the photo studio.",
+  "Weiß wie an der Fuji": "White balance like on a Fuji",
+  "Kunstlicht, Neon, Schatten, oder mit der Pipette am Motiv gemessen.": "Incandescent, neon, shade, or measured on the subject with the eyedropper.",
 
   // Landing: Werkbank
   "Reinziehen.": "Drop them in.",

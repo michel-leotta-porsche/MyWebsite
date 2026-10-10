@@ -58,5 +58,12 @@ export const HOWTO = [
   { title: de("Hinlegen|Landing"), text: de("Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da."), href: "/hilfe" },
 ] as const;
 
+// Kamera, nur in der iPhone-App: drei Dinge, die es schon gibt (Feature #176). Die ganze Liste kommt auf /funktionen (#267).
+export const APP_FEATURES = [
+  { icon: "look", title: de("Der Look schon im Sucher"), text: de("Fuji-Rezept oder Calima-Look liegen beim Fotografieren schon über dem Bild. Halten zeigt das Original.") },
+  { icon: "film", title: de("Film einlegen"), text: de("Wie mit der Einwegkamera: Die Bilder siehst du erst nach dem Entwickeln, dann liegen sie als Umschlag im Fotostudio.") },
+  { icon: "white", title: de("Weiß wie an der Fuji"), text: de("Kunstlicht, Neon, Schatten, oder mit der Pipette am Motiv gemessen.") },
+] as const;
+
 /** Öffentlicher TestFlight-Link für Freunde (#265); bis er steht, sagt die Landing nur, dass die App kommt */
 export const TESTFLIGHT_URL: string | null = null;

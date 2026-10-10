@@ -4,7 +4,7 @@ import { existsSync, statSync } from "node:fs";
 import { test } from "node:test";
 
 import { translate } from "@/lib/i18n";
-import { CLIPS, HOWTO, SECTIONS, cueAt } from "@/lib/landing";
+import { APP_FEATURES, CLIPS, HOWTO, SECTIONS, cueAt } from "@/lib/landing";
 
 const PUBLIC = new URL("../../public/", import.meta.url).pathname;
 
@@ -57,4 +57,9 @@ test("„So geht’s“ hat drei Schritte, jeder führt in die Hilfe", () => {
 test("„So geht’s“ heißt auf Englisch „Hand it over“, nicht wie der Zettel-Knopf „Leave it“", () => {
   assert.equal(translate("de", HOWTO[2].title), "Hinlegen");
   assert.equal(translate("en", HOWTO[2].title), "Hand it over");
+});
+
+test("„Was Calima kann“ endet mit der Kamera: drei Funktionen der iPhone-App, die es schon gibt", () => {
+  assert.equal(APP_FEATURES.length, 3);
+  for (const f of APP_FEATURES) assert.ok(f.title && f.text);
 });

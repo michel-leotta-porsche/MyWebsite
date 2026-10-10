@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { ArrowRight, Camera } from "lucide-react";
+import { Aperture, ArrowRight, Film, Pipette } from "lucide-react";
 
 import { Library } from "@/components/books";
 import { hitClass, linkClass } from "@/components/ui-base";
@@ -19,7 +19,7 @@ import { APPLE_READY, SignInButtons } from "@/components/sign-in-buttons";
 import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
-import { CLIPS, HOWTO, SECTIONS, TESTFLIGHT_URL, cueAt, type Clip as ClipData, type SectionId } from "@/lib/landing";
+import { APP_FEATURES, CLIPS, HOWTO, SECTIONS, TESTFLIGHT_URL, cueAt, type Clip as ClipData, type SectionId } from "@/lib/landing";
 import { sampleBook } from "@/lib/sample-book";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { de, useLang, useT } from "@/lib/i18n";
@@ -31,8 +31,9 @@ import reifen from "../../public/photos/reifen.jpg";
 
 // Landing Page (#264). Freunde öffnen den Link auf dem Telefon; sie sollen erst blättern, dann gefragt werden:
 // 1. Blätter mal: das Beispielbuch Fuerteventura liegt auf dem Basalttisch, ein Tipp schlägt es auf, ohne Konto.
-// 2. Mach dein eigenes: Anmeldung, und ehrlich, was nur die iPhone-App kann.
-// 3. Was Calima kann: Werkbank (Abzüge fliegen beim Scrollen an ihren Platz), Rezept und Hinlegen mit Michels Clips.
+// 2. Mach dein eigenes: Anmeldung.
+// 3. Was Calima kann: Werkbank (Abzüge fliegen beim Scrollen an ihren Platz), Rezept und Hinlegen mit Michels Clips,
+//    zum Schluss ehrlich, was nur die iPhone-App kann (Kamera).
 // 4. So geht’s: drei Schritte, jeder führt in die Hilfe.
 // Die Werkbank hängt am Scrollen (CSS scroll-driven animations) und nutzt nur transform und opacity.
 // Ohne Unterstützung oder bei reduzierter Bewegung steht sie fertig da; die Clips laufen dann nicht von selbst.
@@ -280,20 +281,6 @@ function Own() {
             </Link>
             .
           </p>
-          {/* Ehrlich sagen, was im Web fehlt */}
-          <p className="text-on-table border-on-table-2/25 mt-10 flex max-w-[30rem] items-start gap-3 border-t pt-5 text-base leading-relaxed">
-            <Camera aria-hidden className="text-on-table-2 mt-[0.2lh] size-5 shrink-0" strokeWidth={1.75} />
-            <span>
-              {t("Die Kamera gibt es nur in der iPhone-App.")}{" "}
-              {TESTFLIGHT_URL ? (
-                <a href={TESTFLIGHT_URL} className={`${linkClass} font-semibold`}>
-                  {t("Vorab testen mit TestFlight")}
-                </a>
-              ) : (
-                <span className="text-on-table-2">{t("Sie kommt bald in den App Store.")}</span>
-              )}
-            </span>
-          </p>
         </div>
       </div>
     </section>
@@ -537,6 +524,7 @@ function Recipe() {
         </h3>
         <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
           {t("Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man gleich als .xmp mit.")}
+          <span className="mt-4 block">{t("Im Fotostudio liest Calima Rezept und Preset aus der Datei und legt den Look mit einem Tipp über alle Fotos.")}</span>
         </p>
       </div>
 
@@ -600,6 +588,53 @@ function Share() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+const APP_ICONS = { look: Aperture, film: Film, white: Pipette } as const;
+
+/** Ehrlich sagen, was im Web fehlt: die Kamera kommt mit der iPhone-App */
+function AppCamera() {
+  const t = useT();
+  return (
+    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
+      <div className="grid gap-6 md:grid-cols-12 md:gap-8">
+        <div className="md:col-span-7">
+          <p className="text-on-table-2 flex items-center gap-2 text-sm font-semibold">
+            <span aria-hidden className="bg-cloth size-1.5 rounded-full" />
+            {t("Bald im App Store")}
+          </p>
+          <h3 id="app-h" className={`${displayHeading} mt-4 [text-wrap:balance]`} style={display}>
+            {/* geschütztes Trennzeichen: „iPhone-App“ bricht nicht am Bindestrich */}
+            {t("Die Kamera gibt es nur in der iPhone-App.").replace("iPhone-App", "iPhone\u2011App")}
+          </h3>
+        </div>
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+          {t("Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch.")}{" "}
+          {TESTFLIGHT_URL ? (
+            <a href={TESTFLIGHT_URL} className={`${linkClass} font-semibold opacity-100`}>
+              {t("Vorab testen mit TestFlight")}
+            </a>
+          ) : (
+            t("Sie kommt bald in den App Store.")
+          )}
+        </p>
+      </div>
+      <ul className="mt-14 grid gap-10 md:mt-20 md:grid-cols-3 md:gap-8">
+        {APP_FEATURES.map((f) => {
+          const Icon = APP_ICONS[f.icon];
+          return (
+            <li key={f.title} className="border-on-table-2/25 border-t pt-5">
+              <Icon aria-hidden className="text-on-table-2 size-5" strokeWidth={1.75} />
+              <h4 className="text-on-table mt-4 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
+                {t(f.title)}
+              </h4>
+              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(f.text)}</p>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -678,7 +713,7 @@ function Closing() {
   );
 }
 
-/** 3. Was Calima kann: Werkbank, Rezept, Hinlegen; die Überschrift steht klein über der Werkbank */
+/** 3. Was Calima kann: Werkbank, Rezept, Hinlegen, Kamera aus der App; die Überschrift steht klein über der Werkbank */
 function Features() {
   const t = useT();
   return (
@@ -692,6 +727,7 @@ function Features() {
       />
       <Recipe />
       <Share />
+      <AppCamera />
     </section>
   );
 }
