@@ -272,6 +272,19 @@ Jedes Blatt dreht um den Bund (`rotateY` 0 bis -180°, Perspektive 2600px) mit k
 ### Vergrößerte Tafel
 Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`, nur `transform`) über einem Hintergrund aus `table-deep`-Leinen, darunter Nummer, Titel und Zurück/Weiter. Schließen fliegt sie zurück an ihre Stelle (480ms), die Bedienung blendet vorher in 120ms aus. Tafelwechsel im Vollbild: 260ms Einblenden aus 98.5 %.
 
+## Bedienung nach Apples Human Interface Guidelines
+
+Seit 2026-10-10 (Michel): Wie sich etwas bedienen lässt, richtet sich nach Apples [Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines). Wie es aussieht, bestimmen weiter die Materialien oben (Tisch, Leinen, Papier). Bevor ein neues Bedienmuster entsteht, wird zuerst geprüft, wie iOS dasselbe löst. Weicht Calima davon ab, steht der Grund im PR.
+
+- **Blätter (Sheets)** schweben am Handy frei, mit Rand links, rechts und unten, haben oben einen Griff und schließen beim Tippen daneben, beim Wischen nach unten und mit Esc.
+- **Aktionen nach Wichtigkeit:** Häufiges kommt nach oben, als Symbol mit Namen. Zerstörendes (Löschen, Entfernen) steht in `danger` und immer zuletzt.
+- **Ein/aus** ist ein Schalter (`role="switch"`), kein Häkchen. Eine Wahl aus zwei bis vier Möglichkeiten ist ein Segment (`Segmented`).
+- **Was nicht geht, wird gedimmt** statt versteckt, solange es seinen Platz behält. Eine eigene Zeile bekommt es nicht.
+- **Trefferflächen** sind mit dem Finger mindestens 44 × 44 pt groß (`pointer-coarse:size-11`).
+- **Gesten wie in iOS:** Langes Drücken (550 ms) zeigt, was mit dem Ding geht, und öffnet erst beim Loslassen. Zwei Finger zoomen, Doppeltippen holt heran. Wischen vom linken Rand geht zurück.
+- **Rückmeldung:** Haptik beim Einrasten und beim langen Drücken (`haptic`), Bewegungen als Federn ohne Überschwingen. Bei `prefers-reduced-motion` gibt es keine Bewegung.
+- **Sprache:** Verben in der Grundform („Kopieren“, „Zuschneiden“), kurz und ohne Fachwörter.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -284,6 +297,7 @@ Die Tafel fliegt aus ihrer Position im Buch auf volle Größe (620ms `ease-out`,
 - **Do** Schatten aus Basalt (`rgb(12 10 8)`) oder Prägebraun (`rgb(58 39 6)`) mischen, nie aus neutralem Grau.
 
 ### Don't:
+- **Don't** ein Bedienmuster erfinden, für das iOS schon eines hat (Blatt, Kontextmenü, Schalter, Segment, Wischen), ohne den Grund im PR zu nennen.
 - **Don't** Masonry-Raster, Kartengitter oder eine Lightbox ohne Herkunft bauen; Bilder kommen aus dem Buch und kehren dorthin zurück.
 - **Don't** Gedrucktes runden oder eine fünfte Radius-Stufe erfinden; Werte nur aus `none`, `cut`, `tool`, `full`.
 - **Don't** `cloth` als Hintergrund einer Fläche auf dem Tisch oder als Textfarbe einsetzen.

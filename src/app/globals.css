@@ -412,6 +412,39 @@ html.ohne-struktur .printed::after {
   scroll-snap-align: center;
   transform-origin: 50% 100%;
   will-change: transform;
+  /* die Bücher haben Dicke: Rücken und Papierkanten stehen senkrecht nach hinten und zeigen sich beim Drehen */
+  transform-style: preserve-3d;
+}
+.carousel > li > button,
+.carousel .lift {
+  transform-style: preserve-3d;
+}
+/* Papierkanten rechts und Leinenrücken links klappen um ihre Kante am Einband nach hinten */
+.carousel .book-block-r,
+.carousel .book-spine {
+  display: block;
+  transform-origin: 0 50%;
+  transform: rotateY(90deg);
+}
+/* Schatten des angehobenen Buchs: Deckkraft setzt paintRow je Bild, eine Überblendung hinkte dem Finger nach */
+.carousel .lift-shadow {
+  transition: none;
+}
+/* Schatten, den das mittlere Buch auf die Innenkante eines Nachbarn wirft */
+.cover-cast-l,
+.cover-cast-r {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+.cover-cast-l {
+  background: linear-gradient(to right, rgb(12 10 8 / 0.85), rgb(12 10 8 / 0.25) 30%, transparent 60%);
+}
+.cover-cast-r {
+  background: linear-gradient(to left, rgb(12 10 8 / 0.85), rgb(12 10 8 / 0.25) 30%, transparent 60%);
 }
 /* Ankommen: die Bücher gleiten nacheinander von rechts herein, sichtbar von Anfang an */
 .carousel > li.arrive .lift {
@@ -1092,7 +1125,7 @@ html.ohne-schatten [data-shade] {
 
 /* ------------------------------------------------------------------ Landing */
 /* Alles hängt am Scrollen (scroll-driven animations). Ohne Unterstützung und bei reduzierter Bewegung
-   steht jede Szene fertig da: das Buch aufgeschlagen auf der ersten Doppelseite, die Abzüge an ihrem Platz. */
+   steht jede Szene fertig da: die Abzüge an ihrem Platz. */
 
 /* Knopf gibt beim Drücken nach (scale statt transform, damit eigene Verschiebungen bleiben) */
 .press {
@@ -1105,24 +1138,6 @@ html.ohne-schatten [data-shade] {
   scale: 0.97;
 }
 
-/* Kopf: jedes Blatt hat ein Stück Scrollweg, das Buch bleibt dabei stehen (auch bei reduzierter Bewegung, dann ohne Feder) */
-.hero-track {
-  view-timeline: --hero block;
-  height: calc(var(--leaves, 3) * 80svh + 100svh);
-}
-/* Passt der Kopf nicht in die Höhe (quer, große Schrift, Zoom), scrollt er normal und das Buch bleibt sichtbar */
-.hero-track[data-fixed] {
-  height: auto;
-}
-.hero-track[data-fixed] > .hero-stick {
-  position: relative;
-  min-height: 0;
-  overflow-x: clip;
-  overflow-y: visible;
-}
-.hero-track[data-fixed] .hero-hint {
-  display: none;
-}
 .bench-count-b {
   display: none;
 }
@@ -1135,7 +1150,7 @@ html.ohne-schatten [data-shade] {
   opacity: 0;
 }
 
-/* Überschrift kommt Wort für Wort, Text und Knopf gleich danach; bei reduzierter Bewegung steht alles sofort da */
+/* Überschrift und Text kommen nacheinander auf den Tisch; bei reduzierter Bewegung steht alles sofort da */
 @media (prefers-reduced-motion: no-preference) {
   .word-rise {
     animation: word-rise 900ms var(--ease-out) both;
@@ -1149,49 +1164,9 @@ html.ohne-schatten [data-shade] {
   }
 }
 
-/* Geschwisterbände neben dem geschlossenen Buch; ohne Scroll-Animationen weg (landing.tsx, Neighbours) */
-.hero-neighbour {
-  display: none;
-}
-@supports (animation-timeline: view()) {
-  .hero-neighbour {
-    display: block;
-    translate: var(--at) 0;
-    rotate: var(--rot);
-    scale: 0.86;
-    animation: neighbour-fade linear both;
-    animation-timeline: --hero;
-    animation-range: contain 0% contain 12%;
-  }
-  @keyframes neighbour-fade {
-    to { opacity: 0; }
-  }
-  /* mit Bewegung rücken sie zur Seite, als mache das aufgehende Buch Platz */
-  @media (prefers-reduced-motion: no-preference) {
-    .hero-neighbour {
-      animation-name: neighbour-away;
-    }
-    @keyframes neighbour-away {
-      to {
-        opacity: 0;
-        translate: var(--to) 3%;
-      }
-    }
-  }
-}
-
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .hero-hint {
-      animation: fade-out linear both;
-      animation-timeline: --hero;
-      animation-range: contain 0% contain 8%;
-    }
-    @keyframes fade-out {
-      to { opacity: 0; }
-    }
-
-    /* 2. Werkbank: die Abzüge fliegen an ihren Platz, nacheinander */
+    /* Werkbank: die Abzüge fliegen an ihren Platz, nacheinander */
     .bench-track {
       view-timeline: --bench block;
       height: 220svh;
@@ -1506,4 +1481,12 @@ html[data-kamera] body {
 }
 html[data-kamera] body > :not(#calima-kamera) {
   visibility: hidden;
+}
+
+/* Seitenrand der Landing: auf breiten Bildschirmen bleibt der Inhalt auf 80rem in der Mitte, der Tisch läuft weiter bis an den Rand */
+@utility px-page {
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: max(2rem, calc((100% - 80rem) / 2));
+  }
 }

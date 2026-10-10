@@ -2,12 +2,18 @@
 
 import { Toaster as Sonner, toast } from "sonner";
 
-import { useT } from "@/lib/i18n";
+import { t, useT } from "@/lib/i18n";
 
 // Hinweise von unten als dunkle Pille, wischbar, mit Rückgängig als Aktion. Einmal im Layout eines Raums einsetzen.
 // Aufruf: notify("In die Ablage gelegt", { action: { label: "Rückgängig", onClick: undo } })
 
 export const notify = toast;
+
+/**
+ * Ein Hinweis, der bleibt, bis man ihn bestätigt: wenn Fotos nicht gesichert sind (#285). iOS nähme dafür ein Alert;
+ * Calima bleibt bei der Pille unten, weil sie nicht unterbricht (die Kamera kann weiterlaufen) und trotzdem nicht verschwindet.
+ */
+export const notifyLasting = (text: string) => toast(text, { id: "nicht-gesichert", duration: Infinity, cancel: { label: t("OK"), onClick: () => {} } });
 
 export function Toaster() {
   const t = useT();

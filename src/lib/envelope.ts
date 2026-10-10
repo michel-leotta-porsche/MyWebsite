@@ -1,0 +1,41 @@
+import { dayOf, dayStack, isDayStack } from "@/lib/day-stack";
+import type { Film } from "@/lib/film";
+import { t } from "@/lib/i18n";
+import type { Print } from "@/lib/studio-store";
+
+// Umschlag (#244, Michel 10.10.2026): ein entwickelter Film kommt wie vom Labor als ein Stapel auf den Pult, nicht
+// verteilt auf die Tage seiner Aufnahmen. Der Zettel trägt Filmname und Zeitraum, eingeordnet wird er wie ein Tag,
+// und im Buch bekommt er eine Filmseite. Jedes Bild behält sein Aufnahmedatum.
+
+const PREFIX = "umschlag-";
+
+/** Kennung des Umschlags zu einem Film (dessen Stapel) */
+export const envelopeOf = (film: string) => `${PREFIX}${film}`;
+
+export const isEnvelope = (stack: string | undefined): stack is string => !!stack && stack.startsWith(PREFIX);
+
+/** Stapel, die sich zum Einsortieren öffnen und die das Fotostudio nie selbst wegräumt: Tage und Umschläge */
+export const isSortPile = (stack: string | undefined): stack is string => isDayStack(stack) || isEnvelope(stack);
+
+/** die Bilder eines Films in seinen Umschlag: Reihenfolge des Films, Filmname, wann entwickelt (liegt dann vorn) */
+export const toEnvelope = (roll: Print[], film: string, name: string, now: number): Print[] =>
+  roll.map((p) => ({ ...p, stack: envelopeOf(film), pos: p.pos ?? p.at, roll: name, dev: now }));
+
+/** „Hafen · 8. Okt.“ oder „Sonnenschein · 8.–15. Okt.“; der Tag wechselt wie beim Abendstapel um 4 Uhr früh */
+export function envelopeLabel(pile: Print[], loc: string): string {
+  const days = pile.map((p) => dayOf(dayStack(p.at)).getTime());
+  const fmt = new Intl.DateTimeFormat(loc, { day: "numeric", month: "short" });
+  const span = fmt.formatRange(Math.min(...days), Math.max(...days));
+  const name = pile.find((p) => p.roll)?.roll?.trim();
+  return name ? `${name} · ${span}` : span;
+}
+
+/**
+ * Bilder, die die Kamera auf dem Film gezählt hat, die aber nicht (mehr) auf dem Gerät liegen, etwa nach einem früher
+ * verschluckten Speicherfehler (#285). rolls gehört Film für Film zu films. Entwickeln sagt dann, was fehlt, statt still zuzugehen.
+ */
+export const missingFrames = (films: Pick<Film, "name" | "count">[], rolls: Print[][]) =>
+  films.map((f, i) => ({ name: f.name, count: f.count, missing: f.count - (rolls[i]?.length ?? 0) })).filter((m) => m.missing > 0);
+
+export const framesMissing = ({ name, missing, count }: { name: string; missing: number; count: number }) =>
+  missing >= count ? t("Auf dem Film „{name}“ liegen keine Bilder mehr auf diesem Gerät.", { name }) : t("Vom Film „{name}“ fehlen {n} von {count} Bildern auf diesem Gerät.", { name, n: missing, count });

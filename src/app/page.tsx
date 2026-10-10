@@ -4,11 +4,16 @@ import { preload } from "react-dom";
 import { AppStart } from "@/components/app-start";
 import { Landing } from "@/components/landing";
 import { IS_APP } from "@/lib/app-mode";
+import { shareMeta } from "@/lib/share-meta";
+
+const title = "Calima · Fotobücher zum Blättern";
+// Der eine Satz unter dem Titelbild, wenn Michel den Link in WhatsApp schickt
+const description = "Blätter mal: ein Fotobuch zum Umblättern, kostenlos und ohne Konto zum Anschauen. Dann machst du dein eigenes.";
 
 export const metadata: Metadata = {
-  title: "Calima · Fotobücher zum Blättern",
-  description:
-    "Deine Fotos als Buch zum Umblättern, mit dem Fuji-Rezept aus der Datei. Gestalten, Freunden hinlegen, Zettel zurückbekommen.",
+  title,
+  description,
+  ...shareMeta(title, description),
 };
 
 export default function Home() {

@@ -53,6 +53,7 @@ export const LIBRARY: Record<string, string> = {
   Bearbeitung: "Edits",
   "Fotobuch {title}": "Photo book {title}",
   "Calima, zurück zum Tisch": "Calima, back to the table",
+  "Zurück|Buch": "Back",
   Bearbeiten: "Edit",
   "Bearbeiten (oder lange aufs Buch drücken)": "Edit (or press and hold the book)",
   "Oder lange aufs Buch drücken": "Or press and hold the book",
@@ -299,4 +300,11 @@ export const LIBRARY: Record<string, string> = {
   "Deine Bücher, Fotos und geteilten Links sind weg. Danke, dass du Calima ausprobiert hast.": "Your books, photos and shared links are gone. Thanks for trying Calima.",
   "Diese Seite gibt es nicht.": "This page doesn't exist.",
   "Vielleicht ist der Link alt oder unvollständig.": "Maybe the link is old or incomplete.",
+
+  // Öffentliches Beispielbuch (/beispiel)
+  "Beispielbuch Fuerteventura": "Sample book Fuerteventura",
+  "Ein Beispiel von Michel": "A sample from Michel",
+  "{n} Tafeln · ohne Konto": "{n} plates · no account",
+  "Ein Buch wie dieses machst du aus deinen Fotos.": "You make a book like this from your own photos.",
+  "Eigenes Buch anlegen": "Start your own book",
 };

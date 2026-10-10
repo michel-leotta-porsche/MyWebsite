@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button, buttonClass } from "@/components/ui/button";
-import { notify } from "@/components/ui/toaster";
+import { notify, notifyLasting } from "@/components/ui/toaster";
 import { IS_APP } from "@/lib/app-mode";
 import { haptic } from "@/lib/haptics";
 import { safeFileName, saveFile } from "@/lib/native";
@@ -17,7 +17,9 @@ import { cleanEdit, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from 
 import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from "@/lib/develop/settings";
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
-import { developFilm, putPrints, type Print } from "@/lib/studio-store";
+import { framesMissing, missingFrames } from "@/lib/envelope";
+import type { Film } from "@/lib/film";
+import { developFilm, notDeveloped, patchShot, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -304,25 +306,28 @@ function LightroomSlip({ recipe, reduce }: { recipe: LightroomRecipe; reduce: bo
   );
 }
 
-const lens = (c: CameraInfo, t: Tr, lang: ReturnType<typeof useLang>) => {
+/** wide: das Foto ist quer (#221); hochkant ist der Normalfall und keine Zeile wert */
+const lens = (c: CameraInfo, t: Tr, lang: ReturnType<typeof useLang>, wide = false) => {
   const time = c.shutter ? (c.shutter >= 1 ? `${c.shutter}s` : `1/${Math.round(1 / c.shutter)}s`) : undefined;
   return [
     [t("Gerät"), c.device],
+    [t("Format"), wide ? t("quer") : undefined],
     [t("Brennweite"), c.focal35 ? t("{mm} mm (KB)", { mm: c.focal35 }) : undefined],
     [t("Blende"), c.aperture ? `f/${c.aperture.toFixed(1)}` : undefined],
     [t("Zeit"), time],
     ["ISO", c.iso?.toString()],
+    [t("Blitz"), c.flash ? t("ausgelöst") : undefined],
     [t("Belichtung"), c.ev !== undefined ? `${c.ev > 0 ? "+" : c.ev < 0 ? "−" : "±"}${Math.abs(c.ev).toFixed(1)} EV` : undefined],
     [t("Datum"), c.date ? new Date(c.date).toLocaleDateString(locale(lang), { day: "numeric", month: "long", year: "numeric" }) : undefined],
   ].filter((r): r is [string, string] => !!r[1]);
 };
 
-function CameraSlip({ camera, reduce }: { camera: CameraInfo; reduce: boolean }) {
+function CameraSlip({ camera, wide, reduce }: { camera: CameraInfo; wide: boolean; reduce: boolean }) {
   const t = useT();
   const lang = useLang();
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-      {lens(camera, t, lang).map(([k, v], i) => (
+      {lens(camera, t, lang, wide).map(([k, v], i) => (
         <div key={k} className="contents">
           <dt className="text-ink-2">{k}</dt>
           <dd className="text-ink">
@@ -486,35 +491,48 @@ async function currentUid(): Promise<string | null> {
 
 /**
  * Calimas Kamera über dem Buch. Die Aufnahmen landen wie aus dem Zimmer auf dem Gerät (Abendstapel): ohne Film auf dem
- * Stapel ihres Tages, auf einem Film im Film. Ein Hinweis sagt, wo sie liegen, und das Buch bleibt, wie es war.
+ * Stapel ihres Tages, auf einem Film im Film (entwickelt als Umschlag). Ein Hinweis sagt, wo sie liegen, und das Buch bleibt, wie es war.
  */
 function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
   const t = useT();
-  const made = useRef({ shots: new Set<string>(), films: new Set<string>(), developed: new Set<string>() });
-  const onShot = (p: Print, filmStack?: string) => {
+  const made = useRef({ shots: new Set<string>(), films: new Set<string>(), developed: [] as string[] });
+  // die Kamera wartet, bis das Foto gesichert ist, und zählt es sonst nicht (#285); gemeldet wird erst, was sicher liegt
+  const onShot = async (p: Print, filmStack?: string) => {
     // auf einem Film zählt die Kamera selbst, der Stapel ist der Film
     if (filmStack) {
+      await putPrints(uid, [{ ...p, stack: filmStack }]);
       made.current.films.add(filmStack);
-      putPrints(uid, [{ ...p, stack: filmStack }]).catch(() => {});
       return;
     }
+    await putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]);
     made.current.shots.add(p.id);
-    putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]).catch(() => {});
   };
+  // das Vorschaubild ergänzt nur shot am gesicherten Abzug, auch wenn der Film inzwischen entwickelt ist (#284)
+  const onLook = (id: string, shot: Blob) => void patchShot(uid, id, shot).catch(() => {});
   const close = () => {
     const { shots, films, developed } = made.current;
     onClose();
-    if (developed.size) notify(t("Entwickelt. Die Bilder liegen auf dem Stapel ihres Tages."));
+    if (developed.length === 1) notify(t("Entwickelt. Der Umschlag „{name}“ liegt im Fotostudio.", { name: developed[0] }));
+    else if (developed.length) notify(t("Entwickelt. Die {n} Umschläge liegen im Fotostudio.", { n: developed.length }));
     else if (shots.size) notify(shots.size === 1 ? t("Das Foto liegt auf dem Stapel von heute.") : t("Die {n} Fotos liegen auf dem Stapel von heute.", { n: shots.size }));
     else if (films.size) notify(t("Der Film liegt im Fotostudio."));
   };
-  // ein entwickelter Film kommt wie im Zimmer auf den Abendstapel
-  const onFilmDone = (stack: string) => {
-    made.current.films.delete(stack);
-    made.current.developed.add(stack);
-    developFilm(uid, stack).catch(() => {});
+  // ein entwickelter Film kommt wie im Zimmer als Umschlag auf den Pult (#244); putPrints reiht ein, also sind
+  // alle Bilder des Films gesichert, bevor er entwickelt wird (#284)
+  const onFilmDone = (films: Film[]) => {
+    for (const f of films) {
+      made.current.films.delete(f.stack);
+      developFilm(uid, f.stack, f.name)
+        .then((n) => {
+          // was die Kamera gezählt hat, aber nicht auf dem Gerät liegt, sagt Calima, statt still nichts zu tun
+          const [gone] = missingFrames([f], [Array(n)]);
+          if (gone) notifyLasting(framesMissing(gone));
+          if (n) made.current.developed.push(f.name);
+        })
+        .catch((e) => notifyLasting(notDeveloped(e)));
+    }
   };
-  return <CameraView uid={uid} taken onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
+  return <CameraView uid={uid} taken onShot={onShot} onLook={onLook} onFilmDone={onFilmDone} onClose={close} />;
 }
 
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {
@@ -570,7 +588,7 @@ export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; o
       {recipe?.kind === "lightroom" && <LightroomSlip recipe={recipe} reduce={reduce} />}
       {recipe?.kind === "calima" && <CalimaSlip recipe={recipe} reduce={reduce} />}
       {recipe && camera && <div className="my-4 border-t border-ink/15" />}
-      {camera && <CameraSlip camera={camera} reduce={reduce} />}
+      {camera && <CameraSlip camera={camera} wide={plate.src.width > plate.src.height} reduce={reduce} />}
       {edit && (recipe || camera) && <div className="my-4 border-t border-ink/15" />}
       {edit && <EditSlip edit={edit} reduce={reduce} />}
       <TakeAlong plate={plate} recipe={recipe} />

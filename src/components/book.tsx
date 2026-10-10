@@ -27,6 +27,7 @@ import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { buttonClass } from "@/components/ui/button-class";
 import { haptic } from "@/lib/haptics";
+import { atBookEnd } from "@/lib/sample-book";
 
 export type Mode = "spread" | "single";
 export type Leaf = { front: Page; back: Page };
@@ -339,6 +340,8 @@ export function Book({
   onEdit,
   onPin,
   pins,
+  end,
+  backLabel,
 }: {
   book: BookData;
   mode: Mode;
@@ -360,6 +363,10 @@ export function Book({
   pins?: Pinned[];
   /** Nur im eigenen Buch: in die Werkbank, an die aufgeschlagene Stelle (step wie k: 0 Einband, 1 Titel, …) */
   onEdit?: (step: number) => void;
+  /** Leise unter dem Buch, sobald die letzte Doppelseite oder der Rückdeckel aufliegt (z. B. der Weg zum eigenen Buch) */
+  end?: React.ReactNode;
+  /** Statt „Calima“ oben links, wo der Name nicht als Weg zurück erkannt wird (Besucher der Landing) */
+  backLabel?: string;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -1001,11 +1008,11 @@ export function Book({
             onClick={onClose}
             className="text-on-table -ml-1 inline-flex min-h-11 items-center gap-0.5 justify-self-start pr-2 text-lg font-bold whitespace-nowrap tracking-[-0.02em] transition-opacity duration-150 active:opacity-60 flat:whitespace-normal"
             style={{ fontVariationSettings: '"wdth" 80' }}
-            aria-label={t("Calima, zurück zum Tisch")}
+            aria-label={backLabel ?? t("Calima, zurück zum Tisch")}
           >
             {/* Pfeil zeigt, dass der Name zurückführt (wie „‹ Bücherzimmer“ in der Werkbank); auf dem Telefon gibt es kein Esc */}
             <ChevronLeft aria-hidden className="text-on-table-2 size-5" />
-            Calima
+            {backLabel ?? "Calima"}
           </button>
           {/* Bildtitel der randlosen Tafeln (auf der Seite selbst steht nichts) und ihr Rezept: je Seite eine Gruppe */}
           <div className="hidden items-start gap-x-8 gap-y-2 text-sm md:flex flat:col-start-1 flat:row-start-2 flat:flex-col">
@@ -1351,6 +1358,23 @@ export function Book({
               })}
             </ol>
           </div>
+          {/* Platz bleibt reserviert, damit das Buch nicht springt, wenn der Satz am Ende erscheint */}
+          {end && (
+            <div className="grid min-h-12 place-items-center pt-2 text-center md:min-h-10">
+              <AnimatePresence>
+                {atBookEnd(k, count) && (
+                  <motion.div
+                    initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+                  >
+                    {end}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </nav>
       </motion.div>
 

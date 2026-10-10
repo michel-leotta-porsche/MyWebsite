@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizontal, Sun, SwitchCamera, X, Zap } from "lucide-react";
+import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizontal, Sun, SwitchCamera, X, Zap, ZapOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
@@ -9,19 +9,22 @@ import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { DISPOSABLE_FRAMES, DISPOSABLES, disposableEdit, type Disposable } from "@/lib/disposable";
-import { filmStrip, readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
+import { filmAge, filmStrip, readShelf, withLast, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Gains, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
+import { nextFlash, readFlash, type FlashMode } from "@/lib/flash";
+import { turnFor } from "@/lib/camera-turn";
+import { EV_TICKS, evLabel, evMode, evStep } from "@/lib/ev";
 import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
-import { useT } from "@/lib/i18n";
+import { locale, useLang, useT } from "@/lib/i18n";
 import { correctWhite } from "@/lib/white";
 import { useRecentSettings } from "@/lib/settings-clipboard";
 import { myRecipes, newId } from "@/lib/store";
-import type { Print } from "@/lib/studio-store";
+import { listPrints, notSaved, storageLow, tooFull, type Print } from "@/lib/studio-store";
 
 // Calimas Kamera (Kamera-Workshop 9.10.2026, kamera-workshop-2026-10-09/): ein Bildschirm, eine Hand, kein Menü.
 // Der Sucher ist der native Teil (ios/App/App/CalimaCamera.swift) hinter der durchsichtigen Seite; hier liegen nur
@@ -41,7 +44,6 @@ const SHIFT_KEY = "calima:kamera-weiss";
 const TOOLS_KEY = "calima:kamera-werkzeug";
 const HOLD_MS = 220;
 const MOVE_PX = 10;
-const EV_MAX = 2;
 /** Seite des Messquadrats der Weiß-Pipette, Anteil der Sucherbreite */
 const PATCH = 0.18;
 
@@ -55,10 +57,30 @@ const stamp = () => {
 };
 /** so viele Bilder passen auf den Film: eine Einwegkamera bringt ihre eigene Zahl mit */
 const framesOf = (f: Film) => f.rules?.frames ?? FILM_FRAMES;
-const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
+
+/** gemerkter Blitz-Knopf (#221) */
+const FLASH_KEY = "calima:blitz";
 
 /** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
-export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: string; taken?: boolean; onShot: (p: Print, stack?: string) => void; onFilmDone: (stack: string) => void; onClose: () => void }) {
+/**
+ * onShot sichert das Foto und löst sich erst, wenn es auf dem Gerät liegt; scheitert es, zählt das Bild nicht (#285).
+ * onLook hängt das eingerechnete Vorschaubild an den schon gesicherten Abzug, ohne ihn zu ersetzen (#284).
+ */
+export function Camera({
+  uid,
+  taken,
+  onShot,
+  onLook,
+  onFilmDone,
+  onClose,
+}: {
+  uid: string;
+  taken?: boolean;
+  onShot: (p: Print, stack?: string) => Promise<void>;
+  onLook: (id: string, shot: Blob) => void;
+  onFilmDone: (films: Film[]) => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const recent = useRecentSettings();
   const [own, setOwn] = useState<NamedRecipe[]>([]);
@@ -74,6 +96,22 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [front, setFront] = useState(false);
+  /** Blitz Aus, Auto, An (#221); bleibt auf dem Gerät. Einwegkameras bringen ihren eigenen mit */
+  const [flashMode, setFlashMode] = useState<FlashMode>(() => {
+    try {
+      return readFlash(localStorage.getItem(FLASH_KEY));
+    } catch {
+      return "off";
+    }
+  });
+  const cycleFlash = () => {
+    haptic("select");
+    const next = nextFlash(flashMode);
+    setFlashMode(next);
+    try {
+      localStorage.setItem(FLASH_KEY, next);
+    } catch {}
+  };
   const [zoom, setZoom] = useState(1);
   const [ev, setEv] = useState(0);
   const [showEv, setShowEv] = useState(false);
@@ -122,6 +160,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   const [grid, setGrid] = useState(false);
   const [meter, setMeter] = useState<Meter | null>(null);
   const [roll, setRoll] = useState<number | null>(null);
+  /** Querformat (#221): die Knöpfe drehen sich mit dem Telefon, der Sucher bleibt stehen */
+  const [turn, setTurn] = useState(0);
+  const turned: CSSProperties = { transform: `rotate(${turn}deg)`, transition: "transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1)" };
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
   const [shelf, setShelf] = useState<Shelf>(readShelf);
   const film = useMemo(() => shelf.films.find((f) => f.stack === shelf.loaded) ?? null, [shelf]);
@@ -138,6 +179,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   /** ab zwei beiseitegelegten Filmen liegen sie als Stapel vor den Looks; offen zeigt er sie alle */
   const [pileOpen, setPileOpen] = useState(false);
   const strip = filmStrip(aside, pileOpen);
+  /** „Alle entwickeln“ (#245): der erste Tipp fragt im Knopf nach, der zweite entwickelt */
+  const [allAsk, setAllAsk] = useState(false);
+  const lang = useLang();
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -349,6 +393,22 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       writeShelf(next);
       return next;
     });
+  // Filme von vor #245 kennen ihr Datum nicht: sie nehmen das jüngste Bild auf ihnen, einmal beim Öffnen
+  useEffect(() => {
+    if (readShelf().films.every((f) => f.last)) return;
+    listPrints(uid)
+      .then((ps) => update((s) => ({ ...s, films: withLast(s.films, ps) })))
+      .catch(() => {});
+  }, [uid]);
+  /** „seit Mi.“ am Film; liegt er seit 7 Tagen, leise „liegt seit 9 Tagen“ */
+  const since = (f: Film) => {
+    if (!f.last) return null;
+    const a = filmAge(f.last);
+    if (a.stale) return t("liegt seit {n} Tagen", { n: a.days });
+    if (a.days === 0) return t("seit heute");
+    if (a.days === 1) return t("seit gestern");
+    return t("seit {day}", { day: a.day.toLocaleDateString(locale(lang), { weekday: "short" }) });
+  };
   const loadFilm = () => {
     if (!ready || film) return;
     haptic("press");
@@ -401,10 +461,19 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     haptic("select");
     update((s) => ({ loaded: null, films: film.count ? s.films : s.films.filter((f) => f.stack !== film.stack) }));
   };
-  /** Film entwickeln: erst jetzt werden die Bilder sichtbar, auf dem Abendstapel ihres Tages */
+  /** Film entwickeln: erst jetzt werden die Bilder sichtbar, als Umschlag vorn auf dem Pult (#244) */
   const develop = (f: Film) => {
     update((s) => ({ loaded: null, films: s.films.filter((x) => x.stack !== f.stack) }));
-    if (f.count) onFilmDone(f.stack);
+    if (f.count) onFilmDone([f]);
+  };
+  /** alle beiseitegelegten Filme auf einmal entwickeln, auch Einwegkameras; der eingelegte bleibt drin (#245) */
+  const developAll = () => {
+    const all = aside.filter((f) => f.count);
+    haptic("success");
+    setAllAsk(false);
+    setPileOpen(false);
+    update((s) => ({ ...s, films: s.films.filter((x) => x.stack === s.loaded) }));
+    if (all.length) onFilmDone(all);
   };
 
   /* ----- Gesten im Sucher: halten (Original), wischen (Licht), zwei Finger (Zoom), tippen (Schärfe) ----- */
@@ -481,9 +550,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       if (!fixed) setShowEv(true);
     }
     if (g.mode === "drag") {
-      const next = Math.round(Math.min(EV_MAX, Math.max(-EV_MAX, g.ev0 - dy / 120)) * 10) / 10;
-      if (next !== ev) {
+      // Zeit und ISO von Hand: es gibt nichts nachzuregeln, der Sucher sagt das statt still nichts zu tun (#224)
+      const next = evStep(g.ev0 - dy / 120);
+      if (evMode(dials) !== "manual" && next !== ev) {
         setEv(next);
+        haptic("select");
         later(() => CalimaCamera.setExposure({ ev: next }).catch(() => {}));
       }
     }
@@ -578,25 +649,44 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     }
   };
 
+  // Platz auf dem Gerät: beim Öffnen und nach jedem Foto nachgesehen, damit das Auslösen nicht darauf wartet
+  const low = useRef(false);
+  useEffect(() => {
+    storageLow().then((v) => (low.current = v));
+  }, []);
   const shoot = async () => {
     if (metering) return measureWhite();
     if (!ready || busy) return;
+    // ist der Speicher fast voll, löst Calima nicht aus, statt ein Foto zu machen, das sich nicht sichern lässt (#285)
+    if (low.current && (low.current = await storageLow())) {
+      haptic("warning");
+      setError(tooFull());
+      window.setTimeout(() => setError(null), 5000);
+      return;
+    }
     setBusy(true);
     haptic("press");
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
+    let saving = false;
     try {
       // auf einem Film sichert die App das Bild gleich mit, unter der Kennung des Abzugs (#247)
       const id = newId();
-      const { path } = await CalimaCamera.capture({ ...(film?.rules?.flash ? { flash: true } : {}), ...(film ? { keep: { stack: film.stack, id } } : {}) });
+      // Einwegkamera: ihr Blitz gilt; sonst der Blitz-Knopf (die Frontkamera hat keinen)
+      const flashFor = fixed ? fixed.flash || undefined : front || flashMode === "off" ? undefined : flashMode === "on" || "auto";
+      const { path } = await CalimaCamera.capture({ ...(flashFor ? { flash: flashFor } : {}), ...(film ? { keep: { stack: film.stack, id } } : {}) });
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = lookNow.edit ?? undefined;
       const onFilm = film;
       const print: Print = { id, name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit, pos: onFilm?.count };
-      onShot(print, onFilm?.stack);
+      // erst wenn das Foto sicher liegt, zählt es: auf dem Film, und vor dem Entwickeln (#284)
+      saving = true;
+      await onShot(print, onFilm?.stack);
+      saving = false;
+      storageLow().then((v) => (low.current = v));
       if (onFilm) {
-        const next = { ...onFilm, count: onFilm.count + 1 };
+        const next = { ...onFilm, count: onFilm.count + 1, last: print.at };
         if (next.count >= framesOf(next)) {
           // voll: der Film wird entwickelt und kommt auf den Abendstapel
           haptic("success");
@@ -624,7 +714,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         const url = URL.createObjectURL(s.page);
         bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: onFilm ? SIZES.thumb : SIZES.page, thumb: SIZES.thumb } })
           .then((r) => {
-            onShot({ ...print, shot: r.blobs.thumb }, onFilm?.stack);
+            onLook(print.id, r.blobs.thumb);
             // auf dem Film bleibt das Bild im Dunkeln, bis er entwickelt ist
             if (!onFilm) {
               setLast((old) => {
@@ -637,10 +727,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           .catch(() => {})
           .finally(() => URL.revokeObjectURL(url));
       }
-    } catch {
+    } catch (e) {
       haptic("warning");
-      setError(t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
-      window.setTimeout(() => setError(null), 2500);
+      if (saving) storageLow().then((v) => (low.current = v));
+      setError(saving ? notSaved(e) : t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
+      window.setTimeout(() => setError(null), saving ? 5000 : 2500);
     } finally {
       setBusy(false);
     }
@@ -669,6 +760,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
       else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
+      else if (e.name === "orientation") setTurn((last) => turnFor(typeof e.data.orientation === "string" ? e.data.orientation : undefined, last));
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -707,19 +799,36 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   return createPortal(
     <div id="calima-kamera" className="text-on-table fixed inset-0 z-[600] flex flex-col bg-transparent select-none" role="dialog" aria-label={t("Kamera")}>
       <header className="bg-table-deep flex items-center justify-between gap-2 px-3 pb-2" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" }}>
-        <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
-          <X aria-hidden />
-        </IconButton>
+        <span className="flex items-center gap-1">
+          <IconButton label={t("Schließen")} variant="quiet" onClick={onClose} className="text-on-table">
+            <X aria-hidden style={turned} />
+          </IconButton>
+          {!fixed && !front && (
+            <IconButton
+              label={flashMode === "off" ? t("Blitz aus") : flashMode === "auto" ? t("Blitz automatisch") : t("Blitz an")}
+              variant="quiet"
+              onClick={cycleFlash}
+              className={`relative ${flashMode === "on" ? "text-cloth" : "text-on-table"}`}
+            >
+              {flashMode === "off" ? <ZapOff aria-hidden style={turned} /> : <Zap aria-hidden style={turned} />}
+              {flashMode === "auto" && (
+                <span aria-hidden className="absolute right-1 bottom-1 text-[11px] leading-none font-bold">
+                  A
+                </span>
+              )}
+            </IconButton>
+          )}
+        </span>
         <div className="min-w-0 text-center" aria-live="polite">
           <p className="truncate text-[15px] leading-tight font-bold tracking-[-0.01em]">{title}</p>
           <p className="text-on-table-2 truncate text-[12px] leading-tight">{sub || " "}</p>
         </div>
         <span className="flex items-center gap-1">
-          <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
+          <span className="text-on-table-2 inline-block text-right text-[13px] tabular-nums" style={turned} aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
             {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
           </span>
           <IconButton label={tools ? t("Werkzeug weglegen") : t("Werkzeug")} variant="quiet" onClick={toggleTools} disabled={!!fixed} aria-pressed={tools} className={`${tools || !allAuto(dials) ? "text-cloth" : "text-on-table"} disabled:opacity-30`}>
-            <SlidersHorizontal aria-hidden />
+            <SlidersHorizontal aria-hidden style={turned} />
           </IconButton>
         </span>
       </header>
@@ -773,11 +882,22 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               )}
             </span>
           )}
-          {showEv && (
-            <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 right-3 rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums">
-              {evLabel(ev)}
-            </span>
-          )}
+          {showEv &&
+            (evMode(dials) === "manual" ? (
+              <p role="status" className="bg-table-deep/80 text-on-table absolute inset-x-6 top-3 rounded-2xl px-3 py-2 text-center text-[13px] leading-snug">
+                {t("Zeit und ISO stehen von Hand. Für Heller/Dunkler stell eins der beiden Räder auf A.")}
+              </p>
+            ) : (
+              // Skala in Dritteln: man sieht, wie weit man gewischt hat, auch wenn das Bild sich nur wenig ändert
+              <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 right-3 flex items-center gap-2 rounded-full py-1 pr-2.5 pl-2 text-[13px] font-semibold tabular-nums">
+                <span className="relative flex h-3 items-center gap-[3px]">
+                  {EV_TICKS.map((v) => (
+                    <i key={v} className={`block w-px ${Number.isInteger(v) ? "h-3" : "h-1.5"} ${Math.abs(v - ev) < 0.01 ? "bg-cloth" : "bg-on-table-2/60"}`} />
+                  ))}
+                </span>
+                <span className="min-w-8 text-right">{evLabel(ev)}</span>
+              </span>
+            ))}
         </div>
       </div>
 
@@ -924,6 +1044,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
                 type="button"
                 onClick={() => {
                   haptic("select");
+                  setAllAsk(false);
                   setPileOpen((o) => !o);
                 }}
                 aria-expanded={pileOpen}
@@ -950,9 +1071,27 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
                 <FilmIcon aria-hidden className="text-cloth h-4 w-4" />
                 {f.name}
                 <span className="text-on-table-2 tabular-nums">{t("{i}/{n}", { i: f.count, n: framesOf(f) })}</span>
+                {since(f) && <span className="text-on-table-2 font-normal">· {since(f)}</span>}
               </button>
             </li>
           ))}
+          {strip.pile != null && pileOpen && (
+            <li className="flex-none">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!allAsk) {
+                    haptic("select");
+                    return setAllAsk(true);
+                  }
+                  developAll();
+                }}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors ${allAsk ? "bg-cloth border-cloth text-cloth-ink" : "border-on-table-2/50 text-on-table"}`}
+              >
+                {allAsk ? t("{n} Filme entwickeln?", { n: strip.pile }) : t("Alle entwickeln")}
+              </button>
+            </li>
+          )}
           {looks.map((l) => {
             const on = l.id === active.id;
             return (
@@ -976,6 +1115,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               type="button"
               onClick={openReview}
               disabled={!!film || !review}
+              style={turned}
               aria-label={t("Letztes Foto ansehen")}
               className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-[10px] border-2 border-on-table-2/60"
             >
@@ -1002,7 +1142,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           </button>
           <span className="justify-self-end">
             <IconButton label={front ? t("Rückkamera") : t("Frontkamera")} variant="quiet" onClick={flip} className="text-on-table border-on-table-2/60 h-12 w-12 rounded-full border-2">
-              <SwitchCamera aria-hidden />
+              <SwitchCamera aria-hidden style={turned} />
             </IconButton>
           </span>
         </div>

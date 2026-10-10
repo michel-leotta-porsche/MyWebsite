@@ -13,13 +13,18 @@ const MESSAGES: Record<string, string> = {
   "storage/retry-limit-exceeded": de("Keine Verbindung. Versuch es gleich nochmal."),
 };
 
-export function friendlyError(e: unknown): string {
+/** Was sich über den Fehler in Alltagssprache sagen lässt; null, wenn nichts Genaueres bekannt ist */
+export function errorDetail(e: unknown): string | null {
   const code = typeof e === "object" && e && "code" in e ? String((e as { code: unknown }).code).replace(/^firestore\//, "") : "";
   if (MESSAGES[code]) return t(MESSAGES[code]);
   if (/insufficient permissions/i.test(String((e as Error)?.message ?? e))) return t(MESSAGES["permission-denied"]);
   // eigene Meldungen ohne Code (z. B. aus dem Import) sind schon deutsch und bleiben
   if (e instanceof Error && !code && e.message) return t(e.message);
-  return t("Das hat nicht geklappt. Versuch es bitte nochmal.");
+  return null;
+}
+
+export function friendlyError(e: unknown): string {
+  return errorDetail(e) ?? t("Das hat nicht geklappt. Versuch es bitte nochmal.");
 }
 
 // Abgebrochen hat die Person selbst: kein Fehler, nichts anzeigen
