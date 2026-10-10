@@ -26,6 +26,7 @@ import { Carousel, CoverEar, SlipTabs, type Slide } from "@/components/room-caro
 import { OpenBook, Table } from "@/components/table";
 import type { User } from "@/lib/firebase";
 import { IS_APP } from "@/lib/app-mode";
+import { SHUTTER_ROOM } from "@/lib/shutter";
 import { friendlyError } from "@/lib/errors";
 import { handOver } from "@/lib/handoff";
 import { getLang, locale, t, useLang, useT } from "@/lib/i18n";
@@ -699,7 +700,8 @@ function Panel({
         {title}
       </h3>
       <p className="text-on-table-2 text-sm">{meta}</p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
+      {/* in der App hält die Reihe auf dem Telefon rechts Platz für den Auslöser frei und bricht vorher um (#242) */}
+      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2 max-md:pr-(--shutter-room) [&>*]:shrink-0" style={shutterRow}>
         {primary ??
           (book && (
             <Button variant="cloth" onClick={() => open(book.id)}>
@@ -712,6 +714,14 @@ function Panel({
     </div>
   );
 }
+
+/**
+ * Den Auslöser gibt es nur in der App (hasCamera in lib/camera ist IS_APP; die Datei holt Capacitor, darum nicht von
+ * hier). Der Tisch hat px-4, so weit liegen die Reihen auf dem Telefon vom Rand; dieser Rand wächst mit der Schrift,
+ * der Auslöser nicht. min-w-0 an der Reihe: Ein Knopf, der allein breiter ist als der Rest, macht das Buch nicht
+ * breiter als den Bildschirm.
+ */
+const shutterRow = IS_APP ? ({ "--shutter-room": `max(0px, calc(${SHUTTER_ROOM}px - 1rem))` } as CSSProperties) : undefined;
 
 const shortDate = (n: Feedback) => (n.at?.seconds ? new Date(n.at.seconds * 1000).toLocaleDateString(locale(getLang()), { day: "numeric", month: "short" }) : null);
 
@@ -745,7 +755,7 @@ function Returns({ book, spread, isNew, onAll }: { book: BookData; spread: Sprea
   const head = [notes.length && noteCount(notes.length), ears.length && earCount(ears.length), fresh && t("{n} neu", { n: fresh })].filter(Boolean).join(" · ");
   return (
     <div className="mt-6 grid gap-4">
-      <div className="text-on-table-2 flex items-center justify-between gap-3 text-[13px]">
+      <div className="text-on-table-2 flex min-w-0 items-center justify-between gap-3 text-[13px] max-md:pr-(--shutter-room) [&>button]:shrink-0" style={shutterRow}>
         <span>{head}</span>
         <Button size="sm" onClick={onAll}>
           {t("Alle")}
