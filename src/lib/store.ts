@@ -32,6 +32,7 @@ import { de, getLang, translate, type Lang } from "@/lib/i18n";
 import { mapPoint, outSize } from "@/lib/develop/geo";
 import { cleanEdit, fineOf, isNeutral, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import type { Ingested, SizeName } from "@/lib/ingest";
+import { packNested, unpackNested } from "@/lib/nested-arrays";
 
 // Bücher aus dem Editor: so liegen sie in Firestore, und so werden sie wieder zu BookData fürs Blättern.
 
@@ -326,7 +327,7 @@ export async function myRecipes(uid: string): Promise<NamedRecipe[]> {
     } catch {}
   } else {
     const snap = await getDocs(collection(db(), "users", uid, "recipes"));
-    raw = snap.docs.map((d) => d.data());
+    raw = snap.docs.map((d) => unpackNested(d.data()));
   }
   return (Array.isArray(raw) ? raw : [])
     .map(cleanRecipe)
@@ -341,7 +342,7 @@ export async function saveRecipe(uid: string, r: NamedRecipe) {
     } catch {}
     return;
   }
-  await setDoc(doc(db(), "users", uid, "recipes", r.id), r);
+  await setDoc(doc(db(), "users", uid, "recipes", r.id), packNested(r));
 }
 export async function deleteRecipe(uid: string, id: string) {
   if (MOCK) {
@@ -372,15 +373,15 @@ export async function saveBook(b: StoredBook, base?: number, late?: (e: unknown)
   const at = doc(db(), "books", b.id);
   const queue = () => {
     const next = { ...b, rev: (base ?? revOf(b)) + 1 };
-    setDoc(at, { ...next, updatedAt: serverTimestamp() }, { merge: false }).catch((e) => late?.(e));
+    setDoc(at, { ...packNested(next), updatedAt: serverTimestamp() }, { merge: false }).catch((e) => late?.(e));
     return next;
   };
   if (typeof navigator !== "undefined" && !navigator.onLine) return queue();
   try {
     return await runTransaction(db(), async (tx) => {
       const s = await tx.get(at);
-      const next = commitBook(s.exists() ? (s.data() as StoredBook) : null, b, base);
-      tx.set(at, { ...next, updatedAt: serverTimestamp() });
+      const next = commitBook(s.exists() ? unpackNested(s.data() as StoredBook) : null, b, base);
+      tx.set(at, { ...packNested(next), updatedAt: serverTimestamp() });
       return next;
     });
   } catch (e) {
@@ -402,7 +403,7 @@ export function watchBook(id: string, next: (b: StoredBook) => void): () => void
   return onSnapshot(
     doc(db(), "books", id),
     (s) => {
-      if (s.exists() && !s.metadata.hasPendingWrites) next(migrate(s.data() as StoredBook));
+      if (s.exists() && !s.metadata.hasPendingWrites) next(migrate(unpackNested(s.data() as StoredBook)));
     },
     () => {},
   );
@@ -411,7 +412,7 @@ export function watchBook(id: string, next: (b: StoredBook) => void): () => void
 export async function loadBook(id: string): Promise<StoredBook | null> {
   if (MOCK) return mem.books.get(id) ?? null;
   const s = await getDoc(doc(db(), "books", id));
-  return s.exists() ? migrate(s.data() as StoredBook) : null;
+  return s.exists() ? migrate(unpackNested(s.data() as StoredBook)) : null;
 }
 
 // Versionen: Zwischenstände unter books/{id}/versions, automatisch vor großen Änderungen oder von Hand benannt
@@ -425,13 +426,13 @@ export async function saveVersion(b: StoredBook, label: string, auto: boolean) {
     memVersions.set(b.id, list.slice(0, 40));
     return;
   }
-  await addDoc(collection(db(), "books", b.id, "versions"), { label, auto, at: serverTimestamp(), book: { ...b, schema: SCHEMA } });
+  await addDoc(collection(db(), "books", b.id, "versions"), { label, auto, at: serverTimestamp(), book: packNested({ ...b, schema: SCHEMA }) });
 }
 
 export async function listVersions(bookId: string): Promise<Version[]> {
   if (MOCK) return memVersions.get(bookId) ?? [];
   const s = await getDocs(query(collection(db(), "books", bookId, "versions"), orderBy("at", "desc"), limit(40)));
-  return s.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Version, "id">) }));
+  return s.docs.map((d) => ({ id: d.id, ...unpackNested(d.data() as Omit<Version, "id">) }));
 }
 
 /** Ganzes Projekt als Datei; die Fotos bleiben im Konto und sind über ihre Links erreichbar */
@@ -479,7 +480,7 @@ export async function trashBook(b: StoredBook, on: boolean) {
         fromName: s.fromName,
         to: s.to,
         bookId: b.id,
-        ...(on ? { paused: true } : { book: { ...forGuests(b), trashed: null } }),
+        ...(on ? { paused: true } : { book: packNested({ ...forGuests(b), trashed: null }) }),
         createdAt: serverTimestamp(),
       }),
     ),
@@ -661,7 +662,7 @@ export async function dropFromInbox(uid: string, token: string) {
 }
 
 const fromDoc = (data: unknown): StoredBook => {
-  const b = data as StoredBook & { trashed?: number | null };
+  const b = unpackNested(data as StoredBook & { trashed?: number | null });
   return { ...b, trashed: b.trashed ?? undefined };
 };
 
@@ -708,7 +709,7 @@ export async function shareBook(b: StoredBook, to: string): Promise<string> {
     owner: b.owner,
     fromName: b.ownerName,
     to,
-    book: forGuests(b),
+    book: packNested(forGuests(b)),
     bookId: b.id,
     createdAt: serverTimestamp(),
   });
@@ -735,14 +736,14 @@ export async function refreshShares(b: StoredBook, known?: Share[]) {
     return;
   }
   const shares = (known ?? (await sharesOfBook(b.owner, b.id))).filter((s) => !s.paused && s.book);
-  await Promise.all(shares.map((s) => updateDoc(doc(db(), "shares", s.token), { book })));
+  await Promise.all(shares.map((s) => updateDoc(doc(db(), "shares", s.token), { book: packNested(book) })));
 }
 
 export async function loadShare(token: string): Promise<Share | null> {
   if (MOCK) return mem.shares.get(token) ?? null;
   const s = await getDoc(doc(db(), "shares", token));
   if (!s.exists()) return null;
-  const share = s.data() as Share;
+  const share = unpackNested(s.data() as Share);
   // ruhender Link: das Buch liegt im Papierkorb
   return share.paused || !share.book ? null : share;
 }
@@ -752,7 +753,7 @@ export async function mySharesOf(uid: string, cached = false): Promise<Share[]> 
   if (MOCK) return [...mem.shares.values()];
   const q = query(collection(db(), "shares"), where("owner", "==", uid));
   const s = await (cached ? getDocsFromCache(q) : getDocs(q));
-  return s.docs.map((d) => d.data() as Share);
+  return s.docs.map((d) => unpackNested(d.data() as Share));
 }
 
 export async function unshare(token: string) {

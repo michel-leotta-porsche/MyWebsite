@@ -12,12 +12,13 @@ import { CAMERA } from "./camera";
 import { DEVELOP } from "./develop";
 import { EVENING } from "./evening";
 import { FEATURES } from "./features";
+import { HELP } from "./help";
 import { LEGAL } from "./legal";
 import { LIBRARY } from "./library";
 import { STAGE } from "./stage";
 import { START } from "./start";
 import { WORKBENCH } from "./workbench";
 
-export const PARTS: Record<string, Record<string, string>> = { START, LEGAL, STAGE, WORKBENCH, LIBRARY, DEVELOP, CAMERA, EVENING, FEATURES };
+export const PARTS: Record<string, Record<string, string>> = { START, LEGAL, STAGE, WORKBENCH, LIBRARY, DEVELOP, CAMERA, EVENING, FEATURES, HELP };
 
 export const EN: Record<string, string> = Object.assign({}, ...Object.values(PARTS));

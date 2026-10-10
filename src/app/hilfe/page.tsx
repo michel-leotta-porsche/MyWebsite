@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { HelpMap } from "@/components/help-page";
 import { LegalPage, LegalSection, Mail } from "@/components/legal";
 import { linkClass } from "@/components/ui-classes";
 import { T } from "@/lib/i18n";
 
 export const metadata: Metadata = {
   title: "Hilfe · Calima",
-  description: "Antworten zu Büchern, Links und deinem Konto, und wie du mich erreichst.",
+  description: "Vom Foto zum Buch: kurze Anleitungen mit Bildern zu Kamera, Abendstapel, Buch, Hinlegen und Lesen. Dazu Konto, Löschen und Kontakt.",
 };
 
 const inline = `${linkClass} underline`;
@@ -15,6 +16,8 @@ const inline = `${linkClass} underline`;
 export default function Page() {
   return (
     <LegalPage title={<T>Hilfe</T>}>
+      <HelpMap />
+
       <LegalSection title={<T>Kontakt</T>}>
         <p>
           <T>Schreib mir an</T> <Mail />.{" "}
@@ -22,37 +25,9 @@ export default function Page() {
         </p>
       </LegalSection>
 
-      <LegalSection id="buch-anlegen" title={<T>Ein Buch anlegen</T>}>
-        <p>
-          <T>
-            Im Bücherzimmer auf „Neues Buch anlegen“, dann „Fotos auswählen“. Calima ordnet die Fotos zu Doppelseiten; mit „Gestalten“ ordnest du
-            eine Doppelseite frei an. Bis zu 60 Fotos passen in ein Buch.
-          </T>
-        </p>
-      </LegalSection>
-
-      <LegalSection id="fotos-bearbeiten" title={<T>Fotos bearbeiten</T>}>
-        <p>
-          <T>
-            Im Bücherzimmer beim Fotostudio auf „Fotos wählen“, gern mehrere auf einmal, oder auf der Werkbank „Fotos bearbeiten“. Tippe auf einen Look
-            und wisch auf dem Foto, dann änderst du die Stärke; unter „Feinschliff“ stellst du einzelne Regler ein, „Auf alle“ überträgt die Einstellung.
-            Der Reiter „Rezept“ stellt die Werte ein wie an einer Fuji, nachempfunden. Im Fotostudio wird nichts hochgeladen.
-          </T>
-        </p>
-      </LegalSection>
-
-      <LegalSection id="buch-teilen" title={<T>Ein Buch teilen</T>}>
-        <p>
-          <T>
-            Auf der Werkbank „Hinlegen für …“ wählen und einen Namen eintragen. Jede Person bekommt ihren eigenen Link; lesen geht ohne Konto.
-            Mit „Zurückziehen“ machst du einen Link sofort ungültig.
-          </T>
-        </p>
-      </LegalSection>
-
       <LegalSection title={<T>Ein Buch löschen</T>}>
         <p>
-          <T>Im Bücherzimmer über „Mehr …“ in den Papierkorb legen, dann „Papierkorb leeren“. Fotos, Verlauf und geteilte Links sind dann weg.</T>
+          <T>Im Bücherzimmer über die drei Punkte („Mehr“) „In den Papierkorb“ wählen, dann „Papierkorb leeren“. Fotos, Verlauf und geteilte Links sind dann weg.</T>
         </p>
       </LegalSection>
 
@@ -70,7 +45,7 @@ export default function Page() {
       <LegalSection title={<T>Einen Inhalt melden oder ausblenden</T>}>
         <p>
           <T>
-            Hat dir jemand ein Buch hingelegt, das nicht in Ordnung ist, tippe im Buch auf „Melden“ (im Bücherzimmer unter „Mehr …“). Melden geht
+            Hat dir jemand ein Buch hingelegt, das nicht in Ordnung ist, tippe im Buch unter „Mehr“ auf „Buch melden“ (im Bücherzimmer „Melden …“). Melden geht
             auch ohne Konto. Ich prüfe jede Meldung innerhalb von 24 Stunden, nehme Inhalte herunter, die gegen die
           </T>{" "}
           <Link href="/nutzungsbedingungen" className={inline}>

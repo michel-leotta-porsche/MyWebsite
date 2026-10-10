@@ -1,4 +1,6 @@
 import { dayOf, dayStack, isDayStack } from "@/lib/day-stack";
+import type { Film } from "@/lib/film";
+import { t } from "@/lib/i18n";
 import type { Print } from "@/lib/studio-store";
 
 // Umschlag (#244, Michel 10.10.2026): ein entwickelter Film kommt wie vom Labor als ein Stapel auf den Pult, nicht
@@ -27,3 +29,13 @@ export function envelopeLabel(pile: Print[], loc: string): string {
   const name = pile.find((p) => p.roll)?.roll?.trim();
   return name ? `${name} · ${span}` : span;
 }
+
+/**
+ * Bilder, die die Kamera auf dem Film gezählt hat, die aber nicht (mehr) auf dem Gerät liegen, etwa nach einem früher
+ * verschluckten Speicherfehler (#285). rolls gehört Film für Film zu films. Entwickeln sagt dann, was fehlt, statt still zuzugehen.
+ */
+export const missingFrames = (films: Pick<Film, "name" | "count">[], rolls: Print[][]) =>
+  films.map((f, i) => ({ name: f.name, count: f.count, missing: f.count - (rolls[i]?.length ?? 0) })).filter((m) => m.missing > 0);
+
+export const framesMissing = ({ name, missing, count }: { name: string; missing: number; count: number }) =>
+  missing >= count ? t("Auf dem Film „{name}“ liegen keine Bilder mehr auf diesem Gerät.", { name }) : t("Vom Film „{name}“ fehlen {n} von {count} Bildern auf diesem Gerät.", { name, n: missing, count });
