@@ -2657,7 +2657,7 @@ function SheetRow({ icon, label, on, onClick }: { icon: React.ReactNode; label: 
 }
 
 /**
- * Blatt beim langen Drücken am Handy (#275): oben große Symbol-Kacheln, Löschen in Rot, darunter die Zeilen.
+ * Blatt beim langen Drücken am Handy (#275): frei schwebend mit Rand zu allen Seiten, oben große Symbol-Kacheln, Löschen in Rot, darunter die Zeilen.
  * Es öffnet beim Loslassen; der Klick, den der Browser danach schickt, darf nichts auslösen. Tippen daneben und Esc schließen.
  */
 function PressSheet({ tiles, onClose, children }: { tiles: SheetTile[]; onClose: () => void; children: React.ReactNode }) {
@@ -2703,7 +2703,7 @@ function PressSheet({ tiles, onClose, children }: { tiles: SheetTile[]; onClose:
           e.stopPropagation();
           e.preventDefault();
         }}
-        className="slip text-ink rounded-t-cut fixed inset-x-0 bottom-0 max-h-[85svh] overflow-y-auto overscroll-contain px-2 pt-2.5 min-[375px]:px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
+        className="slip text-ink rounded-cut fixed inset-x-2 bottom-[max(0.5rem,env(safe-area-inset-bottom))] max-h-[85svh] overflow-y-auto overscroll-contain px-2 pt-2.5 pb-2 text-base shadow-[0_20px_48px_-16px_rgb(12_10_8/0.85)] min-[375px]:inset-x-3 min-[375px]:px-3 min-[375px]:pb-3"
       >
         <div aria-hidden className="bg-ink/20 mx-auto mb-3 h-[5px] w-10 rounded-full" />
         <div className="grid gap-1 min-[375px]:gap-1.5" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
@@ -2712,7 +2712,7 @@ function PressSheet({ tiles, onClose, children }: { tiles: SheetTile[]; onClose:
               key={tl.key}
               type="button"
               onClick={tl.run}
-              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-0 text-[clamp(10.5px,3.2vw,12px)] leading-tight font-semibold transition-[background-color,transform] duration-150 active:scale-[0.96] [&>svg]:size-[22px] ${
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-0 text-[clamp(10px,2.9vw,12px)] leading-tight font-semibold transition-[background-color,transform] duration-150 active:scale-[0.96] [&>svg]:size-[22px] ${
                 tl.danger ? "text-danger bg-danger/8 active:bg-danger/14" : "bg-ink/6 active:bg-ink/12 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.08)]"
               }`}
             >
