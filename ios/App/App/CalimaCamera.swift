@@ -350,6 +350,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     /// Lupe: der Sucher zeigt die Mitte dreifach vergrößert
     var magnify = false
     private var frameTick = 0
+    /// Heller/Dunkler in EV, wie zuletzt gewischt (#257)
+    private var bias: Float = 0
     private var lastMeter: (offset: Float, duration: Double, iso: Float, lens: Float, kelvin: Float)?
     private var motion: CMMotionManager?
     /// Lage des Telefons aus dem Beschleunigungssensor (wie die Kamera-App): UIDevice.orientation meldet bei
@@ -397,6 +399,8 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         // Belichtung; auf A nur zurück zur Automatik, wenn vorher von Hand gestellt war (eine Sperre per Tipp bleibt)
         if d.duration == nil && d.iso == nil {
             if device.exposureMode == .custom, device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            // zurück in der Vollautomatik gilt die Korrektur wieder am Gerät
+            device.setExposureTargetBias(min(max(bias, device.minExposureTargetBias), device.maxExposureTargetBias))
         } else if device.isExposureModeSupported(.custom) {
             device.setExposureModeCustom(duration: clampDuration(d.duration), iso: clampISO(d.iso), completionHandler: nil)
         }
@@ -461,9 +465,13 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
         }
         // Halbautomatik (Michels Wahl „Ausgleichen“): steht nur Zeit oder nur ISO von Hand, regelt die Kamera das andere nach,
         // damit das Foto richtig belichtet bleibt. Der Chip zeigt den ausgleichenden Wert („Zeit A 1/4“). Halbe Schritte, sonst pendelt es
+        // Heller/Dunkler (#257): iOS beachtet die Korrektur im Custom-Modus nicht, also auf offset − bias regeln. Damit
+        // offset sicher ohne Korrektur gemessen ist, steht die Korrektur am Gerät in der Halbautomatik auf 0.
         let semi = (dials.duration == nil) != (dials.iso == nil)
-        if semi, abs(offset) > 0.15, offset.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
-            let k = pow(2, Double(-offset) * 0.5)
+        let err = offset - bias
+        if semi, abs(err) > 0.15, err.isFinite, device.isExposureModeSupported(.custom), (try? device.lockForConfiguration()) != nil {
+            if device.exposureTargetBias != 0 { device.setExposureTargetBias(0) }
+            let k = pow(2, Double(-err) * 0.5)
             if let d = dials.duration {
                 device.setExposureModeCustom(duration: clampDuration(d), iso: clampISO(iso * Float(k)), completionHandler: nil)
             } else if let i = dials.iso {
@@ -828,9 +836,12 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
     func setExposure(ev: Float) {
         guard let device = input?.device else { return }
         queue.async {
-            guard (try? device.lockForConfiguration()) != nil else { return }
             let v = min(max(ev, device.minExposureTargetBias), device.maxExposureTargetBias)
-            device.setExposureTargetBias(v)
+            // gemerkt für die Halbautomatik (meter() regelt dort auf diese Korrektur); am Gerät nur in der Vollautomatik
+            self.bias = v
+            let semi = (self.dials.duration == nil) != (self.dials.iso == nil)
+            guard (try? device.lockForConfiguration()) != nil else { return }
+            device.setExposureTargetBias(semi ? 0 : v)
             device.unlockForConfiguration()
         }
     }
