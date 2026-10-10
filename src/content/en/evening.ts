@@ -27,6 +27,7 @@ export const EVENING: Record<string, string> = {
   "Was du weggelegt hast, liegt noch eine Woche unter dem Pult. Dort holst du es zurück, danach räumt Calima es weg.":
     "What you put aside stays under the desk for a week. You can bring it back there; after that Calima clears it away.",
   "In „{title}“ legen": "Add to “{title}”",
+  "Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal.": "That didn't work. Check your connection and tap again.",
   "{kind} anlegen": "Start “{kind}”",
   "Ein Foto kommt ins Buch.": "One photo goes into the book.",
   "{n} Fotos kommen ins Buch.": "{n} photos go into the book.",

@@ -15,7 +15,7 @@ import { envelopeLabel, isEnvelope } from "@/lib/envelope";
 import { bakePhoto } from "@/lib/develop/bake";
 import { outSize } from "@/lib/develop/geo";
 import { buildLut, isNeutral } from "@/lib/develop/model";
-import { friendlyError } from "@/lib/errors";
+import { errorDetail } from "@/lib/errors";
 import type { User } from "@/lib/firebase";
 import { haptic } from "@/lib/haptics";
 import { de, getLang, locale, useT } from "@/lib/i18n";
@@ -620,7 +620,12 @@ function Finish({
     } catch (e) {
       // auf einem anderen Gerät voll geworden: den frischen Stand zeigen, dann bietet der Abschluss den nächsten Band an
       if (e instanceof BookFull && "book" in chosen) return setTarget({ book: e.book as StoredBook });
-      setError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
+      const detail = errorDetail(e);
+      setError(
+        detail
+          ? t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: detail })
+          : t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal."),
+      );
     } finally {
       setBusy(null);
       onBusy(false);
