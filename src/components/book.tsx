@@ -27,6 +27,7 @@ import { RecipeSlip } from "@/components/recipe-slip";
 import { SunAndShade } from "@/components/sun-and-shade";
 import { buttonClass } from "@/components/ui/button-class";
 import { haptic } from "@/lib/haptics";
+import { atBookEnd } from "@/lib/sample-book";
 
 export type Mode = "spread" | "single";
 export type Leaf = { front: Page; back: Page };
@@ -339,6 +340,7 @@ export function Book({
   onEdit,
   onPin,
   pins,
+  end,
 }: {
   book: BookData;
   mode: Mode;
@@ -360,6 +362,8 @@ export function Book({
   pins?: Pinned[];
   /** Nur im eigenen Buch: in die Werkbank, an die aufgeschlagene Stelle (step wie k: 0 Einband, 1 Titel, …) */
   onEdit?: (step: number) => void;
+  /** Leise unter dem Buch, sobald die letzte Doppelseite oder der Rückdeckel aufliegt (z. B. der Weg zum eigenen Buch) */
+  end?: React.ReactNode;
 }) {
   const { leaves, base } = useMemo(() => buildLeaves(book, mode), [book, mode]);
   const curl = useMemo(() => createCurlStore(), []);
@@ -1351,6 +1355,23 @@ export function Book({
               })}
             </ol>
           </div>
+          {/* Platz bleibt reserviert, damit das Buch nicht springt, wenn der Satz am Ende erscheint */}
+          {end && (
+            <div className="grid min-h-12 place-items-center pt-2 text-center md:min-h-10">
+              <AnimatePresence>
+                {atBookEnd(k, count) && (
+                  <motion.div
+                    initial={reduce ? { opacity: 0 } : { opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+                  >
+                    {end}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </nav>
       </motion.div>
 
