@@ -51,11 +51,11 @@ export function cueAt(cues: Cue[], t: number): string | null {
   return cues.find((c) => t >= c.from && t < c.to)?.de ?? null;
 }
 
-// Drei Schritte, jeder verweist auf die Hilfe. Sobald Hilfe Welle 1 freigegeben ist, zeigen sie auf die einzelnen Seiten.
+// Drei Schritte, jeder führt auf die passende Anleitung der Hilfe (#215)
 export const HOWTO = [
-  { title: de("Fotos reinziehen"), text: de("Im Bücherzimmer ein Buch anlegen und Fotos auswählen. Calima setzt sie nach Aufnahmezeit zu Doppelseiten."), href: "/hilfe" },
-  { title: de("Gestalten, wenn du willst"), text: de("Bilder schieben, zuschneiden, Text dazu. Das Fuji-Rezept liegt als Zettel unter dem Foto."), href: "/hilfe" },
-  { title: de("Hinlegen|Landing"), text: de("Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da."), href: "/hilfe" },
+  { title: de("Fotos reinziehen"), text: de("Im Bücherzimmer ein Buch anlegen und Fotos auswählen. Calima setzt sie nach Aufnahmezeit zu Doppelseiten."), href: "/hilfe/erstes-buch" },
+  { title: de("Gestalten, wenn du willst"), text: de("Bilder schieben, zuschneiden, Text dazu. Das Fuji-Rezept liegt als Zettel unter dem Foto."), href: "/hilfe/erstes-buch#schritt-4" },
+  { title: de("Hinlegen|Landing"), text: de("Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da."), href: "/hilfe/hinlegen" },
 ] as const;
 
 // Kamera, nur in der iPhone-App: drei Dinge, die es schon gibt (Feature #176). Die ganze Liste kommt auf /funktionen (#267).

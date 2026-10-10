@@ -13,8 +13,8 @@ export const FEATURES: Record<string, string> = {
   "„Gestalten“ öffnet die Doppelseite: Fotos frei schieben, zuschneiden, Text schreiben, zeichnen.":
     "“Design” opens the spread: move photos freely, crop them, add text, draw.",
   Einband: "Cover",
-  "Unter „Titelbild …“ kommt ein Foto auf den Einband. Dort wählst du auch Titel und Farbe des Einbands.":
-    "Under “Cover photo …”, a photo goes on the cover. Pick the title and cover color there too.",
+  "Unter „Titelbild …“ kommt ein Foto auf den Einband. Daneben wählst du Titel und Farbe des Einbands.":
+    "Under “Cover photo …”, a photo goes on the cover. Pick the title and cover color right next to it.",
   "Fotos bearbeiten": "Edit photos",
   "Licht und Farbe stellst du mit dem Finger direkt auf dem Foto ein. Ein Foto oder gleich mehrere auf einmal.":
     "You adjust light and color with your finger, right on the photo. One photo, or several at once.",
