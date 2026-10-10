@@ -33,6 +33,8 @@ export const WORKBENCH: Record<string, string> = {
   fertig: "done",
   "Kein Foto": "Not a photo",
   "Ließ sich nicht öffnen": "Couldn't be opened",
+  "Dieses Buch liegt hier nicht mehr.": "This book isn't here anymore.",
+  "Das Buch ließ sich nicht laden. Versuch es gleich nochmal.": "The book couldn't be loaded. Try again in a moment.",
   "Diese Fotos kamen nicht als Dateien an. Aus der Fotos-App bitte erst in den Finder ziehen oder „Fotos auswählen“ nutzen.":
     "These photos didn't arrive as files. From the Photos app, drag them into the Finder first or use “Choose photos”.",
   "{n} von {all} Fotos aufgenommen, damit ist das Buch voll (bis zu {max} Fotos). Die übrigen {over} passen in ein zweites Buch.":
