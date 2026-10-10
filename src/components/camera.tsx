@@ -4,6 +4,7 @@ import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizont
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { AidsRow, Histogram } from "@/components/camera-aids";
 import { allAuto, DIALS, DialChips, GridOverlay, isManual, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
 import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
@@ -14,6 +15,7 @@ import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, l
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
+import { readAids, type Aids } from "@/lib/aids";
 import { haptic } from "@/lib/haptics";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
@@ -58,6 +60,9 @@ const framesOf = (f: Film) => f.rules?.frames ?? FILM_FRAMES;
 const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
 
 /** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
+/** gemerkte Profi-Hilfen (#185) */
+const AIDS_KEY = "calima:hilfen";
+
 export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: string; taken?: boolean; onShot: (p: Print, stack?: string) => void; onFilmDone: (stack: string) => void; onClose: () => void }) {
   const t = useT();
   const recent = useRecentSettings();
@@ -119,7 +124,26 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   const [whiteMsg, setWhiteMsg] = useState<string | null>(null);
   const [dial, setDial] = useState<DialKey | "focal" | null>(null);
   const [focal, setFocal] = useState<number | null>(null);
-  const [grid, setGrid] = useState(false);
+  /** Profi-Hilfen (#185): einzeln an und aus, gemerkt auf dem Gerät; die Reihe der Schalter klappt unter den Rädern auf */
+  const [aids, setAidsState] = useState<Aids>(() => {
+    try {
+      return readAids(localStorage.getItem(AIDS_KEY));
+    } catch {
+      return readAids(null);
+    }
+  });
+  const setAids = (a: Aids) => {
+    haptic("select");
+    setAidsState(a);
+    try {
+      localStorage.setItem(AIDS_KEY, JSON.stringify(a));
+    } catch {}
+  };
+  const [aidsOpen, setAidsOpen] = useState(false);
+  const [bins, setBins] = useState<number[] | null>(null);
+  /** Selbstauslöser: Sekunden bis zum Auslösen, null wenn keiner läuft */
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countTimer = useRef(0);
   const [meter, setMeter] = useState<Meter | null>(null);
   const [roll, setRoll] = useState<number | null>(null);
   // die Filme im Gerät: einer eingelegt, die anderen beiseitegelegt, alle noch nicht entwickelt
@@ -290,8 +314,15 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     if (ready) CalimaCamera.setDials(dials).catch(() => {});
   }, [dials, ready]);
   useEffect(() => {
-    if (ready) CalimaCamera.setLevel({ on: tools && grid }).catch(() => {});
-  }, [tools, grid, ready]);
+    if (ready) CalimaCamera.setLevel({ on: !fixed && aids.grid }).catch(() => {});
+  }, [fixed, aids.grid, ready]);
+  // Peaking, Zebra und Histogramm zeichnet bzw. misst die App; bei der Einwegkamera gibt es keine Hilfen
+  const { peaking, zebra, histogram } = aids;
+  useEffect(() => {
+    if (!ready) return;
+    const off = !!fixed;
+    CalimaCamera.setAids({ peaking: !off && peaking, zebra: !off && zebra, histogram: !off && histogram }).catch(() => {});
+  }, [fixed, peaking, zebra, histogram, ready]);
   const toggleTools = () => {
     haptic("select");
     setToolsDown(false);
@@ -574,15 +605,43 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     }
   };
 
-  const shoot = async () => {
+  /** Auslöser: misst Weiß, startet den Selbstauslöser (ein zweiter Druck bricht ihn ab) oder löst gleich aus */
+  const shoot = () => {
     if (metering) return measureWhite();
+    if (countdown != null) {
+      window.clearInterval(countTimer.current);
+      setCountdown(null);
+      haptic("select");
+      return;
+    }
+    const delay = fixed ? 0 : aids.timer;
+    if (!delay || !ready || busy) return expose();
+    haptic("press");
+    let left = delay;
+    setCountdown(left);
+    countTimer.current = window.setInterval(() => {
+      left -= 1;
+      if (left > 0) {
+        haptic("select");
+        return setCountdown(left);
+      }
+      window.clearInterval(countTimer.current);
+      setCountdown(null);
+      void exposeRef.current();
+    }, 1000);
+  };
+
+  const expose = async () => {
     if (!ready || busy) return;
     setBusy(true);
     haptic("press");
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
     try {
-      const { path } = await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
+      // RAW (#185) nur ohne Film: die DNG-Datei ginge sofort in die Mediathek, ein Film zeigt seine Bilder erst entwickelt
+      const raw = aids.raw && !!info?.raw && !film;
+      const opts = { ...(film?.rules?.flash ? { flash: true } : {}), ...(raw ? { raw: true } : {}) };
+      const { path } = await CalimaCamera.capture(Object.keys(opts).length ? opts : undefined);
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = lookNow.edit ?? undefined;
@@ -644,9 +703,13 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
 
   // Kamera-Knopf und Lautstärketasten lösen aus, Wischen am Knopf zoomt; der Auslöser hier ist immer der aktuelle
   const shootRef = useRef(shoot);
+  // der Selbstauslöser löst mit dem neuesten Stand aus (Look, Film, Hilfen können sich im Countdown ändern)
+  const exposeRef = useRef(expose);
   useEffect(() => {
     shootRef.current = shoot;
+    exposeRef.current = expose;
   });
+  useEffect(() => () => window.clearInterval(countTimer.current), []);
   useEffect(() => {
     const sub = CalimaCamera.addListener("event", (e) => {
       if (e.name === "shutter") shootRef.current();
@@ -663,6 +726,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
       else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
+      else if (e.name === "histogram" && Array.isArray(e.data.bins)) setBins(e.data.bins.filter((b): b is number => typeof b === "number"));
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -709,6 +773,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           <p className="text-on-table-2 truncate text-[12px] leading-tight">{sub || " "}</p>
         </div>
         <span className="flex items-center gap-1">
+          {aids.raw && info?.raw && !film && <span className="text-cloth text-[11px] font-bold tracking-wide">RAW</span>}
           <span className="text-on-table-2 text-right text-[13px] tabular-nums" aria-label={t("Zoom {factor}", { factor: `${zoom.toFixed(zoom < 1 ? 1 : zoom % 1 ? 1 : 0)}×` })}>
             {zoom.toFixed(zoom < 1 || zoom % 1 ? 1 : 0)}×
           </span>
@@ -739,7 +804,13 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               {error}
             </p>
           )}
-          {tools && grid && <GridOverlay roll={roll} />}
+          {!fixed && aids.grid && <GridOverlay roll={roll} />}
+          {!fixed && aids.histogram && <Histogram bins={bins} />}
+          {countdown != null && (
+            <p aria-live="assertive" className="text-on-table pointer-events-none absolute inset-0 grid place-items-center text-[96px] font-bold tabular-nums drop-shadow-[0_2px_12px_rgb(0_0_0/0.6)]">
+              {countdown}
+            </p>
+          )}
           {tools && ready && <MeterBadge meter={meter} />}
           {metering && (
             // das Messquadrat: hierauf zielt die Pipette, wie das Feld bei „Custom WB“ an einer Fuji
@@ -824,11 +895,16 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         >
           <div ref={panel} className="grid gap-3 pt-3">
             {tools && (
-              <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={grid} onPick={(k) => {
+              <DialChips dials={dials} dial={dial} meter={meter} focal={focal} realFocals={lenses} grid={aidsOpen} onPick={(k) => {
+                  setAidsOpen(false);
                   setMetering(false);
                   setDial(k);
-                }} onFocal={pickFocal} onGrid={() => setGrid((g) => !g)} onReset={resetDial} />
+                }} onFocal={pickFocal} onGrid={() => {
+                  setDial(null);
+                  setAidsOpen((o) => !o);
+                }} onReset={resetDial} />
             )}
+            {tools && aidsOpen && <AidsRow aids={aids} raw={!!info?.raw} onChange={setAids} />}
             {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} metering={metering} onPipette={togglePipette} />}
             {tools && dial && dial !== "focal" && dial !== "kelvin" && (
               <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? magnifyWhile : undefined} />

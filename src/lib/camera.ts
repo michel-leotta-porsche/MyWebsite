@@ -13,7 +13,8 @@ import { de } from "@/lib/i18n";
 export type Frame = { x: number; y: number; w: number; h: number };
 
 /** was die Kamera kann: echte Objektive als Zoomfaktoren zur Hauptkamera, Grenzen für Zeit und ISO */
-export type CameraInfo = { front: boolean; lenses: number[]; limits: { minDuration: number; maxDuration: number; minISO: number; maxISO: number } };
+/** raw: das Gerät kann ProRAW (#185); fehlt bei älteren App-Ständen */
+export type CameraInfo = { front: boolean; lenses: number[]; limits: { minDuration: number; maxDuration: number; minISO: number; maxISO: number }; raw?: boolean };
 
 /** Die Räder (Expertenmodus E1): null heißt „A“, die Kamera stellt selbst. duration in Sekunden, focus 0 (nah) bis 1 (fern), kelvin als Farbtemperatur,
  *  tint die Tönung dazu (negativ grüner, positiv magenta; gilt nur mit kelvin, setzt das Licht „Neon“). */
@@ -47,8 +48,16 @@ type Plugin = {
   setMagnify(o: { on: boolean }): Promise<void>;
   /** Wasserwaage: die App meldet die Neigung als Ereignis „level“ (data.roll in Grad, 0 = gerade) */
   setLevel(o: { on: boolean }): Promise<void>;
-  /** flash: echter Blitz für dieses Bild (Einwegkamera-Vorlagen); eine App ohne Blitz-Unterstützung löst ohne aus */
-  capture(o?: { flash?: boolean }): Promise<{ path: string }>;
+  /**
+   * flash: echter Blitz für dieses Bild (Einwegkamera-Vorlagen); eine App ohne Blitz-Unterstützung löst ohne aus.
+   * raw: zusätzlich ProRAW aufnehmen und die DNG-Datei gleich in die Mediathek legen (#185); path bleibt das JPEG fürs Buch.
+   */
+  capture(o?: { flash?: boolean; raw?: boolean }): Promise<{ path: string }>;
+  /**
+   * Profi-Hilfen im Sucher (#185), von der App gezeichnet: Peaking färbt scharfe Kanten, Zebra streift ausgefressene
+   * Lichter, histogram meldet das Ereignis „histogram“ (data.bins: Helligkeit, links dunkel, etwa 64 Werte).
+   */
+  setAids(o: { peaking: boolean; zebra: boolean; histogram: boolean }): Promise<void>;
   /** fertiges Foto (JPEG, Base64) zusätzlich in die Mediathek; denied, wenn „Fotos hinzufügen“ nicht erlaubt ist */
   saveToLibrary(o: { data: string }): Promise<{ saved: boolean; denied?: boolean }>;
   discard(o: { path: string }): Promise<void>;
