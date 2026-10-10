@@ -9,7 +9,7 @@ import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { DISPOSABLE_FRAMES, DISPOSABLES, disposableEdit, type Disposable } from "@/lib/disposable";
-import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
+import { filmStrip, readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
@@ -128,6 +128,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   /** Reihe unter dem Sucher: Looks oder Einwegkamera-Vorlagen */
   const [tab, setTab] = useState<"looks" | "einweg">("looks");
   const aside = shelf.films.filter((f) => f.stack !== shelf.loaded);
+  /** ab zwei beiseitegelegten Filmen liegen sie als Stapel vor den Looks; offen zeigt er sie alle */
+  const [pileOpen, setPileOpen] = useState(false);
+  const strip = filmStrip(aside, pileOpen);
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -816,12 +819,32 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               <ChevronRight aria-hidden className="text-on-table-2 -mr-1 h-4 w-4" />
             </button>
           </li>
-          {/* beiseitegelegte Filme: wieder einlegen und weiter belichten */}
-          {aside.map((f) => (
+          {/* beiseitegelegte Filme: wieder einlegen und weiter belichten; ab zwei als ein Stapel (#226) */}
+          {strip.pile != null && (
+            <li className="flex-none">
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("select");
+                  setPileOpen((o) => !o);
+                }}
+                aria-expanded={pileOpen}
+                className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap"
+              >
+                <FilmIcon aria-hidden className="text-cloth h-4 w-4" />
+                {t("Filme · {n}", { n: strip.pile })}
+                <ChevronRight aria-hidden className={`text-on-table-2 -mr-1 h-4 w-4 transition-transform ${pileOpen ? "rotate-90" : ""}`} />
+              </button>
+            </li>
+          )}
+          {strip.films.map((f) => (
             <li key={f.stack} className="flex-none">
               <button
                 type="button"
-                onClick={() => resumeFilm(f.stack)}
+                onClick={() => {
+                  setPileOpen(false);
+                  resumeFilm(f.stack);
+                }}
                 disabled={!ready}
                 aria-label={t("Film „{name}“ weiter belichten, {i} von {n}", { name: f.name, i: f.count, n: framesOf(f) })}
                 className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50"

@@ -46,3 +46,10 @@ export function writeShelf(s: Shelf) {
 
 /** Stapel, deren Bilder noch im Dunkeln liegen: unentwickelte Filme */
 export const undevelopedStacks = (): Set<string> => new Set(readShelf().films.map((f) => f.stack));
+
+/**
+ * Die beiseitegelegten Filme in der Look-Leiste (#226): ab zwei liegen sie als ein Stapel („Filme · N“) vor den Looks,
+ * damit die Looks ohne Scrollen erreichbar bleiben. pile ist die Zahl am Stapel (null: kein Stapel), films was zu sehen ist.
+ */
+export const filmStrip = (aside: Film[], open: boolean): { pile: number | null; films: Film[] } =>
+  aside.length < 2 ? { pile: null, films: aside } : { pile: aside.length, films: open ? aside : [] };

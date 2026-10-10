@@ -55,6 +55,7 @@ export const CAMERA: Record<string, string> = {
   "Schärfe und Licht stehen fest. Ein Tipp auf die Marke löst sie.": "Focus and exposure are locked. Tap the mark to release.",
   "Noch ein Tipp auf die Marke hält Schärfe und Licht fest.": "Tap the mark again to lock focus and exposure.",
   "Ziehen oder tippen wählt das Licht. Feinabstimmung verschiebt die Farbe wie bei Fuji.": "Drag or tap to pick the light. Fine-tune shifts the color like on a Fuji.",
+  "Filme · {n}": "Films · {n}",
   Licht: "Light",
   gemessen: "measured",
   Feinabstimmung: "Fine-tune",
