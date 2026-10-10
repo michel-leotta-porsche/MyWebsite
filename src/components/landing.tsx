@@ -261,7 +261,7 @@ function Own() {
           {t("Mach dein eigenes.")}
         </h2>
         <div className="md:col-span-6 md:col-start-7">
-          <p className="text-on-table max-w-[30rem] text-lg leading-relaxed opacity-80">
+          <p className="text-on-table max-w-[30rem] text-lg leading-relaxed opacity-80 lg:max-w-[34rem] lg:text-xl">
             {t("Ein Ordner Fotos wird ein Buch, das man wirklich umblättert. Mit dem Fuji-Rezept als Zettel dazu.")}
           </p>
           <div className="mt-8">
@@ -423,7 +423,7 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
               <br />
               {t("Fertig gesetzt.")}
             </h3>
-            <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg">
+            <p className="text-on-table mt-6 max-w-[28rem] text-base leading-relaxed opacity-80 md:text-lg xl:text-xl">
               {t(
                 "Fotos vom Handy, von der Fuji oder aus Lightroom auf die Werkbank ziehen, auch HEIC und DNG. Nach ein, zwei Sekunden stehen sie als Doppelseiten da, nach Aufnahmezeit geordnet. Ortsdaten fallen beim Hochladen weg.",
               )}
@@ -518,18 +518,18 @@ function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
 function Recipe() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-36">
+    <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-28">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <h3 id="recipe-h" className={`${displayHeading} md:col-span-7`} style={display}>
           {t("Das Rezept liegt bei.")}
         </h3>
-        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-5 md:col-start-8 md:self-end lg:text-xl">
           {t("Filmsimulation, Körnung, Weißabgleich: Was die Fuji in die Datei schreibt, liegt als Zettel unter dem Foto. Lightroom-Presets nimmt man gleich als .xmp mit.")}
           <span className="mt-4 block">{t("Im Fotostudio liest Calima Rezept und Preset aus der Datei und legt den Look mit einem Tipp über alle Fotos.")}</span>
         </p>
       </div>
 
-      <figure className="relative mx-auto mt-14 max-w-[880px] md:mt-20">
+      <figure className="relative mx-auto mt-14 max-w-[880px] md:mt-16 xl:max-w-[1040px]">
         <Clip clip={CLIPS.rezept} label={t("Clip: Calima liest Fuji-Rezept und Lightroom-Preset, ein Look für alle Fotos")} className="mx-auto w-[74%] -rotate-[1.5deg] md:mx-0 md:ml-[8%] md:w-[38%]" />
         {/* Zettel schiebt sich unter dem Clip hervor, sobald er ins Bild kommt */}
         <Slip className="reveal-slip relative mt-[-18%] ml-auto w-[88%] rotate-[3deg] p-5 md:absolute md:right-0 md:bottom-[14%] md:mt-0 md:w-[50%] md:p-8">
@@ -564,9 +564,9 @@ function Recipe() {
 function Share() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-24 md:py-36">
+    <div role="group" aria-labelledby="share-h" className="linen table-surface relative overflow-hidden bg-table-deep px-page py-24 md:py-28">
       <div className="grid items-center gap-16 md:grid-cols-12 md:gap-8">
-        <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0">
+        <div className="relative mx-auto w-full max-w-[520px] md:col-span-6 md:mx-0 xl:max-w-[640px]">
           <Clip clip={CLIPS.hinlegen} label={t("Clip: Fotos werden ein Buch, das Buch wird einer Person hingelegt")} className="w-[66%] -rotate-[2deg] md:w-[58%]" />
           <Slip className="reveal-slip top-[6%] right-0 w-[46%] rotate-[3deg] text-[15px]">
             {t("Für Jana, von Michel")}
@@ -581,10 +581,10 @@ function Share() {
           <h3 id="share-h" className={displayHeading} style={display}>
             {t("Hinlegen, nicht posten.")}
           </h3>
-          <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80">
+          <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80 lg:max-w-[34rem] lg:text-xl">
             {t("Für jede Person ein eigener Link. Sie blättert ohne Konto, auf dem Telefon Seite für Seite, und lässt dir Zettel und Eselsohren da, die nur du liest.")}
           </p>
-          <p className="text-on-table-2 mt-6 max-w-[30rem] text-base leading-relaxed">
+          <p className="text-on-table-2 mt-6 max-w-[30rem] text-base leading-relaxed lg:max-w-[34rem] lg:text-lg">
             {t("Kein Profil, kein Feed. Ein Buch sieht nur, wer den Link hat, und jeden Link kannst du einzeln zurückziehen.")}
           </p>
         </div>
@@ -599,7 +599,7 @@ const APP_ICONS = { look: Aperture, film: Film, white: Pipette } as const;
 function AppCamera() {
   const t = useT();
   return (
-    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-36">
+    <div role="group" aria-labelledby="app-h" className="linen table-surface relative overflow-hidden bg-table px-page py-24 md:py-28">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
         <div className="md:col-span-7">
           <p className="text-on-table-2 flex items-center gap-2 text-sm font-semibold">
@@ -611,7 +611,7 @@ function AppCamera() {
             {t("Die Kamera gibt es nur in der iPhone-App.").replace("iPhone-App", "iPhone\u2011App")}
           </h3>
         </div>
-        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
+        <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-5 md:col-start-8 md:self-end lg:text-xl">
           {t("Fotografieren wie mit der Fuji, und die Bilder landen gleich im Buch.")}{" "}
           {TESTFLIGHT_URL ? (
             <a href={TESTFLIGHT_URL} className={`${linkClass} font-semibold opacity-100`}>
@@ -631,7 +631,7 @@ function AppCamera() {
               <h4 className="text-on-table mt-4 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
                 {t(f.title)}
               </h4>
-              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(f.text)}</p>
+              <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed lg:text-lg">{t(f.text)}</p>
             </li>
           );
         })}
@@ -656,7 +656,7 @@ function HowTo() {
             <h3 className="text-on-table mt-2 text-2xl font-bold tracking-[-0.02em]" style={narrow}>
               {t(s.title)}
             </h3>
-            <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed">{t(s.text)}</p>
+            <p className="text-on-table-2 mt-2 max-w-[30rem] text-base leading-relaxed lg:text-lg">{t(s.text)}</p>
             <Link href={s.href} className={`${linkClass} text-on-table mt-3 inline-flex items-center gap-1 text-sm font-semibold`}>
               {t("Mehr in der Hilfe")}
               <ArrowRight aria-hidden className="size-3.5" />
