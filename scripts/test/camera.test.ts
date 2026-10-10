@@ -7,7 +7,7 @@ import exifr from "exifr";
 import { applySettings, cleanSettings, fromEdit } from "@/lib/develop/settings";
 import { withXmp } from "@/lib/exif-write";
 import { neutralEdit, PRESETS } from "@/lib/develop/model";
-import { fmtDuration, ISO_STOPS, nearest, realFocals, SHUTTER_STOPS } from "@/lib/camera";
+import { fmtDuration, fmtFocus, ISO_STOPS, nearest, realFocals, SHUTTER_STOPS } from "@/lib/camera";
 import { calimaXmp, parseCalimaXmp } from "@/lib/xmp";
 import { jpeg, LR_XMP } from "./fixtures.mjs";
 
@@ -64,4 +64,14 @@ test("Zeiten lesbar und in Drittelstufen", () => {
   // Umschaltpunkte eines iPhone 15 Pro Max: 0,5× Ultraweit, 1× Haupt, 5× Tele
   assert.deepEqual(realFocals([0.5, 1, 5]), [13, 24, 120]);
   assert.deepEqual(realFocals([1]), [24]);
+});
+
+test("Fokus als Skala nah … ∞, nie in Prozent (#225)", () => {
+  assert.equal(fmtFocus(0), "nah|Fokus");
+  assert.equal(fmtFocus(0.45), "Tisch|Fokus");
+  assert.equal(fmtFocus(0.7), "Zimmer|Fokus");
+  assert.equal(fmtFocus(0.88), "Straße|Fokus");
+  assert.equal(fmtFocus(0.95), "∞");
+  assert.equal(fmtFocus(1), "∞");
+  for (let f = 0; f <= 1; f += 0.01) assert.ok(!fmtFocus(f).includes("%"), `kein Prozent bei ${f}`);
 });
