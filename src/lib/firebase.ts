@@ -25,7 +25,7 @@ import { getStorage } from "firebase/storage";
 
 import { IS_APP } from "@/lib/app-mode";
 
-const AUTH_HOSTS = ["calima.photo", "calima.web.app"];
+const AUTH_HOSTS = ["calima.photos", "calima.web.app"];
 
 // Öffentliche Web-Konfiguration (kein Geheimnis): der Zugriff wird über firestore.rules und storage.rules geregelt
 const config = {
