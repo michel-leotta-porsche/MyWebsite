@@ -20,7 +20,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import type { SharpenLevel } from "@/lib/develop/detail";
 import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
-import { friendlyError } from "@/lib/errors";
+import { errorDetail } from "@/lib/errors";
 import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
@@ -884,7 +884,12 @@ function DoneSheet({
       );
       onClose();
     } catch (e) {
-      setBookError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
+      const detail = errorDetail(e);
+      setBookError(
+        detail
+          ? t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: detail })
+          : t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal."),
+      );
     } finally {
       setBusy(null);
     }
