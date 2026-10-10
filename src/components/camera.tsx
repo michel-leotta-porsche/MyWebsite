@@ -21,7 +21,7 @@ import { locale, useLang, useT } from "@/lib/i18n";
 import { correctWhite } from "@/lib/white";
 import { useRecentSettings } from "@/lib/settings-clipboard";
 import { myRecipes, newId } from "@/lib/store";
-import { listPrints, type Print } from "@/lib/studio-store";
+import { listPrints, notSaved, storageLow, tooFull, type Print } from "@/lib/studio-store";
 
 // Calimas Kamera (Kamera-Workshop 9.10.2026, kamera-workshop-2026-10-09/): ein Bildschirm, eine Hand, kein Menü.
 // Der Sucher ist der native Teil (ios/App/App/CalimaCamera.swift) hinter der durchsichtigen Seite; hier liegen nur
@@ -58,7 +58,25 @@ const framesOf = (f: Film) => f.rules?.frames ?? FILM_FRAMES;
 const evLabel = (ev: number) => `${ev > 0 ? "+" : ev < 0 ? "−" : "±"}${Math.abs(ev).toFixed(1)}`;
 
 /** taken: von „So fotografieren“ geöffnet, der eben mitgenommene Look kommt vor dem zuletzt gewählten */
-export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: string; taken?: boolean; onShot: (p: Print, stack?: string) => void; onFilmDone: (films: Film[]) => void; onClose: () => void }) {
+/**
+ * onShot sichert das Foto und löst sich erst, wenn es auf dem Gerät liegt; scheitert es, zählt das Bild nicht (#285).
+ * onLook hängt das eingerechnete Vorschaubild an den schon gesicherten Abzug, ohne ihn zu ersetzen (#284).
+ */
+export function Camera({
+  uid,
+  taken,
+  onShot,
+  onLook,
+  onFilmDone,
+  onClose,
+}: {
+  uid: string;
+  taken?: boolean;
+  onShot: (p: Print, stack?: string) => Promise<void>;
+  onLook: (id: string, shot: Blob) => void;
+  onFilmDone: (films: Film[]) => void;
+  onClose: () => void;
+}) {
   const t = useT();
   const recent = useRecentSettings();
   const [own, setOwn] = useState<NamedRecipe[]>([]);
@@ -602,13 +620,26 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     }
   };
 
+  // Platz auf dem Gerät: beim Öffnen und nach jedem Foto nachgesehen, damit das Auslösen nicht darauf wartet
+  const low = useRef(false);
+  useEffect(() => {
+    storageLow().then((v) => (low.current = v));
+  }, []);
   const shoot = async () => {
     if (metering) return measureWhite();
     if (!ready || busy) return;
+    // ist der Speicher fast voll, löst Calima nicht aus, statt ein Foto zu machen, das sich nicht sichern lässt (#285)
+    if (low.current && (low.current = await storageLow())) {
+      haptic("warning");
+      setError(tooFull());
+      window.setTimeout(() => setError(null), 5000);
+      return;
+    }
     setBusy(true);
     haptic("press");
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
+    let saving = false;
     try {
       const { path } = await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
@@ -616,7 +647,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
       const edit = lookNow.edit ?? undefined;
       const onFilm = film;
       const print: Print = { id: newId(), name: file.name.replace(/\.jpg$/, ""), at: Date.now(), w: s.w, h: s.h, work: s.work, page: s.page, thumb: s.thumb, meta: s.meta, edit, pos: onFilm?.count };
-      onShot(print, onFilm?.stack);
+      // erst wenn das Foto sicher liegt, zählt es: auf dem Film, und vor dem Entwickeln (#284)
+      saving = true;
+      await onShot(print, onFilm?.stack);
+      saving = false;
+      storageLow().then((v) => (low.current = v));
       if (onFilm) {
         const next = { ...onFilm, count: onFilm.count + 1, last: print.at };
         if (next.count >= framesOf(next)) {
@@ -646,7 +681,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         const url = URL.createObjectURL(s.page);
         bakePhoto({ url, lut: buildLut(edit, LUT_N), n: LUT_N, rec: edit.rec, sizes: { large: SIZES.thumb, page: onFilm ? SIZES.thumb : SIZES.page, thumb: SIZES.thumb } })
           .then((r) => {
-            onShot({ ...print, shot: r.blobs.thumb }, onFilm?.stack);
+            onLook(print.id, r.blobs.thumb);
             // auf dem Film bleibt das Bild im Dunkeln, bis er entwickelt ist
             if (!onFilm) {
               setLast((old) => {
@@ -659,10 +694,10 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           .catch(() => {})
           .finally(() => URL.revokeObjectURL(url));
       }
-    } catch {
+    } catch (e) {
       haptic("warning");
-      setError(t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
-      window.setTimeout(() => setError(null), 2500);
+      setError(saving ? notSaved(e) : t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
+      window.setTimeout(() => setError(null), saving ? 5000 : 2500);
     } finally {
       setBusy(false);
     }

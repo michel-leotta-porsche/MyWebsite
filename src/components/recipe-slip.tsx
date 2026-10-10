@@ -18,7 +18,7 @@ import { applySettings, asLook, fromEdit, fromRecipe, type CopiedSettings } from
 import { de, locale, useLang, useT } from "@/lib/i18n";
 import { copySettings } from "@/lib/settings-clipboard";
 import type { Film } from "@/lib/film";
-import { developFilm, putPrints, type Print } from "@/lib/studio-store";
+import { developFilm, notSaved, patchShot, putPrints, type Print } from "@/lib/studio-store";
 import { parseXmp, type LightroomSettings } from "@/lib/xmp";
 
 // Rezeptzettel: gleitet unter dem Buch hervor und kommt leicht schräg zur Ruhe.
@@ -492,16 +492,19 @@ async function currentUid(): Promise<string | null> {
 function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
   const t = useT();
   const made = useRef({ shots: new Set<string>(), films: new Set<string>(), developed: [] as string[] });
-  const onShot = (p: Print, filmStack?: string) => {
+  // die Kamera wartet, bis das Foto gesichert ist, und zählt es sonst nicht (#285); gemeldet wird erst, was sicher liegt
+  const onShot = async (p: Print, filmStack?: string) => {
     // auf einem Film zählt die Kamera selbst, der Stapel ist der Film
     if (filmStack) {
+      await putPrints(uid, [{ ...p, stack: filmStack }]);
       made.current.films.add(filmStack);
-      putPrints(uid, [{ ...p, stack: filmStack }]).catch(() => {});
       return;
     }
+    await putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]);
     made.current.shots.add(p.id);
-    putPrints(uid, [{ ...p, stack: dayStack(p.at), pos: p.at }]).catch(() => {});
   };
+  // das Vorschaubild ergänzt nur shot am gesicherten Abzug, auch wenn der Film inzwischen entwickelt ist (#284)
+  const onLook = (id: string, shot: Blob) => void patchShot(uid, id, shot).catch(() => {});
   const close = () => {
     const { shots, films, developed } = made.current;
     onClose();
@@ -510,15 +513,16 @@ function SlipCamera({ uid, onClose }: { uid: string; onClose: () => void }) {
     else if (shots.size) notify(shots.size === 1 ? t("Das Foto liegt auf dem Stapel von heute.") : t("Die {n} Fotos liegen auf dem Stapel von heute.", { n: shots.size }));
     else if (films.size) notify(t("Der Film liegt im Fotostudio."));
   };
-  // ein entwickelter Film kommt wie im Zimmer als Umschlag auf den Pult (#244)
+  // ein entwickelter Film kommt wie im Zimmer als Umschlag auf den Pult (#244); putPrints reiht ein, also sind
+  // alle Bilder des Films gesichert, bevor er entwickelt wird (#284)
   const onFilmDone = (films: Film[]) => {
     for (const f of films) {
       made.current.films.delete(f.stack);
       made.current.developed.push(f.name);
-      developFilm(uid, f.stack, f.name).catch(() => {});
+      developFilm(uid, f.stack, f.name).catch((e) => notify(notSaved(e, 0), { id: "speicher-voll", duration: Infinity, cancel: { label: t("OK"), onClick: () => {} } }));
     }
   };
-  return <CameraView uid={uid} taken onShot={onShot} onFilmDone={onFilmDone} onClose={close} />;
+  return <CameraView uid={uid} taken onShot={onShot} onLook={onLook} onFilmDone={onFilmDone} onClose={close} />;
 }
 
 export function RecipeSlip({ plate, onClose, side = "right" }: { plate: Plate; onClose: () => void; side?: "left" | "right" }) {

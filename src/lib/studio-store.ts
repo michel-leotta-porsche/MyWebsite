@@ -1,5 +1,6 @@
 "use client";
 
+import { IS_APP } from "@/lib/app-mode";
 import type { PhotoEdit } from "@/lib/develop/model";
 import { isSortPile, toEnvelope } from "@/lib/envelope";
 import { undevelopedStacks } from "@/lib/film";
@@ -123,19 +124,73 @@ function db(): Promise<IDBDatabase> {
 }
 
 async function run<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T> | void, store = STORE): Promise<T | undefined> {
+  const box: { req?: IDBRequest<T> } = {};
+  await within(mode, [store], (tx) => void (box.req = fn(tx.objectStore(store)) ?? undefined));
+  return box.req?.result;
+}
+
+/**
+ * Eine Transaktion über einen oder mehrere Speicher: alles oder nichts. Ein Fehler (etwa voller Speicher) bricht sie ab
+ * und kommt beim Aufrufer an, auch wenn WebKit ihn schon beim Schreiben wirft statt erst beim Abschluss.
+ */
+async function within(mode: IDBTransactionMode, stores: string[], fn: (tx: IDBTransaction) => void): Promise<void> {
   const d = await db();
   return new Promise((ok, fail) => {
-    const tx = d.transaction(store, mode);
-    const req = fn(tx.objectStore(store));
+    const tx = d.transaction(stores, mode);
     tx.oncomplete = () => {
       d.close();
-      ok(req ? req.result : undefined);
+      ok();
     };
     tx.onerror = tx.onabort = () => {
       d.close();
-      fail(tx.error);
+      fail(tx.error ?? new DOMException("Transaktion abgebrochen", "AbortError"));
     };
+    try {
+      fn(tx);
+    } catch (e) {
+      tx.onerror = tx.onabort = () => d.close();
+      try {
+        tx.abort();
+      } catch {}
+      fail(e);
+    }
   });
+}
+
+/** Der Speicher des Geräts ist voll: WebKit meldet das als QuotaExceededError */
+export const isStorageFull = (e: unknown): boolean => e instanceof DOMException && e.name === "QuotaExceededError";
+
+/** was man sieht, wenn Fotos nicht gesichert sind (n = 0: ein Film ließ sich nicht entwickeln), beim vollen Speicher mit dem Weg, Platz zu schaffen */
+export function notSaved(e: unknown, n = 1): string {
+  const what = n === 0 ? t("Der Film ist nicht entwickelt.") : n === 1 ? t("Das Foto ist nicht gesichert.") : t("{n} Fotos sind nicht gesichert.", { n });
+  if (!isStorageFull(e)) return `${n === 0 ? what : n === 1 ? t("Das Foto ließ sich nicht sichern.") : t("{n} Fotos ließen sich nicht sichern.", { n })} ${t("Versuch es noch einmal.")}`;
+  return IS_APP ? `${t("Der iPhone-Speicher ist voll.")} ${what} ${t("Platz schaffen kannst du unter Einstellungen → Allgemein → iPhone-Speicher.")}` : `${t("Der Speicher auf diesem Gerät ist voll.")} ${what}`;
+}
+/** vor dem Auslösen, wenn der Platz nicht mehr reicht */
+export const tooFull = () => (IS_APP ? t("Der iPhone-Speicher ist fast voll. Schaff Platz unter Einstellungen → Allgemein → iPhone-Speicher, sonst lassen sich keine Fotos sichern.") : t("Der Speicher auf diesem Gerät ist fast voll. Schaff Platz, sonst lassen sich keine Fotos sichern."));
+
+/** so viel Platz braucht Calima mindestens noch, um ein paar Aufnahmen samt Arbeitsfassung zu sichern */
+const LOW_ROOM = 40e6;
+/** wird der Platz knapp? Ohne Angaben (ältere Browser) nicht */
+export const roomLow = ({ usage, quota }: { usage?: number; quota?: number }) => usage != null && quota != null && quota - usage < LOW_ROOM;
+/** vor dem Auslösen: ist auf dem Gerät noch Platz für das Foto? */
+export const storageLow = (): Promise<boolean> =>
+  navigator.storage?.estimate
+    ? navigator.storage
+        .estimate()
+        .then(roomLow)
+        .catch(() => false)
+    : Promise.resolve(false);
+
+/*
+ * Schreiben nacheinander, in der Reihenfolge der Aufrufe: das letzte Bild eines Films ist gesichert, bevor der Film
+ * entwickelt wird, und das Vorschaubild kommt erst danach an seinen Eintrag (#284). Ein Fehler hält die Reihe nicht auf.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const next = queue.then(fn, fn);
+  queue = next.catch(() => {});
+  return next;
 }
 
 /*
@@ -173,10 +228,15 @@ async function light(p: Print, uid: string): Promise<Stored> {
   return { ...p, work: undefined, owner: uid, page: await pack(p.page), thumb: await pack(p.thumb), shot: p.shot ? await pack(p.shot) : undefined };
 }
 
-const putWork = async (id: string, work: Blob) => {
-  const w = { id, ...(await pack(work)) };
-  await run("readwrite", (st) => st.put(w), WORK);
-};
+/** Eintrag und, wenn sie mitkommt, Arbeitsfassung in einer Transaktion: beides liegt danach auf dem Gerät oder keins */
+async function write(p: Print, uid: string) {
+  const w = p.work ? { id: p.id, ...(await pack(p.work)) } : null;
+  const l = await light(p, uid);
+  await within("readwrite", [STORE, WORK], (tx) => {
+    if (w) tx.objectStore(WORK).put(w);
+    tx.objectStore(STORE).put(l);
+  });
+}
 
 /** Abzüge dieses Kontos ohne Arbeitsfassung, neueste zuerst; nicht mehr lesbare werden dabei entfernt */
 export async function listPrints(uid: string): Promise<Print[]> {
@@ -185,19 +245,11 @@ export async function listPrints(uid: string): Promise<Print[]> {
   for (const s of all.filter((p) => p.owner === uid)) {
     const p = await unpackPrint(s);
     if (!p) {
-      await removePrint(s.id).catch(() => {});
+      await remove(s.id).catch(() => {});
       continue;
     }
     // ältere Einträge tragen die Arbeitsfassung noch selbst: einmal umziehen, danach liegt sie für sich
-    if (p.work) {
-      const moved = { ...p };
-      await putWork(p.id, p.work)
-        .then(async () => {
-          const l = await light(moved, uid);
-          await run("readwrite", (st) => st.put(l));
-        })
-        .catch(() => {});
-    }
+    if (p.work) await write(p, uid).catch(() => {});
     out.push({ ...p, work: undefined });
   }
   return out.sort((a, b) => b.at - a.at);
@@ -213,35 +265,73 @@ export async function workOf(p: Print): Promise<Blob> {
 
 /**
  * Für dieses Konto speichern und, was über die Grenzen hinausgeht, wegräumen. Die Arbeitsfassung wird nur geschrieben,
- * wenn sie mitkommt; Änderungen beim Einsortieren schreiben nur den kleinen Eintrag.
+ * wenn sie mitkommt; Änderungen beim Einsortieren schreiben nur den kleinen Eintrag. Scheitert das Sichern (Speicher
+ * voll, #285), lehnt das Versprechen ab: Was bis dahin nicht gesichert ist, liegt nicht auf dem Gerät.
  */
-export async function putPrints(uid: string, ps: Print[]) {
+export const putPrints = (uid: string, ps: Print[]) => serial(() => put(uid, ps));
+
+async function put(uid: string, ps: Print[]) {
   // ein Tag auf dem Pult: iOS soll den Speicher bei Platzmangel nicht von selbst leeren
   if (ps.some((p) => isSortPile(p.stack))) navigator.storage?.persist?.().catch(() => {});
-  for (const p of ps) {
-    if (p.work) await putWork(p.id, p.work);
-    const l = await light(p, uid);
-    await run("readwrite", (st) => st.put(l));
-  }
+  for (const p of ps) await write(p, uid);
   // Tage und Umschläge räumt niemand weg, also ändert ein Foto darauf nichts an den anderen: nicht alles neu lesen
   if (ps.every((p) => isSortPile(p.stack))) return;
-  for (const old of trimPiles(piles(await listPrints(uid))).drop) await removePrint(old.id);
+  // die Fotos liegen schon sicher; scheitert nur das Aufräumen, holt es das nächste Sichern nach
+  try {
+    for (const old of trimPiles(piles(await listPrints(uid))).drop) await remove(old.id);
+  } catch {}
 }
+
+/**
+ * Das eingerechnete Vorschaubild an einen Abzug hängen, der schon liegt (#284): nur shot ändert sich, Stapel, Umschlag
+ * und Arbeitsfassung bleiben, wie sie sind. Liegt der Abzug nicht (mehr) da, passiert nichts.
+ */
+export const patchShot = (uid: string, id: string, shot: Blob) =>
+  serial(async () => {
+    const packed = await pack(shot);
+    await within("readwrite", [STORE], (tx) => {
+      const s = tx.objectStore(STORE);
+      const req = s.get(id) as IDBRequest<Stored | undefined>;
+      req.onsuccess = () => {
+        if (req.result && req.result.owner === uid) s.put({ ...req.result, shot: packed });
+      };
+    });
+  });
 
 /** einen Film aus der Kamera über dem Buch entwickeln, ohne dass das Studio offen ist: er kommt als Umschlag auf den Pult */
-export async function developFilm(uid: string, stack: string, name: string) {
-  const roll = (await listPrints(uid)).filter((p) => p.stack === stack);
-  if (roll.length) await putPrints(uid, toEnvelope(roll, stack, name, Date.now()));
-  return roll.length;
-}
+export const developFilm = (uid: string, stack: string, name: string) =>
+  serial(async () => {
+    const roll = (await listPrints(uid)).filter((p) => p.stack === stack);
+    if (roll.length) await put(uid, toEnvelope(roll, stack, name, Date.now()));
+    return roll.length;
+  });
 
-export async function removePrint(id: string) {
-  await run("readwrite", (s) => s.delete(id));
-  await run("readwrite", (s) => s.delete(id), WORK);
-}
+/** einen Abzug samt Arbeitsfassung vom Gerät nehmen, in einer Transaktion */
+export const removePrint = (id: string) => serial(() => remove(id));
 
-/** Beim Löschen des Kontos: alle Abzüge dieses Kontos und die alten ohne Besitzer vom Gerät entfernen */
-export async function clearPrints(uid: string) {
-  const all = (await run<Stored[]>("readonly", (s) => s.getAll() as IDBRequest<Stored[]>)) ?? [];
-  for (const p of all) if (!p.owner || p.owner === uid) await removePrint(p.id);
-}
+const remove = (id: string) =>
+  within("readwrite", [STORE, WORK], (tx) => {
+    tx.objectStore(STORE).delete(id);
+    tx.objectStore(WORK).delete(id);
+  });
+
+/** Beim Löschen des Kontos: alle Abzüge dieses Kontos, die alten ohne Besitzer und verwaiste Arbeitsfassungen vom Gerät entfernen */
+export const clearPrints = (uid: string) =>
+  serial(() =>
+    within("readwrite", [STORE, WORK], (tx) => {
+      const prints = tx.objectStore(STORE);
+      const work = tx.objectStore(WORK);
+      const all = prints.getAll() as IDBRequest<Stored[]>;
+      all.onsuccess = () => {
+        const stays = new Set<IDBValidKey>();
+        for (const p of all.result) {
+          if (!p.owner || p.owner === uid) prints.delete(p.id);
+          else stays.add(p.id);
+        }
+        const ids = work.getAllKeys();
+        ids.onsuccess = () => {
+          for (const id of ids.result) if (!stays.has(id)) work.delete(id);
+        };
+      };
+    }),
+  );
