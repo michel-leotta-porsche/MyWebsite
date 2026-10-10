@@ -16,7 +16,7 @@ function io(over: Partial<LayIo> = {}) {
   const fake: LayIo = {
     uploadPrints: async () => [photo("n1"), photo("n2")],
     loadBook: async () => shared,
-    saveBook: async (b) => void calls.saved.push(b),
+    saveBook: async (b) => (calls.saved.push(b), b),
     refreshShares: async (b) => void calls.refreshed.push(b),
     ...over,
   };

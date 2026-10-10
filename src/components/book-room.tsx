@@ -30,7 +30,8 @@ import { SHUTTER_ROOM } from "@/lib/shutter";
 import { friendlyError } from "@/lib/errors";
 import { handOver } from "@/lib/handoff";
 import { getLang, locale, t, useLang, useT } from "@/lib/i18n";
-import { importBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
+import { revOf } from "@/lib/book-rev";
+import { importBook, loadBook, numberWord, saveBook, toBookData, type Share, type StoredBook } from "@/lib/store";
 import { useRoom, type Feedback, type Spread } from "@/lib/use-room";
 import { markSeen, seenSnapshot } from "@/lib/seen";
 import { useShelf } from "@/lib/shelf";
@@ -576,8 +577,9 @@ function Room({ user }: { user: User }) {
             room.recount();
           }}
           onTitle={async (title) => {
-            const b = { ...sharing, title };
-            await saveBook(b);
+            // nur den Titel ändern: frisch geladen, damit ein Tag von einem anderen Gerät nicht verloren geht (#287)
+            const fresh = (await loadBook(sharing.id)) ?? sharing;
+            const b = await saveBook({ ...fresh, title }, revOf(fresh));
             room.replace(b);
             setSharing(b);
           }}

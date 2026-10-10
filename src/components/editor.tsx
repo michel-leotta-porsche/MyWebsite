@@ -51,7 +51,9 @@ import {
   type StoredBook,
   type StoredPhoto,
   type Version,
+  watchBook,
 } from "@/lib/store";
+import { BookConflict, keepMine, remoteChange, revOf } from "@/lib/book-rev";
 import { IS_APP, withKeys } from "@/lib/app-mode";
 import { friendlyError } from "@/lib/errors";
 import { openBook } from "@/lib/open-book";
@@ -118,6 +120,7 @@ const msg = {
   cantOpen: () => t("Ließ sich nicht öffnen"),
   full: (n: number, all: number, over: number) =>
     t("{n} von {all} Fotos aufgenommen, damit ist das Buch voll (bis zu {max} Fotos). Die übrigen {over} passen in ein zweites Buch.", { n, all, max: MAX, over }),
+  elsewhere: () => t("Auf einem anderen Gerät geändert. Die Werkbank zeigt jetzt diesen Stand."),
   fullAlready: (over: number) => t("Das Buch ist schon voll (bis zu {max} Fotos). Die {over} Fotos passen in ein zweites Buch.", { max: MAX, over }),
 };
 
@@ -218,9 +221,56 @@ export function Editor() {
   // die Änderung, deren Speichern noch auf den Zeitgeber wartet
   const unsaved = useRef<StoredBook | null>(null);
   const lastAutoVersion = useRef(0);
+  // Stand auf dem Server (#287): base ist das Buch, wie es dort zuletzt lag; gespeichert wird nur auf diesem Stand.
+  // writing ist der Stand, den die laufende Speicherung schreibt; Speicherungen laufen nacheinander.
+  const base = useRef<StoredBook | null>(null);
+  const writing = useRef<number | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  // ein anderes Gerät hat gespeichert, während hier noch etwas offen war: bis zur Wahl wird nichts gespeichert
+  const [conflict, setConflict] = useState<StoredBook | null>(null);
+  const conflictRef = useRef<StoredBook | null>(null);
   useEffect(() => {
     bookRef.current = book;
   }, [book]);
+  useEffect(() => {
+    conflictRef.current = conflict;
+  }, [conflict]);
+
+  /** Fragen, wie es weitergeht; kommt währenddessen ein noch neuerer Stand, gilt der */
+  const raise = useCallback((r: StoredBook) => {
+    if (conflictRef.current && revOf(conflictRef.current) >= revOf(r)) return;
+    conflictRef.current = r;
+    setConflict(r);
+  }, []);
+
+  /** Speichern auf dem bekannten Stand; null, solange ein Konflikt auf die Wahl wartet */
+  const persist = useCallback((b: StoredBook): Promise<StoredBook | null> => {
+    const run = queue.current.then(async () => {
+      if (conflictRef.current) return null;
+      const known = revOf(base.current);
+      writing.current = known + 1;
+      // ohne Netz ungeprüft in die Warteschlange; lehnt der Server das später ab, liegt hier nichts davon dort: fragen
+      const late = () =>
+        loadBook(b.id)
+          .then((r) => r && raise(r))
+          .catch(() => {});
+      try {
+        const saved = await saveBook(b, known, late);
+        base.current = saved;
+        return saved;
+      } catch (e) {
+        if (e instanceof BookConflict) {
+          raise(e.current);
+          return null;
+        }
+        throw e;
+      } finally {
+        writing.current = null;
+      }
+    });
+    queue.current = run.catch(() => {});
+    return run;
+  }, [raise]);
 
   // vorhandenes Buch laden
   useEffect(() => {
@@ -233,6 +283,7 @@ export function Editor() {
         // gelöscht, fremd oder nicht ladbar: Meldung statt leerem Tisch (#213)
         if (o.state !== "open") return setMissing(o.state);
         const b = o.book;
+        base.current = b;
         savedOnce.current = true;
         setLoaded(b);
         // aus dem offenen Buch (langes Drücken, „Bearbeiten“): gleich die Doppelseite, die dort aufgeschlagen war
@@ -254,13 +305,14 @@ export function Editor() {
     unsaved.current = book;
     const id = window.setTimeout(() => {
       unsaved.current = null;
-      const done = saveBook(book);
+      const done = persist(book);
       // Firestore bestätigt erst mit Netz; offline zeigt der Kopf das an
       const offline = window.setTimeout(() => !navigator.onLine && setSaved("offline"), 1500);
       done
-        .then(() => {
+        .then((ok) => {
           window.clearTimeout(offline);
-          setSaved("gespeichert");
+          if (!ok) return setSaved(null);
+          setSaved(navigator.onLine ? "gespeichert" : "offline");
           savedOnce.current = true;
           // geteilte Links bekommen denselben Stand wie das Buch
           refreshShares(book).catch(() => {});
@@ -273,14 +325,14 @@ export function Editor() {
         .catch(() => setSaved("fehler"));
     }, 900);
     return () => window.clearTimeout(id);
-  }, [book, idParam, touched]);
+  }, [book, idParam, touched, persist]);
 
   // Wer die Werkbank verlässt oder die App weglegt, bevor der Zeitgeber oben läuft, verliert sonst die letzte Änderung,
   // beim neuen Buch sogar das ganze Buch: was noch aussteht, geht dann sofort raus
   useEffect(() => {
     const flush = () => {
       const b = unsaved.current;
-      if (b) saveBook(b).catch(() => {});
+      if (b) persist(b).catch(() => {});
     };
     const onHide = () => document.visibilityState === "hidden" && flush();
     document.addEventListener("visibilitychange", onHide);
@@ -290,7 +342,64 @@ export function Editor() {
       window.removeEventListener("pagehide", flush);
       flush();
     };
+  }, [persist]);
+
+  /** Rückgängig führte nach einem Stand von woanders zurück hinter dessen Änderung */
+  const clearHistory = useCallback(() => {
+    past.current = [];
+    future.current = [];
+    lastTag.current = null;
+    setUndoState({ past: 0, future: 0 });
   }, []);
+
+  /** Den Stand von dort übernehmen */
+  const adopt = useCallback((r: StoredBook) => {
+    base.current = r;
+    unsaved.current = null;
+    bookRef.current = r;
+    clearHistory();
+    setTouched(false);
+    setSaved(null);
+    setLoaded(r);
+  }, [clearHistory]);
+
+  // Änderungen von anderen Geräten (#287): ist hier nichts offen, zeigt die Werkbank still den neuen Stand, sonst fragt sie
+  // ein neues Buch gibt es auf dem Server erst nach dem ersten Speichern; bis dahin meldet watchBook nichts
+  const bookId = book?.id;
+  useEffect(() => {
+    if (!user || !bookId) return;
+    return watchBook(bookId, (r) => {
+      // offen ist auch, was hinter einer gestellten Frage wartet
+      const dirty = !!unsaved.current || writing.current !== null || !!conflictRef.current;
+      const what = remoteChange({ remote: revOf(r), known: revOf(base.current), writing: writing.current, dirty });
+      if (what === "adopt") {
+        adopt(r);
+        say(msg.elsewhere());
+      } else if (what === "ask") raise(r);
+    });
+  }, [user, bookId, adopt, say, raise]);
+
+  /** Neu laden: der Stand von dort, was hier offen war, fällt weg */
+  const reloadTheirs = () => {
+    const r = conflict;
+    if (!r) return;
+    setConflict(null);
+    adopt(r);
+  };
+  /** Meine behalten: was dort dazukam, wird angehängt, gespeichert wird auf dem Stand von dort (das übernimmt der Zeitgeber oben) */
+  const keepOurs = () => {
+    const r = conflict;
+    const mine = bookRef.current;
+    if (!r || !mine) return;
+    const merged = keepMine(mine, base.current ?? r, r);
+    base.current = r;
+    conflictRef.current = null;
+    setConflict(null);
+    clearHistory();
+    setTouched(true);
+    setSaved("speichert");
+    setLoaded(merged);
+  };
 
   /** Zwischenstand vor einer großen Änderung */
   const snapshot = useCallback((label: string) => {
@@ -1509,6 +1618,7 @@ export function Editor() {
         </Button>
       )}
       <Toaster />
+      {conflict && <Conflict onReload={reloadTheirs} onKeep={keepOurs} />}
       {stageSpread && data && (
         <Stage
           data={data}
@@ -1778,4 +1888,35 @@ function textOverflow(s: SpreadDraft, data: BookData | null): number {
   if (overflowCache.size > 200) overflowCache.clear();
   overflowCache.set(key, over);
   return over;
+}
+
+/**
+ * Ein anderes Gerät hat das Buch gespeichert, während hier noch eine Änderung offen war (#287). Eine Wahl ist nötig,
+ * darum ein Hinweisfenster wie UIAlertController und kein Blatt, das sich wegwischen lässt. „Neu laden“ ist der
+ * sichere Weg und steht rechts; „Meine behalten“ verliert nichts, was dort dazukam.
+ */
+function Conflict({ onReload, onKeep }: { onReload: () => void; onKeep: () => void }) {
+  const t = useT();
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  return (
+    <div className="fixed inset-0 z-[760] flex items-end justify-center bg-[rgb(12_10_8/0.55)] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:items-center">
+      <div role="alertdialog" aria-modal="true" aria-labelledby="konflikt-titel" aria-describedby="konflikt-text" className="slip text-ink rounded-cut relative w-full max-w-sm p-5 shadow-[0_24px_48px_-20px_rgb(12_10_8/0.8)]">
+        <p id="konflikt-titel" className="text-[17px] font-bold tracking-[-0.01em]">
+          {t("Auf einem anderen Gerät geändert")}
+        </p>
+        <p id="konflikt-text" className="text-ink-2 mt-2 text-sm leading-relaxed">
+          {t("Während du hier gestaltet hast, wurde das Buch woanders gespeichert. Neu laden zeigt den Stand von dort, deine letzten Änderungen hier fallen weg. Meine behalten behält sie und nimmt mit, was dort dazukam.")}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={onKeep} className={buttonClass("paper", "sm")}>
+            {t("Meine behalten")}
+          </button>
+          <button ref={first} type="button" onClick={onReload} className={buttonClass("ink", "sm")}>
+            {t("Neu laden")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
