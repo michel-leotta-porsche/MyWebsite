@@ -1507,3 +1507,15 @@ html[data-kamera] body {
 html[data-kamera] body > :not(#calima-kamera) {
   visibility: hidden;
 }
+
+/* Querformat (#253): die Leisten bleiben stehen, aber die Beschriftung jeder Pille läuft quer in Halterichtung
+   (Michel, 10.10.: „Text quer wirkt natürlicher“). Pillen sind die runden Knöpfe mit Text (whitespace-nowrap). */
+#calima-kamera[data-turn] footer button.rounded-full.whitespace-nowrap {
+  writing-mode: vertical-rl;
+}
+#calima-kamera[data-turn="-90"] footer button.rounded-full.whitespace-nowrap {
+  transform: rotate(180deg);
+}
+#calima-kamera[data-turn] footer button.rounded-full.whitespace-nowrap svg {
+  transform: rotate(90deg);
+}
