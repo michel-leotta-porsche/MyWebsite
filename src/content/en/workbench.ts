@@ -292,4 +292,11 @@ export const WORKBENCH: Record<string, string> = {
   "Buch aufschlagen": "Open book",
   "Tisch mit Fotobüchern": "Table with photo books",
   "Deine Bücher liegen jetzt im Bücherzimmer": "Your books are now in the Library",
+  // zwei Geräte am selben Buch (#287)
+  "Auf einem anderen Gerät geändert. Die Werkbank zeigt jetzt diesen Stand.": "Changed on another device. The workbench now shows that version.",
+  "Auf einem anderen Gerät geändert": "Changed on another device",
+  "Während du hier gestaltet hast, wurde das Buch woanders gespeichert. Neu laden zeigt den Stand von dort, deine letzten Änderungen hier fallen weg. Meine behalten behält sie und nimmt mit, was dort dazukam.":
+    "While you were working here, the book was saved somewhere else. Reload shows that version and drops your latest changes here. Keep Mine keeps them and adds what was added there.",
+  "Meine behalten": "Keep Mine",
+  "Neu laden": "Reload",
 };

@@ -9,10 +9,12 @@ import {
   getDoc,
   getDocs,
   getDocsFromCache,
+  increment,
   limit,
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -23,6 +25,7 @@ import { deleteObject, getDownloadURL, listAll, ref, uploadBytes, type StorageRe
 
 import { build, COLOPHON, ENDPAPER, INDEX, TITLE, type BookData, type Photo } from "@/content/books";
 import type { CameraInfo, Recipe } from "@/content/recipes";
+import { commitBook, revOf } from "@/lib/book-rev";
 import { spreadId, variantsOf, type AutoPhoto, type SpreadDraft } from "@/lib/auto-sequence";
 import { db, storage } from "@/lib/firebase";
 import { de, getLang, translate, type Lang } from "@/lib/i18n";
@@ -91,6 +94,8 @@ export type StoredBook = {
   spreads: SpreadDraft[];
   /** gesetzt, sobald eine Doppelseite frei gestaltet ist: das Seitenformat ändert sich dann nicht mehr von selbst */
   aspectLocked?: boolean;
+  /** Stand: zählt bei jedem Speichern hoch, damit zwei Geräte sich nicht überschreiben (#287) */
+  rev?: number;
   /** im Papierkorb: liegt nicht mehr auf dem Tisch, lässt sich zurücklegen (Millisekunden seit 1970) */
   trashed?: number;
 };
@@ -349,13 +354,56 @@ export async function deleteRecipe(uid: string, id: string) {
   await deleteDoc(doc(db(), "users", uid, "recipes", id));
 }
 
-export async function saveBook(b: StoredBook) {
+/**
+ * Buch speichern und seinen Stand hochzählen (#287). Mit base nur, wenn auf dem Server noch dieser Stand liegt,
+ * sonst wirft das BookConflict mit dem Stand vom Server. Ohne Netz geht das Buch wie bisher in die Warteschlange von
+ * Firestore, dann ohne Prüfung: eine Transaktion braucht den Server.
+ */
+export async function saveBook(b: StoredBook, base?: number): Promise<StoredBook> {
   b = { ...b, schema: SCHEMA };
   if (MOCK) {
-    mem.books.set(b.id, structuredClone(b));
-    return void mockWatchers.forEach((f) => f());
+    const next = commitBook(mem.books.get(b.id) ?? null, b, base);
+    mem.books.set(b.id, structuredClone(next));
+    mockWatchers.forEach((f) => f());
+    return next;
   }
-  await setDoc(doc(db(), "books", b.id), { ...b, updatedAt: serverTimestamp() }, { merge: false });
+  const at = doc(db(), "books", b.id);
+  const queue = async () => {
+    const next = { ...b, rev: (base ?? revOf(b)) + 1 };
+    await setDoc(at, { ...next, updatedAt: serverTimestamp() }, { merge: false });
+    return next;
+  };
+  if (typeof navigator !== "undefined" && !navigator.onLine) return queue();
+  try {
+    return await runTransaction(db(), async (tx) => {
+      const s = await tx.get(at);
+      const next = commitBook(s.exists() ? (s.data() as StoredBook) : null, b, base);
+      tx.set(at, { ...next, updatedAt: serverTimestamp() });
+      return next;
+    });
+  } catch (e) {
+    if ((e as { code?: string })?.code === "unavailable") return queue();
+    throw e;
+  }
+}
+
+/** Das Buch, wie es auf dem Server liegt, bei jeder Änderung von woanders; eigene, noch nicht bestätigte Schreibvorgänge zählen nicht */
+export function watchBook(id: string, next: (b: StoredBook) => void): () => void {
+  if (MOCK) {
+    const f = () => {
+      const b = mem.books.get(id);
+      if (b) next(structuredClone(b));
+    };
+    mockWatchers.add(f);
+    return () => void mockWatchers.delete(f);
+  }
+  return onSnapshot(
+    doc(db(), "books", id),
+    (s) => {
+      if (s.exists() && !s.metadata.hasPendingWrites) next(migrate(s.data() as StoredBook));
+    },
+    () => {},
+  );
 }
 
 export async function loadBook(id: string): Promise<StoredBook | null> {
@@ -407,7 +455,7 @@ const pausedMock = new Map<string, Share>();
 export async function trashBook(b: StoredBook, on: boolean) {
   const trashed = on ? Date.now() : null;
   if (MOCK) {
-    mem.books.set(b.id, { ...b, trashed: trashed ?? undefined });
+    mem.books.set(b.id, { ...b, trashed: trashed ?? undefined, rev: revOf(mem.books.get(b.id)) + 1 });
     for (const s of [...mem.shares.values(), ...pausedMock.values()].filter((s) => s.book?.id === b.id)) {
       if (on) {
         mem.shares.delete(s.token);
@@ -419,7 +467,7 @@ export async function trashBook(b: StoredBook, on: boolean) {
     }
     return;
   }
-  await updateDoc(doc(db(), "books", b.id), { trashed });
+  await updateDoc(doc(db(), "books", b.id), { trashed, rev: increment(1) });
   const shares = await sharesOfBook(b.owner, b.id);
   await Promise.all(
     shares.map((s) =>

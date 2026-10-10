@@ -95,7 +95,7 @@ export function daySpreads(photos: StoredPhoto[], heading: string, story: string
 export type LayIo = {
   uploadPrints: typeof uploadPrints;
   loadBook: typeof loadBook;
-  saveBook: typeof saveBook;
+  saveBook: (b: StoredBook) => Promise<unknown>;
   refreshShares: typeof refreshShares;
 };
 
