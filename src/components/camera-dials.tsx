@@ -11,7 +11,9 @@ import { useT } from "@/lib/i18n";
 // Zeitvorwahl (ISO gleicht aus, der Chip zeigt „ISO A 640“), wer Zeit und ISO festhält, fotografiert von Hand. Ein Rad wird angetippt und dann auf dem Lineal darunter
 // gedreht; ein Tipp auf „A“ gibt es der Kamera zurück. Brennweiten sind ehrlich: echte Objektive fett, der Rest Ausschnitt.
 
-export type DialKey = Exclude<keyof Dials, "tint">;
+export type DialKey = Exclude<keyof Dials, "tint" | "gains">;
+/** ein Rad steht von Hand; Weiß auch, wenn die Pipette gemessen hat */
+export const isManual = (d: Dials, k: DialKey) => d[k] != null || (k === "kelvin" && d.gains != null);
 export const DIALS: DialKey[] = ["duration", "iso", "focus", "kelvin"];
 
 /** Zeiten und ISO, die diese Kamera wirklich kann */
@@ -40,6 +42,7 @@ export function DialChips({
   onPick,
   onFocal,
   onGrid,
+  onReset,
 }: {
   dials: Dials;
   dial: DialKey | "focal" | null;
@@ -50,9 +53,22 @@ export function DialChips({
   onPick: (k: DialKey | "focal" | null) => void;
   onFocal: (mm: number) => void;
   onGrid: () => void;
+  /** Doppeltipp auf ein Rad gibt es der Kamera zurück (Weiß: auch das gemessene) */
+  onReset: (k: DialKey) => void;
 }) {
   const t = useT();
   const lightName = useLightName();
+  const lastTap = useRef<{ k: DialKey; at: number } | null>(null);
+  const tap = (k: DialKey, now: number) => {
+    const prev = lastTap.current;
+    if (prev && prev.k === k && now - prev.at < 350 && isManual(dials, k)) {
+      lastTap.current = null;
+      onReset(k);
+      return;
+    }
+    lastTap.current = { k, at: now };
+    onPick(dial === k ? null : k);
+  };
   const names: Record<DialKey, string> = { duration: t("Zeit"), iso: t("ISO"), focus: t("Fokus"), kelvin: t("Weiß") };
   const chip = (on: boolean, manual: boolean) =>
     `flex-none rounded-full border px-3 py-1.5 text-[12px] font-semibold whitespace-nowrap tabular-nums transition-colors ${
@@ -91,14 +107,14 @@ export function DialChips({
         </button>
       </li>
       {DIALS.map((k) => {
-        const manual = dials[k] != null;
+        const manual = isManual(dials, k);
         // Halbautomatik: steht nur Zeit oder nur ISO von Hand, gleicht das andere Rad aus. Damit man sieht, dass das Rad
         // wirkt, läuft der ausgleichende Wert hinter dem A mit („Zeit A 1/4“), wie die Anzeige im Sucher einer Kamera
         const partner = k === "duration" ? "iso" : k === "iso" ? "duration" : null;
         const steering = !manual && partner != null && dials[partner] != null && meter != null;
         return (
           <li key={k} className="flex-none">
-            <button type="button" onClick={() => onPick(dial === k ? null : k)} aria-pressed={dial === k} className={chip(dial === k, manual)}>
+            <button type="button" onClick={(e) => tap(k, e.timeStamp)} aria-pressed={dial === k} className={chip(dial === k, manual)}>
               {k === "kelvin" && manual ? (
                 // Weiß zeigt das gewählte Licht: Gravur und Name statt Kelvin
                 <span className="flex items-center gap-1">
@@ -205,7 +221,7 @@ export function Ruler({
     <div className="flex items-center gap-3 px-4">
       <button
         type="button"
-        onClick={() => onChange({ ...dials, [dial]: null, ...(dial === "kelvin" ? { tint: null } : {}) })}
+        onClick={() => onChange({ ...dials, [dial]: null, ...(dial === "kelvin" ? { tint: null, gains: null } : {}) })}
         aria-pressed={!manual}
         className={`flex-none rounded-full border px-3 py-1.5 text-[13px] font-bold ${manual ? "border-on-table-2/50 text-on-table" : "bg-cloth border-cloth text-cloth-ink"}`}
         aria-label={t("Rad auf A, die Kamera stellt selbst")}
@@ -300,5 +316,5 @@ export function MeterBadge({ meter }: { meter: Meter | null }) {
   );
 }
 
-export const allAuto = (d: Dials) => DIALS.every((k) => d[k] == null);
+export const allAuto = (d: Dials) => DIALS.every((k) => !isManual(d, k));
 export { AUTO };

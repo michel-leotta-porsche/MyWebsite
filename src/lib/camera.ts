@@ -17,8 +17,10 @@ export type CameraInfo = { front: boolean; lenses: number[]; limits: { minDurati
 
 /** Die Räder (Expertenmodus E1): null heißt „A“, die Kamera stellt selbst. duration in Sekunden, focus 0 (nah) bis 1 (fern), kelvin als Farbtemperatur,
  *  tint die Tönung dazu (negativ grüner, positiv magenta; gilt nur mit kelvin, setzt das Licht „Neon“). */
-export type Dials = { duration: number | null; iso: number | null; focus: number | null; kelvin: number | null; tint: number | null };
-export const AUTO: Dials = { duration: null, iso: null, focus: null, kelvin: null, tint: null };
+export type Dials = { duration: number | null; iso: number | null; focus: number | null; kelvin: number | null; tint: number | null; gains?: Gains | null };
+export const AUTO: Dials = { duration: null, iso: null, focus: null, kelvin: null, tint: null, gains: null };
+/** Weißabgleich-Gains der Kamera je Kanal, der kleinste ist 1. Gesetzt von der Weiß-Pipette (white.ts), geht vor kelvin */
+export type Gains = { r: number; g: number; b: number };
 
 /** Messung der Kamera, kommt als Ereignis „meter“: offset in EV zur Zielbelichtung, dazu die Werte, die gerade gelten */
 export type Meter = { offset: number; duration: number; iso: number; lens: number; kelvin: number };
@@ -36,6 +38,11 @@ type Plugin = {
   flip(): Promise<CameraInfo>;
   /** Räder stellen; fehlende oder null-Werte heißen A. Steht nur Zeit oder nur ISO, regelt die Kamera das andere nach (wie Fuji, Michels Wahl „Ausgleichen“) */
   setDials(o: Dials): Promise<void>;
+  /**
+   * Weiß-Pipette (#184): Mittel von Rot, Grün, Blau im Rechteck, linear und vor dem Look gemessen, dazu die Weißabgleich-
+   * Gains, die gerade gelten. rect in Anteilen des Sucherbilds (0…1). Gestellt wird danach über setDials({ gains }).
+   */
+  measureWhite(o: { rect: { x: number; y: number; w: number; h: number } }): Promise<{ r: number; g: number; b: number; gains: Gains }>;
   /** Lupe: der Sucher zeigt die Mitte dreifach vergrößert, zum Scharfstellen von Hand */
   setMagnify(o: { on: boolean }): Promise<void>;
   /** Wasserwaage: die App meldet die Neigung als Ereignis „level“ (data.roll in Grad, 0 = gerade) */
