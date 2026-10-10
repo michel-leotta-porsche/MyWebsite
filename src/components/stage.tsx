@@ -77,7 +77,7 @@ import {
 import type { StoredPhoto } from "@/lib/store";
 import { haptic, warmHaptics } from "@/lib/haptics";
 import { IS_APP, keys, withKeys } from "@/lib/app-mode";
-import { LONG_PRESS_MS, pressMoved, sheetPlan, type MenuTile } from "@/lib/stage-menu";
+import { LONG_PRESS_MS, PRESS_SLOP, pressMoved, sheetPlan, type MenuTile } from "@/lib/stage-menu";
 import { de, useT } from "@/lib/i18n";
 
 // Die Bühne: eine Doppelseite groß, Fotos und Texte direkt auf der Seite bewegen, vergrößern, zuschneiden.
@@ -586,7 +586,7 @@ export function Stage({
     if (!d) return null;
     const it = items.find((i) => i.id === d.id);
     if (!it) return null;
-    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < (d.touch ? 8 : 3)) return null;
+    if (!d.moved && Math.hypot(clientX - d.sx, clientY - d.sy) < (d.touch ? PRESS_SLOP : 3)) return null;
     d.moved = true;
     window.clearTimeout(press.current);
     // fährt die Kamera während des Zugs mit, zählt ihr Weg mit
@@ -2703,16 +2703,16 @@ function PressSheet({ tiles, onClose, children }: { tiles: SheetTile[]; onClose:
           e.stopPropagation();
           e.preventDefault();
         }}
-        className="slip text-ink rounded-t-cut fixed inset-x-0 bottom-0 max-h-[85svh] overflow-y-auto overscroll-contain px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
+        className="slip text-ink rounded-t-cut fixed inset-x-0 bottom-0 max-h-[85svh] overflow-y-auto overscroll-contain px-2 pt-2.5 min-[375px]:px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-base shadow-[0_-20px_40px_-24px_rgb(12_10_8/0.8)]"
       >
         <div aria-hidden className="bg-ink/20 mx-auto mb-3 h-[5px] w-10 rounded-full" />
-        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
+        <div className="grid gap-1 min-[375px]:gap-1.5" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }}>
           {tiles.map((tl) => (
             <button
               key={tl.key}
               type="button"
               onClick={tl.run}
-              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-0 text-[12px] leading-tight font-semibold transition-[background-color,transform] duration-150 active:scale-[0.96] [&>svg]:size-[22px] ${
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1.5 rounded-[14px] px-0 text-[clamp(10.5px,3.2vw,12px)] leading-tight font-semibold transition-[background-color,transform] duration-150 active:scale-[0.96] [&>svg]:size-[22px] ${
                 tl.danger ? "text-danger bg-danger/8 active:bg-danger/14" : "bg-ink/6 active:bg-ink/12 shadow-[inset_0_0_0_1px_rgb(27_28_26/0.08)]"
               }`}
             >
@@ -3280,7 +3280,6 @@ const TOOL_INFO: Record<Tool, { label: string; key: string }> = {
   ...SHAPES,
 };
 
-/** Werkzeugknopf mit kleinem Zeichen; Name und Kürzel im Tooltip und für Screenreader */
 /** Symbole der Werkzeuge, auch für die Formen im Blatt am Handy */
 const TOOL_ICON: Record<Tool, React.ReactNode> = {
   select: <path d="M5 3l12 8-5.5 1.2L9 18z" fill="currentColor" />,
@@ -3293,6 +3292,7 @@ const TOOL_ICON: Record<Tool, React.ReactNode> = {
   tape: <path d="M3 12l3-4 1 1 1-1 7 0 1 1 1-1-3 4-1-1-1 1H5l-1-1z" fill="currentColor" opacity={0.75} />,
 };
 
+/** Werkzeugknopf mit kleinem Zeichen; Name und Kürzel im Tooltip und für Screenreader */
 function ToolButton({ tool, active, onClick }: { tool: Tool; active: boolean; onClick: () => void }) {
   const t = useT();
   const info = TOOL_INFO[tool];

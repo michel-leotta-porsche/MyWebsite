@@ -19,10 +19,11 @@ export const pressMoved = (a: { x: number; y: number }, b: { x: number; y: numbe
 const ROWS: Record<Exclude<MenuTarget, "paper">, MenuRow[]> = { photo: ["crop", "caption"], text: ["write", "role", "light"], shape: [], ink: [] };
 
 /**
- * Aufbau des Blatts. Einfügen nur, wenn Calimas Zwischenablage etwas hält: aufs Papier als vierte Kachel,
- * am Element als Zeile, weil fünf Kacheln am iPhone die Namen umbrechen.
+ * Aufbau des Blatts. Am Element Einfügen nur, wenn Calimas Zwischenablage etwas hält, als Zeile,
+ * weil fünf Kacheln am iPhone die Namen umbrechen. Aufs Papier immer: nur hier kommt am Handy Text
+ * aus anderen Apps herein, und ob das System etwas hält, verrät iOS erst nach einer Rückfrage.
  */
 export function sheetPlan(target: MenuTarget, { clip }: { clip: boolean }): SheetPlan {
-  if (target === "paper") return { tiles: clip ? ["heading", "body", "note", "paste"] : ["heading", "body", "note"], rows: ["shapes"], layer: false };
+  if (target === "paper") return { tiles: ["heading", "body", "note", "paste"], rows: ["shapes"], layer: false };
   return { tiles: ["copy", "duplicate", "cut", "delete"], rows: clip ? [...ROWS[target], "paste"] : ROWS[target], layer: true };
 }
