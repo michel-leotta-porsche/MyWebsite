@@ -1,13 +1,8 @@
 import { de } from "@/lib/i18n";
 
 // Aufbau der Landing (#264, Landing-Workshop 10.10.): Freunde öffnen den Link auf dem Telefon und sollen zuerst
-// ein echtes Buch umblättern, erst danach kommt die Anmeldung. Die Abschnitte stehen in dieser Reihenfolge.
-export const SECTIONS = [
-  { id: "blaettern", title: de("Blätter mal.") },
-  { id: "eigenes", title: de("Mach dein eigenes.") },
-  { id: "kann", title: de("Was Calima kann") },
-  { id: "so-gehts", title: de("So geht’s") },
-] as const;
+// ein echtes Buch umblättern, erst danach kommt die Anmeldung. landing.tsx zeichnet die Abschnitte in dieser Reihenfolge.
+export const SECTIONS = [{ id: "blaettern" }, { id: "eigenes" }, { id: "kann" }, { id: "so-gehts" }] as const;
 
 export type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -60,7 +55,7 @@ export function cueAt(cues: Cue[], t: number): string | null {
 export const HOWTO = [
   { title: de("Fotos reinziehen"), text: de("Im Bücherzimmer ein Buch anlegen und Fotos auswählen. Calima setzt sie nach Aufnahmezeit zu Doppelseiten."), href: "/hilfe" },
   { title: de("Gestalten, wenn du willst"), text: de("Bilder schieben, zuschneiden, Text dazu. Das Fuji-Rezept liegt als Zettel unter dem Foto."), href: "/hilfe" },
-  { title: de("Hinlegen"), text: de("Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da."), href: "/hilfe" },
+  { title: de("Hinlegen|Landing"), text: de("Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da."), href: "/hilfe" },
 ] as const;
 
 /** Öffentlicher TestFlight-Link für Freunde (#265); bis er steht, sagt die Landing nur, dass die App kommt */

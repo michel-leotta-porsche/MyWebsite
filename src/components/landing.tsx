@@ -19,7 +19,7 @@ import { APPLE_READY, SignInButtons } from "@/components/sign-in-buttons";
 import { signInError } from "@/lib/errors";
 import type { SignInProvider } from "@/lib/firebase";
 import { loadFirebase, prefetchFirebaseWhenIdle, signInNow, useLazyUser } from "@/lib/lazy-user";
-import { CLIPS, HOWTO, TESTFLIGHT_URL, cueAt, type Clip as ClipData } from "@/lib/landing";
+import { CLIPS, HOWTO, SECTIONS, TESTFLIGHT_URL, cueAt, type Clip as ClipData, type SectionId } from "@/lib/landing";
 import { sampleBook } from "@/lib/sample-book";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { de, useLang, useT } from "@/lib/i18n";
@@ -43,7 +43,8 @@ const narrow: CSSProperties = { fontVariationSettings: '"wdth" 80' };
 const PROVIDERS = APPLE_READY ? de("Apple oder Google") : "Google";
 // Abzug, der auf dem Tisch liegt
 const lifted = "shadow-[0_28px_50px_-18px_rgb(12_10_8/0.75),0_6px_14px_-6px_rgb(12_10_8/0.5)]";
-const h2Class = "text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl";
+// Große Überschrift eines Abschnitts oder einer Funktion
+const displayHeading = "text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl";
 
 const book = sampleBook();
 
@@ -74,12 +75,11 @@ function useEnter() {
 function HeaderSession() {
   const user = useLazyUser();
   const t = useT();
-  // solange Firebase prüft, bleibt die Stelle leer statt zu springen
-  if (user === undefined) return <span aria-hidden className="inline-block min-h-9 w-24" />;
-  // zwei Anbieter passen nicht in den Kopf: die Anmeldung im Bücherzimmer zeigt beide
+  // Angemeldete gehen gleich hinein; alle anderen blättern erst, die Anmeldung kommt im zweiten Abschnitt (#264)
+  if (!user) return null;
   return (
     <Link href="/zimmer" className={buttonClass("quiet", "sm")}>
-      {user ? t("Ins Bücherzimmer") : t("Anmelden")}
+      {t("Ins Bücherzimmer")}
     </Link>
   );
 }
@@ -105,8 +105,6 @@ function EnterButton({ label }: { label?: string }) {
     </span>
   );
 }
-
-/* ------------------------------------------------------------------ Papier, Zettel, Clip */
 
 /* ------------------------------------------------------------------ Papier und Leinen */
 
@@ -157,6 +155,8 @@ function Clip({ clip, label, className = "" }: { clip: ClipData; label: string; 
   const reduce = useReducedMotion();
   const lang = useLang();
   const [line, setLine] = useState<string | null>(null);
+  // Stromsparmodus oder Browser verbieten das Abspielen: dann wenigstens die Bedienleiste
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     const v = video.current;
@@ -165,13 +165,16 @@ function Clip({ clip, label, className = "" }: { clip: ClipData; label: string; 
     v.muted = true;
     const io = new IntersectionObserver(
       ([e]) => {
-        if (e.isIntersecting) v.play().catch(() => {});
+        if (e.isIntersecting) v.play().catch(() => setBlocked(true));
         else v.pause();
       },
       { rootMargin: "200px 0px" },
     );
     io.observe(v);
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      v.pause();
+    };
   }, [reduce]);
 
   return (
@@ -185,7 +188,7 @@ function Clip({ clip, label, className = "" }: { clip: ClipData; label: string; 
           loop
           playsInline
           preload="none"
-          controls={reduce}
+          controls={reduce || blocked}
           aria-label={label}
           onTimeUpdate={(e) => setLine(lang === "de" ? cueAt(clip.cues, e.currentTarget.currentTime) : null)}
           className="absolute inset-0 size-full object-cover"
@@ -193,7 +196,7 @@ function Clip({ clip, label, className = "" }: { clip: ClipData; label: string; 
         {lang === "de" && line && (
           // direkt unter der englischen Zeile im Bild (oben links); unten liegen auf der Landing die Zettel
           <p aria-hidden className="pointer-events-none absolute top-[19%] left-[8%] max-w-[80%] text-[13px] leading-[1.6] md:text-[15px]">
-            <span className="bg-[rgb(12_10_8/0.72)] px-2 py-0.5 text-[#f4efe6] [box-decoration-break:clone]">{line}</span>
+            <span className="bg-[rgb(12_10_8/0.72)] px-2 py-0.5 text-on-table [box-decoration-break:clone]">{line}</span>
           </p>
         )}
       </div>
@@ -252,7 +255,7 @@ function Own() {
   return (
     <section id="eigenes" aria-labelledby="eigenes-h" className="linen table-surface relative overflow-hidden bg-table-deep px-4 py-20 md:px-8 md:py-32">
       <div className="grid gap-8 md:grid-cols-12 md:gap-8">
-        <h2 id="eigenes-h" className={`${h2Class} md:col-span-5`} style={display}>
+        <h2 id="eigenes-h" className={`${displayHeading} md:col-span-5`} style={display}>
           {t("Mach dein eigenes.")}
         </h2>
         <div className="md:col-span-6 md:col-start-7">
@@ -299,7 +302,7 @@ function Own() {
 
 /* ------------------------------------------------------------------ 3. Was Calima kann */
 
-/* ------------------------------------------------------------------ 2. Werkbank: Abzüge werden eine Doppelseite */
+/* ------------------------------------------------------------------ Werkbank: Abzüge werden eine Doppelseite */
 
 // Platz auf der Doppelseite in % (Breite 2 Seiten, Höhe 1.5 Seiten) und Startlage als loser Abzug auf dem Tisch.
 // Auf dem Telefon liegt der Text über dem Buch: dort gleiten die Abzüge von links und rechts herein (phone), nicht von oben
@@ -418,17 +421,16 @@ function Sheet({ src, sizes, bend }: { src: StaticImageData; sizes: string; bend
   );
 }
 
-function Workbench() {
+/** eyebrow: die kleine Überschrift des Abschnitts, in dem die Werkbank als erste Funktion steht */
+function Workbench({ eyebrow }: { eyebrow?: ReactNode }) {
   const t = useT();
   return (
     <div id="werkbank" role="group" aria-labelledby="bench-h" className="bench-track relative scroll-mt-0">
       <div className="linen table-surface sticky top-0 flex min-h-svh flex-col justify-center overflow-hidden bg-table-deep px-4 py-12 md:px-8 md:py-10">
         <div className="relative z-10 grid items-center gap-10 md:grid-cols-12 md:gap-8">
           <div className="md:col-span-4">
-            <h2 id="kann-h" className="text-on-table-2 mb-5 text-sm font-semibold tracking-[0.08em] uppercase">
-              {t("Was Calima kann")}
-            </h2>
-            <h3 id="bench-h" className="text-on-table text-5xl leading-[0.9] font-bold tracking-[-0.035em] md:text-7xl" style={display}>
+            {eyebrow}
+            <h3 id="bench-h" className={displayHeading} style={display}>
               {t("Reinziehen.")}
               <br />
               {t("Fertig gesetzt.")}
@@ -530,7 +532,7 @@ function Recipe() {
   return (
     <div role="group" aria-labelledby="recipe-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-24 md:px-8 md:py-36">
       <div className="grid gap-6 md:grid-cols-12 md:gap-8">
-        <h3 id="recipe-h" className={`${h2Class} md:col-span-7`} style={display}>
+        <h3 id="recipe-h" className={`${displayHeading} md:col-span-7`} style={display}>
           {t("Das Rezept liegt bei.")}
         </h3>
         <p className="text-on-table text-lg leading-relaxed opacity-80 md:col-span-4 md:col-start-9 md:self-end">
@@ -587,7 +589,7 @@ function Share() {
           </Slip>
         </div>
         <div className="md:col-span-5 md:col-start-8">
-          <h3 id="share-h" className={h2Class} style={display}>
+          <h3 id="share-h" className={displayHeading} style={display}>
             {t("Hinlegen, nicht posten.")}
           </h3>
           <p className="text-on-table mt-6 max-w-[30rem] text-lg leading-relaxed opacity-80">
@@ -608,7 +610,7 @@ function HowTo() {
   const t = useT();
   return (
     <section id="so-gehts" aria-labelledby="so-gehts-h" className="linen table-surface relative overflow-hidden bg-table px-4 py-20 md:px-8 md:py-32">
-      <h2 id="so-gehts-h" className={h2Class} style={display}>
+      <h2 id="so-gehts-h" className={displayHeading} style={display}>
         {t("So geht’s")}
       </h2>
       <ol className="mt-12 grid gap-10 md:mt-16 md:grid-cols-3 md:gap-8">
@@ -676,7 +678,30 @@ function Closing() {
   );
 }
 
+/** 3. Was Calima kann: Werkbank, Rezept, Hinlegen; die Überschrift steht klein über der Werkbank */
+function Features() {
+  const t = useT();
+  return (
+    <section id="kann" aria-labelledby="kann-h">
+      <Workbench
+        eyebrow={
+          <h2 id="kann-h" className="text-on-table-2 mb-5 text-sm font-semibold tracking-[0.08em] uppercase">
+            {t("Was Calima kann")}
+          </h2>
+        }
+      />
+      <Recipe />
+      <Share />
+    </section>
+  );
+}
+
+// Jeder Abschnitt aus SECTIONS (lib/landing.ts) mit seinem Bauteil; die Reihenfolge kommt von dort
+const PARTS: Record<SectionId, () => ReactNode> = { blaettern: Hero, eigenes: Own, kann: Features, "so-gehts": HowTo };
+
 export function Landing() {
+  const [first, ...rest] = SECTIONS;
+  const Top = PARTS[first.id];
   return (
     // Safari zählt in 3D gedrehte Abzüge sonst zur Seitenhöhe mit, auch wenn ihr Abschnitt sie abschneidet;
     // clip schneidet ab, ohne einen Scrollbereich zu bilden, das Kleben der Werkbank bleibt erhalten
@@ -687,18 +712,15 @@ export function Landing() {
         bookEnd={<OwnBook />}
         footer={
           <>
-            <Own />
-            <section id="kann" aria-labelledby="kann-h">
-              <Workbench />
-              <Recipe />
-              <Share />
-            </section>
-            <HowTo />
+            {rest.map(({ id }) => {
+              const Part = PARTS[id];
+              return <Part key={id} />;
+            })}
             <Closing />
           </>
         }
       >
-        <Hero />
+        <Top />
       </Library>
     </main>
   );

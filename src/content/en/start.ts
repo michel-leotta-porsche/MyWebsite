@@ -61,6 +61,7 @@ export const START: Record<string, string> = {
   "Gestalten, wenn du willst": "Arrange, if you like",
   "Bilder schieben, zuschneiden, Text dazu. Das Fuji-Rezept liegt als Zettel unter dem Foto.": "Move pictures, crop, add text. The Fuji recipe sits as a note under the photo.",
   "Für jede Person ein eigener Link. Sie blättert ohne Konto und lässt dir Zettel da.": "Each person gets their own link. They leaf through without an account and leave you notes.",
+  "Hinlegen|Landing": "Hand it over",
   "Mehr in der Hilfe": "More in the help",
 
   // Landing: Werkbank
