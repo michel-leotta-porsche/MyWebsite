@@ -4,6 +4,7 @@ import { registerPlugin } from "@capacitor/core";
 
 import { IS_APP } from "@/lib/app-mode";
 import { buildLut, GRAIN, type PhotoEdit } from "@/lib/develop/model";
+import { de } from "@/lib/i18n";
 
 // Brücke zu Calimas Kamera in der iPhone-App (ios/App/App/CalimaCamera.swift). Der Sucher liegt hinter der Webansicht,
 // die Seite malt die Bedienung darüber. Der Look geht als derselbe 3D-LUT hinüber, den die Vorschau beim Bearbeiten nutzt.
@@ -87,7 +88,18 @@ export function fmtDuration(s: number): string {
 export const fmtISO = (iso: number) => `ISO ${iso >= 1000 ? Math.round(iso / 10) * 10 : Math.round(iso)}`;
 export const fmtKelvin = (k: number) => `${Math.round(k / 100) * 100} K`;
 /** Lage der Linse als Wort: nah … fern */
-export const fmtFocus = (f: number) => (f >= 0.98 ? "∞" : f <= 0.02 ? "nah" : `${Math.round(f * 100)} %`);
+/**
+ * Fokus als Wort statt Prozent (#225): Apples Linsenstellung 0…1 ist nicht linear und hat keine Meter. Die Zonen sind
+ * Richtwerte (Blume, Tisch, Zimmer, Straße, Berg); der Wert unter A zeigt, wohin der Autofokus wirklich stellt, daran
+ * lassen sie sich am iPhone nachziehen. Gibt einen Text für t() zurück („Wort|Fokus“), ∞ bleibt ∞.
+ */
+export const FOCUS_ZONES: { upTo: number; label: string }[] = [
+  { upTo: 0.3, label: de("nah|Fokus") },
+  { upTo: 0.6, label: de("Tisch|Fokus") },
+  { upTo: 0.8, label: de("Zimmer|Fokus") },
+  { upTo: 0.92, label: de("Straße|Fokus") },
+];
+export const fmtFocus = (f: number) => FOCUS_ZONES.find((z) => f < z.upTo)?.label ?? "∞";
 
 /** nächste Raststellung einer Reihe */
 export const nearest = (list: readonly number[], v: number) => list.reduce((b, x) => (Math.abs(Math.log(x / v)) < Math.abs(Math.log(b / v)) ? x : b), list[0]);
