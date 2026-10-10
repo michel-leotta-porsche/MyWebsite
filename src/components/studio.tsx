@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { BookPlus, Camera as CameraIcon, ChevronLeft, Pencil, Trash2 } from "lucide-react";
+import { BookPlus, Camera as CameraIcon, ChevronLeft, ChevronRight, Pencil, Trash2, X } from "lucide-react";
 
 import { usePultSort } from "@/components/pult-sort";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+
+import { Button, IconButton } from "@/components/ui/button";
 import { ListGroup, ListRow } from "@/components/ui/list";
 import { hitClass } from "@/components/ui-classes";
 import { Segmented } from "@/components/ui/segmented";
@@ -20,7 +22,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import type { SharpenLevel } from "@/lib/develop/detail";
 import { outSize } from "@/lib/develop/geo";
 import { buildLut, describeEdit, isNeutral, neutralEdit, type PhotoEdit } from "@/lib/develop/model";
-import { friendlyError } from "@/lib/errors";
+import { errorDetail } from "@/lib/errors";
 import { fromEdit } from "@/lib/develop/settings";
 import { withExif, withXmp } from "@/lib/exif-write";
 import { hasCamera, OPEN_CAMERA } from "@/lib/camera";
@@ -40,6 +42,7 @@ import { changeNotSaved, isNoStore, listPrints, MAX_STACK, notDeveloped, notSave
 import { de, getLang, locale, t, useT } from "@/lib/i18n";
 import { SHUTTER } from "@/lib/shutter";
 import { saveToLibrary } from "@/lib/library-save";
+import { browserStore, FIRST_HINT, hintDone, markHintDone } from "@/lib/help";
 
 // Fotostudio unten im Bücherzimmer (Workshop 9.10.2026, fotostudio-workshop/): ein Foto öffnen, mit dem Editor der Werkbank
 // bearbeiten, dann sichern oder in ein Buch legen. Bis dahin bleibt alles auf dem Gerät. Die letzten Fotos liegen als Abzüge
@@ -172,8 +175,16 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
   // Bilder auf dem Film, auch die noch nicht gezeichneten: das letzte Bild eines vollen Films kommt im selben Zug wie das
   // Entwickeln. Ohne Arbeitsfassung, die ist dann schon gesichert (keep sichert nacheinander)
   const onFilm = useRef<Print[]>([]);
+  // Erster Start in der App (#215): einmal der Weg in einem Satz, bis er weggetippt ist oder das erste Foto entsteht.
+  // Das Fotostudio zeichnet erst nach der Anmeldung, also nur im Browser: kein Unterschied zur statischen Seite
+  const [hint, setHint] = useState(() => hasCamera() && !hintDone(browserStore));
+  const hintAway = () => {
+    setHint(false);
+    markHintDone(browserStore);
+  };
   // Abendstapel: ohne Film legt die Kamera jedes Foto auf den Stapel seines Tages, sortiert nach der Aufnahmezeit
   const onShot = (p: Print, filmStack?: string): Promise<void> => {
+    if (hint) hintAway();
     // auf einem Film zählt die Kamera selbst (pos), der Stapel ist der Film; erst gesichert gehört das Bild zum Film
     if (filmStack) {
       const q = { ...p, stack: filmStack };
@@ -343,6 +354,20 @@ export function Studio({ user, books }: { user: User; books: StoredBook[] | null
           {t("Fotostudio")}
         </h2>
         <p className="text-on-table-2 text-sm">{sub}</p>
+        {hint && (
+          <p className="bg-on-table/7 text-on-table mt-3 flex max-w-[34rem] items-center gap-2 rounded-xl py-1 pr-1 pl-3.5 text-sm leading-snug">
+            <span className="flex-1 py-2">
+              {t(FIRST_HINT.text)}{" "}
+              <Link href={FIRST_HINT.href} onClick={hintAway} className={`${hitClass} inline-flex items-center font-semibold whitespace-nowrap underline-offset-4 hover:underline`}>
+                {t(FIRST_HINT.link)}
+                <ChevronRight aria-hidden className="size-3.5" />
+              </Link>
+            </span>
+            <IconButton label={t("Hinweis ausblenden")} onClick={hintAway}>
+              <X aria-hidden />
+            </IconButton>
+          </p>
+        )}
       </div>
 
       <ul {...sort.bind} className="flex flex-wrap items-end gap-y-7 pt-2 pl-7 select-none md:pl-8 [-webkit-touch-callout:none]" aria-label={t("Abzüge")}>
@@ -916,7 +941,12 @@ function DoneSheet({
       );
       onClose();
     } catch (e) {
-      setBookError(t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: friendlyError(e) }));
+      const detail = errorDetail(e);
+      setBookError(
+        detail
+          ? t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal. ({error})", { error: detail })
+          : t("Hat nicht geklappt. Prüf die Verbindung und tipp noch einmal."),
+      );
     } finally {
       setBusy(null);
     }

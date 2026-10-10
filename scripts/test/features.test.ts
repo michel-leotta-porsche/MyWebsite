@@ -32,7 +32,7 @@ test("Die Seite liegt unter /funktionen", () => {
 
 for (const g of FEATURE_GROUPS) {
   test(`${g.id}: „So geht’s“ führt in die Hilfe`, () => {
-    assert.match(g.help, /^\/hilfe(#[a-z-]+)?$/);
+    assert.match(g.help, /^\/hilfe\/[a-z-]+(#schritt-\d+)?$/);
   });
 
   for (const f of g.features) {
