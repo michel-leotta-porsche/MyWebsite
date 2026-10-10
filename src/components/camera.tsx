@@ -4,7 +4,7 @@ import { Box, ChevronLeft, ChevronRight, Film as FilmIcon, Lock, SlidersHorizont
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { allAuto, DIALS, DialChips, GridOverlay, isManual, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
+import { allAuto, DIALS, DialChips, GridOverlay, isManual, LongRow, MeterBadge, Ruler, type DialKey } from "@/components/camera-dials";
 import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
 import { applySettings, type CopiedSettings } from "@/lib/develop/settings";
 import { haptic } from "@/lib/haptics";
+import { deviceDials, isLong, LONG_MODE_KEY, longPlan, readLongMode, type LongMode } from "@/lib/long";
 import { SIZES, studioSource } from "@/lib/ingest";
 import { saveToLibrary } from "@/lib/library-save";
 import { useT } from "@/lib/i18n";
@@ -44,6 +45,9 @@ const MOVE_PX = 10;
 const EV_MAX = 2;
 /** Seite des Messquadrats der Weiß-Pipette, Anteil der Sucherbreite */
 const PATCH = 0.18;
+
+/** Langzeitbelichtung abgebrochen: kein Foto, keine Fehlermeldung */
+const CANCELLED = Symbol("abgebrochen");
 
 const lookOfSettings = (s: CopiedSettings, id: string): Look => ({ id, name: s.name, approx: s.approx, edit: applySettings(neutralEdit(), s) });
 const lookOfRecipe = (r: NamedRecipe): Look => ({ id: r.id, name: r.name, approx: false, edit: { ...neutralEdit(), ...(r.f ?? {}), rec: { ...r.v }, recName: r.name } });
@@ -113,6 +117,22 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     }
   });
   const [info, setInfo] = useState<CameraInfo | null>(null);
+  // Langzeitbelichtung (#249): Art gemerkt je Gerät; run läuft gerade (Restsekunden, ob das Telefon wackelt)
+  const [longMode, setLongMode] = useState<LongMode>(() => {
+    try {
+      return readLongMode(localStorage.getItem(LONG_MODE_KEY));
+    } catch {
+      return "fliessend";
+    }
+  });
+  const pickLongMode = (m: LongMode) => {
+    haptic("select");
+    setLongMode(m);
+    try {
+      localStorage.setItem(LONG_MODE_KEY, m);
+    } catch {}
+  };
+  const [longRun, setLongRun] = useState<{ left: number; frames: number; shaky: boolean } | null>(null);
   const [dials, setDials] = useState<Dials>(AUTO);
   /** Weiß-Pipette: das Messquadrat steht im Sucher, der Auslöser misst statt aufzunehmen */
   const [pipette, setMetering] = useState(false);
@@ -287,7 +307,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   /* ----- Werkzeug (E1): Räder an die App, Raster mit Wasserwaage, Brennweite als Zoom ----- */
 
   useEffect(() => {
-    if (ready) CalimaCamera.setDials(dials).catch(() => {});
+    if (ready) CalimaCamera.setDials(deviceDials(dials)).catch(() => {});
   }, [dials, ready]);
   useEffect(() => {
     if (ready) CalimaCamera.setLevel({ on: tools && grid }).catch(() => {});
@@ -574,15 +594,36 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     }
   };
 
+  /** lange Zeit belichten: zählt die Sekunden herunter, ein zweiter Druck auf den Auslöser bricht ab */
+  const exposeLong = async (seconds: number): Promise<{ path: string }> => {
+    const plan = longPlan(seconds, longMode, meter?.duration ?? 1 / 60);
+    setLongRun({ left: seconds, frames: plan.frames, shaky: false });
+    const timer = window.setInterval(() => setLongRun((r) => r && { ...r, left: Math.max(0, r.left - 1) }), 1000);
+    try {
+      const r = await CalimaCamera.captureLong({ seconds, mode: longMode });
+      if (r.cancelled || !r.path) throw CANCELLED;
+      return { path: r.path };
+    } finally {
+      window.clearInterval(timer);
+      setLongRun(null);
+    }
+  };
+
   const shoot = async () => {
     if (metering) return measureWhite();
+    if (longRun) {
+      haptic("select");
+      CalimaCamera.cancelLong().catch(() => {});
+      return;
+    }
     if (!ready || busy) return;
     setBusy(true);
     haptic("press");
     setFlash(true);
     window.setTimeout(() => setFlash(false), 140);
     try {
-      const { path } = await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
+      const long = !fixed && isLong(dials) ? (dials.duration ?? 0) : 0;
+      const { path } = long ? await exposeLong(long) : await CalimaCamera.capture(film?.rules?.flash ? { flash: true } : undefined);
       const file = await takeShot(path, `${t("Kamera")} ${stamp()}`);
       const s = await studioSource(file);
       const edit = lookNow.edit ?? undefined;
@@ -631,7 +672,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
           .catch(() => {})
           .finally(() => URL.revokeObjectURL(url));
       }
-    } catch {
+    } catch (err) {
+      if (err === CANCELLED) return;
       haptic("warning");
       setError(t("Das Foto ließ sich nicht aufnehmen. Versuch es noch einmal."));
       window.setTimeout(() => setError(null), 2500);
@@ -663,6 +705,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
         setFocal(null);
       } else if (e.name === "meter" && typeof e.data.offset === "number") setMeter(e.data as Meter);
       else if (e.name === "level" && typeof e.data.roll === "number") setRoll(e.data.roll);
+      else if (e.name === "long" && e.data.shaky === true) setLongRun((r) => r && (r.shaky ? r : { ...r, shaky: true }));
     });
     return () => {
       sub.then((h) => h.remove()).catch(() => {});
@@ -752,7 +795,14 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               {t("Lupe 3×")}
             </span>
           )}
-          {flash && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
+          {flash && !longRun && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
+          {longRun && (
+            <div role="timer" aria-live="polite" className="pointer-events-none absolute inset-0 grid place-content-center gap-1 text-center">
+              <span className="text-on-table text-[64px] leading-none font-bold tabular-nums drop-shadow">{longRun.left}</span>
+              <span className="text-on-table text-[13px] font-semibold drop-shadow">{t("aus {n} Bildern · Auslöser bricht ab", { n: longRun.frames })}</span>
+              {longRun.shaky && <span className="bg-table-deep/80 text-on-table mx-auto mt-2 rounded-full px-3 py-1 text-[13px]">{t("Das Telefon bewegt sich. Mit Stativ wird es scharf.")}</span>}
+            </div>
+          )}
           {reticle && (
             <span
               aria-hidden
@@ -832,6 +882,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} metering={metering} onPipette={togglePipette} />}
             {tools && dial && dial !== "focal" && dial !== "kelvin" && (
               <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? magnifyWhile : undefined} />
+            )}
+            {tools && dial === "duration" && isLong(dials) && (
+              <LongRow mode={longMode} onMode={pickLongMode} frames={longPlan(dials.duration ?? 2, longMode, meter?.duration ?? 1 / 60).frames} />
             )}
           </div>
         </div>
