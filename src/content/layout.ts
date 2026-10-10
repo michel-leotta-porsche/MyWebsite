@@ -44,6 +44,11 @@ export type El =
       align?: "left" | "center" | "right";
       italic?: boolean;
     }
+  /**
+   * Zeilen, die von unten wachsen (Kolophon): bottom ist die Unterkante in cqw, gap der Abstand zwischen den Zeilen.
+   * Die Höhen ergeben sich erst beim Zeichnen, weil kleine Schrift auf dem Telefon größer wird und öfter umbricht.
+   */
+  | { t: "colophon"; lines: string[]; x: number; bottom: number; w: number; size: number; lh: number; gap: number }
   /** Abzug im Bildverzeichnis, ganz sichtbar (contain), springt zur Tafel */
   | { t: "thumb"; no: number; x: number; y: number; w: number; h: number }
   | { t: "rect"; x: number; y: number; w: number; h: number; color: string }
@@ -402,22 +407,22 @@ export function layoutPage(book: BookData, page: Page, side: "left" | "right"): 
       return paper(els);
     }
 
-    case "colophon": {
-      // von unten bündig: geschätzte Zeilen, damit HTML und Textur gleich stehen
-      const lines = book.colophon;
-      const size = CAPTION;
-      const lh = size * LEADING;
-      const rows = lines.map((l) => Math.max(1, Math.ceil((l.length * size * 0.5) / 66)));
-      const total = rows.reduce((a, r) => a + r * lh, 0) + (lines.length - 1) * 2;
-      let y = ta.y + ta.h - total;
-      const els: El[] = [];
-      lines.forEach((text, i) => {
-        els.push({ t: "text", text, x: ta.x, y, size, weight: i === 0 ? 600 : 400, tone: i === 0 ? "ink" : "ink2", lh: LEADING, w: 66 });
-        y += rows[i] * lh + 2;
-      });
-      return paper(els);
-    }
+    case "colophon":
+      // von unten bündig; erste Zeile fett, der Rest leiser
+      return paper([{ t: "colophon", lines: book.colophon, x: ta.x, bottom: ta.y + ta.h, w: 66, size: CAPTION, lh: LEADING, gap: 2 }]);
   }
+}
+
+/** Oberkanten von Zeilen, die von unten gestapelt werden: die letzte endet bei bottom, dazwischen je gap */
+export function stackFromBottom(heights: number[], gap: number, bottom: number): number[] {
+  const tops: number[] = [];
+  let y = bottom;
+  for (let i = heights.length - 1; i >= 0; i--) {
+    y -= heights[i];
+    tops[i] = y;
+    y -= gap;
+  }
+  return tops;
 }
 
 /** Tafeln ohne Unterschrift auf der Seite: ihr Titel steht in der Kopfzeile */
