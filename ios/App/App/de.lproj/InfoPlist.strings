@@ -1,6 +1,6 @@
 /* Texte der Berechtigungsabfragen auf Deutsch (gleich wie in Info.plist) */
 "NSCameraUsageDescription" = "Calima nutzt die Kamera nur, wenn du ein Foto direkt für dein Buch aufnimmst.";
-"NSPhotoLibraryAddUsageDescription" = "Calima legt ein Foto nur dann in deine Mediathek, wenn du es im Fotostudio sicherst.";
+"NSPhotoLibraryAddUsageDescription" = "Calima legt jedes Foto aus seiner Kamera zusätzlich in deine Mediathek, damit es nicht verloren geht.";
 
 /* Quick Action am App-Symbol (Abendstapel) */
 "Ins Reisebuch fotografieren" = "Ins Reisebuch fotografieren";
