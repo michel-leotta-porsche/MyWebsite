@@ -9,7 +9,7 @@ import { fmtShift, WhiteDial, type Shift } from "@/components/white-dial";
 import { PhotoZoom } from "@/components/photo-zoom";
 import { IconButton } from "@/components/ui/button";
 import { DISPOSABLE_FRAMES, DISPOSABLES, disposableEdit, type Disposable } from "@/lib/disposable";
-import { readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
+import { filmStrip, readShelf, writeShelf, type Film, type Shelf } from "@/lib/film";
 import { AUTO, CalimaCamera, FILM_FRAMES, focalZoom, grainOf, isDenied, LUT_N, lutOf, realFocals, takeShot, type CameraInfo, type Dials, type Frame, type Gains, type Meter } from "@/lib/camera";
 import { bakePhoto } from "@/lib/develop/bake";
 import { buildLut, neutralEdit, PRESETS, type NamedRecipe, type PhotoEdit } from "@/lib/develop/model";
@@ -134,6 +134,9 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
   /** Reihe unter dem Sucher: Looks oder Einwegkamera-Vorlagen */
   const [tab, setTab] = useState<"looks" | "einweg">("looks");
   const aside = shelf.films.filter((f) => f.stack !== shelf.loaded);
+  /** ab zwei beiseitegelegten Filmen liegen sie als Stapel vor den Looks; offen zeigt er sie alle */
+  const [pileOpen, setPileOpen] = useState(false);
+  const strip = filmStrip(aside, pileOpen);
   const box = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
@@ -323,6 +326,12 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
     haptic("select");
     setWhiteMsg(null);
     setMetering(!metering);
+  };
+  /** Lupe beim Scharfstellen von Hand: angekündigt, damit die Vergrößerung nicht wie Unschärfe wirkt (#225) */
+  const [magnified, setMagnified] = useState(false);
+  const magnifyWhile = (on: boolean) => {
+    setMagnified(on);
+    CalimaCamera.setMagnify({ on }).catch(() => {});
   };
 
   /* ----- Film: ein Look, FILM_FRAMES Bilder, ein Stapel. Beiseitelegen und später weiter belichten geht; die Bilder
@@ -732,6 +741,11 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               <span className="bg-table-deep/70 absolute -top-7 left-1/2 -translate-x-1/2 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap">{t("Weiß messen")}</span>
             </span>
           )}
+          {magnified && (
+            <span aria-hidden className="bg-table-deep/70 text-on-table absolute top-3 left-3 rounded-full px-2.5 py-1 text-[13px] font-semibold">
+              {t("Lupe 3×")}
+            </span>
+          )}
           {flash && <span aria-hidden className="bg-paper/90 absolute inset-0" />}
           {reticle && (
             <span
@@ -811,7 +825,7 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
             )}
             {tools && dial === "kelvin" && <WhiteDial dials={dials} meter={meter} shift={shift} base={base} onDials={changeDials} onShift={setShift} metering={metering} onPipette={togglePipette} />}
             {tools && dial && dial !== "focal" && dial !== "kelvin" && (
-              <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? (on) => CalimaCamera.setMagnify({ on }).catch(() => {}) : undefined} />
+              <Ruler dial={dial} dials={dials} meter={meter} info={info} onChange={changeDials} onDragging={dial === "focus" ? magnifyWhile : undefined} />
             )}
           </div>
         </div>
@@ -891,12 +905,32 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
               <ChevronRight aria-hidden className="text-on-table-2 -mr-1 h-4 w-4" />
             </button>
           </li>
-          {/* beiseitegelegte Filme: wieder einlegen und weiter belichten */}
-          {aside.map((f) => (
+          {/* beiseitegelegte Filme: wieder einlegen und weiter belichten; ab zwei als ein Stapel (#226) */}
+          {strip.pile != null && (
+            <li className="flex-none">
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("select");
+                  setPileOpen((o) => !o);
+                }}
+                aria-expanded={pileOpen}
+                className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap"
+              >
+                <FilmIcon aria-hidden className="text-cloth h-4 w-4" />
+                {t("Filme · {n}", { n: strip.pile })}
+                <ChevronRight aria-hidden className={`text-on-table-2 -mr-1 h-4 w-4 transition-transform ${pileOpen ? "rotate-90" : ""}`} />
+              </button>
+            </li>
+          )}
+          {strip.films.map((f) => (
             <li key={f.stack} className="flex-none">
               <button
                 type="button"
-                onClick={() => resumeFilm(f.stack)}
+                onClick={() => {
+                  setPileOpen(false);
+                  resumeFilm(f.stack);
+                }}
                 disabled={!ready}
                 aria-label={t("Film „{name}“ weiter belichten, {i} von {n}", { name: f.name, i: f.count, n: framesOf(f) })}
                 className="border-cloth/60 text-on-table flex items-center gap-1.5 rounded-full border border-dashed px-3 py-2 text-[13px] font-semibold whitespace-nowrap disabled:opacity-50"
@@ -969,6 +1003,8 @@ export function Camera({ uid, taken, onShot, onFilmDone, onClose }: { uid: strin
                 ? (whiteMsg ?? t("Richte das Quadrat auf etwas Weißes oder Graues und drück den Auslöser. Es wird kein Foto gemacht."))
               : tools && dial === "kelvin"
                 ? t("Ziehen oder tippen wählt das Licht. Feinabstimmung verschiebt die Farbe wie bei Fuji.")
+                : tools && dial === "focus"
+                  ? t("Ziehen stellt scharf. Solange du ziehst, zeigt die Lupe die Mitte dreifach groß.")
                 : tools && dial && dial !== "focal"
             ? t("Ziehen auf dem Lineal dreht das Rad. A gibt es der Kamera zurück.")
             : tools && focal != null && !lenses.includes(focal)

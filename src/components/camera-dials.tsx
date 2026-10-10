@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 
 import { AUTO, fmtDuration, fmtFocus, fmtISO, fmtKelvin, FOCALS, ISO_STOPS, KELVIN, nearest, SHUTTER_STOPS, type CameraInfo, type Dials, type Meter } from "@/lib/camera";
 import { LightIcon, lightOf, useLightName } from "@/components/white-dial";
@@ -126,10 +126,10 @@ export function DialChips({
               )}
               {/* fmtISO bringt „ISO“ schon mit, der Name steht davor */}
               {k === "kelvin" && manual ? null : manual ? (
-                dialLabel(k, dials, meter).replace(/^ISO /, "")
+                t(dialLabel(k, dials, meter)).replace(/^ISO /, "")
               ) : steering ? (
                 <>
-                  A <span className="font-medium">{dialLabel(k, dials, meter).replace(/^ISO /, "")}</span>
+                  A <span className="font-medium">{t(dialLabel(k, dials, meter)).replace(/^ISO /, "")}</span>
                 </>
               ) : (
                 "A"
@@ -237,7 +237,7 @@ export function Ruler({
         role="slider"
         aria-label={hint}
         aria-valuenow={current()}
-        aria-valuetext={dialLabel(dial, dials, meter)}
+        aria-valuetext={t(dialLabel(dial, dials, meter))}
         tabIndex={0}
       >
         <div className="relative h-7 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_20%,black_80%,transparent)]" aria-hidden>
@@ -245,15 +245,35 @@ export function Ruler({
             {ticks.map((tk) => (
               <span key={tk.x} className={`absolute bottom-0 w-px -translate-x-1/2 ${tk.major ? "bg-on-table-2 h-3" : "bg-on-table-2/50 h-1.5"}`} style={{ left: tk.x }} />
             ))}
+            {/* Fokus (#225): Blume für nah, Berg für unendlich statt Prozent; dazwischen nur Striche, keine Meter */}
+            {dial === "focus" && (
+              <>
+                <FocusIcon kind="near" className="absolute top-0 -translate-x-[calc(100%+6px)]" style={{ left: 0 }} />
+                <FocusIcon kind="far" className="absolute top-0 translate-x-[6px]" style={{ left: 320 }} />
+              </>
+            )}
           </div>
         </div>
         <span aria-hidden className="bg-cloth pointer-events-none absolute top-0 left-1/2 h-7 w-0.5 -translate-x-1/2 rounded-full" />
         <p className={`mt-1 text-center text-[13px] font-semibold tabular-nums ${manual ? "text-cloth" : "text-on-table"}`}>
           {manual ? "" : "A · "}
-          {dialLabel(dial, dials, meter)}
+          {t(dialLabel(dial, dials, meter))}
         </p>
       </div>
     </div>
+  );
+}
+
+/** Linien-Icons für die Enden der Fokus-Skala: Blume (nah) und Berg (∞) */
+function FocusIcon({ kind, className = "", style }: { kind: "near" | "far"; className?: string; style?: CSSProperties }) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" aria-hidden className={`text-on-table-2 ${className}`} style={style} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+      {kind === "near" ? (
+        <path d="M12 21v-8M12 13a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM12 8V5.5M14.5 10.5H17M9.5 10.5H7M12 17c-2.5 0-4-1.5-4.5-3M12 18.5c2.5 0 4-1.5 4.5-3" />
+      ) : (
+        <path d="M2.5 19.5 9 8.5l3.5 5.5 2.5-3.5 6.5 9zM7.2 11.6 9 13l1.6-1.6" />
+      )}
+    </svg>
   );
 }
 
