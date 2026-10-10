@@ -127,6 +127,10 @@ export const STAGE: Record<string, string> = {
   "Text schreiben": "Write text",
   "Helle Schrift": "Light text",
   "{what} hier": "{what} here",
+  "Form hier": "Shape here",
+  Ebene: "Layer",
+  Art: "Kind",
+  Löschen: "Delete",
 
   // Bühne: Zuschneiden
   Fertig: "Done",
@@ -175,13 +179,14 @@ export const STAGE: Record<string, string> = {
   "Kopie und Ebene": "Copy and layer",
 
   // Bühne: Hilfe unter der Doppelseite
-  "Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken zeigt alles, was mit dem Element geht.":
-    "Two fingers zoom, double-tap the paper to bring a page up close. Drag to move, double-tap a photo to crop, long-press to see everything you can do with an element.",
+  "Zwei Finger zoomen, Doppeltippen aufs Papier holt eine Seite groß. Ziehen verschiebt, Doppeltippen auf ein Foto schneidet zu, langes Drücken auf ein Element zeigt alles, was damit geht, aufs leere Papier legt etwas an.":
+    "Two fingers zoom, double-tap the paper to bring a page up close. Drag to move, double-tap a photo to crop, long-press an element to see everything you can do with it, or empty paper to add something.",
   "Zwei Finger zoomen und verschieben die Ansicht, Doppeltippen aufs freie Papier holt eine Seite groß und wieder zurück. Zwei Finger auf dem gewählten Foto ändern seine Größe.":
     "Two fingers zoom and pan the view, double-tap empty paper to bring a page up close and back. Two fingers on the selected photo resize it.",
   "Ziehen verschiebt ein Foto oder einen Text, die Griffe ändern die Größe. Doppeltippen auf ein Foto schneidet zu, auf einen Text schreibt.":
     "Drag to move a photo or text, handles to resize. Double-tap a photo to crop, a text to write.",
-  "Lange drücken zeigt alles, was mit dem Element geht.": "Long-press to see everything you can do with an element.",
+  "Lange drücken auf ein Element zeigt alles, was damit geht, aufs leere Papier legt etwas an.":
+    "Long-press an element to see everything you can do with it, or empty paper to add something.",
   "Ziehen verschiebt, die Griffe ändern die Größe. Doppelklick auf ein Foto schneidet zu, auf einen Text schreibt, aufs Papier legt neuen Text an.":
     "Drag to move, handles to resize. Double-click a photo to crop, a text to write, the paper to add new text.",
   "Kanten rasten am Raster ein,": "Edges snap to the grid,",
