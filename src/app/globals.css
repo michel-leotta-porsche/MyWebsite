@@ -55,6 +55,10 @@ html {
   background: var(--table);
   color: var(--on-table);
   scrollbar-color: var(--cloth) var(--table-deep);
+  /* iOS: kein grauer Kasten beim Tippen; Druck zeigt .press */
+  -webkit-tap-highlight-color: transparent;
+  /* die Oberfläche federt nicht samt Leisten, echte Scrollflächen schon */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -77,6 +81,26 @@ body {
     img {
       -webkit-touch-callout: none;
     }
+  }
+
+  /* Bedienung ist Gegenstand, kein Text: langes Drücken markiert nichts und öffnet keine Lupe, Tippen wartet nicht auf einen Doppeltipp */
+  button,
+  [role="button"],
+  label,
+  summary,
+  a {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  /* Eingaben bleiben markierbar, auch in Knöpfen und Beschriftungen */
+  input,
+  textarea,
+  [contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
   }
 
   /* Fokus in Einbandgelb auf dem Tisch; auf Papier setzen Elemente Tinte (outline-ink) */
@@ -959,9 +983,6 @@ html.ohne-struktur .printed::after {
     transition: none;
   }
 }
-.press:active {
-  scale: 0.97;
-}
 @media (min-width: 768px) {
   .carousel {
     --tw: 260px;
@@ -1070,15 +1091,15 @@ html.ohne-schatten [data-shade] {
 /* Alles hängt am Scrollen (scroll-driven animations). Ohne Unterstützung und bei reduzierter Bewegung
    steht jede Szene fertig da: das Buch aufgeschlagen auf der ersten Doppelseite, die Abzüge an ihrem Platz. */
 
-/* Knopf gibt beim Drücken nach */
+/* Knopf gibt beim Drücken nach (scale statt transform, damit eigene Verschiebungen bleiben) */
 .press {
   transition:
-    transform 160ms var(--ease-out),
+    scale 160ms var(--ease-out),
     background-color 150ms ease,
     color 150ms ease;
 }
 .press:active:not(:disabled) {
-  transform: scale(0.97);
+  scale: 0.97;
 }
 
 /* Kopf: jedes Blatt hat ein Stück Scrollweg, das Buch bleibt dabei stehen (auch bei reduzierter Bewegung, dann ohne Feder) */

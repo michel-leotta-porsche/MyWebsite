@@ -249,30 +249,33 @@ function Ear({ side, resting, reduce }: { side: "left" | "right"; resting: Motio
     <motion.div
       aria-hidden
       className="absolute top-0 aspect-square w-[16%] max-w-[96px]"
-      style={{ [right ? "right" : "left"]: 0, transformOrigin: right ? "top right" : "top left", opacity: resting }}
-      initial={reduce ? false : { scale: 0, rotate: right ? 8 : -8 }}
-      animate={{ scale: 1, rotate: 0 }}
-      exit={reduce ? { opacity: 0 } : { scale: 0 }}
-      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 17, mass: 0.8 }}
+      style={{ [right ? "right" : "left"]: 0, transformOrigin: right ? "top right" : "top left" }}
+      initial={reduce ? false : { scale: 0.9, opacity: 0, rotate: right ? 8 : -8 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      exit={reduce ? { opacity: 0 } : { scale: 0.9, opacity: 0 }}
+      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 380, damping: 17, mass: 0.8, opacity: { duration: 0.15, ease: "easeOut" } }}
     >
-      {/* Loch: darunter liegt die nächste Seite im Schatten der Falte */}
-      <div
-        className="absolute inset-0"
-        style={{
-          clipPath: right ? "polygon(0 0, 100% 0, 100% 100%)" : "polygon(0 0, 100% 0, 0 100%)",
-          background: `linear-gradient(${dir}, var(--paper) 0%, var(--paper-shade) 34%, rgb(12 10 8 / 0.3) 50%)`,
-        }}
-      />
-      {/* Lasche: Rückseite des Blatts, liegt auf der Seite und wirft einen kleinen Schatten */}
-      <div className="absolute inset-0 [filter:drop-shadow(-2px_3px_4px_rgb(12_10_8/0.35))]">
+      {/* innen, damit das Einblenden die Ruhe-Deckkraft beim Umblättern nicht überschreibt */}
+      <motion.div className="absolute inset-0" style={{ opacity: resting }}>
+        {/* Loch: darunter liegt die nächste Seite im Schatten der Falte */}
         <div
           className="absolute inset-0"
           style={{
-            clipPath: right ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
-            background: `linear-gradient(${right ? "to top right" : "to top left"}, var(--paper) 50%, color-mix(in oklab, var(--paper) 70%, white) 51%, var(--paper-shade) 100%)`,
+            clipPath: right ? "polygon(0 0, 100% 0, 100% 100%)" : "polygon(0 0, 100% 0, 0 100%)",
+            background: `linear-gradient(${dir}, var(--paper) 0%, var(--paper-shade) 34%, rgb(12 10 8 / 0.3) 50%)`,
           }}
         />
-      </div>
+        {/* Lasche: Rückseite des Blatts, liegt auf der Seite und wirft einen kleinen Schatten */}
+        <div className="absolute inset-0 [filter:drop-shadow(-2px_3px_4px_rgb(12_10_8/0.35))]">
+          <div
+            className="absolute inset-0"
+            style={{
+              clipPath: right ? "polygon(0 0, 100% 100%, 0 100%)" : "polygon(100% 0, 100% 100%, 0 100%)",
+              background: `linear-gradient(${right ? "to top right" : "to top left"}, var(--paper) 50%, color-mix(in oklab, var(--paper) 70%, white) 51%, var(--paper-shade) 100%)`,
+            }}
+          />
+        </div>
+      </motion.div>
     </motion.div>
   );
 }
