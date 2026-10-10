@@ -126,4 +126,5 @@ export const CAMERA: Record<string, string> = {
   "Blitz an": "Flash on",
   "ausgelöst": "fired",
   quer: "landscape",
+  "Zeit und ISO stehen von Hand. Für Heller/Dunkler stell eins der beiden Räder auf A.": "Shutter and ISO are both manual. For brighter/darker, set one of them back to A.",
 };
