@@ -1247,7 +1247,7 @@ export function Editor() {
                   <PageView book={data} page={{ kind: "cover" }} side="right" sizes={() => "128px"} />
                 </button>
               ) : (
-                // noch ohne Fotos: nur Leinen mit Titel und Zeile darunter
+                // noch ohne Fotos: nur Leinen mit Titel; die Zeile darunter wäre auf 128px neben dem 12px-Titel unter der Lesegrenze (HIG 11px) und steht im Feld daneben
                 <div
                   aria-hidden
                   className="linen relative aspect-[2/3] w-32 shrink-0 shadow-[0_14px_20px_-12px_rgb(12_10_8/0.8)] transition-colors duration-500 ease-out"
@@ -1258,7 +1258,6 @@ export function Editor() {
                     <span className="line-clamp-3 text-[12px] leading-[0.95] font-bold tracking-[-0.03em] break-words" style={{ fontVariationSettings: '"wdth" 76' }}>
                       {book.title || t("Ohne Titel")}
                     </span>
-                    {book.subtitle && <span className="mt-1 line-clamp-2 block text-[9px] leading-tight font-medium break-words">{book.subtitle}</span>}
                   </span>
                 </div>
               )}

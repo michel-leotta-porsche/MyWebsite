@@ -69,9 +69,9 @@ export function PinNote({
             key="slip"
             role={kind === "draft" ? "dialog" : "note"}
             aria-label={kind === "draft" ? t("Zettel an {who}", { who }) : kind === "mine" ? t("Dein Zettel bei {who}", { who }) : t("Zettel von {who}", { who })}
-            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.4, rotate: 0 }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9, rotate: 0 }}
             animate={{ opacity: 1, scale: 1, rotate: -2 }}
-            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.3 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
             className="pin-slip absolute w-[min(176px,46vw)] px-3 pt-4 pb-2"
             style={{
@@ -143,7 +143,7 @@ export function PinNote({
           <motion.button
             key="marker"
             type="button"
-            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.5 }}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 28 }}

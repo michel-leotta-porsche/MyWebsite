@@ -212,7 +212,7 @@ function Room({ user }: { user: User }) {
   const newTile = (
     <Link
       href="/neu"
-      className="group relative block"
+      className="group relative block select-none [-webkit-touch-callout:none]"
       style={{ width: "var(--tw)", aspectRatio: "2 / 3" }}
       aria-label={t("Neues Buch anlegen")}
     >

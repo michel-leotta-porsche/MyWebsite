@@ -173,7 +173,7 @@ export function WhiteDial({
             <span key={l.id} className={`absolute top-0 flex -translate-x-1/2 flex-col items-center ${i === at ? "text-on-table" : "text-on-table-2/80"}`} style={{ left: i * STEP }}>
               <LightIcon icon={l.icon} size={22} className="mt-1.5" />
               <span className={`mt-[9px] h-2.5 w-px ${i === at ? "bg-on-table" : "bg-on-table-2"}`} />
-              <span className={`mt-0.5 text-[9.5px] tracking-[.04em] tabular-nums ${i === at ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
+              <span className={`mt-0.5 text-[11px] tracking-[.04em] tabular-nums ${i === at ? "font-semibold" : ""}`}>{l.kelvin ?? "auto"}</span>
             </span>
           ))}
         </div>
@@ -250,13 +250,13 @@ function ShiftGrid({ light, shift, base, onShift, onDone }: { light: Light; shif
           </button>
         </div>
       </div>
-      <div className="relative flex-none p-3.5" aria-hidden>
-        <span className="text-on-table-2 absolute top-0 left-1/2 -translate-x-1/2 text-[9px] leading-[14px] font-semibold">B+</span>
-        <span className="text-on-table-2 absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] leading-[14px] font-semibold">B−</span>
-        <span className="text-on-table-2 absolute top-1/2 left-0 -translate-y-1/2 text-[9px] font-semibold">R−</span>
-        <span className="text-on-table-2 absolute top-1/2 right-0 -translate-y-1/2 text-[9px] font-semibold">R+</span>
-        <span className="text-on-table-2/80 absolute top-0 right-0.5 text-[9px]">M</span>
-        <span className="text-on-table-2/80 absolute bottom-0 left-1 text-[9px]">G</span>
+      <div className="relative flex-none p-4" aria-hidden>
+        <span className="text-on-table-2 absolute top-0 left-1/2 -translate-x-1/2 text-[11px] leading-4 font-semibold">B+</span>
+        <span className="text-on-table-2 absolute bottom-0 left-1/2 -translate-x-1/2 text-[11px] leading-4 font-semibold">B−</span>
+        <span className="text-on-table-2 absolute top-1/2 left-0 -translate-y-1/2 text-[11px] font-semibold">R−</span>
+        <span className="text-on-table-2 absolute top-1/2 right-0 -translate-y-1/2 text-[11px] font-semibold">R+</span>
+        <span className="text-on-table-2/80 absolute top-0 right-0.5 text-[11px]">M</span>
+        <span className="text-on-table-2/80 absolute bottom-0 left-1 text-[11px]">G</span>
         <div
           className="bg-table-deep border-on-table-2/25 relative touch-none border"
           style={{
