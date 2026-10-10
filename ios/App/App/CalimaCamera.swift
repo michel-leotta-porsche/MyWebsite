@@ -136,11 +136,9 @@ public class CalimaCameraPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("Kein Feld", "white")
             return
         }
-        guard let m = camera.measureWhite(rect: CGRect(x: x, y: y, width: w, height: h)) else {
-            call.reject("Noch kein Bild", "white")
-            return
+        camera.measureWhiteSettled(rect: CGRect(x: x, y: y, width: w, height: h)) { m in
+            if let m { call.resolve(m) } else { call.reject("Noch kein Bild", "white") }
         }
-        call.resolve(m)
     }
 
     @objc func setMagnify(_ call: CAPPluginCall) {
@@ -929,6 +927,28 @@ final class CalimaCamera: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate
             self.pendingCapture = done
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
+    }
+
+    /// Wie measureWhite, aber erst, wenn Belichtung und Weiß stillstehen und danach ein paar neue Bilder kamen (höchstens
+    /// 1,5 s). Nach einem Objektivwechsel sind die ersten Bilder dunkel und die Gains noch unterwegs; so gemessen kippte
+    /// die Pipette in der zweiten Runde (am iPhone gesehen: r/g/b um 0,04, danach überkorrigiert ins Blaue).
+    func measureWhiteSettled(rect: CGRect, _ done: @escaping ([String: Any]?) -> Void) {
+        let start = Date()
+        var calm = 0
+        var lastTick = frameTick
+        func poll() {
+            let device = input?.device
+            let busy = device.map { $0.isAdjustingExposure || $0.isAdjustingWhiteBalance || $0.isAdjustingFocus } ?? false
+            let tick = frameTick
+            if !busy, tick != lastTick { calm += 1 } else if busy { calm = 0 }
+            lastTick = tick
+            if calm >= 3 || Date().timeIntervalSince(start) > 1.5 {
+                done(measureWhite(rect: rect))
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.04) { poll() }
+        }
+        poll()
     }
 
     /// Mittel des Felds rect (hochkant, oben links 0/0) im letzten rohen Sucherbild, linear, mit den Gains dieses Bilds.

@@ -211,13 +211,17 @@ export function WhiteDial({
 function ShiftGrid({ light, shift, base, onShift, onDone }: { light: Light; shift: Shift; base: Shift; onShift: (s: Shift) => void; onDone: () => void }) {
   const t = useT();
   const nameOf = useLightName();
-  const drag = useRef<{ id: number; x: number; y: number; start: Shift } | null>(null);
   const lastTap = useRef(0);
   const clamp = (n: number) => Math.max(-9, Math.min(9, n));
   const set = (s: Shift) => {
     if (s.r === shift.r && s.b === shift.b) return;
     haptic(Math.abs(s.r) === 9 || Math.abs(s.b) === 9 ? "warning" : "select");
     onShift(s);
+  };
+  // der Punkt liegt unter dem Finger, eingerastet aufs Kästchen darunter (Michel, 10.10.: relativ wirkte versetzt)
+  const cellAt = (e: ReactPointerEvent): Shift => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return { r: clamp(Math.floor((e.clientX - r.left) / CELL) - 9), b: clamp(9 - Math.floor((e.clientY - r.top) / CELL)) };
   };
   const onDown = (e: ReactPointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -229,17 +233,10 @@ function ShiftGrid({ light, shift, base, onShift, onDone }: { light: Light; shif
       return;
     }
     lastTap.current = now;
-    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: shift };
+    set(cellAt(e));
   };
   const onMove = (e: ReactPointerEvent) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId) return;
-    // halbe Kästchen pro Pixel wäre zu nervös: 1,5 Raster-Kästchen Fingerweg je Schritt
-    const k = CELL * 1.5;
-    set({ r: clamp(d.start.r + Math.round((e.clientX - d.x) / k)), b: clamp(d.start.b - Math.round((e.clientY - d.y) / k)) });
-  };
-  const onUp = (e: ReactPointerEvent) => {
-    if (drag.current?.id === e.pointerId) drag.current = null;
+    if (e.buttons) set(cellAt(e));
   };
   const words = [shift.r > 0 ? t("röter") : shift.r < 0 ? t("türkiser") : "", shift.b > 0 ? t("blauer") : shift.b < 0 ? t("gelber") : ""].filter(Boolean);
   const size = 19 * CELL;
@@ -280,8 +277,6 @@ function ShiftGrid({ light, shift, base, onShift, onDone }: { light: Light; shif
           }}
           onPointerDown={onDown}
           onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
           role="slider"
           aria-label={t("Weißabgleich verschieben")}
           aria-valuenow={shift.r}
