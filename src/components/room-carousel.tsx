@@ -7,6 +7,7 @@ import { roomLoadingSeen } from "@/components/room-loading";
 import { ClosedBook } from "@/components/table";
 import { haptic } from "@/lib/haptics";
 import { useT } from "@/lib/i18n";
+import { rowPose } from "@/lib/row-pose";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 
 /** Ein Platz im Karussell: ein Buch (mit dem, was darauf liegt) oder etwas anderes in Buchgröße, z. B. das leere Buch */
@@ -27,7 +28,13 @@ const remember = (id: string, key: string) => {
 };
 
 // Was je Buch beim Wischen bewegt wird; einmal gesucht und gemerkt
-type Parts = { rot: number; shade: HTMLElement | null; sheen: HTMLElement | null };
+type Parts = {
+  rot: number;
+  shade: HTMLElement | null;
+  sheen: HTMLElement | null;
+  lift: HTMLElement | null;
+  cast: { left: HTMLElement | null; right: HTMLElement | null };
+};
 const partsCache = new WeakMap<HTMLElement, Parts>();
 function partsOf(li: HTMLElement): Parts {
   let p = partsCache.get(li);
@@ -36,6 +43,8 @@ function partsOf(li: HTMLElement): Parts {
       rot: parseFloat(li.style.getPropertyValue("--rot")) || 0,
       shade: li.querySelector<HTMLElement>(".cover-shade"),
       sheen: li.querySelector<HTMLElement>(".cover-sheen > span"),
+      lift: li.querySelector<HTMLElement>(".lift-shadow"),
+      cast: { left: li.querySelector<HTMLElement>(".cover-cast-l"), right: li.querySelector<HTMLElement>(".cover-cast-r") },
     };
     partsCache.set(li, p);
   }
@@ -43,7 +52,7 @@ function partsOf(li: HTMLElement): Parts {
 }
 
 /**
- * Lage, Licht und Stapelreihenfolge jedes Buchs aus seinem Abstand zur Mitte. Gibt das mittlere zurück.
+ * Lage, Licht und Stapelreihenfolge jedes Buchs aus seinem Abstand zur Mitte (rowPose). Gibt das mittlere zurück.
  * Absichtlich ohne CSS-Variablen: eine Variable am Buch ließe den Browser bei jedem Bild alle Stile darunter neu
  * berechnen (gemessen: der Großteil der Rechenzeit beim Wischen). transform und opacity direkt am Element
  * erledigt die Grafikkarte. Erst alles messen, dann schreiben, sonst rechnet der Browser zwischendurch das Layout.
@@ -56,22 +65,18 @@ function paintRow(ul: HTMLElement, flat: boolean) {
   let dist = Infinity;
   items.forEach((li, i) => {
     const [d, w] = geo[i];
-    // 0 = Mitte, 1 = Nachbar, 2 = zweiter Nachbar (liegt noch tiefer im Stapel)
-    const p = Math.min(Math.abs(d) / w, 2);
-    const q = Math.min(p, 1);
-    const side = d < 0 ? -1 : 1;
-    const { rot, shade, sheen } = partsOf(li);
-    // Stapel: die Nachbarn rutschen unter das mittlere Buch; beim Wischen kippen sie leicht, das mittlere liegt fast gerade
-    li.style.transform =
-      `translate(${(side * -42 * p).toFixed(2)}%, ${(-6 * (1 - q)).toFixed(2)}px) scale(${(1 - 0.14 * p).toFixed(4)}) ` +
-      (flat ? "" : `perspective(1000px) rotateY(${(side * -14 * q).toFixed(2)}deg) `) +
-      `rotate(${(rot * (0.35 + 0.65 * q)).toFixed(2)}deg)`;
-    li.style.zIndex = String(100 - Math.round(p * 40));
-    if (shade) shade.style.opacity = (0.4 * p).toFixed(3);
+    const { rot, shade, sheen, lift, cast } = partsOf(li);
+    const pose = rowPose(d, w, rot, flat);
+    li.style.transform = pose.transform;
+    li.style.zIndex = String(pose.zIndex);
+    if (shade) shade.style.opacity = pose.shade.toFixed(3);
+    // die Mitte hebt sich vom Tisch und wirft ihren Schatten auf die Innenkante der Nachbarn
+    if (lift) lift.style.opacity = pose.lift.toFixed(3);
+    if (cast.left) cast.left.style.opacity = pose.castFrom === "left" ? pose.cast.toFixed(3) : "0";
+    if (cast.right) cast.right.style.opacity = pose.castFrom === "right" ? pose.cast.toFixed(3) : "0";
     if (sheen) {
-      // Glanz nur während des Drehens, in der Mitte und ganz außen ist er weg
-      sheen.style.opacity = flat ? "0" : Math.max(0, p * (1 - p) * 4).toFixed(3);
-      sheen.style.transform = `translateX(${(side * (p - 0.5) * 26).toFixed(2)}%)`;
+      sheen.style.opacity = pose.sheen.toFixed(3);
+      sheen.style.transform = `translateX(${pose.sheenX.toFixed(2)}%)`;
     }
     if (Math.abs(d) < dist) {
       dist = Math.abs(d);
@@ -99,7 +104,8 @@ function nearestSlide(ul: HTMLElement, left: number) {
 }
 
 /**
- * Eine Reihe im Bücherzimmer als Karussell: ein Buch liegt groß unter der Lampe, die Nachbarn rücken in den Halbschatten.
+ * Eine Reihe im Bücherzimmer als Karussell: ein Buch liegt groß unter der Lampe, die Nachbarn drehen sich auf einem
+ * flachen Bogen weg und rücken in den Halbschatten.
  * Größe und Licht hängen stufenlos am Finger (`--p` je Buch, 0 in der Mitte, 1 einen Platz daneben);
  * was unter dem Buch steht (`panel`), wechselt erst, wenn die Reihe eingerastet ist.
  * Ein Nachbar wird beim Antippen erst in die Mitte geholt, erst das Buch in der Mitte schlägt sich auf.
@@ -365,6 +371,9 @@ export function Carousel({
                         <span aria-hidden className="cover-sheen">
                           <span />
                         </span>
+                        {/* Schatten des mittleren Buchs auf dem Nachbarn, von der Innenkante her */}
+                        <span aria-hidden className="cover-cast-l" />
+                        <span aria-hidden className="cover-cast-r" />
                         {/* Halbschatten für die Nachbarn: liegt nur auf dem Einband, nicht auf dem Tisch */}
                         <span aria-hidden className="cover-shade" />
                       </>
